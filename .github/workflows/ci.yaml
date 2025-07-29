@@ -99,7 +99,7 @@ jobs:
           # Install ledger dependencies
           cd runtime/ledger
           npm ci
-          
+
           # Install marketplace UI dependencies
           cd ../../marketplace/ui
           npm ci
