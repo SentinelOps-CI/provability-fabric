@@ -139,9 +139,13 @@ impl Watcher {
         
         let http_client = Client::new();
 
+        let mut registry = Registry::default();
+        let metrics = Metrics::new(&mut registry);
+        let assumption_monitor = AssumptionMonitor::new();
+
         Ok(Self {
-            metrics: Metrics::new(&mut Registry::default()),
-            assumption_monitor: AssumptionMonitor::new(),
+            metrics,
+            assumption_monitor,
             spec_sig,
             budget_limit,
             spam_score_limit,
@@ -163,6 +167,7 @@ impl Watcher {
         let net_bytes = 1024; // Simplified - would be actual network bytes
         self.metrics.network_bytes.inc_by(net_bytes);
 
+        // Check spam score
         if let Some(spam_score) = action.spam_score {
             if spam_score > self.spam_score_limit {
                 self.metrics.violations.inc();
@@ -171,6 +176,7 @@ impl Watcher {
             }
         }
 
+        // Check budget
         if let Some(amount) = action.usd_amount {
             self.running_spend += amount;
             if self.running_spend > self.budget_limit {
