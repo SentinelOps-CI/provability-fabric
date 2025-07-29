@@ -92,9 +92,9 @@ insights: ## Generate weekly insights and charts
 	@# Run insurance simulation
 	$(MAKE) insurance
 	@# Generate additional insights
-	@echo "📊 Risk analysis charts generated in docs/insights/"
-	@echo "📝 Insurance report available at docs/insights/insurance_report.md"
-	@echo "✅ Weekly insights generated successfully"
+	@echo "Risk analysis charts generated in docs/insights/"
+	@echo "Insurance report available at docs/insights/insurance_report.md"
+	@echo "Weekly insights generated successfully"
 
 spec-deps: ## Generate spec dependency graph
 	@echo "Generating spec dependency graph..."
@@ -154,7 +154,7 @@ This release includes:
 	@# Push changes
 	git push origin $(STABLE_BRANCH)
 	git push origin v$(VERSION)
-	@echo "✅ Release v$(VERSION) created successfully"
+	@echo "Release v$(VERSION) created successfully"
 
 serve-docs: ## Serve documentation locally
 	@echo "Serving documentation at http://localhost:8000"

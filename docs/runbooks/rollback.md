@@ -248,19 +248,6 @@ kubectl port-forward deployment/rollback-controller 8080:8080 -n flux-system
 curl http://localhost:8080/metrics
 ```
 
-## Related Documentation
-
-- [Rollback CRD Specification](ops/crd/rollback.yaml)
-- [Flux Integration](ops/flux/rollback-controller.yaml)
-- [Incident Response Architecture](../architecture/incident-response.md)
-- [Automated Rollback Guide](../guides/automated-rollback.md)
-
-## Emergency Contacts
-
-- **On-Call Engineer**: [Contact Information]
-- **SRE Team**: [Contact Information]
-- **Security Team**: [Contact Information]
-
 ## Post-Incident Actions
 
 1. **Document the Incident**
