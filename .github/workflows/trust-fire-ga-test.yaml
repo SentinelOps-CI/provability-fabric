@@ -1,0 +1,372 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: TRUST-FIRE GA Test Suite
+
+on:
+  schedule:
+    # Run weekly on Sundays at 3 AM UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      run_phases:
+        description: "Phases to run (comma-separated, or 'all')"
+        required: false
+        default: "all"
+        type: string
+      config_file:
+        description: "Configuration file path"
+        required: false
+        default: "trust-fire-config.json"
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+  GO_VERSION: "1.21"
+  RUST_VERSION: "1.75"
+  KIND_CLUSTER_NAME: "trust-fire-test"
+
+jobs:
+  setup-test-environment:
+    name: Setup Test Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          # Install system dependencies
+          sudo apt-get update
+          sudo apt-get install -y docker.io curl jq redis-server
+
+          # Install k6
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+          # Install Kind
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          # Install Helm
+          curl https://get.helm.sh/helm-v3.13.0-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin/
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install redis requests kubernetes pyyaml boto3
+
+      - name: Create Kind cluster
+        run: |
+          kind create cluster --name $KIND_CLUSTER_NAME --config - <<EOF
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 30000
+              hostPort: 30000
+            - containerPort: 30001
+              hostPort: 30001
+          - role: worker
+          - role: worker
+          EOF
+
+      - name: Wait for cluster
+        run: |
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+      - name: Build and load images
+        run: |
+          # Build all images
+          docker build -t provability-fabric/sidecar-watcher:test runtime/sidecar-watcher/
+          docker build -t provability-fabric/admission-controller:test runtime/admission-controller/
+          docker build -t provability-fabric/ledger:test runtime/ledger/
+          docker build -t provability-fabric/attestor:test runtime/attestor/
+
+          # Load into Kind
+          kind load docker-image provability-fabric/sidecar-watcher:test --name $KIND_CLUSTER_NAME
+          kind load docker-image provability-fabric/admission-controller:test --name $KIND_CLUSTER_NAME
+          kind load docker-image provability-fabric/ledger:test --name $KIND_CLUSTER_NAME
+          kind load docker-image provability-fabric/attestor:test --name $KIND_CLUSTER_NAME
+
+      - name: Deploy Redis
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install redis bitnami/redis \
+            --set auth.enabled=false \
+            --set architecture=standalone
+
+      - name: Deploy test services
+        run: |
+          # Deploy attestor service
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: attestor
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: attestor
+            template:
+              metadata:
+                labels:
+                  app: attestor
+              spec:
+                containers:
+                - name: attestor
+                  image: provability-fabric/attestor:test
+                  ports:
+                  - containerPort: 8080
+                  env:
+                  - name: REDIS_URL
+                    value: "redis://redis-master:6379"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: attestor-service
+          spec:
+            selector:
+              app: attestor
+            ports:
+            - protocol: TCP
+              port: 8080
+              targetPort: 8080
+          EOF
+
+          # Deploy ledger service
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ledger
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ledger
+            template:
+              metadata:
+                labels:
+                  app: ledger
+              spec:
+                containers:
+                - name: ledger
+                  image: provability-fabric/ledger:test
+                  ports:
+                  - containerPort: 4000
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ledger-service
+          spec:
+            selector:
+              app: ledger
+            ports:
+            - protocol: TCP
+              port: 4000
+              targetPort: 4000
+          EOF
+
+      - name: Wait for services
+        run: |
+          kubectl wait --for=condition=available deployment/attestor --timeout=300s
+          kubectl wait --for=condition=available deployment/ledger --timeout=300s
+
+  run-trust-fire-suite:
+    name: Run TRUST-FIRE Test Suite
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install redis requests kubernetes pyyaml boto3
+
+      - name: Setup Kind cluster access
+        run: |
+          kind export kubeconfig --name $KIND_CLUSTER_NAME
+
+      - name: Update configuration
+        run: |
+          # Update configuration with actual endpoints
+          jq '.redis_url = "redis://redis-master:6379"' trust-fire-config.json > trust-fire-config-updated.json
+          jq '.ledger_url = "http://ledger-service:4000"' trust-fire-config-updated.json > trust-fire-config.json
+          jq '.github_token = "${{ secrets.GITHUB_TOKEN }}"' trust-fire-config.json > trust-fire-config-updated.json
+          mv trust-fire-config-updated.json trust-fire-config.json
+
+      - name: Run TRUST-FIRE Phase 1
+        if: contains(github.event.inputs.run_phases, '1') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 1: Edge Traffic Surge"
+          k6 run tests/load/edge_load.js \
+            -e RPS=2500 \
+            -e DURATION=30m \
+            --out json=phase1-results.json
+
+      - name: Run TRUST-FIRE Phase 2
+        if: contains(github.event.inputs.run_phases, '2') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 2: Privacy Burn-Down"
+          python tests/privacy/privacy_burn_down.py \
+            --tenant-id acme-beta \
+            --redis-url redis://redis-master:6379 \
+            --ledger-url http://ledger-service:4000
+
+      - name: Run TRUST-FIRE Phase 3
+        if: contains(github.event.inputs.run_phases, '3') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 3: Malicious Adapter Sandbox"
+          python tests/security/malicious_adapter_test.py \
+            --registry-path registry \
+            --wasm-sandbox-path runtime/wasm-sandbox
+
+      - name: Run TRUST-FIRE Phase 4
+        if: contains(github.event.inputs.run_phases, '4') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 4: Chaos + Rollback"
+          python tests/chaos/chaos_rollback_test.py \
+            --kube-config ~/.kube/config \
+            --helm-chart-path chart
+
+      - name: Run TRUST-FIRE Phase 5
+        if: contains(github.event.inputs.run_phases, '5') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 5: Cold Start & Scale-to-Zero"
+          python tests/performance/cold_start_test.py \
+            --kube-config ~/.kube/config \
+            --quote-service-url http://localhost:8080
+
+      - name: Run TRUST-FIRE Phase 6
+        if: contains(github.event.inputs.run_phases, '6') || github.event.inputs.run_phases == 'all'
+        run: |
+          echo "🚀 Running TRUST-FIRE Phase 6: Evidence & KPI Audit"
+          python tests/compliance/evidence_kpi_audit.py \
+            --s3-bucket provability-fabric-evidence \
+            --bigquery-project provability-fabric \
+            --github-token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Complete TRUST-FIRE Suite
+        run: |
+          echo "🔥 Running Complete TRUST-FIRE GA Test Suite"
+          python tests/trust_fire_orchestrator.py \
+            --config trust-fire-config.json \
+            --output trust-fire-report.json
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-fire-results-${{ github.run_id }}
+          path: |
+            trust-fire-report.json
+            phase1-results.json
+          retention-days: 90
+
+      - name: Check test results
+        run: |
+          if [ -f "trust-fire-report.json" ]; then
+            echo "📊 TRUST-FIRE Test Results:"
+            cat trust-fire-report.json | jq '.'
+            
+            # Check overall status
+            overall_status=$(cat trust-fire-report.json | jq -r '.overall_status')
+            
+            if [ "$overall_status" = "PASS" ]; then
+              echo "✅ TRUST-FIRE GA Test Suite PASSED"
+              exit 0
+            else
+              echo "❌ TRUST-FIRE GA Test Suite FAILED"
+              exit 1
+            fi
+          else
+            echo "❌ No test results file found"
+            exit 1
+          fi
+
+  cleanup:
+    name: Cleanup Test Environment
+    runs-on: ubuntu-latest
+    needs: [setup-test-environment, run-trust-fire-suite]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Cleanup Kind cluster
+        run: |
+          kind delete cluster --name $KIND_CLUSTER_NAME || true
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = 'TRUST-FIRE GA test suite completed.';
+
+            try {
+              const reportPath = 'trust-fire-report.json';
+              if (fs.existsSync(reportPath)) {
+                const reportData = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+                report = `## TRUST-FIRE GA Test Suite Results
+
+            **Overall Status:** ${reportData.overall_status}
+            **Duration:** ${Math.round(reportData.duration_seconds / 60)} minutes
+
+            ### Phase Results:
+            ${Object.entries(reportData.phase_results).map(([phase, data]) => 
+              `- **Phase ${phase.slice(-1)}:** ${data.status}${data.error ? ` (${data.error})` : ''}`
+            ).join('\n')}
+
+            _Generated by TRUST-FIRE GA test suite_`;
+              }
+            } catch (error) {
+              console.log('Could not read test report:', error.message);
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
