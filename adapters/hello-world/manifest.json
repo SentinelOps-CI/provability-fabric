@@ -1,0 +1,16 @@
+{
+  "id": "hello-world",
+  "name": "Hello World Adapter",
+  "version": "1.0.0",
+  "type": "adapter",
+  "metadata": {
+    "runtime": "wasm",
+    "wasm_module": "hello.wasm",
+    "wasm_sha256": "safe_hash_456",
+    "description": "Safe hello world adapter"
+  },
+  "capabilities": [
+    "basic_computation"
+  ],
+  "security_level": "safe"
+}
