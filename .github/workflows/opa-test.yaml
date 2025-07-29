@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: OPA Policy Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtime/admission-controller/opa/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/admission-controller/opa/**"
+
+jobs:
+  opa-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install conftest
+        run: |
+          curl -L https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_$(uname -s)_$(uname -m).tar.gz | tar xz
+          sudo mv conftest /usr/local/bin/
+
+      - name: Run OPA tests
+        run: |
+          cd runtime/admission-controller/opa
+
+          # Run tests with coverage threshold
+          conftest verify --policy . --test-files tests/ --coverage-threshold 100
+
+          # Run tests with coverage report
+          conftest verify --policy . --test-files tests/ --coverage
+
+          echo "✅ OPA policy tests passed with 100% coverage"
+
+      - name: Test policy with sample data
+        run: |
+          cd runtime/admission-controller/opa
+
+          # Create sample test data
+          cat > test-data.json << 'EOF'
+          {
+            "request": {
+              "kind": {
+                "kind": "Pod"
+              },
+              "object": {
+                "metadata": {
+                  "annotations": {
+                    "spec.sig": "valid_signature_here"
+                  }
+                }
+              }
+            }
+          }
+          EOF
+
+          # Test with valid signature
+          conftest test --policy . test-data.json
+
+          # Test with revoked signature
+          echo '{"request":{"kind":{"kind":"Pod"},"object":{"metadata":{"annotations":{"spec.sig":"revoked:some_signature"}}}}}' > revoked-test.json
+          conftest test --policy . revoked-test.json
+
+          echo "✅ Policy validation tests passed"

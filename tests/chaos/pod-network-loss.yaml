@@ -1,0 +1,29 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sidecar-network-loss
+  namespace: default
+spec:
+  appinfo:
+    appns: 'default'
+    applabel: 'app=sidecar'
+    appkind: 'deployment'
+  jobCleanUpPolicy: 'retain'
+  annotationCheck: 'false'
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+  - name: pod-network-loss
+    spec:
+      components:
+        env:
+        - name: TOTAL_CHAOS_DURATION
+          value: '30'
+        - name: NETWORK_INTERFACE
+          value: 'eth0'
+        - name: TARGET_CONTAINER
+          value: 'sidecar'
+        - name: CONTAINER_RUNTIME
+          value: 'docker'
+        - name: NETWORK_PACKET_LOSS_PERCENTAGE
+          value: '100'
