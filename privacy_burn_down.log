@@ -1,0 +1,13 @@
+2025-07-29 10:25:43,866 - INFO - Starting TRUST-FIRE Phase 2 with arguments:
+2025-07-29 10:25:43,866 - INFO -   tenant-id: acme-beta
+2025-07-29 10:25:43,867 - INFO -   redis-url: redis://localhost:6379
+2025-07-29 10:25:43,867 - INFO -   ledger-url: http://localhost:4000
+2025-07-29 10:25:43,867 - INFO -   output: dsar_export.zip
+2025-07-29 10:25:43,867 - INFO - Initializing PrivacyBurnDownTest with tenant_id=acme-beta, redis_url=redis://localhost:6379, ledger_url=http://localhost:4000
+2025-07-29 10:25:43,867 - INFO - Attempting to connect to Redis at redis://localhost:6379
+2025-07-29 10:25:43,868 - INFO - Testing Redis connection...
+2025-07-29 10:25:47,984 - ERROR - Please ensure Redis is running and accessible
+2025-07-29 10:25:47,984 - ERROR - On Windows, you may need to:
+2025-07-29 10:25:47,985 - ERROR - 1. Install Redis for Windows
+2025-07-29 10:25:47,985 - ERROR - 2. Start Redis server: redis-server
+2025-07-29 10:25:47,985 - ERROR - 3. Or use Docker: docker run -d -p 6379:6379 redis:alpine

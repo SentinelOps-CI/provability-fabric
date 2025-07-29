@@ -1,27 +1,17 @@
-apiVersion: litmuschaos.io/v1alpha1
-kind: ChaosEngine
-metadata:
-  name: admission-controller-cpu-hog
-  namespace: default
-spec:
-  appinfo:
-    appns: 'default'
-    applabel: 'app=admission-controller'
-    appkind: 'deployment'
-  jobCleanUpPolicy: 'retain'
-  annotationCheck: 'false'
-  engineState: 'active'
-  chaosServiceAccount: litmus-admin
-  experiments:
-  - name: pod-cpu-hog
-    spec:
-      components:
-        env:
-        - name: TOTAL_CHAOS_DURATION
-          value: '60'
-        - name: CPU_CORES
-          value: '2'
-        - name: TARGET_CONTAINER
-          value: 'admission-controller'
-        - name: CONTAINER_RUNTIME
-          value: 'docker'
+
+            apiVersion: chaos-mesh.org/v1alpha1
+            kind: PodChaos
+            metadata:
+              name: cpu-hog-chaos
+            spec:
+              action: pod-failure
+              mode: one
+              selector:
+                namespaces:
+                  - default
+                labelSelectors:
+                  app: pf
+              duration: '30s'
+              scheduler:
+                cron: '@every 30s'
+            

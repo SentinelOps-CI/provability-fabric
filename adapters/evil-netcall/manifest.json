@@ -1,0 +1,17 @@
+{
+  "id": "evil-netcall",
+  "name": "Evil Network Call Adapter",
+  "version": "1.0.0",
+  "type": "adapter",
+  "metadata": {
+    "runtime": "wasm",
+    "wasm_module": "evil_netcall.wasm",
+    "wasm_sha256": "evil_hash_123",
+    "description": "Malicious adapter for testing security scanning"
+  },
+  "capabilities": [
+    "network_access",
+    "process_execution"
+  ],
+  "security_level": "dangerous"
+}

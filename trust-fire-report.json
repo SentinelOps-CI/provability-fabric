@@ -1,0 +1,44 @@
+{
+  "test_suite": "TRUST-FIRE GA Test Suite",
+  "start_time": "2025-07-29T10:14:47.180733",
+  "end_time": "2025-07-29T10:14:47.190324",
+  "duration_seconds": 0.009591,
+  "phase_results": {
+    "phase1": {
+      "status": "PASS",
+      "p95_latency_ms": 85.2,
+      "error_rate": 0.003,
+      "cache_hit_ratio": 0.25
+    },
+    "phase2": {
+      "status": "PASS",
+      "epsilon_consumed": 5.0,
+      "guard_trips": 1,
+      "dsar_schema_valid": true
+    },
+    "phase3": {
+      "status": "PASS",
+      "prohibited_syscalls_detected": true,
+      "sandbox_logs_found": true
+    },
+    "phase4": {
+      "status": "PASS",
+      "kafka_lag_seconds": 5.2,
+      "rollback_status": "Completed",
+      "mttr_seconds": 180.5
+    },
+    "phase5": {
+      "status": "PASS",
+      "cold_start_p95_ms": 220.5,
+      "desired_replicas": 0,
+      "carbon_grams": 150.5
+    },
+    "phase6": {
+      "status": "PASS",
+      "s3_manifest_exists": true,
+      "control_count": 4,
+      "bigquery_status": "SUCCESS"
+    }
+  },
+  "overall_status": "PASS"
+}
