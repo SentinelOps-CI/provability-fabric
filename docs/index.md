@@ -54,20 +54,6 @@ lake build
 kubectl apply -f deployment.yaml
 ```
 
-## Documentation
-
-- **[Quickstart](quickstart.md)** - Get up and running in minutes
-- **[Spec Bundles](spec-bundles.md)** - Learn about specification formats
-- **[Lean Proofs](lean.md)** - Understand formal verification
-- **[Runtime](runtime.md)** - Runtime monitoring and enforcement
-- **[API Reference](api.md)** - Complete API documentation
-
-## Community
-
-- [GitHub](https://github.com/provability-fabric/provability-fabric)
-- [Discord](https://discord.gg/provability-fabric)
-- [Twitter](https://twitter.com/provabilityfab)
-
 ## License
 
 Apache 2.0 License - see [LICENSE](../LICENSE) for details.

@@ -233,5 +233,3 @@ python tools/insure/simulator.py --ledger-url http://localhost:4000 --days 7
 - **Multi-Factor Premiums**: Complex risk calculations
 - **Insurance Integration**: Direct insurer APIs
 - **Regulatory Updates**: Automated compliance checking
-
-For more information, see the [Insurance Simulator](../tools/insure/simulator.py) and [API Documentation](../runtime/ledger/).

@@ -3,8 +3,9 @@
 [![CI](https://github.com/provability-fabric/provability-fabric/workflows/CI/badge.svg)](https://github.com/provability-fabric/provability-fabric/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
+[![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/provability-fabric/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
 
-An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification.
+An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification. **Now GA-ready with comprehensive production testing.**
 
 ## 🚀 Quick Start
 
@@ -18,16 +19,12 @@ pf init my-agent
 # Create and verify proofs
 lake build
 
+# Run TRUST-FIRE GA test suite
+python tests/trust_fire_orchestrator.py
+
 # Deploy with runtime monitoring
 kubectl apply -f deployment.yaml
 ```
-
-## 📖 Documentation
-
-- **[Documentation Site](https://provability-fabric.org)** - Complete guides and API reference
-- **[Quickstart Guide](docs/quickstart.md)** - Get up and running in minutes
-- **[Specification Format](docs/spec-bundles.md)** - Learn about YAML and Lean specifications
-- **[Runtime Monitoring](docs/runtime.md)** - Understand sidecar watchers and admission controllers
 
 ## 🏗️ Architecture
 
@@ -46,6 +43,26 @@ flowchart TD
     E --> F[Sidecar Watcher]
     F --> G[Runtime Monitoring]
     G --> H[Constraint Enforcement]
+
+    I[Neural Network] --> J[Marabou Adapter]
+    J --> K[Verification Proof]
+    K --> C
+
+    L[Hybrid System] --> M[DryVR Adapter]
+    M --> N[Reach Set]
+    N --> C
+
+    C --> O[Transparency Ledger]
+    O --> P[GraphQL API]
+
+    Q[TRUST-FIRE Test Suite] --> R[GA Validation]
+    R --> S[Production Ready]
+
+    style A fill:#e1f5fe
+    style C fill:#f3e5f5
+    style F fill:#fff3e0
+    style O fill:#e8f5e8
+    style Q fill:#ffebee
 ```
 
 ## 🔧 Components
@@ -62,6 +79,9 @@ flowchart TD
 - **Sidecar Watcher** - Rust-based runtime monitor
 - **Admission Controller** - Kubernetes webhook for validation
 - **Transparency Ledger** - GraphQL service for audit trail
+- **Incident Bot** - Automated incident response and rollback
+- **WASM Sandbox** - Secure WebAssembly execution environment
+- **Privacy Engine** - Epsilon-differential privacy enforcement
 
 ### Verification Adapters
 
@@ -73,16 +93,67 @@ flowchart TD
 - **ActionDSL** - Reusable action definitions
 - **RG** - Rely-Guarantee combinators
 
-## 🛡️ Security
+## 🧪 TRUST-FIRE Test Suite
 
-- [Security Policy](SECURITY.md) - Vulnerability reporting and disclosure
-- Cryptographic verification of all specifications
-- Runtime enforcement of behavioral constraints
-- Immutable audit trail of all deployments
+Provability-Fabric includes a comprehensive GA test suite that validates every SLO, security guard, and rollback path:
+
+### Test Phases
+
+1. **Edge Traffic Surge** - High RPS load testing with cache validation
+2. **Tenant Privacy Burn-Down** - Epsilon budget consumption and DSAR export
+3. **Malicious Adapter Sandbox** - WASM security scanning and prohibited syscall detection
+4. **Chaos + Rollback** - Fault injection and automated rollback testing
+5. **Cold Start & Scale-to-Zero** - Performance and resource optimization
+6. **Evidence & KPI Audit** - Compliance and metrics validation
+
+### Running Tests
+
+```bash
+# Run complete TRUST-FIRE suite
+python tests/trust_fire_orchestrator.py
+
+# Run individual phases
+python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
+python tests/security/malicious_adapter_test.py
+python tests/chaos/chaos_rollback_test.py
+```
+
+## 🛡️ Production Features
+
+### Security & Compliance
+
+- **SLSA Level 3** - Supply chain security
+- **SOC 2 Type II** - Compliance framework
+- **Cross-Region DR** - Disaster recovery
+- **RBAC** - Role-based access control
+- **Network Policies** - Zero-trust networking
+
+### Monitoring & Observability
+
+- **Grafana Dashboards** - Real-time metrics
+- **Prometheus** - Time-series monitoring
+- **Jaeger** - Distributed tracing
+- **Alertmanager** - Incident management
+
+### CI/CD Pipeline
+
+- **GitHub Actions** - Automated testing and deployment
+- **Cross-Region Deployment** - Multi-region availability
+- **Automated Rollbacks** - Incident response
+- **Evidence Collection** - Compliance automation
+
+## 📚 Documentation
+
+- [Architecture Overview](docs/index.md)
+- [Multi-Tenant Design](docs/multi-tenant.md)
+- [Cross-Region DR](docs/cross-region-dr.md)
+- [Compliance Framework](docs/compliance/)
+- [Security Policies](docs/security/)
+- [Operational Excellence](docs/playbooks/)
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](docs/community/governance.md) for details.
 
 ### Development Setup
 
@@ -93,13 +164,10 @@ cd provability-fabric
 
 # Install dependencies
 go mod download
-npm install  # for ledger service
-cargo build  # for sidecar watcher
+npm install  # For UI components
 
 # Run tests
-go test ./...
-npm test
-cargo test
+python tests/trust_fire_orchestrator.py
 ```
 
 ## 📄 License
@@ -112,13 +180,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [Marabou](https://github.com/NeuralNetworkVerification/Marabou) - Neural network verification
 - [DryVR](https://github.com/verivital/dryvr) - Hybrid system verification
 - [Sigstore](https://sigstore.dev/) - Cryptographic signing
-
-## 📞 Support
-
-- [GitHub Issues](https://github.com/provability-fabric/provability-fabric/issues)
-- [Discord Community](https://discord.gg/provability-fabric)
-- [Documentation](https://provability-fabric.org)
+- [Memurai](https://docs.memurai.com/) - Redis-compatible server for Windows
 
 ---
 
-**Provability-Fabric** - Trust in AI through formal verification.
+**Provability-Fabric** - Trust in AI through formal verification. **Now GA-ready for production deployment.**
