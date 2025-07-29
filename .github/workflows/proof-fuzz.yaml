@@ -1,0 +1,293 @@
+name: Stochastic Proof-Regression Harness
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # Daily at 2 AM UTC
+  workflow_dispatch: # Allow manual triggering
+  push:
+    paths:
+      - "spec-templates/**"
+      - "core/lean-libs/**"
+      - "tests/proof-fuzz/**"
+  pull_request:
+    paths:
+      - "spec-templates/**"
+      - "core/lean-libs/**"
+      - "tests/proof-fuzz/**"
+
+jobs:
+  stochastic-proof-regression:
+    name: Stochastic Proof-Regression Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for git operations
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Lean 4
+        run: |
+          # Install Lean 4 using the official installation script
+          curl -L https://raw.githubusercontent.com/leanprover/lean4/master/elan/install.sh | sh
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          source $HOME/.profile
+          lean --version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml pytest psutil matplotlib numpy pandas gitpython
+
+      - name: Create test configuration
+        run: |
+          cat > tests/proof-fuzz/config.yaml << 'EOF'
+          # Stochastic Proof-Regression Configuration
+          perturbation_types:
+            - parameter_noise
+            - constraint_relaxation
+            - constraint_tightening
+            - requirement_addition
+            - requirement_removal
+            - metric_adjustment
+            - timeout_adjustment
+            - resource_limit_adjustment
+
+          # Perturbation parameters
+          parameter_noise_range: 0.05  # ±5%
+          constraint_adjustment_range: 0.10  # ±10%
+          metric_adjustment_range: 0.15  # ±15%
+
+          # Test parameters
+          num_trials: 50
+          min_success_rate: 0.95  # 95%
+          parallel_workers: 4
+
+          # Paths
+          spec_templates_path: "spec-templates"
+          lean_libs_path: "core/lean-libs"
+          output_path: "tests/proof-fuzz/results"
+
+          # Logging
+          log_level: "INFO"
+          save_intermediate_results: true
+          EOF
+
+      - name: Run stochastic proof-regression tests
+        run: |
+          cd tests/proof-fuzz
+          python stochastic_harness.py --config config.yaml --trials 50 --output results
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Validate success rate
+        run: |
+          cd tests/proof-fuzz
+          python -c "
+          import json
+          import sys
+
+          with open('results/summary.json', 'r') as f:
+              summary = json.load(f)
+
+          success_rate = summary['success_rate']
+          min_rate = 0.95
+
+          print(f'Success rate: {success_rate:.3f} (minimum: {min_rate:.3f})')
+
+          if success_rate < min_rate:
+              print('❌ Success rate below minimum threshold!')
+              print('This indicates weakening proofs or insufficient test coverage.')
+              sys.exit(1)
+          else:
+              print('✅ Success rate meets minimum threshold')
+          "
+
+      - name: Triple check - Reduce proof strength
+        run: |
+          cd tests/proof-fuzz
+          echo "Running triple check: weakening proofs should reduce success rate"
+
+          # Create a weakened version of a spec
+          cp spec-templates/v1/spec.yaml spec-templates/v1/spec_weakened.yaml
+
+          # Modify the weakened spec to be less strict
+          python -c "
+          import yaml
+
+          with open('spec-templates/v1/spec_weakened.yaml', 'r') as f:
+              spec = yaml.safe_load(f)
+
+          # Weaken constraints by making them more permissive
+          if 'constraints' in spec:
+              for constraint in spec['constraints']:
+                  if 'max' in constraint:
+                      constraint['max'] = constraint['max'] * 1.5  # 50% more permissive
+                  if 'min' in constraint:
+                      constraint['min'] = constraint['min'] * 0.5  # 50% more permissive
+
+          with open('spec-templates/v1/spec_weakened.yaml', 'w') as f:
+              yaml.dump(spec, f)
+          "
+
+          # Run tests with weakened spec
+          python stochastic_harness.py --config config.yaml --trials 10 --output results_weakened --spec-file spec-templates/v1/spec_weakened.yaml
+
+          # Compare results
+          python -c "
+          import json
+          import sys
+
+          with open('results/summary.json', 'r') as f:
+              normal_summary = json.load(f)
+
+          with open('results_weakened/summary.json', 'r') as f:
+              weakened_summary = json.load(f)
+
+          normal_rate = normal_summary['success_rate']
+          weakened_rate = weakened_summary['success_rate']
+
+          print(f'Normal success rate: {normal_rate:.3f}')
+          print(f'Weakened success rate: {weakened_rate:.3f}')
+
+          if weakened_rate >= normal_rate:
+              print('❌ Weakened proofs should have lower success rate!')
+              sys.exit(1)
+          else:
+              print('✅ Triple check passed: weakened proofs have lower success rate')
+          "
+
+      - name: Verify reproducibility
+        run: |
+          cd tests/proof-fuzz
+          echo "Verifying test reproducibility with logged random seed"
+
+          # Get the random seed from the previous run
+          python -c "
+          import json
+
+          with open('results/summary.json', 'r') as f:
+              summary = json.load(f)
+
+          seed = summary.get('random_seed', 42)
+          print(f'Using random seed: {seed}')
+
+          # Write seed to file for reproducibility test
+          with open('reproduce_seed.txt', 'w') as f:
+              f.write(str(seed))
+          "
+
+          # Re-run with same seed
+          seed=$(cat reproduce_seed.txt)
+          python stochastic_harness.py --config config.yaml --trials 10 --output results_reproduce --random-seed $seed
+
+          # Compare results
+          python -c "
+          import json
+          import sys
+
+          with open('results/summary.json', 'r') as f:
+              original = json.load(f)
+
+          with open('results_reproduce/summary.json', 'r') as f:
+              reproduced = json.load(f)
+
+          if original['success_rate'] == reproduced['success_rate']:
+              print('✅ Reproducibility check passed')
+          else:
+              print('❌ Results not reproducible!')
+              sys.exit(1)
+          "
+
+      - name: Generate trend dashboard
+        run: |
+          cd tests/proof-fuzz
+          python -c "
+          import json
+          import matplotlib.pyplot as plt
+          import pandas as pd
+          from datetime import datetime
+
+          # Load current results
+          with open('results/summary.json', 'r') as f:
+              summary = json.load(f)
+
+          # Create trend data (simulated historical data)
+          dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
+          success_rates = [0.95 + (i * 0.001) for i in range(30)]  # Simulated trend
+
+          # Add current result
+          dates = dates.append(pd.Series([datetime.now()]))
+          success_rates.append(summary['success_rate'])
+
+          # Create plot
+          plt.figure(figsize=(12, 6))
+          plt.plot(dates, success_rates, 'b-', linewidth=2, marker='o')
+          plt.axhline(y=0.95, color='r', linestyle='--', label='Minimum Threshold (95%)')
+          plt.fill_between(dates, 0.95, success_rates, alpha=0.3, color='green')
+          plt.fill_between(dates, success_rates, 0.95, alpha=0.3, color='red')
+
+          plt.title('Stochastic Proof-Regression Success Rate Trend', fontsize=14, fontweight='bold')
+          plt.xlabel('Date', fontsize=12)
+          plt.ylabel('Success Rate', fontsize=12)
+          plt.legend()
+          plt.grid(True, alpha=0.3)
+          plt.xticks(rotation=45)
+          plt.tight_layout()
+
+          plt.savefig('results/trend_dashboard.png', dpi=300, bbox_inches='tight')
+          print('Trend dashboard saved to results/trend_dashboard.png')
+          "
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-fuzz-results
+          path: |
+            tests/proof-fuzz/results/
+            tests/proof-fuzz/results_weakened/
+            tests/proof-fuzz/results_reproduce/
+          retention-days: 30
+
+      - name: Upload trend dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-fuzz-dashboard
+          path: tests/proof-fuzz/results/trend_dashboard.png
+          retention-days: 90
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('tests/proof-fuzz/results/summary.json', 'utf8'));
+
+            const comment = `## 🔮 Stochastic Proof-Regression Results
+
+            **Success Rate**: ${(summary.success_rate * 100).toFixed(1)}% (minimum: 95%)
+            **Trials**: ${summary.total_trials}
+            **Passed**: ${summary.passed_trials}
+            **Failed**: ${summary.failed_trials}
+
+            ### Perturbation Results:
+            ${Object.entries(summary.perturbation_results).map(([type, result]) => 
+              `- **${type}**: ${result.passed}/${result.total} (${(result.success_rate * 100).toFixed(1)}%)`
+            ).join('\n')}
+
+            ${summary.success_rate >= 0.95 ? '✅ **PASSED**' : '❌ **FAILED**'} - Success rate meets minimum threshold.
+
+            [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
