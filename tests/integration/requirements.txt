@@ -1,0 +1,5 @@
+pytest>=7.0.0
+kubernetes>=28.0.0
+requests>=2.31.0
+pyyaml>=6.0
+flake8-breakpoint>=0.1.0

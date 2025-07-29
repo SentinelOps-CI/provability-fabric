@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Fuzz Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtime/sidecar-watcher/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/sidecar-watcher/**"
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cargo-fuzz
+        run: |
+          cargo install cargo-fuzz
+
+      - name: Run fuzz tests
+        run: |
+          cd runtime/sidecar-watcher/fuzz
+          cargo fuzz run json_actions -- -runs=1000 -max_total_time=120
+
+      - name: Upload fuzz artifacts
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: fuzz-artifacts
+          path: runtime/sidecar-watcher/fuzz/fuzz/artifacts/

@@ -1,0 +1,159 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Dependency Graph Check
+
+on:
+  pull_request:
+    paths:
+      - "bundles/**/spec.yaml"
+      - "tools/specgraph/**"
+      - ".github/workflows/dep-graph.yaml"
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Build specgraph tool
+        run: |
+          cd tools/specgraph
+          go mod download
+          go build -o specgraph .
+
+      - name: Generate dependency graph
+        run: |
+          tools/specgraph/specgraph mod init
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed files in this PR
+          git diff --name-only origin/main...HEAD > changed_files.txt
+          echo "Changed files:"
+          cat changed_files.txt
+
+      - name: Check for impacted bundles
+        id: impact-check
+        run: |
+          if [ -s changed_files.txt ]; then
+            # Run impact analysis
+            tools/specgraph/specgraph impact $(cat changed_files.txt) > impact_result.json
+            
+            echo "Impact result:"
+            cat impact_result.json
+            
+            # Extract impacted bundles
+            IMPACTED=$(cat impact_result.json | jq -r '.impacted_bundles[]' 2>/dev/null || echo "")
+            if [ -n "$IMPACTED" ]; then
+              echo "Impacted bundles: $IMPACTED"
+              echo "impacted_bundles=$IMPACTED" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No files changed"
+            echo "impacted_bundles=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Lean
+        if: steps.impact-check.outputs.impacted_bundles != ''
+        run: |
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+
+      - name: Build impacted bundle proofs
+        if: steps.impact-check.outputs.impacted_bundles != ''
+        run: |
+          # Build proofs for impacted bundles only
+          for bundle in ${{ steps.impact-check.outputs.impacted_bundles }}; do
+            echo "Building proofs for bundle: $bundle"
+            if [ -d "bundles/$bundle" ]; then
+              cd bundles/$bundle
+              lake build || {
+                echo "❌ Failed to build proofs for $bundle"
+                exit 1
+              }
+              cd ../..
+            fi
+          done
+          echo "✅ All impacted bundle proofs built successfully"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = '## Dependency Graph Check\n\n';
+
+            // Check if spec-deps.json was generated
+            if (fs.existsSync('spec-deps.json')) {
+              const deps = JSON.parse(fs.readFileSync('spec-deps.json', 'utf8'));
+              comment += `✅ Dependency graph generated with ${deps.specs.length} specs\n\n`;
+            } else {
+              comment += '❌ Failed to generate dependency graph\n\n';
+            }
+
+            // Check impact analysis
+            if (fs.existsSync('impact_result.json')) {
+              const impact = JSON.parse(fs.readFileSync('impact_result.json', 'utf8'));
+              
+              if (impact.impacted_bundles && impact.impacted_bundles.length > 0) {
+                comment += `**Impacted Bundles:**\n`;
+                impact.impacted_bundles.forEach(bundle => {
+                  comment += `- \`${bundle}\`\n`;
+                });
+                comment += '\n';
+                
+                // Check if proofs were rebuilt
+                const changedFiles = fs.readFileSync('changed_files.txt', 'utf8').split('\n').filter(f => f);
+                const hasSpecChanges = changedFiles.some(f => f.includes('bundles/') && f.endsWith('spec.yaml'));
+                
+                if (hasSpecChanges) {
+                  comment += '✅ Impacted bundle proofs rebuilt successfully\n';
+                } else {
+                  comment += 'ℹ️ No spec changes detected\n';
+                }
+              } else {
+                comment += 'ℹ️ No impacted bundles detected\n';
+              }
+            }
+
+            // Check for cycles
+            try {
+              const deps = JSON.parse(fs.readFileSync('spec-deps.json', 'utf8'));
+              if (deps.cycles && deps.cycles.length > 0) {
+                comment += '\n❌ **Dependency cycles detected:**\n';
+                deps.cycles.forEach(cycle => {
+                  comment += `- ${cycle}\n`;
+                });
+              }
+            } catch (e) {
+              comment += '\n❌ Failed to check for cycles\n';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Commit spec-deps.json
+        if: github.event_name == 'pull_request'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add spec-deps.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update dependency graph"
+          git push

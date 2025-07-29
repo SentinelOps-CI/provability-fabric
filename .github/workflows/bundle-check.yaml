@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Bundle Check
+
+on:
+  pull_request:
+    paths:
+      - 'bundles/**'
+
+jobs:
+  bundle-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install cosign
+        run: |
+          wget -O cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x cosign
+          sudo mv cosign /usr/local/bin/
+
+      - name: Verify Sigstore bundles
+        run: |
+          for bundle in bundles/*/spec.sig.bundle; do
+            if [ -f "$bundle" ]; then
+              echo "Verifying bundle: $bundle"
+              cosign verify-blob --bundle "$bundle" "${bundle%.bundle}" || exit 1
+            fi
+          done
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Run trace checking
+        run: |
+          go run core/cli/pf check-trace
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            let missingLinks = [];
+            
+            // Check for missing REQ to AC mappings
+            const specFiles = fs.readdirSync('bundles').filter(dir => 
+              fs.statSync(path.join('bundles', dir)).isDirectory()
+            );
+            
+            for (const specDir of specFiles) {
+              const specPath = path.join('bundles', specDir, 'spec.yaml');
+              if (fs.existsSync(specPath)) {
+                const spec = require('js-yaml').load(fs.readFileSync(specPath, 'utf8'));
+                
+                // Check REQ to AC mappings
+                if (spec.trace) {
+                  for (const [reqId, acIds] of Object.entries(spec.trace)) {
+                    if (!Array.isArray(acIds) || acIds.length === 0) {
+                      missingLinks.push(`Missing AC mappings for ${reqId}`);
+                    }
+                  }
+                }
+                
+                // Check AC to test vector mappings
+                if (spec.acceptanceCriteria) {
+                  for (const [acId, ac] of Object.entries(spec.acceptanceCriteria)) {
+                    const testVectorPath = path.join('bundles', specDir, 'tests', `${acId}.json`);
+                    if (!fs.existsSync(testVectorPath)) {
+                      missingLinks.push(`Missing test vector for ${acId}`);
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (missingLinks.length > 0) {
+              const comment = `## Bundle Verification Failed
+              
+              The following traceability issues were found:
+              
+              ${missingLinks.map(link => `- ${link}`).join('\n')}
+              
+              Please ensure all requirements map to acceptance criteria and all acceptance criteria have corresponding test vectors.`;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+              
+              core.setFailed('Bundle verification failed');
+            } else {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '✅ Bundle verification passed - all traceability links are present.'
+              });
+            } 
