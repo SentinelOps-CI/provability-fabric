@@ -1,0 +1,243 @@
+name: Marketplace E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "marketplace/**"
+      - ".github/workflows/marketplace-e2e.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "marketplace/**"
+      - ".github/workflows/marketplace-e2e.yaml"
+  workflow_dispatch:
+
+jobs:
+  marketplace-e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketplace_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: marketplace/ui/package-lock.json
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Install UI dependencies
+        run: |
+          cd marketplace/ui
+          npm ci
+
+      - name: Build UI
+        run: |
+          cd marketplace/ui
+          npm run build
+
+      - name: Install API dependencies
+        run: |
+          cd marketplace/api
+          go mod download
+
+      - name: Build API
+        run: |
+          cd marketplace/api
+          go build -o marketplace-api .
+
+      - name: Start marketplace API
+        run: |
+          cd marketplace/api
+          ./marketplace-api &
+          sleep 5
+
+      - name: Install Playwright
+        run: |
+          cd marketplace/ui
+          npx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: |
+          cd marketplace/ui
+          npm run test:e2e
+        env:
+          MARKETPLACE_API_URL: http://localhost:8080
+
+      - name: Test semantic version validation
+        run: |
+          cd marketplace/api
+          go test -v -run TestSemanticVersionValidation
+
+      - name: Test compatibility checks
+        run: |
+          cd marketplace/api
+          go test -v -run TestCompatibilityChecks
+
+      - name: Test adapter verification workflow
+        run: |
+          cd marketplace/api
+          go test -v -run TestAdapterVerification
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marketplace-e2e-results
+          path: |
+            marketplace/ui/test-results/
+            marketplace/ui/playwright-report/
+
+  marketplace-api-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Install dependencies
+        run: |
+          cd marketplace/api
+          go mod download
+
+      - name: Run API tests
+        run: |
+          cd marketplace/api
+          go test -v ./...
+
+      - name: Test broken semver rejection
+        run: |
+          cd marketplace/api
+          go test -v -run TestBrokenSemverRejection
+
+      - name: Test incompatible adapter rejection
+        run: |
+          cd marketplace/api
+          go test -v -run TestIncompatibleAdapterRejection
+
+  marketplace-ui-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: marketplace/ui/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd marketplace/ui
+          npm ci
+
+      - name: Run unit tests
+        run: |
+          cd marketplace/ui
+          npm test -- --coverage --watchAll=false
+
+      - name: Test UI compatibility blocking
+        run: |
+          cd marketplace/ui
+          npm run test:compatibility
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marketplace-ui-coverage
+          path: marketplace/ui/coverage/
+
+  marketplace-integration:
+    runs-on: ubuntu-latest
+    needs: [marketplace-api-tests, marketplace-ui-tests]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketplace_integration
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Install dependencies
+        run: |
+          cd marketplace/api
+          go mod download
+          cd ../ui
+          npm ci
+
+      - name: Start marketplace services
+        run: |
+          cd marketplace/api
+          ./marketplace-api &
+          sleep 5
+          cd ../ui
+          npm start &
+          sleep 10
+
+      - name: Run integration tests
+        run: |
+          cd marketplace/ui
+          npm run test:integration
+
+      - name: Test marketplace workflow
+        run: |
+          cd marketplace/ui
+          npm run test:workflow
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marketplace-integration-results
+          path: marketplace/ui/integration-results/

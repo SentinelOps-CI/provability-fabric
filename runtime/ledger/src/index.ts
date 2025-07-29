@@ -8,6 +8,7 @@ import { expressMiddleware } from '@apollo/server/express4'
 import { json } from 'body-parser'
 import cors from 'cors'
 import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth'
+import { BillingService, billingMiddleware } from './billing'
 
 const prisma = new PrismaClient()
 
@@ -154,6 +155,10 @@ async function startServer() {
   const app = express()
   const port = process.env.PORT || 4000
 
+  // Initialize billing service
+  const billingService = new BillingService()
+  const billing = billingMiddleware(billingService)
+
   // CORS middleware
   app.use(cors())
   app.use(json())
@@ -162,6 +167,11 @@ async function startServer() {
   app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() })
   })
+
+  // Billing endpoints
+  app.post('/usage', authMiddleware, tenantMiddleware, billing.recordUsage)
+  app.get('/tenant/:tenantId/invoice/pdf', authMiddleware, tenantMiddleware, billing.getInvoicePDF)
+  app.get('/tenant/:tenantId/invoice/csv', authMiddleware, tenantMiddleware, billing.getInvoiceCSV)
 
   // Tenant-scoped REST endpoints
   app.get('/tenant/:tid/capsules', authMiddleware, tenantMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -251,6 +261,7 @@ async function startServer() {
     console.log(`📊 GraphQL endpoint: http://localhost:${port}/graphql`)
     console.log(`💰 Premium quotes: http://localhost:${port}/tenant/:tid/quote/:hash`)
     console.log(`🏢 Tenant capsules: http://localhost:${port}/tenant/:tid/capsules`)
+    console.log(`💳 Billing endpoints: http://localhost:${port}/usage, /tenant/:tid/invoice/*`)
   })
 }
 
