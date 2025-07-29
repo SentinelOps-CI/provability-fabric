@@ -1,0 +1,328 @@
+name: Incident Response Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtime/incident-bot/**"
+      - "ops/crd/**"
+      - "ops/flux/**"
+      - ".github/workflows/incident-test.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/incident-bot/**"
+      - "ops/crd/**"
+      - "ops/flux/**"
+      - ".github/workflows/incident-test.yaml"
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+
+env:
+  KIND_CLUSTER_NAME: incident-test
+  KUBERNETES_VERSION: v1.28.0
+  FLUX_VERSION: v2.1.0
+  HELM_VERSION: v3.13.0
+
+jobs:
+  setup-test-environment:
+    name: Setup Test Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io curl jq
+
+      - name: Install Kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install Helm
+        run: |
+          curl https://get.helm.sh/helm-v3.13.0-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin/
+
+      - name: Install Flux
+        run: |
+          curl -s https://fluxcd.io/install.sh | sudo bash
+
+      - name: Create Kind cluster
+        run: |
+          kind create cluster --name $KIND_CLUSTER_NAME --config - <<EOF
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 30000
+              hostPort: 30000
+            - containerPort: 30001
+              hostPort: 30001
+          - role: worker
+          - role: worker
+          EOF
+
+      - name: Wait for cluster
+        run: |
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+      - name: Install CRD
+        run: |
+          kubectl apply -f ops/crd/rollback.yaml
+          kubectl wait --for=condition=Established crd/rollbacks.ops.prov-fabric.io --timeout=60s
+
+      - name: Install Flux
+        run: |
+          flux install --components=source-controller,helm-controller --namespace=flux-system --create-namespace
+          kubectl wait --for=condition=Ready pods -n flux-system --timeout=300s
+
+      - name: Deploy rollback controller
+        run: |
+          kubectl apply -k ops/flux/
+          kubectl wait --for=condition=Available deployment/rollback-controller -n flux-system --timeout=300s
+
+      - name: Setup Kafka (simulated)
+        run: |
+          # Create a simple Kafka simulation using a pod
+          kubectl run kafka-sim --image=confluentinc/cp-kafka:7.4.0 --port=9092
+          kubectl wait --for=condition=Ready pod/kafka-sim --timeout=300s
+
+      - name: Deploy incident-bot
+        run: |
+          # Build and deploy incident-bot
+          cd runtime/incident-bot
+          npm install
+          npm run build
+
+          # Create Docker image
+          docker build -t incident-bot:test .
+
+          # Load into kind
+          kind load docker-image incident-bot:test --name $KIND_CLUSTER_NAME
+
+          # Deploy to cluster
+          kubectl create deployment incident-bot --image=incident-bot:test
+          kubectl wait --for=condition=Available deployment/incident-bot --timeout=300s
+
+      - name: Setup Prometheus Alertmanager
+        run: |
+          # Deploy a simple Alertmanager for testing
+          kubectl create configmap alertmanager-config --from-literal=alertmanager.yml='
+          global:
+            resolve_timeout: 5m
+          route:
+            group_by: ["alertname"]
+            group_wait: 10s
+            group_interval: 10s
+            repeat_interval: 1h
+            receiver: "webhook"
+          receivers:
+          - name: "webhook"
+            webhook_configs:
+            - url: "http://incident-bot:3000/api/v1/alertmanager"
+              send_resolved: true
+          '
+
+          kubectl create deployment alertmanager --image=prom/alertmanager:v0.26.0
+          kubectl wait --for=condition=Available deployment/alertmanager --timeout=300s
+
+      - name: Verify setup
+        run: |
+          # Verify all components are running
+          kubectl get pods -A
+          kubectl get crd rollbacks.ops.prov-fabric.io
+
+          # Test incident-bot health
+          kubectl port-forward deployment/incident-bot 3000:3000 &
+          sleep 10
+          curl -f http://localhost:3000/api/v1/health || exit 1
+          pkill -f "kubectl port-forward"
+
+  test-incident-response:
+    name: Test Incident Response
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Kind cluster access
+        run: |
+          kind export kubeconfig --name incident-test
+
+      - name: Deploy faulty release
+        run: |
+          # Deploy a service with FORCE_FAIL_GUARD=true to trigger incidents
+          kubectl create deployment faulty-service --image=nginx:alpine
+          kubectl set env deployment/faulty-service FORCE_FAIL_GUARD=true
+          kubectl wait --for=condition=Available deployment/faulty-service --timeout=300s
+
+      - name: Trigger GuardTrip event
+        run: |
+          # Send a GuardTrip event to Kafka (simulated)
+          kubectl exec deployment/incident-bot -- curl -X POST http://localhost:3000/api/v1/kafka/event \
+            -H "Content-Type: application/json" \
+            -d '{
+              "capsuleHash": "sha256:test1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              "tenantId": "test-tenant-123",
+              "riskScore": 0.95,
+              "heartbeatMisses": 5,
+              "ts": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "eventType": "guard_trip"
+            }'
+
+      - name: Wait for GuardTrip processing
+        run: |
+          # Wait up to 60 seconds for GuardTrip event processing
+          timeout 60 bash -c 'until kubectl logs deployment/incident-bot | grep -q "Rollback decision made"; do sleep 2; done'
+
+      - name: Verify rollback creation
+        run: |
+          # Check that a Rollback CR was created
+          kubectl get rollbacks -o yaml
+
+          # Verify rollback was created within 60 seconds
+          timeout 60 bash -c 'until kubectl get rollbacks | grep -q "rollback-"; do sleep 2; done'
+
+          # Get the rollback name
+          ROLLBACK_NAME=$(kubectl get rollbacks -o jsonpath='{.items[0].metadata.name}')
+          echo "Rollback created: $ROLLBACK_NAME"
+
+      - name: Verify rollback completion
+        run: |
+          # Wait for rollback to complete (should be < 300 seconds)
+          timeout 300 bash -c 'until kubectl get rollbacks -o jsonpath="{.items[0].status.phase}" | grep -q "Completed"; do sleep 5; done'
+
+          # Verify rollback status
+          kubectl get rollbacks -o yaml
+
+      - name: Verify service recovery
+        run: |
+          # Wait for service to be responsive after rollback
+          timeout 300 bash -c 'until curl -f http://localhost:3000/api/v1/health; do sleep 5; done'
+
+  double-check-thresholds:
+    name: Double Check - Threshold Validation
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Kind cluster access
+        run: |
+          kind export kubeconfig --name incident-test
+
+      - name: Temporarily set high risk threshold
+        run: |
+          # Patch incident-bot to use very high risk threshold (0.95)
+          kubectl patch deployment incident-bot --patch '{"spec":{"template":{"spec":{"containers":[{"name":"incident-bot","env":[{"name":"RISK_SCORE_THRESHOLD","value":"0.95"}]}]}}}}'
+          kubectl wait --for=condition=Available deployment/incident-bot --timeout=300s
+
+      - name: Trigger low-risk event
+        run: |
+          # Send a low-risk event that should NOT trigger rollback
+          kubectl exec deployment/incident-bot -- curl -X POST http://localhost:3000/api/v1/kafka/event \
+            -H "Content-Type: application/json" \
+            -d '{
+              "capsuleHash": "sha256:lowrisk1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              "tenantId": "test-tenant-456",
+              "riskScore": 0.7,
+              "heartbeatMisses": 2,
+              "ts": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "eventType": "guard_trip"
+            }'
+
+      - name: Verify no rollback triggered
+        run: |
+          # Wait and verify NO rollback was created
+          sleep 30
+
+          # Check that no new rollbacks were created
+          ROLLBACK_COUNT=$(kubectl get rollbacks --no-headers | wc -l)
+          if [[ $ROLLBACK_COUNT -gt 0 ]]; then
+            echo "ERROR: Rollback was created when it should not have been"
+            kubectl get rollbacks -o yaml
+            exit 1
+          fi
+
+          echo "SUCCESS: No rollback triggered for low-risk event (threshold test passed)"
+
+  triple-check-rbac:
+    name: Triple Check - RBAC Validation
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Kind cluster access
+        run: |
+          kind export kubeconfig --name incident-test
+
+      - name: Remove RBAC permissions
+        run: |
+          # Remove create permission on Rollbacks
+          kubectl patch clusterrole rollback-controller --type='json' -p='[{"op": "remove", "path": "/rules/0/verbs/0"}]'
+
+      - name: Trigger incident
+        run: |
+          # Send a high-risk event
+          kubectl exec deployment/incident-bot -- curl -X POST http://localhost:3000/api/v1/kafka/event \
+            -H "Content-Type: application/json" \
+            -d '{
+              "capsuleHash": "sha256:rbac1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              "tenantId": "test-tenant-789",
+              "riskScore": 0.9,
+              "heartbeatMisses": 4,
+              "ts": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "eventType": "guard_trip"
+            }'
+
+      - name: Verify RBAC failure
+        run: |
+          # Wait and check logs for "Forbidden" error
+          timeout 60 bash -c 'until kubectl logs deployment/incident-bot | grep -q "Forbidden\|403"; do sleep 2; done'
+
+          # Verify no rollback was created due to RBAC failure
+          ROLLBACK_COUNT=$(kubectl get rollbacks --no-headers | wc -l)
+          if [[ $ROLLBACK_COUNT -gt 0 ]]; then
+            echo "ERROR: Rollback was created despite RBAC restrictions"
+            kubectl get rollbacks -o yaml
+            exit 1
+          fi
+
+          echo "SUCCESS: RBAC validation passed - rollback blocked by permissions"
+
+  cleanup:
+    name: Cleanup Test Environment
+    runs-on: ubuntu-latest
+    needs: [test-incident-response, double-check-thresholds, triple-check-rbac]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Cleanup Kind cluster
+        run: |
+          kind delete cluster --name incident-test || true

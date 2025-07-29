@@ -1,0 +1,80 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: rollbacks.ops.prov-fabric.io
+  annotations:
+    description: "Automated rollback controller for Provability-Fabric releases"
+spec:
+  group: ops.prov-fabric.io
+  scope: Cluster
+  names:
+    plural: rollbacks
+    singular: rollback
+    kind: Rollback
+    shortNames: [rb]
+    categories: [provability-fabric]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: Target Release
+          type: string
+          jsonPath: .spec.targetRelease
+        - name: Reason
+          type: string
+          jsonPath: .spec.reason
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [targetRelease, reason]
+              properties:
+                targetRelease:
+                  type: string
+                  description: "Target release hash to rollback to"
+                  pattern: "^[a-f0-9]{64}$"
+                reason:
+                  type: string
+                  description: "Reason for rollback"
+                  enum: ["high_risk", "heartbeat_miss", "manual", "smoke_test_fail"]
+                capsuleHash:
+                  type: string
+                  description: "Capsule hash that triggered rollback"
+                  pattern: "^sha256:[a-f0-9]{64}$"
+                tenantId:
+                  type: string
+                  description: "Tenant ID associated with rollback"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: ["Pending", "InProgress", "Completed", "Failed"]
+                  description: "Current phase of rollback operation"
+                startedAt:
+                  type: string
+                  format: date-time
+                  description: "Timestamp when rollback started"
+                completedAt:
+                  type: string
+                  format: date-time
+                  description: "Timestamp when rollback completed"
+                message:
+                  type: string
+                  description: "Human-readable status message"
+                helmReleaseRevision:
+                  type: integer
+                  description: "Helm release revision after rollback"
+                previousRevision:
+                  type: integer
+                  description: "Previous Helm release revision"

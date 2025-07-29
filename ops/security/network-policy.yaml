@@ -1,0 +1,156 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: incident-bot-network-policy
+  namespace: monitoring
+  labels:
+    app: incident-bot
+    security: high
+spec:
+  podSelector:
+    matchLabels:
+      app: incident-bot
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # Ingress rules - only allow health checks
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 3000
+  
+  # Egress rules - restrict to necessary services only
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow communication with Kubernetes API server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    
+    # Allow communication with Kafka
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+    
+    # Allow communication with Alertmanager
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9093
+    
+    # Allow communication with Prometheus
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    
+    # Deny all other outbound traffic
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 1
+        - protocol: UDP
+          port: 1
+      # This effectively blocks all other traffic by creating a catch-all rule
+      # that matches no actual traffic
+
+---
+# NetworkPolicy for rollback controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rollback-controller-network-policy
+  namespace: flux-system
+  labels:
+    app: rollback-controller
+    security: high
+spec:
+  podSelector:
+    matchLabels:
+      app: rollback-controller
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  # Ingress rules - only allow health checks
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: flux-system
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 8080
+  
+  # Egress rules - restrict to Kubernetes API only
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow communication with Kubernetes API server only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    
+    # Deny all other outbound traffic
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 1
+        - protocol: UDP
+          port: 1

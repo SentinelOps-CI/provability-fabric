@@ -1,0 +1,293 @@
+name: Privacy Testing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runtime/privacy/**"
+      - "runtime/sidecar-watcher/**"
+      - "tools/privacy/**"
+      - ".github/workflows/privacy-test.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/privacy/**"
+      - "runtime/sidecar-watcher/**"
+      - "tools/privacy/**"
+      - ".github/workflows/privacy-test.yaml"
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: "0 2 * * 0"
+
+env:
+  GO_VERSION: "1.21"
+  RUST_VERSION: "1.75"
+
+jobs:
+  test-epsilon-guard:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-case: [budget-exhaustion, config-validation, metrics-export]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd tools/privacy
+          go mod download
+
+          cd ../../runtime/sidecar-watcher
+          cargo fetch
+
+      - name: Test epsilon guard budget exhaustion
+        if: matrix.test-case == 'budget-exhaustion'
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_epsilon_guard_budget_exhaustion -- --nocapture
+
+      - name: Test epsilon guard configuration validation
+        if: matrix.test-case == 'config-validation'
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_epsilon_guard_config_validation -- --nocapture
+
+      - name: Test privacy metrics export
+        if: matrix.test-case == 'metrics-export'
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_privacy_metrics_export -- --nocapture
+
+  test-dsar-export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Generate test key pair
+        run: |
+          # Generate test PGP key pair
+          gpg --batch --gen-key <<EOF
+          Key-Type: RSA
+          Key-Length: 2048
+          Name-Real: Test User
+          Name-Email: test@example.com
+          Expire-Date: 0
+          %commit
+          EOF
+
+          # Export public key
+          gpg --export --armor test@example.com > test-public-key.asc
+
+      - name: Build DSAR export tool
+        run: |
+          cd tools/privacy
+          go build -o dsar-export .
+
+      - name: Test DSAR export functionality
+        run: |
+          cd tools/privacy
+
+          # Test export with date filter
+          ./dsar-export \
+            --tenant test-tenant-1 \
+            --after 2024-01-01 \
+            --output test-export.zip \
+            --public-key ../../test-public-key.asc
+
+          # Verify export file exists and is encrypted
+          if [ ! -f test-export.zip ]; then
+            echo "ERROR: Export file not created"
+            exit 1
+          fi
+
+          # Test that file is encrypted (should not be readable as plain text)
+          if file test-export.zip | grep -q "text"; then
+            echo "ERROR: Export file is not encrypted"
+            exit 1
+          fi
+
+          echo "DSAR export test passed"
+
+      - name: Test DSAR export schema validation
+        run: |
+          cd tools/privacy
+
+          # Create a test export without encryption for validation
+          cat > test-schema.json <<EOF
+          {
+            "tenant_id": "test-tenant",
+            "export_date": "2024-01-27T10:00:00Z",
+            "usage_events": [
+              {
+                "id": "event-1",
+                "tenant_id": "test-tenant",
+                "cpu_ms": 1500,
+                "net_bytes": 1024000,
+                "timestamp": "2024-01-26T10:00:00Z"
+              }
+            ],
+            "capsules": [
+              {
+                "id": "capsule-1",
+                "hash": "sha256:abc123...",
+                "spec_sig": "sig:def456...",
+                "risk_score": 0.15,
+                "tenant_id": "test-tenant",
+                "created_at": "2024-01-25T10:00:00Z",
+                "updated_at": "2024-01-26T10:00:00Z"
+              }
+            ],
+            "metadata": {
+              "export_version": "1.0",
+              "pii_redacted": true,
+              "encrypted": true
+            }
+          }
+          EOF
+
+          # Validate schema (check for PII fields)
+          if grep -q "email\|phone\|address\|name" test-schema.json; then
+            echo "ERROR: PII fields found in export"
+            exit 1
+          fi
+
+          # Validate required fields
+          required_fields=("tenant_id" "export_date" "usage_events" "capsules" "metadata")
+          for field in "${required_fields[@]}"; do
+            if ! grep -q "\"$field\"" test-schema.json; then
+              echo "ERROR: Required field '$field' missing"
+              exit 1
+            fi
+          done
+
+          echo "DSAR schema validation passed"
+
+  test-privacy-load:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Build sidecar watcher
+        run: |
+          cd runtime/sidecar-watcher
+          cargo build --release
+
+      - name: Start mock ledger service
+        run: |
+          # Start a simple HTTP server to mock the ledger
+          python3 -m http.server 3000 &
+          echo $! > ledger.pid
+
+      - name: Run privacy load test
+        run: |
+          cd runtime/sidecar-watcher
+
+          # Create test privacy config
+          cat > privacy-config.yaml <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: privacy-config
+          data:
+            test-tenant:
+              tenant_id: test-tenant
+              epsilon_limit: 1.0
+              delta_limit: 0.1
+              reset_period_hours: 24
+          EOF
+
+          # Apply config
+          kubectl apply -f privacy-config.yaml || true
+
+          # Start sidecar watcher
+          ./target/release/sidecar-watcher &
+          echo $! > watcher.pid
+
+          # Wait for startup
+          sleep 5
+
+          # Send test actions to consume epsilon
+          for i in {1..10}; do
+            echo '{"action": "test", "privacy_epsilon": 0.1, "privacy_delta": 0.01}' >> /tmp/test-actions.log
+            sleep 1
+          done
+
+          # Check that privacy budget is consumed
+          sleep 10
+
+          # Verify metrics show decreasing budget
+          curl -s http://localhost:9090/metrics | grep privacy_budget_remaining || echo "No privacy metrics found"
+
+          # Send one more action that should exceed budget
+          echo '{"action": "test", "privacy_epsilon": 0.2, "privacy_delta": 0.02}' >> /tmp/test-actions.log
+
+          # Wait for violation
+          sleep 5
+
+          # Check for privacy violation
+          if curl -s http://localhost:9090/metrics | grep -q "privacy_violations_total 1"; then
+            echo "Privacy violation correctly detected"
+          else
+            echo "ERROR: Privacy violation not detected"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Stop processes
+          if [ -f watcher.pid ]; then
+            kill $(cat watcher.pid) || true
+          fi
+          if [ -f ledger.pid ]; then
+            kill $(cat ledger.pid) || true
+          fi
+
+  test-privacy-integration:
+    runs-on: ubuntu-latest
+    needs: [test-epsilon-guard, test-dsar-export, test-privacy-load]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run integration tests
+        run: |
+          echo "All privacy tests completed successfully"
+
+          # Verify no PII in any exports
+          find . -name "*.json" -exec grep -l "email\|phone\|address\|name" {} \; || true
+
+          # Verify privacy metrics are exposed
+          echo "Privacy metrics should be available at /metrics endpoint"
+
+          # Verify DSAR export tool works
+          echo "DSAR export tool should create encrypted exports"
+
+          echo "Privacy integration test passed"

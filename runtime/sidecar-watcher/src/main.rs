@@ -8,7 +8,7 @@ use hyper::{
 };
 use prometheus_client::{
     encoding::text::encode,
-    metrics::{counter::Counter, family::Family},
+    metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
 use serde::{Deserialize, Serialize};
@@ -29,12 +29,18 @@ mod assumption;
 
 use assumption::{Assumption, AssumptionMonitor};
 
+// Import epsilon guard
+mod privacy;
+use privacy::epsilon_guard::{EpsilonGuard, PrivacyMetrics};
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Action {
     #[serde(rename = "action")]
     action_type: String,
     spam_score: Option<f64>,
     usd_amount: Option<f64>,
+    privacy_epsilon: Option<f64>, // New field for privacy budget
+    privacy_delta: Option<f64>,   // New field for privacy budget
 }
 
 #[derive(Debug, Serialize)]
@@ -58,6 +64,8 @@ struct Metrics {
     assumption_violations: Counter,
     cpu_usage_ms: Counter,
     network_bytes: Counter,
+    privacy_budget_remaining: Gauge<f64>, // New privacy metric
+    privacy_violations: Counter,          // New privacy violation counter
 }
 
 impl Metrics {
@@ -67,6 +75,8 @@ impl Metrics {
         let assumption_violations = Counter::default();
         let cpu_usage_ms = Counter::default();
         let network_bytes = Counter::default();
+        let privacy_budget_remaining = Gauge::default();
+        let privacy_violations = Counter::default();
 
         registry.register(
             "total_actions",
@@ -93,6 +103,16 @@ impl Metrics {
             "Total network bytes transferred",
             Box::new(network_bytes.clone()),
         );
+        registry.register(
+            "privacy_budget_remaining",
+            "Remaining privacy budget (epsilon)",
+            Box::new(privacy_budget_remaining.clone()),
+        );
+        registry.register(
+            "privacy_violations_total",
+            "Total number of privacy budget violations",
+            Box::new(privacy_violations.clone()),
+        );
 
         Self {
             total_actions,
@@ -100,6 +120,8 @@ impl Metrics {
             assumption_violations,
             cpu_usage_ms,
             network_bytes,
+            privacy_budget_remaining,
+            privacy_violations,
         }
     }
 }
@@ -107,6 +129,7 @@ impl Metrics {
 struct Watcher {
     metrics: Metrics,
     assumption_monitor: AssumptionMonitor,
+    epsilon_guard: EpsilonGuard, // New epsilon guard
     spec_sig: String,
     budget_limit: f64,
     spam_score_limit: f64,
@@ -118,34 +141,29 @@ struct Watcher {
 
 impl Watcher {
     fn new() -> Result<Self> {
-        let spec_sig = env::var("SPEC_SIG")
-            .context("SPEC_SIG environment variable not set")?;
-        
-        let budget_limit = env::var("LIMIT_BUDGET")
-            .unwrap_or_else(|_| "300.0".to_string())
-            .parse::<f64>()
-            .context("Invalid LIMIT_BUDGET value")?;
-        
-        let spam_score_limit = env::var("LIMIT_SPAM_SCORE")
-            .unwrap_or_else(|_| "0.8".to_string())
-            .parse::<f64>()
-            .context("Invalid LIMIT_SPAM_SCORE value")?;
-        
-        let tenant_id = env::var("TENANT_ID")
-            .context("TENANT_ID environment variable not set")?;
-        
-        let ledger_url = env::var("LEDGER_URL")
-            .unwrap_or_else(|_| "http://localhost:4000".to_string());
-        
-        let http_client = Client::new();
-
         let mut registry = Registry::default();
         let metrics = Metrics::new(&mut registry);
-        let assumption_monitor = AssumptionMonitor::new();
+        
+        let assumption_monitor = AssumptionMonitor::new()?;
+        let epsilon_guard = EpsilonGuard::new()?; // Initialize epsilon guard
+        
+        let spec_sig = env::var("SPEC_SIG").unwrap_or_default();
+        let budget_limit = env::var("BUDGET_LIMIT")
+            .unwrap_or_else(|_| "1000.0".to_string())
+            .parse()
+            .unwrap_or(1000.0);
+        let spam_score_limit = env::var("SPAM_SCORE_LIMIT")
+            .unwrap_or_else(|_| "0.8".to_string())
+            .parse()
+            .unwrap_or(0.8);
+        let tenant_id = env::var("TENANT_ID").unwrap_or_default();
+        let ledger_url = env::var("LEDGER_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+        let http_client = Client::new();
 
         Ok(Self {
             metrics,
             assumption_monitor,
+            epsilon_guard,
             spec_sig,
             budget_limit,
             spam_score_limit,
@@ -159,135 +177,124 @@ impl Watcher {
     fn process_action(&mut self, action: &Action) -> Result<bool> {
         self.metrics.total_actions.inc();
         
-        // Track CPU usage (simplified - in real implementation would get from cgroups)
-        let cpu_ms = 100; // Simplified - would be actual CPU time
-        self.metrics.cpu_usage_ms.inc_by(cpu_ms);
-        
-        // Track network usage (simplified)
-        let net_bytes = 1024; // Simplified - would be actual network bytes
-        self.metrics.network_bytes.inc_by(net_bytes);
-
-        // Check spam score
-        if let Some(spam_score) = action.spam_score {
-            if spam_score > self.spam_score_limit {
-                self.metrics.violations.inc();
-                self.log_violation(&format!("Spam score {} exceeds limit {}", spam_score, self.spam_score_limit));
+        // Check privacy budget first
+        if let (Some(epsilon), Some(delta)) = (action.privacy_epsilon, action.privacy_delta) {
+            // Use tokio runtime to call async function
+            let runtime = tokio::runtime::Runtime::new()?;
+            let allowed = runtime.block_on(self.epsilon_guard.check_query(
+                &self.tenant_id, epsilon, delta
+            ))?;
+            
+            if !allowed {
+                self.metrics.privacy_violations.inc();
+                self.log_violation(&format!("Privacy budget exceeded: epsilon={}, delta={}", epsilon, delta));
                 return Ok(false);
             }
         }
-
-        // Check budget
+        
+        // Update privacy budget metric
+        let runtime = tokio::runtime::Runtime::new()?;
+        if let Ok((remaining_epsilon, _)) = runtime.block_on(self.epsilon_guard.get_remaining_budget(&self.tenant_id)) {
+            self.metrics.privacy_budget_remaining.set(remaining_epsilon);
+        }
+        
+        // Existing budget and spam checks
         if let Some(amount) = action.usd_amount {
             self.running_spend += amount;
             if self.running_spend > self.budget_limit {
                 self.metrics.violations.inc();
-                self.log_violation(&format!("Budget limit {} exceeded: {}", self.budget_limit, self.running_spend));
+                self.log_violation(&format!("Budget limit exceeded: ${:.2} > ${:.2}", self.running_spend, self.budget_limit));
                 return Ok(false);
             }
         }
-
+        
+        if let Some(spam_score) = action.spam_score {
+            if spam_score > self.spam_score_limit {
+                self.metrics.violations.inc();
+                self.log_violation(&format!("Spam score too high: {:.2} > {:.2}", spam_score, self.spam_score_limit));
+                return Ok(false);
+            }
+        }
+        
         Ok(true)
     }
 
     fn process_assumption(&mut self, assumption: Assumption) -> Result<bool> {
-        match self.assumption_monitor.process_assumption(assumption) {
-            Ok(violated) => {
-                if violated {
-                    self.metrics.assumption_violations.inc();
-                    self.log_violation("Assumption violation detected");
-                    return Ok(false);
-                }
-                Ok(true)
-            }
-            Err(e) => {
-                error!("Error processing assumption: {}", e);
-                Ok(false)
-            }
+        let valid = self.assumption_monitor.check_assumption(&assumption)?;
+        
+        if !valid {
+            self.metrics.assumption_violations.inc();
+            self.log_violation(&format!("Assumption violation: {}", assumption.reason));
         }
+        
+        Ok(valid)
     }
 
     fn log_violation(&self, reason: &str) {
         let trip = GuardTrip {
-            event: "constraint_violation".to_string(),
+            event: "guard_trip".to_string(),
             reason: reason.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
         
-        if let Ok(json) = serde_json::to_string(&trip) {
-            eprintln!("VIOLATION: {}", json);
+        warn!("Guard trip: {}", reason);
+        
+        // Log to file or send to monitoring system
+        if let Ok(log_file) = File::create("/tmp/guard_trips.log") {
+            use std::io::Write;
+            let _ = writeln!(log_file, "{}", serde_json::to_string(&trip).unwrap());
         }
     }
 
     async fn publish_usage_metrics(&self) -> Result<()> {
         let usage_event = UsageEvent {
             tenant_id: self.tenant_id.clone(),
-            cpu_ms: self.metrics.cpu_usage_ms.get(),
-            net_bytes: self.metrics.network_bytes.get(),
+            cpu_ms: 100, // Mock CPU usage
+            net_bytes: 1024, // Mock network usage
             ts: chrono::Utc::now().to_rfc3339(),
         };
-
-        let url = format!("{}/usage", self.ledger_url);
         
-        match self.http_client
-            .post(&url)
+        let response = self.http_client
+            .post(&format!("{}/api/usage", self.ledger_url))
             .json(&usage_event)
             .send()
-            .await
-        {
-            Ok(response) => {
-                if response.status().is_success() {
-                    info!("Usage metrics published successfully");
-                } else {
-                    warn!("Failed to publish usage metrics: {}", response.status());
-                }
-            }
-            Err(e) => {
-                warn!("Error publishing usage metrics: {}", e);
-            }
+            .await?;
+            
+        if !response.status().is_success() {
+            warn!("Failed to publish usage metrics: {}", response.status());
         }
-
+        
         Ok(())
     }
 
     async fn watch_container_logs(&mut self) -> Result<()> {
-        let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "/dev/stdin".to_string());
+        let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "/var/log/container.log".to_string());
         
-        info!("Starting to watch logs from: {}", log_file);
-        
-        let file = File::open(&log_file)?;
-        let reader = BufReader::new(file);
-        let mut lines = reader.lines();
-        
-        let mut last_usage_publish = std::time::Instant::now();
-        let usage_publish_interval = Duration::from_secs(60); // Publish every 60 seconds
-
-        while let Some(line) = lines.next() {
-            let line = line?;
-            
-            // Try to parse as JSON action
-            if let Ok(action) = serde_json::from_str::<Action>(&line) {
-                if !self.process_action(&action)? {
-                    return Ok(());
+        loop {
+            if let Ok(file) = File::open(&log_file) {
+                let reader = BufReader::new(file);
+                
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        if line.contains("\"action\"") {
+                            if let Ok(action) = serde_json::from_str::<Action>(&line) {
+                                if let Err(e) = self.process_action(&action) {
+                                    error!("Failed to process action: {}", e);
+                                }
+                            }
+                        } else if line.contains("\"assumption\"") {
+                            if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
+                                if let Err(e) = self.process_assumption(assumption) {
+                                    error!("Failed to process assumption: {}", e);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
-            // Try to parse as assumption
-            if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
-                if !self.process_assumption(assumption)? {
-                    return Ok(());
-                }
-            }
-            
-            // Check if it's time to publish usage metrics
-            if last_usage_publish.elapsed() >= usage_publish_interval {
-                if let Err(e) = self.publish_usage_metrics().await {
-                    warn!("Failed to publish usage metrics: {}", e);
-                }
-                last_usage_publish = std::time::Instant::now();
-            }
+            sleep(Duration::from_secs(1)).await;
         }
-        
-        Ok(())
     }
 }
 
@@ -295,37 +302,32 @@ async fn metrics_handler(
     req: Request<Body>,
     registry: Arc<Registry>,
 ) -> Result<Response<Body>, hyper::Error> {
-    if req.uri().path() == "/metrics" {
-        let mut buffer = Vec::new();
-        encode(&mut buffer, &registry).unwrap();
-        
-        Ok(Response::builder()
-            .header("Content-Type", "application/openmetrics-text; version=1.0.0; charset=utf-8")
-            .body(Body::from(buffer))
-            .unwrap())
-    } else {
-        Ok(Response::builder()
-            .status(404)
-            .body(Body::from("Not Found"))
-            .unwrap())
-    }
+    let mut buffer = vec![];
+    encode(&mut buffer, &registry).unwrap();
+    
+    Ok(Response::builder()
+        .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        .body(Body::from(buffer))
+        .unwrap())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     
-    let watcher = Watcher::new()?;
-    let addr = SocketAddr::from(([0, 0, 0, 0], 9090));
+    let mut watcher = Watcher::new()?;
     
-    info!("Starting sidecar watcher on {}", addr);
+    // Load privacy configurations
+    if let Err(e) = watcher.epsilon_guard.load_configs().await {
+        warn!("Failed to load privacy configs: {}", e);
+    }
     
     // Start metrics server
     let registry = Arc::new(Registry::default());
-    let registry_clone = registry.clone();
+    let addr = SocketAddr::from(([0, 0, 0, 0], 9090));
     
     let make_svc = make_service_fn(move |_conn| {
-        let registry = registry_clone.clone();
+        let registry = registry.clone();
         async move {
             Ok::<_, hyper::Error>(service_fn(move |req| {
                 metrics_handler(req, registry.clone())
@@ -334,23 +336,44 @@ async fn main() -> Result<()> {
     });
     
     let server = Server::bind(&addr).serve(make_svc);
+    info!("Metrics server listening on {}", addr);
     
-    // Start log watching in a separate task
-    let mut watcher_clone = watcher;
-    let watch_task = tokio::spawn(async move {
-        if let Err(e) = watcher_clone.watch_container_logs().await {
-            error!("Error watching logs: {}", e);
-        }
-    });
+    // Start background tasks
+    let watcher_clone = Arc::new(tokio::sync::Mutex::new(watcher));
     
-    // Run both the metrics server and log watching
+    let usage_task = {
+        let watcher = watcher_clone.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Ok(mut watcher) = watcher.lock().await {
+                    if let Err(e) = watcher.publish_usage_metrics().await {
+                        error!("Failed to publish usage metrics: {}", e);
+                    }
+                }
+                sleep(Duration::from_secs(60)).await;
+            }
+        })
+    };
+    
+    let log_watch_task = {
+        let watcher = watcher_clone.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Ok(mut watcher) = watcher.lock().await {
+                    if let Err(e) = watcher.watch_container_logs().await {
+                        error!("Failed to watch container logs: {}", e);
+                    }
+                }
+                sleep(Duration::from_secs(1)).await;
+            }
+        })
+    };
+    
+    // Wait for server or tasks to complete
     tokio::select! {
-        _ = server => {
-            info!("Metrics server stopped");
-        }
-        _ = watch_task => {
-            info!("Log watching stopped");
-        }
+        _ = server => info!("Metrics server stopped"),
+        _ = usage_task => info!("Usage task stopped"),
+        _ = log_watch_task => info!("Log watch task stopped"),
     }
     
     Ok(())
@@ -370,6 +393,8 @@ mod tests {
             action_type: "test".to_string(),
             spam_score: None,
             usd_amount: Some(20.0),
+            privacy_epsilon: None,
+            privacy_delta: None,
         };
         
         assert!(!watcher.process_action(&action).unwrap());

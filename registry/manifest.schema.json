@@ -95,6 +95,11 @@
             "type": "integer",
             "minimum": 0,
             "description": "File size in bytes"
+          },
+          "wasm_sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "description": "SHA256 hash of WebAssembly module (for WASM files only)"
           }
         }
       },
@@ -112,7 +117,7 @@
             "properties": {
               "runtime": {
                 "type": "string",
-                "enum": ["python", "go", "rust", "node"],
+                "enum": ["python", "go", "rust", "node", "wasm"],
                 "description": "Adapter runtime"
               },
               "entrypoint": {
@@ -125,6 +130,37 @@
                   "type": "string"
                 },
                 "description": "Runtime dependencies"
+              },
+              "wasm_module": {
+                "type": "string",
+                "description": "Path to WebAssembly module (for WASM adapters)"
+              },
+              "wasm_sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$",
+                "description": "SHA256 hash of WebAssembly module"
+              },
+              "wasm_fuel_limit": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 10000000,
+                "default": 1000000,
+                "description": "Fuel limit for WASM execution"
+              },
+              "wasm_allow_network": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow network access in WASM sandbox"
+              },
+              "wasm_allow_fs": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow file system access in WASM sandbox"
+              },
+              "verification_function": {
+                "type": "string",
+                "default": "verify",
+                "description": "Name of the verification function to call"
               }
             }
           }

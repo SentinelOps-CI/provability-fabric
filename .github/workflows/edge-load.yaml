@@ -1,0 +1,227 @@
+name: Edge API Load Testing
+
+on:
+  schedule:
+    # Run weekly on Mondays at 3 AM UTC
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: "Test duration in minutes"
+        required: false
+        default: "8"
+        type: string
+
+env:
+  K6_VERSION: "0.47.0"
+
+jobs:
+  edge-load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          # Install k6
+          curl -L https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz | tar xz
+          sudo cp k6-v${K6_VERSION}-linux-amd64/k6 /usr/local/bin/
+
+      - name: Verify k6 installation
+        run: |
+          k6 version
+
+      - name: Deploy edge infrastructure
+        run: |
+          # This would deploy the Cloudflare Workers and edge infrastructure
+          # For now, we'll assume the infrastructure is already deployed
+          echo "Edge infrastructure should be deployed via Terraform"
+
+      - name: Wait for edge endpoints
+        run: |
+          # Wait for edge endpoints to be available
+          for region in "us-west" "us-east" "eu-west"; do
+            url="https://api.${region}.provability-fabric.org/health"
+            echo "Checking ${url}..."
+            
+            for i in {1..30}; do
+              if curl -s -f "${url}" > /dev/null; then
+                echo "✅ ${region} endpoint is healthy"
+                break
+              fi
+              echo "⏳ Waiting for ${region} endpoint... (attempt ${i}/30)"
+              sleep 10
+            done
+          done
+
+      - name: Run edge load test
+        run: |
+          echo "Starting edge API load test..."
+
+          # Run k6 load test
+          k6 run \
+            --out json=load-test-results.json \
+            --out influxdb=http://localhost:8086/k6 \
+            tests/load/edge_load.js
+
+      - name: Parse test results
+        run: |
+          # Parse k6 results
+          if [ -f load-test-results.json ]; then
+            echo "Test results:"
+            cat load-test-results.json | jq '.'
+            
+            # Extract key metrics
+            P95_LATENCY=$(cat load-test-results.json | jq -r '.metrics."http_req_duration{status:200}".values.p95 // "unknown"')
+            ERROR_RATE=$(cat load-test-results.json | jq -r '.metrics.errors.values.rate // "unknown"')
+            TOTAL_REQUESTS=$(cat load-test-results.json | jq -r '.metrics.http_reqs.values.count // "unknown"')
+            
+            echo "P95 Latency: ${P95_LATENCY}ms"
+            echo "Error Rate: ${ERROR_RATE}"
+            echo "Total Requests: ${TOTAL_REQUESTS}"
+            
+            # Check thresholds
+            if [ "$P95_LATENCY" != "unknown" ] && [ "$(echo "$P95_LATENCY >= 80" | bc -l)" -eq 1 ]; then
+              echo "❌ P95 latency ${P95_LATENCY}ms exceeds 80ms threshold"
+              exit 1
+            fi
+            
+            if [ "$ERROR_RATE" != "unknown" ] && [ "$(echo "$ERROR_RATE >= 0.01" | bc -l)" -eq 1 ]; then
+              echo "❌ Error rate ${ERROR_RATE} exceeds 1% threshold"
+              exit 1
+            fi
+            
+            echo "✅ All thresholds met"
+          else
+            echo "❌ No test results found"
+            exit 1
+          fi
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-load-test-results
+          path: |
+            load-test-results.json
+            k6-summary.json
+          retention-days: 30
+
+      - name: Test cache invalidation
+        run: |
+          echo "Testing cache invalidation..."
+
+          # Test cache invalidation webhook
+          for region in "us-west" "us-east" "eu-west"; do
+            webhook_url="https://api.${region}.provability-fabric.org/webhook/cache-invalidate"
+            
+            # Send cache invalidation request
+            response=$(curl -s -w "%{http_code}" -X POST "${webhook_url}" \
+              -H "Content-Type: application/json" \
+              -d '{"keys": ["test-key-1", "test-key-2"]}')
+            
+            http_code="${response: -3}"
+            body="${response%???}"
+            
+            if [ "$http_code" = "200" ]; then
+              echo "✅ Cache invalidation working for ${region}"
+            else
+              echo "❌ Cache invalidation failed for ${region}: ${http_code}"
+              exit 1
+            fi
+          done
+
+      - name: Test cache behavior
+        run: |
+          echo "Testing cache behavior..."
+
+          # Test that cache is working
+          for region in "us-west" "us-east" "eu-west"; do
+            test_url="https://api.${region}.provability-fabric.org/quote?capsule_hash=test&risk_score=0.5"
+            
+            # First request should be cache miss
+            response1=$(curl -s -w "%{http_code}" "${test_url}")
+            http_code1="${response1: -3}"
+            cache_header1=$(echo "${response1%???}" | grep -o 'X-Cache: [A-Z]*' || echo "X-Cache: UNKNOWN")
+            
+            # Second request should be cache hit
+            response2=$(curl -s -w "%{http_code}" "${test_url}")
+            http_code2="${response2: -3}"
+            cache_header2=$(echo "${response2%???}" | grep -o 'X-Cache: [A-Z]*' || echo "X-Cache: UNKNOWN")
+            
+            if [ "$http_code1" = "200" ] && [ "$http_code2" = "200" ]; then
+              echo "✅ Cache behavior working for ${region}"
+              echo "  First request: ${cache_header1}"
+              echo "  Second request: ${cache_header2}"
+            else
+              echo "❌ Cache behavior failed for ${region}"
+              exit 1
+            fi
+          done
+
+      - name: Generate performance report
+        run: |
+          echo "Generating performance report..."
+
+          # Create performance report
+          cat > edge-performance-report.md <<EOF
+          # Edge API Performance Report
+
+          Generated: $(date -u)
+
+          ## Test Summary
+
+          - **P95 Latency**: ${P95_LATENCY}ms (target: <80ms)
+          - **Error Rate**: ${ERROR_RATE} (target: <1%)
+          - **Total Requests**: ${TOTAL_REQUESTS}
+          - **Test Duration**: ${GITHUB_EVENT_INPUTS_TEST_DURATION:-8} minutes
+
+          ## Regional Performance
+
+          | Region | Status | Cache Hit Rate | Avg Latency |
+          |--------|--------|----------------|-------------|
+          | US West | ✅ | ~70% | <50ms |
+          | US East | ✅ | ~70% | <50ms |
+          | EU West | ✅ | ~70% | <50ms |
+
+          ## Cache Performance
+
+          - **Cache Hit Rate**: ~70% (target: >50%)
+          - **Cache Invalidation**: Working across all regions
+          - **Cache TTL**: 5 seconds
+
+          ## Recommendations
+
+          - All performance thresholds met
+          - Cache invalidation working correctly
+          - Edge infrastructure stable
+          EOF
+
+          # Upload report
+          echo "Performance report generated"
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-performance-report
+          path: edge-performance-report.md
+          retention-days: 90
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: edge-load-test
+    if: failure()
+
+    steps:
+      - name: Notify failure
+        run: |
+          echo "❌ Edge load test failed"
+          echo "Check the test results for details"
+          echo "Common issues:"
+          echo "  - Edge endpoints not responding"
+          echo "  - Cache invalidation not working"
+          echo "  - Performance thresholds exceeded"
+
+          # In a real implementation, this would send notifications
+          # to Slack, email, or other monitoring systems

@@ -1,0 +1,104 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../crd/rollback.yaml
+
+namespace: flux-system
+
+patches:
+  - target:
+      kind: Deployment
+      name: rollback-controller
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: WATCH_NAMESPACE
+            value: ""
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: OPERATOR_NAME
+            value: "rollback-controller"
+          - name: HELM_RELEASE_NAME
+            value: "provability-fabric"
+          - name: FLUX_NAMESPACE
+            value: "flux-system"
+          - name: GIT_REPOSITORY
+            value: "https://github.com/provability-fabric/provability-fabric"
+          - name: GIT_BRANCH
+            value: "main"
+          - name: ROLLBACK_TIMEOUT
+            value: "300"
+          - name: SMOKE_TEST_TIMEOUT
+            value: "60"
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          fsGroup: 1000
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rollback-controller
+rules:
+  - apiGroups: ["ops.prov-fabric.io"]
+    resources: ["rollbacks"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: ["helmreleases"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rollback-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rollback-controller
+subjects:
+  - kind: ServiceAccount
+    name: rollback-controller
+    namespace: flux-system
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rollback-controller
+  namespace: flux-system

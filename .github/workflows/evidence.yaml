@@ -1,0 +1,216 @@
+name: SOC 2 / ISO 42001 Evidence Collection
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Specific GitHub Actions run ID to collect from"
+        required: false
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  collect-evidence:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 requests
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Collect evidence artifacts
+        run: |
+          python tools/compliance/evidence_collector.py \
+            --repo provability-fabric/provability-fabric \
+            --github-token ${{ secrets.GITHUB_TOKEN }} \
+            --s3-bucket ${{ secrets.EVIDENCE_BUCKET }} \
+            --output evidence-manifest.json \
+            ${{ github.event.inputs.run_id && format('--run-id {0}', github.event.inputs.run_id) || '' }}
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-manifest
+          path: evidence-manifest.json
+
+  verify-controls:
+    runs-on: ubuntu-latest
+    needs: collect-evidence
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: evidence-manifest
+          path: .
+
+      - name: Verify required controls
+        run: |
+          python -c "
+          import json
+          import sys
+
+          # Required controls and their minimum artifact counts
+          required_controls = {
+              'CC1.1': 2,  # At least 2 artifacts for control environment
+              'CC6.3': 2,  # At least 2 artifacts for access controls  
+              'CC7.2': 2,  # At least 2 artifacts for system operations
+              'ISO42001-7.4b': 2  # At least 2 artifacts for AI risk assessment
+          }
+
+          # Load manifest
+          with open('evidence-manifest.json', 'r') as f:
+              manifest = json.load(f)
+              
+          # Count artifacts per control
+          control_counts = {}
+          for artifact in manifest['artifacts']:
+              control_id = artifact['control_id']
+              control_counts[control_id] = control_counts.get(control_id, 0) + 1
+              
+          # Verify each required control has sufficient artifacts
+          missing_controls = []
+          for control_id, min_count in required_controls.items():
+              actual_count = control_counts.get(control_id, 0)
+              if actual_count < min_count:
+                  missing_controls.append(f'{control_id}: {actual_count}/{min_count} artifacts')
+                  
+          if missing_controls:
+              print('ERROR: Missing required control artifacts:')
+              for missing in missing_controls:
+                  print(f'  - {missing}')
+              sys.exit(1)
+          else:
+              print('SUCCESS: All required controls have sufficient artifacts')
+              for control_id, count in control_counts.items():
+                  print(f'  - {control_id}: {count} artifacts')
+          "
+
+      - name: Verify manifest integrity
+        run: |
+          python -c "
+          import json
+          import hashlib
+
+          # Load manifest
+          with open('evidence-manifest.json', 'r') as f:
+              manifest = json.load(f)
+              
+          # Verify SHA256 hashes are valid hex strings
+          invalid_hashes = []
+          for artifact in manifest['artifacts']:
+              sha256 = artifact['sha256']
+              if not (len(sha256) == 64 and all(c in '0123456789abcdef' for c in sha256)):
+                  invalid_hashes.append(artifact['artifact_name'])
+                  
+          if invalid_hashes:
+              print('ERROR: Invalid SHA256 hashes found:')
+              for name in invalid_hashes:
+                  print(f'  - {name}')
+              exit(1)
+          else:
+              print('SUCCESS: All SHA256 hashes are valid')
+          "
+
+  generate-compliance-report:
+    runs-on: ubuntu-latest
+    needs: [collect-evidence, verify-controls]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: evidence-manifest
+          path: .
+
+      - name: Generate compliance report
+        run: |
+          python -c "
+          import json
+          from datetime import datetime
+
+          # Load manifest
+          with open('evidence-manifest.json', 'r') as f:
+              manifest = json.load(f)
+              
+          # Generate markdown report
+          report = f'''# SOC 2 / ISO 42001 Compliance Report
+
+          Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+          Repository: {manifest['repo']}
+          Run ID: {manifest['run_id']}
+
+          ## Control Coverage Summary
+
+          '''
+
+          # Group artifacts by control
+          control_artifacts = {}
+          for artifact in manifest['artifacts']:
+              control_id = artifact['control_id']
+              if control_id not in control_artifacts:
+                  control_artifacts[control_id] = []
+              control_artifacts[control_id].append(artifact)
+              
+          # Generate control sections
+          for control_id, artifacts in control_artifacts.items():
+              report += f'\n### {control_id}\n\n'
+              report += f'**Artifacts:** {len(artifacts)}\n\n'
+              
+              for artifact in artifacts:
+                  report += f'- **{artifact[\"artifact_name\"]}**\n'
+                  report += f'  - SHA256: `{artifact[\"sha256\"]}`\n'
+                  report += f'  - Link: {artifact[\"link\"]}\n'
+                  report += f'  - Collected: {artifact[\"collected_at\"]}\n\n'
+                  
+          # Write report
+          with open('docs/compliance/soc2.md', 'w') as f:
+              f.write(report)
+              
+          print('Generated compliance report: docs/compliance/soc2.md')
+          "
+
+      - name: Commit compliance report
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/compliance/soc2.md
+          git commit -m "Update SOC 2 / ISO 42001 compliance report" || exit 0
+          git push
