@@ -1,13 +1,12 @@
 # Provability-Fabric
 
-[![CI](https://github.com/provability-fabric/provability-fabric/workflows/CI/badge.svg)](https://github.com/provability-fabric/provability-fabric/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
 [![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/provability-fabric/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
 
-An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification. **Now GA-ready with comprehensive production testing.**
+An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install the CLI
@@ -26,7 +25,7 @@ python tests/trust_fire_orchestrator.py
 kubectl apply -f deployment.yaml
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 Provability-Fabric consists of three core components:
 
@@ -65,7 +64,7 @@ flowchart TD
     style Q fill:#ffebee
 ```
 
-## 🔧 Components
+## Components
 
 ### Core CLI (`pf`)
 
@@ -93,7 +92,7 @@ flowchart TD
 - **ActionDSL** - Reusable action definitions
 - **RG** - Rely-Guarantee combinators
 
-## 🧪 TRUST-FIRE Test Suite
+## TRUST-FIRE Test Suite
 
 Provability-Fabric includes a comprehensive GA test suite that validates every SLO, security guard, and rollback path:
 
@@ -118,7 +117,7 @@ python tests/security/malicious_adapter_test.py
 python tests/chaos/chaos_rollback_test.py
 ```
 
-## 🛡️ Production Features
+## Production Features
 
 ### Security & Compliance
 
@@ -142,7 +141,7 @@ python tests/chaos/chaos_rollback_test.py
 - **Automated Rollbacks** - Incident response
 - **Evidence Collection** - Compliance automation
 
-## 📚 Documentation
+## Documentation
 
 - [Architecture Overview](docs/index.md)
 - [Multi-Tenant Design](docs/multi-tenant.md)
@@ -151,7 +150,7 @@ python tests/chaos/chaos_rollback_test.py
 - [Security Policies](docs/security/)
 - [Operational Excellence](docs/playbooks/)
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](docs/community/governance.md) for details.
 
@@ -170,11 +169,11 @@ npm install  # For UI components
 python tests/trust_fire_orchestrator.py
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Lean 4](https://leanprover.github.io/) - Formal proof system
 - [Marabou](https://github.com/NeuralNetworkVerification/Marabou) - Neural network verification
@@ -184,4 +183,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
-**Provability-Fabric** - Trust in AI through formal verification. **Now GA-ready for production deployment.**
+**Provability-Fabric** - Trust in AI through formal verification.
