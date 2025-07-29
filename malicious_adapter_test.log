@@ -1,0 +1,60 @@
+2025-07-29 10:25:34,866 - INFO - Starting TRUST-FIRE Phase 3 with arguments:
+2025-07-29 10:25:34,866 - INFO -   registry-path: registry
+2025-07-29 10:25:34,866 - INFO -   wasm-sandbox-path: runtime/wasm-sandbox
+2025-07-29 10:25:34,866 - INFO - Initializing MaliciousAdapterTest with registry_path=registry, wasm_sandbox_path=runtime/wasm-sandbox
+2025-07-29 10:25:34,926 - INFO - Platform: Windows 11
+2025-07-29 10:25:34,926 - INFO - Python version: 3.12.1 (tags/v3.12.1:2305ca5, Dec  7 2023, 22:03:25) [MSC v.1937 64 bit (AMD64)]
+2025-07-29 10:25:34,927 - INFO - Checking if registry path exists: registry
+2025-07-29 10:25:34,927 - INFO - Checking if wasm sandbox path exists: runtime\wasm-sandbox
+2025-07-29 10:25:34,942 - INFO - ============================================================
+2025-07-29 10:25:34,942 - INFO - Step 1: Creating evil adapter...
+2025-07-29 10:25:34,943 - INFO - Creating directory: adapters\evil-netcall
+2025-07-29 10:25:34,944 - INFO - Creating malicious WASM module...
+2025-07-29 10:25:34,945 - INFO - Writing WASM file: adapters\evil-netcall\evil_netcall.wasm
+2025-07-29 10:25:34,946 - INFO - Creating adapter manifest...
+2025-07-29 10:25:34,946 - INFO - Writing manifest file: adapters\evil-netcall\manifest.json
+2025-07-29 10:25:34,948 - INFO - Step 2: Building evil adapter...
+2025-07-29 10:25:34,950 - INFO - Current working directory: C:\Users\mateo\OneDrive\Documents\Documents Matéo\AFTER STANFORD\HC Fellow\provability-fabric
+2025-07-29 10:25:34,950 - INFO - Build directory: adapters\evil-netcall
+2025-07-29 10:25:34,950 - INFO - Running on Windows: True
+2025-07-29 10:25:34,950 - INFO - Creating Windows-compatible build script...
+2025-07-29 10:25:34,951 - INFO - Creating Windows batch file: adapters\evil-netcall\build.bat
+2025-07-29 10:25:34,952 - INFO - Running build script...
+2025-07-29 10:25:34,952 - INFO - Using Windows batch file execution...
+2025-07-29 10:25:34,977 - INFO - Build script return code: 1
+2025-07-29 10:25:34,977 - INFO - Build script stdout: 
+2025-07-29 10:25:34,977 - INFO - Build script stderr: The system cannot find the path specified.
+
+2025-07-29 10:25:34,978 - ERROR - Build script stdout: 
+2025-07-29 10:25:34,978 - ERROR - Build script stderr: The system cannot find the path specified.
+
+2025-07-29 10:25:54,686 - INFO - Starting TRUST-FIRE Phase 3 with arguments:
+2025-07-29 10:25:54,686 - INFO -   registry-path: registry
+2025-07-29 10:25:54,686 - INFO -   wasm-sandbox-path: runtime/wasm-sandbox
+2025-07-29 10:25:54,687 - INFO - Initializing MaliciousAdapterTest with registry_path=registry, wasm_sandbox_path=runtime/wasm-sandbox
+2025-07-29 10:25:54,750 - INFO - Platform: Windows 11
+2025-07-29 10:25:54,750 - INFO - Python version: 3.12.1 (tags/v3.12.1:2305ca5, Dec  7 2023, 22:03:25) [MSC v.1937 64 bit (AMD64)]
+2025-07-29 10:25:54,750 - INFO - Checking if registry path exists: registry
+2025-07-29 10:25:54,751 - INFO - Checking if wasm sandbox path exists: runtime\wasm-sandbox
+2025-07-29 10:25:54,758 - INFO - ============================================================
+2025-07-29 10:25:54,758 - INFO - Step 1: Creating evil adapter...
+2025-07-29 10:25:54,759 - INFO - Creating directory: adapters\evil-netcall
+2025-07-29 10:25:54,761 - INFO - Creating malicious WASM module...
+2025-07-29 10:25:54,761 - INFO - Writing WASM file: adapters\evil-netcall\evil_netcall.wasm
+2025-07-29 10:25:54,763 - INFO - Creating adapter manifest...
+2025-07-29 10:25:54,763 - INFO - Writing manifest file: adapters\evil-netcall\manifest.json
+2025-07-29 10:25:54,768 - INFO - Step 2: Building evil adapter...
+2025-07-29 10:25:54,769 - INFO - Current working directory: C:\Users\mateo\OneDrive\Documents\Documents Matéo\AFTER STANFORD\HC Fellow\provability-fabric
+2025-07-29 10:25:54,769 - INFO - Build directory: adapters\evil-netcall
+2025-07-29 10:25:54,770 - INFO - Running on Windows: True
+2025-07-29 10:25:54,770 - INFO - Creating Windows-compatible build script...
+2025-07-29 10:25:54,770 - INFO - Creating Windows batch file: adapters\evil-netcall\build.bat
+2025-07-29 10:25:54,772 - INFO - Running build script...
+2025-07-29 10:25:54,772 - INFO - Using Windows batch file execution...
+2025-07-29 10:25:54,799 - INFO - Build script return code: 1
+2025-07-29 10:25:54,799 - INFO - Build script stdout: 
+2025-07-29 10:25:54,799 - INFO - Build script stderr: The system cannot find the path specified.
+
+2025-07-29 10:25:54,801 - ERROR - Build script stdout: 
+2025-07-29 10:25:54,801 - ERROR - Build script stderr: The system cannot find the path specified.
+
