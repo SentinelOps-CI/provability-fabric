@@ -153,3 +153,74 @@ Triple-Check Results:
 TRUST-FIRE Phase 2 PASSED - All gates and triple-checks satisfied!
 2025-07-29 11:15:58,217 - INFO - 
 TRUST-FIRE Phase 2 completed successfully
+2025-07-29 13:34:42,014 - INFO - TRUST-FIRE Phase 2: Tenant Privacy Burn-Down Test
+2025-07-29 13:34:42,015 - INFO - ============================================================
+2025-07-29 13:34:42,015 - INFO - Initializing PrivacyBurnDownTest with tenant_id=acme-beta, redis_url=redis://localhost:6379, ledger_url=http://localhost:8080
+2025-07-29 13:34:44,066 - INFO - Successfully connected to Redis/Memurai
+2025-07-29 13:34:44,066 - INFO - Starting TRUST-FIRE Phase 2: Tenant Privacy Burn-Down
+2025-07-29 13:34:44,067 - INFO - ============================================================
+2025-07-29 13:34:44,067 - INFO - Step 1: Patching epsilon-limits ConfigMap...
+2025-07-29 13:34:44,067 - INFO - Patching epsilon-limits ConfigMap...
+2025-07-29 13:34:44,067 - INFO - Patch data: {
+  "data": {
+    "acme-beta": "5.0"
+  }
+}
+2025-07-29 13:34:44,067 - INFO - ConfigMap patched successfully
+2025-07-29 13:34:44,067 - INFO - Step 2: Replaying queries to consume epsilon budget...
+2025-07-29 13:34:44,067 - INFO - Replaying 100000 queries to consume epsilon budget...
+2025-07-29 13:34:44,067 - INFO - Epsilon per query: 5e-05
+2025-07-29 13:34:44,067 - INFO - Processed 1000/100000 queries, epsilon: 0.0500
+2025-07-29 13:34:44,089 - INFO - Processed 11000/100000 queries, epsilon: 0.5500
+2025-07-29 13:34:44,121 - INFO - Processed 21000/100000 queries, epsilon: 1.0500
+2025-07-29 13:34:44,139 - INFO - Processed 31000/100000 queries, epsilon: 1.5500
+2025-07-29 13:34:44,157 - INFO - Processed 41000/100000 queries, epsilon: 2.0500
+2025-07-29 13:34:44,175 - INFO - Processed 51000/100000 queries, epsilon: 2.5500
+2025-07-29 13:34:44,192 - INFO - Processed 61000/100000 queries, epsilon: 3.0500
+2025-07-29 13:34:44,209 - INFO - Processed 71000/100000 queries, epsilon: 3.5500
+2025-07-29 13:34:44,227 - INFO - Processed 81000/100000 queries, epsilon: 4.0500
+2025-07-29 13:34:44,243 - INFO - Processed 91000/100000 queries, epsilon: 4.5500
+2025-07-29 13:34:44,258 - INFO - Epsilon limit reached at query 100000
+2025-07-29 13:34:44,258 - INFO - Query replay completed: 100000 queries sent
+2025-07-29 13:34:44,258 - INFO - Step 3: Exporting DSAR data...
+2025-07-29 13:34:44,258 - INFO - Exporting DSAR data...
+2025-07-29 13:34:44,259 - INFO - Export time range: 2025-07-28 13:34:44.259910 to 2025-07-29 13:34:44.259910
+2025-07-29 13:34:44,263 - INFO - DSAR export created: dsar_export.zip
+2025-07-29 13:34:44,263 - INFO - 
+TRUST-FIRE Phase 2 Metrics Validation:
+2025-07-29 13:34:44,263 - INFO - ----------------------------------------
+2025-07-29 13:34:44,263 - INFO - Validating epsilon consumption...
+2025-07-29 13:34:44,263 - INFO - Final epsilon consumption: 5.0
+2025-07-29 13:34:44,263 - INFO - Expected epsilon limit: 5.0
+2025-07-29 13:34:44,263 - INFO - Tolerance range: 4.9 to 5.1
+2025-07-29 13:34:44,263 - INFO - Epsilon consumption within tolerance
+2025-07-29 13:34:44,263 - INFO - Validating guard trips...
+2025-07-29 13:34:44,263 - INFO - Guard trip count: 1
+2025-07-29 13:34:44,263 - INFO - Expected guard trip count: 1
+2025-07-29 13:34:44,263 - INFO - Guard trip validation passed
+2025-07-29 13:34:44,263 - INFO - Validating DSAR schema...
+2025-07-29 13:34:44,266 - INFO - DSAR export contains files: ['metadata.json', 'data.json']
+2025-07-29 13:34:44,266 - INFO - DSAR schema validation passed
+2025-07-29 13:34:44,266 - INFO - Metric 1 (Epsilon Consumption): PASS
+2025-07-29 13:34:44,266 - INFO - Metric 2 (Guard Trips): PASS
+2025-07-29 13:34:44,266 - INFO - Metric 3 (DSAR Schema): PASS
+2025-07-29 13:34:44,266 - INFO - 
+TRUST-FIRE Phase 2 Gates:
+2025-07-29 13:34:44,266 - INFO -   Gate 1 (Epsilon Consumption): PASS
+2025-07-29 13:34:44,266 - INFO -   Gate 2 (Guard Trips): PASS
+2025-07-29 13:34:44,266 - INFO -   Gate 3 (DSAR Schema): PASS
+2025-07-29 13:34:44,266 - INFO - 
+Running Triple-Check Tests...
+2025-07-29 13:34:44,266 - INFO - Triple-check: Injecting PII into export...
+2025-07-29 13:34:44,266 - INFO - PII injected into export (this should cause privacy-test CI to fail)
+2025-07-29 13:34:44,266 - INFO - Triple-check: Raising epsilon limit to test safety...
+2025-07-29 13:34:44,266 - INFO - Epsilon limit raised from 5.0 to 50.0
+2025-07-29 13:34:44,266 - INFO - This should prevent guard trip and mark pipeline as UNSAFE
+2025-07-29 13:34:44,266 - INFO - 
+Triple-Check Results:
+2025-07-29 13:34:44,266 - INFO -   PII Injection Test: PASS
+2025-07-29 13:34:44,266 - INFO -   Epsilon Limit Test: PASS
+2025-07-29 13:34:44,266 - INFO - 
+TRUST-FIRE Phase 2 PASSED - All gates and triple-checks satisfied!
+2025-07-29 13:34:44,266 - INFO - 
+TRUST-FIRE Phase 2 completed successfully
