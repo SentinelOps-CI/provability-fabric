@@ -27,29 +27,44 @@ def run_phase2_test():
     print("=" * 60)
 
     try:
-        # Check if Redis is available
-        print("Checking Redis availability...")
-        redis_check = subprocess.run(
-            ["redis-cli", "ping"], capture_output=True, text=True, timeout=5
+        # Check if Redis or Memurai is available
+        print("Checking Redis/Memurai availability...")
+
+        # Try Memurai first (since user is using it)
+        memurai_check = subprocess.run(
+            ["memurai-cli", "ping"], capture_output=True, text=True, timeout=5
         )
 
-        if redis_check.returncode != 0:
-            print("❌ Redis is not running or not accessible")
-            print("\nSOLUTIONS:")
-            print("1. Install Redis for Windows:")
-            print(
-                "   - Download from: https://github.com/microsoftarchive/redis/releases"
+        if memurai_check.returncode == 0:
+            print("✅ Memurai is running")
+            redis_available = True
+        else:
+            # Try Redis as fallback
+            redis_check = subprocess.run(
+                ["redis-cli", "ping"], capture_output=True, text=True, timeout=5
             )
-            print("   - Or use Chocolatey: choco install redis-64")
-            print("2. Start Redis server:")
-            print("   - redis-server")
-            print("3. Or use Docker:")
-            print("   - docker run -d -p 6379:6379 redis:alpine")
-            print("\nAfter starting Redis, run:")
-            print("python tests/privacy/privacy_burn_down.py --tenant-id acme-beta")
-            return False
 
-        print("✅ Redis is running")
+            if redis_check.returncode == 0:
+                print("✅ Redis is running")
+                redis_available = True
+            else:
+                print("❌ Neither Redis nor Memurai is running or accessible")
+                print("\nSOLUTIONS:")
+                print("1. Install Memurai for Windows:")
+                print("   - Download from: https://www.memurai.com/")
+                print("   - Follow installation guide in REDIS_WINDOWS_SETUP.md")
+                print("2. Or install Redis:")
+                print(
+                    "   - Download from: https://github.com/microsoftarchive/redis/releases"
+                )
+                print("   - Or use Chocolatey: choco install redis-64")
+                print("3. Start the server:")
+                print('   - For Memurai: "C:\\Program Files\\Memurai\\memurai.exe"')
+                print("   - For Redis: redis-server")
+                print("4. Or use Docker: docker run -d -p 6379:6379 redis:alpine")
+                print("\nThen run:")
+                print("python tests/privacy/privacy_burn_down.py --tenant-id acme-beta")
+                return False
 
         # Run the privacy burn-down test
         print("\nRunning privacy burn-down test...")

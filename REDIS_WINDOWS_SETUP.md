@@ -1,8 +1,60 @@
-# Redis Setup for Windows - TRUST-FIRE Test Suite
+# Redis/Memurai Setup for Windows - TRUST-FIRE Test Suite
 
-This guide helps you install and configure Redis on Windows for running the TRUST-FIRE Phase 2 (Privacy Burn-Down) test.
+This guide helps you install and configure Redis or Memurai on Windows for running the TRUST-FIRE Phase 2 (Privacy Burn-Down) test.
 
-## Option 1: Using Chocolatey (Recommended)
+## Option 1: Using Memurai (Recommended for Windows)
+
+[Memurai](https://docs.memurai.com/) is a Redis-compatible server specifically designed for Windows.
+
+### Installation
+
+1. **Download Memurai**:
+
+   - Visit: https://www.memurai.com/
+   - Download the latest version for Windows
+
+2. **Install Memurai**:
+
+   - Run the downloaded installer
+   - Follow the installation wizard
+   - Memurai will be installed to `C:\Program Files\Memurai`
+
+3. **Start Memurai Server**:
+
+   ```cmd
+   "C:\Program Files\Memurai\memurai.exe"
+   ```
+
+   Or if installed as a Windows service:
+
+   ```cmd
+   net start Memurai
+   ```
+
+### Configuration
+
+Memurai uses the same configuration format as Redis. You can create a custom configuration file:
+
+```cmd
+# Create a config file
+echo port 6379 > memurai.conf
+echo bind 127.0.0.1 >> memurai.conf
+
+# Start with custom config
+"C:\Program Files\Memurai\memurai.exe" memurai.conf
+```
+
+### Verify Installation
+
+After installing Memurai, verify it's working:
+
+```bash
+memurai-cli ping
+```
+
+You should see: `PONG`
+
+## Option 2: Using Chocolatey (Redis)
 
 1. **Install Chocolatey** (if not already installed):
 
@@ -21,7 +73,7 @@ This guide helps you install and configure Redis on Windows for running the TRUS
    redis-server
    ```
 
-## Option 2: Manual Installation
+## Option 3: Manual Redis Installation
 
 1. **Download Redis for Windows**:
 
@@ -39,7 +91,7 @@ This guide helps you install and configure Redis on Windows for running the TRUS
    "C:\Program Files\Redis\redis-server.exe"
    ```
 
-## Option 3: Using Docker (Alternative)
+## Option 4: Using Docker (Alternative)
 
 If you have Docker installed:
 
@@ -49,17 +101,21 @@ docker run -d -p 6379:6379 redis:alpine
 
 ## Verify Installation
 
-After installing Redis, verify it's working:
+After installing Redis or Memurai, verify it's working:
 
 ```bash
+# For Redis
 redis-cli ping
+
+# For Memurai
+memurai-cli ping
 ```
 
 You should see: `PONG`
 
 ## Running Phase 2 Test
 
-Once Redis is running, you can run the TRUST-FIRE Phase 2 test:
+Once Redis/Memurai is running, you can run the TRUST-FIRE Phase 2 test:
 
 ```bash
 python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
@@ -67,14 +123,14 @@ python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
 
 ## Troubleshooting
 
-### Redis CLI not found
+### Redis/Memurai CLI not found
 
-- Ensure Redis is installed and in your PATH
-- Try running: `redis-server --version`
+- Ensure Redis or Memurai is installed and in your PATH
+- Try running: `redis-server --version` or `memurai.exe --version`
 
 ### Connection refused
 
-- Make sure Redis server is running
+- Make sure Redis/Memurai server is running
 - Check if port 6379 is available
 - Try: `netstat -an | findstr 6379`
 
@@ -82,20 +138,28 @@ python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
 
 - Run Command Prompt as Administrator
 - Check Windows Firewall settings
+- For Memurai: Ensure the service has proper permissions
+
+### Memurai-specific issues
+
+- **Service not starting**: Check Windows Event Log for Memurai service errors
+- **Port conflicts**: Memurai defaults to port 6379, same as Redis
+- **Configuration**: Memurai uses Redis-compatible configuration files
 
 ## Quick Test
 
-Run the diagnostic script to check if Redis is working:
+Run the diagnostic script to check if Redis/Memurai is working:
 
 ```bash
 python test_broken_phases.py
 ```
 
-If Redis is properly installed and running, Phase 2 should pass.
+If Redis/Memurai is properly installed and running, Phase 2 should pass.
 
 ## Notes
 
-- Redis server needs to be running before executing Phase 2 tests
-- The test uses Redis to simulate epsilon budget tracking
-- Redis data is temporary and will be cleared when the server stops
-- For production use, consider using a persistent Redis configuration
+- Redis/Memurai server needs to be running before executing Phase 2 tests
+- The test uses Redis/Memurai to simulate epsilon budget tracking
+- Redis/Memurai data is temporary and will be cleared when the server stops
+- For production use, consider using a persistent Redis/Memurai configuration
+- Memurai is specifically optimized for Windows environments

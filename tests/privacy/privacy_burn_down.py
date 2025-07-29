@@ -58,17 +58,31 @@ class PrivacyBurnDownTest:
         self.guard_trips = 0
 
         try:
-            logger.info(f"Attempting to connect to Redis at {redis_url}")
-            self.redis_client = redis.from_url(redis_url)
-            logger.info("Testing Redis connection...")
-            self.redis_client.ping()
-            logger.info("Redis connection successful")
+            # Try to connect to Redis/Memurai
+            self.redis_client = redis.from_url(self.redis_url)
+            self.redis_client.ping()  # Test connection
+            logger.info("Successfully connected to Redis/Memurai")
         except redis.ConnectionError as e:
-            logger.error(f"Redis connection failed: {e}")
-            logger.error("Please ensure Redis is running and accessible")
+            logger.error(f"Failed to connect to Redis/Memurai at {self.redis_url}")
+            logger.error(f"Connection error: {e}")
+            logger.error("")
+            logger.error("SOLUTIONS:")
+            logger.error("1. Install Memurai for Windows:")
+            logger.error("   - Download from: https://www.memurai.com/")
+            logger.error("   - Follow installation guide in REDIS_WINDOWS_SETUP.md")
+            logger.error("2. Or install Redis:")
+            logger.error(
+                "   - Download from: https://github.com/microsoftarchive/redis/releases"
+            )
+            logger.error("   - Or use Chocolatey: choco install redis-64")
+            logger.error("3. Start the server:")
+            logger.error('   - For Memurai: "C:\\Program Files\\Memurai\\memurai.exe"')
+            logger.error("   - For Redis: redis-server")
+            logger.error("4. Or use Docker: docker run -d -p 6379:6379 redis:alpine")
+            logger.error("")
             logger.error("On Windows, you may need to:")
-            logger.error("1. Install Redis for Windows")
-            logger.error("2. Start Redis server: redis-server")
+            logger.error("1. Install Memurai for Windows")
+            logger.error("2. Start Memurai server: memurai.exe")
             logger.error("3. Or use Docker: docker run -d -p 6379:6379 redis:alpine")
             raise
         except Exception as e:
