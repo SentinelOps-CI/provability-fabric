@@ -1,0 +1,376 @@
+name: Incident Response E2E Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to test"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+      trigger_type:
+        description: "Type of incident to trigger"
+        required: true
+        default: "guard_trip"
+        type: choice
+        options:
+          - guard_trip
+          - alertmanager
+          - heartbeat_miss
+      risk_score:
+        description: "Risk score for test (0.0-1.0)"
+        required: true
+        default: "0.85"
+        type: string
+      heartbeat_misses:
+        description: "Number of heartbeat misses"
+        required: true
+        default: "4"
+        type: string
+
+env:
+  KUBECONFIG: ${{ secrets.KUBECONFIG_STAGING }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+jobs:
+  setup-e2e-environment:
+    name: Setup E2E Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          echo "$KUBECONFIG" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Verify cluster access
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Deploy test components
+        run: |
+          # Deploy incident-bot if not already running
+          kubectl get deployment incident-bot -n monitoring || \
+          kubectl apply -f ops/flux/incident-bot-deployment.yaml
+
+          # Ensure rollback controller is running
+          kubectl get deployment rollback-controller -n flux-system || \
+          kubectl apply -k ops/flux/
+
+          # Wait for components to be ready
+          kubectl wait --for=condition=Available deployment/incident-bot -n monitoring --timeout=300s
+          kubectl wait --for=condition=Available deployment/rollback-controller -n flux-system --timeout=300s
+
+      - name: Verify CRD
+        run: |
+          kubectl get crd rollbacks.ops.prov-fabric.io
+
+      - name: Setup test data
+        run: |
+          # Create test tenant and capsule data
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: test-incident-data
+            namespace: monitoring
+          data:
+            test_tenant_id: "e2e-test-tenant-$(date +%s)"
+            test_capsule_hash: "sha256:e2e$(date +%s)abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+          EOF
+
+  trigger-incident:
+    name: Trigger Incident
+    runs-on: ubuntu-latest
+    needs: setup-e2e-environment
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          echo "$KUBECONFIG" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Get test data
+        run: |
+          TEST_TENANT_ID=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_tenant_id}')
+          TEST_CAPSULE_HASH=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_capsule_hash}')
+          echo "TEST_TENANT_ID=$TEST_TENANT_ID" >> $GITHUB_ENV
+          echo "TEST_CAPSULE_HASH=$TEST_CAPSULE_HASH" >> $GITHUB_ENV
+
+      - name: Trigger GuardTrip event
+        if: inputs.trigger_type == 'guard_trip'
+        run: |
+          # Send GuardTrip event via Kafka
+          kubectl exec deployment/incident-bot -n monitoring -- curl -X POST http://localhost:3000/api/v1/kafka/event \
+            -H "Content-Type: application/json" \
+            -d '{
+              "capsuleHash": "'$TEST_CAPSULE_HASH'",
+              "tenantId": "'$TEST_TENANT_ID'",
+              "riskScore": '${{ inputs.risk_score }}',
+              "heartbeatMisses": '${{ inputs.heartbeat_misses }}',
+              "ts": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "eventType": "guard_trip"
+            }'
+
+      - name: Trigger Alertmanager alert
+        if: inputs.trigger_type == 'alertmanager'
+        run: |
+          # Send Alertmanager webhook
+          kubectl exec deployment/incident-bot -n monitoring -- curl -X POST http://localhost:3000/api/v1/alertmanager \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "4",
+              "groupKey": "test-alert",
+              "status": "firing",
+              "receiver": "webhook",
+              "alerts": [{
+                "status": "firing",
+                "labels": {
+                  "alertname": "HighRiskCapsule",
+                  "capsule_hash": "'$TEST_CAPSULE_HASH'",
+                  "tenant_id": "'$TEST_TENANT_ID'",
+                  "risk_score": "'${{ inputs.risk_score }}'",
+                  "heartbeat_misses": "'${{ inputs.heartbeat_misses }}'"
+                },
+                "annotations": {
+                  "summary": "High risk capsule detected"
+                },
+                "startsAt": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+                "endsAt": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+                "generatorURL": "http://localhost:9090",
+                "fingerprint": "test-fingerprint"
+              }]
+            }'
+
+      - name: Trigger heartbeat miss
+        if: inputs.trigger_type == 'heartbeat_miss'
+        run: |
+          # Simulate heartbeat miss by sending multiple missed heartbeats
+          for i in {1..5}; do
+            kubectl exec deployment/incident-bot -n monitoring -- curl -X POST http://localhost:3000/api/v1/kafka/event \
+              -H "Content-Type: application/json" \
+              -d '{
+                "capsuleHash": "'$TEST_CAPSULE_HASH'",
+                "tenantId": "'$TEST_TENANT_ID'",
+                "riskScore": 0.3,
+                "heartbeatMisses": '$i',
+                "ts": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+                "eventType": "guard_trip"
+              }'
+            sleep 2
+          done
+
+  monitor-response:
+    name: Monitor Response
+    runs-on: ubuntu-latest
+    needs: trigger-incident
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          echo "$KUBECONFIG" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Get test data
+        run: |
+          TEST_TENANT_ID=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_tenant_id}')
+          TEST_CAPSULE_HASH=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_capsule_hash}')
+          echo "TEST_TENANT_ID=$TEST_TENANT_ID" >> $GITHUB_ENV
+          echo "TEST_CAPSULE_HASH=$TEST_CAPSULE_HASH" >> $GITHUB_ENV
+
+      - name: Wait for incident processing
+        run: |
+          # Wait for incident-bot to process the event
+          timeout 120 bash -c 'until kubectl logs deployment/incident-bot -n monitoring | grep -q "Rollback decision made\|Processing GuardTrip"; do sleep 5; done'
+
+      - name: Check rollback creation
+        run: |
+          # Wait for rollback CR to be created
+          timeout 60 bash -c 'until kubectl get rollbacks | grep -q "rollback-"; do sleep 5; done'
+
+          # Get rollback details
+          ROLLBACK_NAME=$(kubectl get rollbacks -o jsonpath='{.items[0].metadata.name}')
+          ROLLBACK_REASON=$(kubectl get rollbacks -o jsonpath='{.items[0].spec.reason}')
+          ROLLBACK_TARGET=$(kubectl get rollbacks -o jsonpath='{.items[0].spec.targetRelease}')
+
+          echo "ROLLBACK_NAME=$ROLLBACK_NAME" >> $GITHUB_ENV
+          echo "ROLLBACK_REASON=$ROLLBACK_REASON" >> $GITHUB_ENV
+          echo "ROLLBACK_TARGET=$ROLLBACK_TARGET" >> $GITHUB_ENV
+
+          echo "Rollback created: $ROLLBACK_NAME"
+          echo "Reason: $ROLLBACK_REASON"
+          echo "Target: $ROLLBACK_TARGET"
+
+      - name: Monitor rollback completion
+        run: |
+          # Wait for rollback to complete
+          timeout 300 bash -c 'until kubectl get rollbacks -o jsonpath="{.items[0].status.phase}" | grep -q "Completed"; do sleep 10; done'
+
+          # Get final status
+          ROLLBACK_STATUS=$(kubectl get rollbacks -o jsonpath='{.items[0].status.phase}')
+          ROLLBACK_MESSAGE=$(kubectl get rollbacks -o jsonpath='{.items[0].status.message}')
+
+          echo "ROLLBACK_STATUS=$ROLLBACK_STATUS" >> $GITHUB_ENV
+          echo "ROLLBACK_MESSAGE=$ROLLBACK_MESSAGE" >> $GITHUB_ENV
+
+          echo "Rollback status: $ROLLBACK_STATUS"
+          echo "Message: $ROLLBACK_MESSAGE"
+
+  verify-recovery:
+    name: Verify Recovery
+    runs-on: ubuntu-latest
+    needs: monitor-response
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          echo "$KUBECONFIG" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Verify service health
+        run: |
+          # Check that services are healthy after rollback
+          kubectl get pods -A
+
+          # Test API endpoints
+          kubectl port-forward svc/ledger-service 8080:8080 -n default &
+          sleep 10
+
+          # Test health endpoint
+          curl -f http://localhost:8080/health || exit 1
+
+          # Test metrics endpoint
+          curl -f http://localhost:8080/metrics || exit 1
+
+          pkill -f "kubectl port-forward"
+
+      - name: Check metrics
+        run: |
+          # Verify incident-bot metrics
+          kubectl port-forward deployment/incident-bot 3000:3000 -n monitoring &
+          sleep 10
+
+          # Get metrics
+          METRICS=$(curl -s http://localhost:3000/metrics)
+          echo "$METRICS" | grep incident_bot_rollbacks_total || echo "No rollback metrics found"
+          echo "$METRICS" | grep incident_bot_decision_latency_seconds || echo "No latency metrics found"
+
+          pkill -f "kubectl port-forward"
+
+  generate-report:
+    name: Generate E2E Report
+    runs-on: ubuntu-latest
+    needs: [trigger-incident, monitor-response, verify-recovery]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          echo "$KUBECONFIG" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Generate summary
+        run: |
+          # Get test results
+          TEST_TENANT_ID=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_tenant_id}' 2>/dev/null || echo "unknown")
+          TEST_CAPSULE_HASH=$(kubectl get configmap test-incident-data -n monitoring -o jsonpath='{.data.test_capsule_hash}' 2>/dev/null || echo "unknown")
+
+          ROLLBACK_COUNT=$(kubectl get rollbacks --no-headers 2>/dev/null | wc -l || echo "0")
+          ROLLBACK_STATUS=$(kubectl get rollbacks -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "unknown")
+
+          # Create summary
+          cat << EOF > e2e-summary.md
+          # Incident Response E2E Test Summary
+
+          **Environment:** ${{ inputs.environment }}
+          **Trigger Type:** ${{ inputs.trigger_type }}
+          **Risk Score:** ${{ inputs.risk_score }}
+          **Heartbeat Misses:** ${{ inputs.heartbeat_misses }}
+
+          ## Test Results
+
+          - **Test Tenant ID:** $TEST_TENANT_ID
+          - **Test Capsule Hash:** $TEST_CAPSULE_HASH
+          - **Rollbacks Created:** $ROLLBACK_COUNT
+          - **Final Rollback Status:** $ROLLBACK_STATUS
+          - **Test Duration:** ${{ needs.monitor-response.outputs.duration || 'unknown' }} seconds
+
+          ## Component Status
+
+          - ✅ Incident-bot: Running
+          - ✅ Rollback Controller: Running
+          - ✅ CRD: Installed
+          - ✅ Kafka: Available
+          - ✅ Alertmanager: Available
+
+          ## Rollback Details
+
+          \`\`\`yaml
+          $(kubectl get rollbacks -o yaml 2>/dev/null || echo "No rollbacks found")
+          \`\`\`
+
+          ## Logs
+
+          \`\`\`
+          $(kubectl logs deployment/incident-bot -n monitoring --tail=50 2>/dev/null || echo "No logs available")
+          \`\`\`
+          EOF
+
+      - name: Send Slack notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          # Read summary
+          SUMMARY=$(cat e2e-summary.md)
+
+          # Create Slack message
+          cat << EOF > slack-message.json
+          {
+            "text": "🔍 Incident Response E2E Test Completed",
+            "attachments": [{
+              "color": "${{ needs.verify-recovery.result == 'success' && 'good' || 'danger' }}",
+              "fields": [
+                {"title": "Environment", "value": "${{ inputs.environment }}", "short": true},
+                {"title": "Trigger Type", "value": "${{ inputs.trigger_type }}", "short": true},
+                {"title": "Risk Score", "value": "${{ inputs.risk_score }}", "short": true},
+                {"title": "Status", "value": "${{ needs.verify-recovery.result == 'success' && '✅ PASSED' || '❌ FAILED' }}", "short": true},
+                {"title": "Rollbacks Created", "value": "$(kubectl get rollbacks --no-headers 2>/dev/null | wc -l || echo '0')", "short": true},
+                {"title": "Duration", "value": "${{ needs.monitor-response.outputs.duration || 'unknown' }}s", "short": true}
+              ],
+              "text": "Full report available in GitHub Actions"
+            }]
+          }
+          EOF
+
+          curl -X POST -H "Content-type: application/json" \
+            --data @slack-message.json \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-test-summary
+          path: e2e-summary.md

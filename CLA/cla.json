@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "effective_date": "2025-01-27",
+  "cla_url": "https://provability-fabric.org/cla",
+  "cla_text_url": "https://provability-fabric.org/cla.txt",
+  "github_app_id": "123456",
+  "repository": "provability-fabric/provability-fabric",
+  "organization": "provability-fabric",
+  "contact_email": "cla@provability-fabric.org",
+  "legal_entity": "Provability-Fabric Contributors",
+  "jurisdiction": "California, United States",
+  "license": "Apache-2.0",
+  "terms": {
+    "individual": {
+      "title": "Individual Contributor License Agreement",
+      "description": "For individual contributors",
+      "required_fields": ["name", "email", "github_username", "signature"]
+    },
+    "corporate": {
+      "title": "Corporate Contributor License Agreement", 
+      "description": "For corporate contributors",
+      "required_fields": ["company_name", "contact_name", "contact_email", "github_username", "signature"]
+    }
+  },
+  "webhook_endpoints": {
+    "signature_webhook": "https://provability-fabric.org/api/cla/webhook",
+    "verification_webhook": "https://provability-fabric.org/api/cla/verify"
+  },
+  "github_checks": {
+    "check_name": "CLA Check",
+    "check_description": "Verifies that all contributors have signed the CLA",
+    "failure_message": "One or more contributors have not signed the CLA. Please visit https://provability-fabric.org/cla to sign."
+  },
+  "exemptions": {
+    "trivial_changes": true,
+    "documentation_only": true,
+    "typo_fixes": true,
+    "whitelisted_users": [
+      "dependabot[bot]",
+      "renovate[bot]"
+    ]
+  },
+  "signature_verification": {
+    "require_gpg": false,
+    "require_github_verified": true,
+    "require_email_verification": true
+  },
+  "retention": {
+    "signature_retention_years": 7,
+    "audit_log_retention_years": 10
+  }
+}

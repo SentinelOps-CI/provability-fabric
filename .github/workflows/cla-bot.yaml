@@ -1,0 +1,244 @@
+name: CLA Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+env:
+  CLA_CONFIG_PATH: "CLA/cla.json"
+  CLA_CHECK_NAME: "CLA Check"
+
+jobs:
+  cla-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for commit analysis
+
+      - name: Load CLA configuration
+        run: |
+          echo "Loading CLA configuration..."
+          if [ ! -f "$CLA_CONFIG_PATH" ]; then
+            echo "❌ CLA configuration not found at $CLA_CONFIG_PATH"
+            exit 1
+          fi
+
+          # Extract configuration values
+          CLA_URL=$(jq -r '.cla_url' "$CLA_CONFIG_PATH")
+          CLA_CHECK_NAME=$(jq -r '.github_checks.check_name' "$CLA_CONFIG_PATH")
+          FAILURE_MESSAGE=$(jq -r '.github_checks.failure_message' "$CLA_CONFIG_PATH")
+
+          echo "CLA_URL=$CLA_URL" >> $GITHUB_ENV
+          echo "CLA_CHECK_NAME=$CLA_CHECK_NAME" >> $GITHUB_ENV
+          echo "FAILURE_MESSAGE=$FAILURE_MESSAGE" >> $GITHUB_ENV
+
+          echo "✅ CLA configuration loaded"
+
+      - name: Get unique contributors
+        id: contributors
+        run: |
+          echo "Analyzing contributors..."
+
+          # Get all unique commit authors in this PR
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, get commits in the PR
+            git log --format="%an|%ae" ${{ github.event.pull_request.base.sha }}..HEAD | sort -u > contributors.txt
+          else
+            # For pushes to main, get commits in this push
+            git log --format="%an|%ae" ${{ github.event.before }}..${{ github.event.after }} | sort -u > contributors.txt
+          fi
+
+          # Extract usernames and emails
+          cat contributors.txt | cut -d'|' -f1 | sort -u > usernames.txt
+          cat contributors.txt | cut -d'|' -f2 | sort -u > emails.txt
+
+          echo "Found contributors:"
+          cat contributors.txt
+
+      - name: Check for exempt users
+        run: |
+          echo "Checking for exempt users..."
+
+          # Load exempt users from CLA config
+          jq -r '.exemptions.whitelisted_users[]' "$CLA_CONFIG_PATH" > exempt_users.txt
+
+          # Check if any contributors are exempt
+          while IFS= read -r user; do
+            if grep -q "^$user$" usernames.txt; then
+              echo "✅ Exempt user found: $user"
+              echo "$user" >> exempt_contributors.txt
+            fi
+          done < exempt_users.txt
+
+          # Remove exempt users from contributors list
+          if [ -f exempt_contributors.txt ]; then
+            grep -v -f exempt_contributors.txt contributors.txt > non_exempt_contributors.txt
+          else
+            cp contributors.txt non_exempt_contributors.txt
+          fi
+
+      - name: Check for trivial changes
+        run: |
+          echo "Checking for trivial changes..."
+
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD > changed_files.txt
+          else
+            git diff --name-only ${{ github.event.before }}..${{ github.event.after }} > changed_files.txt
+          fi
+
+          # Check if changes are trivial
+          TRIVIAL_CHANGES=true
+
+          # Check for documentation-only changes
+          if ! grep -q -v "\.md$\|\.txt$\|\.rst$\|docs/" changed_files.txt; then
+            echo "✅ Documentation-only changes detected"
+            echo "TRIVIAL_CHANGES=true" >> $GITHUB_ENV
+          fi
+
+          # Check for typo fixes (simplified heuristic)
+          if [ $(wc -l < changed_files.txt) -lt 3 ]; then
+            echo "✅ Small number of changes detected"
+            echo "TRIVIAL_CHANGES=true" >> $GITHUB_ENV
+          fi
+
+      - name: Verify CLA signatures
+        id: cla-verify
+        run: |
+          echo "Verifying CLA signatures..."
+
+          # Skip CLA check for trivial changes if configured
+          if [ "$TRIVIAL_CHANGES" = "true" ] && [ "$(jq -r '.exemptions.trivial_changes' "$CLA_CONFIG_PATH")" = "true" ]; then
+            echo "✅ Trivial changes detected, skipping CLA check"
+            echo "cla_status=success" >> $GITHUB_OUTPUT
+            echo "missing_contributors=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check each non-exempt contributor
+          missing_contributors=""
+
+          while IFS='|' read -r username email; do
+            echo "Checking CLA for: $username ($email)"
+            
+            # Call CLA verification API
+            response=$(curl -s -w "%{http_code}" \
+              -H "Content-Type: application/json" \
+              -d "{\"username\": \"$username\", \"email\": \"$email\"}" \
+              "$CLA_URL/verify")
+            
+            http_code="${response: -3}"
+            body="${response%???}"
+            
+            if [ "$http_code" = "200" ]; then
+              cla_status=$(echo "$body" | jq -r '.signed // false')
+              
+              if [ "$cla_status" = "true" ]; then
+                echo "✅ CLA signed by $username"
+              else
+                echo "❌ CLA not signed by $username"
+                missing_contributors="$missing_contributors $username"
+              fi
+            else
+              echo "❌ CLA verification failed for $username"
+              missing_contributors="$missing_contributors $username"
+            fi
+          done < non_exempt_contributors.txt
+
+          if [ -n "$missing_contributors" ]; then
+            echo "❌ Missing CLA signatures: $missing_contributors"
+            echo "cla_status=failure" >> $GITHUB_OUTPUT
+            echo "missing_contributors=$missing_contributors" >> $GITHUB_OUTPUT
+          else
+            echo "✅ All contributors have signed the CLA"
+            echo "cla_status=success" >> $GITHUB_OUTPUT
+            echo "missing_contributors=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update GitHub Check
+        run: |
+          echo "Updating GitHub Check..."
+
+          if [ "${{ steps.cla-verify.outputs.cla_status }}" = "success" ]; then
+            echo "✅ CLA Check: All contributors have signed the CLA"
+          else
+            echo "❌ CLA Check: Missing CLA signatures"
+            echo "Missing contributors: ${{ steps.cla-verify.outputs.missing_contributors }}"
+            echo "Please visit $CLA_URL to sign the CLA"
+            exit 1
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.cla-verify.outputs.cla_status == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const claComment = comments.find(comment => 
+              comment.body.includes('CLA Check') && comment.user.type === 'Bot'
+            );
+
+            const commentBody = `## CLA Check Failed ❌
+
+            The following contributors have not signed the CLA:
+            ${process.env.MISSING_CONTRIBUTORS}
+
+            **Please visit [${process.env.CLA_URL}](${process.env.CLA_URL}) to sign the CLA.**
+
+            Once signed, the CLA check will automatically pass on the next commit.
+
+            ---
+            *This comment was automatically generated by the CLA Bot.*`;
+
+            if (claComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: claComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody,
+              });
+            }
+        env:
+          MISSING_CONTRIBUTORS: ${{ steps.cla-verify.outputs.missing_contributors }}
+          CLA_URL: ${{ env.CLA_URL }}
+
+  cla-webhook:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Process CLA signatures
+        run: |
+          echo "Processing CLA signatures..."
+
+          # This would handle webhook events from the CLA signing system
+          # For now, we'll just log the event
+          echo "CLA webhook event received"
+          echo "Event type: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+
+          # In a real implementation, this would:
+          # 1. Verify the webhook signature
+          # 2. Update the CLA database
+          # 3. Trigger re-checks for affected PRs
+          # 4. Send notifications
+
+          echo "✅ CLA webhook processed"
