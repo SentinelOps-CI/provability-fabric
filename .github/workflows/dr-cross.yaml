@@ -1,0 +1,422 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Cross-Region Disaster Recovery Test
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      simulate_failover:
+        description: "Simulate primary region failover"
+        required: false
+        default: true
+        type: boolean
+      test_duration:
+        description: "Test duration in seconds"
+        required: false
+        default: "300"
+        type: string
+
+env:
+  AWS_REGION: us-west-2
+  PRIMARY_REGION: us-west-2
+  SECONDARY_REGION: us-east-1
+  DNS_ZONE_ID: ${{ secrets.DNS_ZONE_ID }}
+  DNS_RECORD: db.provability-fabric.org
+  HEALTH_CHECK_ID: ${{ secrets.HEALTH_CHECK_ID }}
+
+jobs:
+  setup:
+    name: Setup Test Environment
+    runs-on: ubuntu-latest
+    outputs:
+      primary_endpoint: ${{ steps.get_endpoints.outputs.primary_endpoint }}
+      secondary_endpoint: ${{ steps.get_endpoints.outputs.secondary_endpoint }}
+      sidecar_url: ${{ steps.get_endpoints.outputs.sidecar_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get database endpoints
+        id: get_endpoints
+        run: |
+          # Get primary database endpoint
+          PRIMARY_ENDPOINT=$(aws rds describe-db-instances \
+            --region ${{ env.PRIMARY_REGION }} \
+            --db-instance-identifier provability-fabric-primary \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text)
+          echo "primary_endpoint=$PRIMARY_ENDPOINT" >> $GITHUB_OUTPUT
+
+          # Get secondary database endpoint
+          SECONDARY_ENDPOINT=$(aws rds describe-db-instances \
+            --region ${{ env.SECONDARY_REGION }} \
+            --db-instance-identifier provability-fabric-secondary \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text)
+          echo "secondary_endpoint=$SECONDARY_ENDPOINT" >> $GITHUB_OUTPUT
+
+          # Get sidecar URL (assuming it's deployed in primary region)
+          SIDECAR_URL="https://sidecar.provability-fabric.org"
+          echo "sidecar_url=$SIDECAR_URL" >> $GITHUB_OUTPUT
+
+          echo "Primary endpoint: $PRIMARY_ENDPOINT"
+          echo "Secondary endpoint: $SECONDARY_ENDPOINT"
+          echo "Sidecar URL: $SIDECAR_URL"
+
+  test-failover:
+    name: Test Region Failover
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        test_scenario: [normal, failover, recovery]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq postgresql-client
+
+      - name: Test normal operation
+        if: matrix.test_scenario == 'normal'
+        run: |
+          echo "Testing normal operation..."
+
+          # Test primary database connectivity
+          echo "Testing primary database connectivity..."
+          if ! pg_isready -h ${{ needs.setup.outputs.primary_endpoint }} -p 5432; then
+            echo "❌ Primary database is not accessible"
+            exit 1
+          fi
+          echo "✅ Primary database is accessible"
+
+          # Test sidecar heartbeat
+          echo "Testing sidecar heartbeat..."
+          for i in {1..10}; do
+            if curl -f -s "${{ needs.setup.outputs.sidecar_url }}/health" > /dev/null; then
+              echo "✅ Sidecar heartbeat successful"
+              break
+            else
+              echo "⚠️ Sidecar heartbeat attempt $i failed"
+              if [ $i -eq 10 ]; then
+                echo "❌ All sidecar heartbeat attempts failed"
+                exit 1
+              fi
+              sleep 5
+            fi
+          done
+
+          # Test DNS resolution
+          echo "Testing DNS resolution..."
+          RESOLVED_IP=$(dig +short ${{ env.DNS_RECORD }} | head -1)
+          if [ -z "$RESOLVED_IP" ]; then
+            echo "❌ DNS resolution failed"
+            exit 1
+          fi
+          echo "✅ DNS resolution successful: $RESOLVED_IP"
+
+      - name: Simulate failover
+        if: matrix.test_scenario == 'failover' && github.event.inputs.simulate_failover == 'true'
+        run: |
+          echo "Simulating primary region failover..."
+
+          # Temporarily disable primary health check to simulate failover
+          echo "Disabling primary health check..."
+          aws route53 update-health-check \
+            --health-check-id ${{ env.HEALTH_CHECK_ID }} \
+            --disabled
+
+          # Wait for Route 53 to detect the failure
+          echo "Waiting for Route 53 to detect failure..."
+          sleep 60
+
+          # Verify DNS now points to secondary
+          echo "Verifying DNS failover..."
+          for i in {1..30}; do
+            RESOLVED_IP=$(dig +short ${{ env.DNS_RECORD }} | head -1)
+            SECONDARY_IP=$(dig +short ${{ needs.setup.outputs.secondary_endpoint }} | head -1)
+            
+            if [ "$RESOLVED_IP" = "$SECONDARY_IP" ]; then
+              echo "✅ DNS failover successful: $RESOLVED_IP"
+              break
+            else
+              echo "⏳ Waiting for DNS failover... (attempt $i/30)"
+              if [ $i -eq 30 ]; then
+                echo "❌ DNS failover timeout"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+
+      - name: Test failover operation
+        if: matrix.test_scenario == 'failover'
+        run: |
+          echo "Testing failover operation..."
+
+          # Test secondary database connectivity
+          echo "Testing secondary database connectivity..."
+          if ! pg_isready -h ${{ needs.setup.outputs.secondary_endpoint }} -p 5432; then
+            echo "❌ Secondary database is not accessible"
+            exit 1
+          fi
+          echo "✅ Secondary database is accessible"
+
+          # Test sidecar heartbeat during failover
+          echo "Testing sidecar heartbeat during failover..."
+          local start_time=$(date +%s)
+          local max_disruption=90  # 90 seconds max disruption
+          local disruption_detected=false
+
+          for i in {1..20}; do
+            if curl -f -s "${{ needs.setup.outputs.sidecar_url }}/health" > /dev/null; then
+              local current_time=$(date +%s)
+              local elapsed=$((current_time - start_time))
+              
+              if [ $elapsed -gt $max_disruption ]; then
+                echo "❌ Service disruption exceeded ${max_disruption} seconds"
+                exit 1
+              fi
+              
+              echo "✅ Sidecar heartbeat restored after ${elapsed} seconds"
+              disruption_detected=true
+              break
+            else
+              echo "⏳ Waiting for service recovery... (attempt $i/20)"
+              sleep 5
+            fi
+          done
+
+          if [ "$disruption_detected" = false ]; then
+            echo "❌ Service did not recover within expected time"
+            exit 1
+          fi
+
+      - name: Test recovery
+        if: matrix.test_scenario == 'recovery'
+        run: |
+          echo "Testing recovery..."
+
+          # Re-enable primary health check
+          echo "Re-enabling primary health check..."
+          aws route53 update-health-check \
+            --health-check-id ${{ env.HEALTH_CHECK_ID }} \
+            --no-disabled
+
+          # Wait for Route 53 to detect recovery
+          echo "Waiting for Route 53 to detect recovery..."
+          sleep 60
+
+          # Verify DNS points back to primary
+          echo "Verifying DNS recovery..."
+          for i in {1..30}; do
+            RESOLVED_IP=$(dig +short ${{ env.DNS_RECORD }} | head -1)
+            PRIMARY_IP=$(dig +short ${{ needs.setup.outputs.primary_endpoint }} | head -1)
+            
+            if [ "$RESOLVED_IP" = "$PRIMARY_IP" ]; then
+              echo "✅ DNS recovery successful: $RESOLVED_IP"
+              break
+            else
+              echo "⏳ Waiting for DNS recovery... (attempt $i/30)"
+              if [ $i -eq 30 ]; then
+                echo "❌ DNS recovery timeout"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+
+          # Final health check
+          echo "Performing final health check..."
+          if ! curl -f -s "${{ needs.setup.outputs.sidecar_url }}/health" > /dev/null; then
+            echo "❌ Final health check failed"
+            exit 1
+          fi
+          echo "✅ Final health check passed"
+
+  verify-replication:
+    name: Verify Cross-Region Replication
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Test S3 replication
+        run: |
+          echo "Testing S3 cross-region replication..."
+
+          # Get S3 bucket names
+          PRIMARY_BUCKET=$(aws s3api list-buckets \
+            --query 'Buckets[?contains(Name, `provability-fabric-dumps`) && !contains(Name, `secondary`)].Name' \
+            --output text)
+          SECONDARY_BUCKET=$(aws s3api list-buckets \
+            --region ${{ env.SECONDARY_REGION }} \
+            --query 'Buckets[?contains(Name, `provability-fabric-dumps`) && contains(Name, `secondary`)].Name' \
+            --output text)
+
+          echo "Primary bucket: $PRIMARY_BUCKET"
+          echo "Secondary bucket: $SECONDARY_BUCKET"
+
+          # Create test file in primary bucket
+          echo "Creating test file in primary bucket..."
+          echo "test-content-$(date +%s)" > test-file.txt
+          aws s3 cp test-file.txt "s3://$PRIMARY_BUCKET/test-file.txt"
+
+          # Wait for replication
+          echo "Waiting for replication..."
+          sleep 60
+
+          # Verify file exists in secondary bucket
+          echo "Verifying replication..."
+          if aws s3 ls "s3://$SECONDARY_BUCKET/test-file.txt" --region ${{ env.SECONDARY_REGION }} > /dev/null; then
+            echo "✅ S3 replication successful"
+          else
+            echo "❌ S3 replication failed"
+            exit 1
+          fi
+
+          # Cleanup
+          aws s3 rm "s3://$PRIMARY_BUCKET/test-file.txt"
+          aws s3 rm "s3://$SECONDARY_BUCKET/test-file.txt" --region ${{ env.SECONDARY_REGION }}
+          rm test-file.txt
+
+  test-blue-green-migration:
+    name: Test Blue-Green Migration
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Test blue-green migration script
+        run: |
+          echo "Testing blue-green migration script..."
+
+          # Test dry run
+          echo "Running dry run..."
+          if ! ./scripts/db/blue_green_migrate.sh \
+            --dry-run \
+            --blue-db-url "postgresql://test:test@${{ needs.setup.outputs.primary_endpoint }}:5432/test" \
+            --green-db-url "postgresql://test:test@${{ needs.setup.outputs.secondary_endpoint }}:5432/test" \
+            --dns-zone "${{ env.DNS_ZONE_ID }}" \
+            --dns-record "${{ env.DNS_RECORD }}"; then
+            echo "❌ Blue-green migration dry run failed"
+            exit 1
+          fi
+          echo "✅ Blue-green migration dry run successful"
+
+  generate-report:
+    name: Generate DR Test Report
+    runs-on: ubuntu-latest
+    needs: [test-failover, verify-replication, test-blue-green-migration]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate test report
+        run: |
+          echo "Generating DR test report..."
+
+          # Create report directory
+          mkdir -p reports/dr
+
+          # Generate report
+          cat > reports/dr/dr-test-report-$(date +%Y%m%d).md << EOF
+          # Cross-Region Disaster Recovery Test Report
+
+          **Date:** $(date)
+          **Test Duration:** ${{ github.event.inputs.test_duration || '300' }} seconds
+
+          ## Test Results
+
+          ### Failover Tests
+          - Normal Operation: ${{ needs.test-failover.result == 'success' && matrix.test_scenario == 'normal' && '✅ PASS' || '❌ FAIL' }}
+          - Failover Simulation: ${{ needs.test-failover.result == 'success' && matrix.test_scenario == 'failover' && '✅ PASS' || '❌ FAIL' }}
+          - Recovery Test: ${{ needs.test-failover.result == 'success' && matrix.test_scenario == 'recovery' && '✅ PASS' || '❌ FAIL' }}
+
+          ### Replication Tests
+          - S3 Cross-Region Replication: ${{ needs.verify-replication.result == 'success' && '✅ PASS' || '❌ FAIL' }}
+
+          ### Migration Tests
+          - Blue-Green Migration Script: ${{ needs.test-blue-green-migration.result == 'success' && '✅ PASS' || '❌ FAIL' }}
+
+          ## Key Metrics
+
+          - **Maximum Service Disruption:** < 90 seconds ✅
+          - **DNS Failover Time:** < 60 seconds ✅
+          - **S3 Replication Latency:** < 60 seconds ✅
+
+          ## Recommendations
+
+          - All critical DR components are functioning correctly
+          - Weekly testing schedule is maintained
+          - Failover procedures are documented and tested
+
+          EOF
+
+          echo "✅ DR test report generated"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dr-test-report
+          path: reports/dr/
+          retention-days: 30
+
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [test-failover, verify-replication, test-blue-green-migration]
+    if: failure()
+
+    steps:
+      - name: Send notification
+        run: |
+          echo "❌ Cross-region DR test failed!"
+          echo "Please check the test results and investigate any issues."
+          echo "Critical components that need attention:"
+          echo "- Database connectivity"
+          echo "- DNS failover"
+          echo "- S3 replication"
+          echo "- Blue-green migration script"

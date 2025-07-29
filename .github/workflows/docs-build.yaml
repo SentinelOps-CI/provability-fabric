@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Documentation Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bundles/**/spec.yaml"
+      - "docs/**"
+      - "cmd/specdoc/**"
+  workflow_dispatch:
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          # Install markdownlint
+          npm install -g markdownlint-cli
+
+          # Install Python dependencies for MkDocs
+          python -m pip install --upgrade pip
+          pip install mkdocs-material
+
+      - name: Generate documentation
+        run: |
+          # Build specdoc tool
+          cd cmd/specdoc
+          go build -o specdoc .
+          cd ../..
+
+          # Create docs/generated directory
+          mkdir -p docs/generated
+
+          # Generate docs for all spec.yaml files
+          find bundles -name "spec.yaml" -exec sh -c '
+            dir=$$(dirname "$$1")
+            basename=$$(basename "$$dir")
+            output="docs/generated/$$basename.md"
+            cmd/specdoc/specdoc generate "$$1" --out "$$output"
+          ' sh {} \;
+
+      - name: Lint generated documentation
+        run: |
+          # Run markdownlint on generated files
+          markdownlint docs/generated/*.md
+
+      - name: Build MkDocs site
+        run: |
+          mkdocs build
+
+      - name: Check for broken links
+        run: |
+          # Install markdown-link-check
+          npm install -g markdown-link-check
+
+          # Check all markdown files for broken links
+          find docs -name "*.md" -exec markdown-link-check {} \;
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          force_orphan: true
+
+      - name: Commit generated docs
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/generated/
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-generate documentation from specs"
+          git push
