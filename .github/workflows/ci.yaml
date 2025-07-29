@@ -40,7 +40,41 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+
+      - name: Cache Node.js dependencies
+        id: cache-node
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            runtime/ledger/node_modules
+            marketplace/ui/node_modules
+          key: node-${{ hashFiles('runtime/ledger/package-lock.json', 'marketplace/ui/package-lock.json') }}
+          restore-keys: |
+            node-
+
+      - name: Cache Go dependencies
+        id: cache-go
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: gomod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            gomod-
+
+      - name: Ensure cache hit
+        if: steps.cache-node.outputs.cache-hit != 'true' || steps.cache-go.outputs.cache-hit != 'true'
+        run: |
+          if [ "${{ steps.cache-node.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Node cache miss — lock file may be missing"
+            exit 1
+          fi
+          if [ "${{ steps.cache-go.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Go cache miss — go.sum may be missing"
+            exit 1
+          fi
 
       - name: Install dependencies
         run: |
@@ -59,6 +93,16 @@ jobs:
 
           # Install security tools
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
+
+      - name: Install Node.js dependencies
+        run: |
+          # Install ledger dependencies
+          cd runtime/ledger
+          npm ci
+          
+          # Install marketplace UI dependencies
+          cd ../../marketplace/ui
+          npm ci
 
       - name: Run spectral lint
         run: |
@@ -153,20 +197,11 @@ jobs:
       - name: Test Node.js ledger
         run: |
           cd runtime/ledger
-          npm install
           npm test
 
       - name: Run integration tests
         run: |
           timeout 20m pytest tests/integration/ -v
-
-      - name: Cache Lean artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/lean
-            .lake
-          key: ${{ runner.os }}-lean-${{ hashFiles('**/lakefile.lean') }}
 
       - name: Sign spec bundles
         if: github.event_name == 'push'
