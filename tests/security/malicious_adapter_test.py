@@ -27,7 +27,9 @@ if platform.system() == "Windows":
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler("malicious_adapter_test.log", encoding="utf-8"),
+            logging.FileHandler(
+                "malicious_adapter_test.log", encoding="utf-8", errors="replace"
+            ),
         ],
     )
 else:

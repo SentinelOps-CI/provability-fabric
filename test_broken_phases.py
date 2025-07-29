@@ -159,7 +159,7 @@ def check_log_files():
         if os.path.exists(log_file):
             print(f"\n📄 {log_file}:")
             try:
-                with open(log_file, "r", encoding="utf-8") as f:
+                with open(log_file, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
                     lines = content.split("\n")
                     print(f"   Lines: {len(lines)}")
@@ -167,6 +167,23 @@ def check_log_files():
                     for line in lines[-5:]:
                         if line.strip():
                             print(f"   {line}")
+            except UnicodeDecodeError as e:
+                print(f"   Error reading log file (encoding issue): {e}")
+                print(
+                    f"   This is likely due to Windows console encoding. The log file may contain special characters."
+                )
+                # Try reading with different encoding
+                try:
+                    with open(log_file, "r", encoding="cp1252", errors="replace") as f:
+                        content = f.read()
+                        lines = content.split("\n")
+                        print(f"   Lines: {len(lines)}")
+                        print(f"   Last 5 lines (cp1252 encoding):")
+                        for line in lines[-5:]:
+                            if line.strip():
+                                print(f"   {line}")
+                except Exception as e2:
+                    print(f"   Failed to read with cp1252 encoding: {e2}")
             except Exception as e:
                 print(f"   Error reading log file: {e}")
         else:
