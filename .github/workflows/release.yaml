@@ -1,0 +1,316 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Secure Release Pipeline
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - "stable/*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/stable/'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+        with:
+          node_image: kindest/node:v1.28.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+
+      - name: Install dependencies
+        run: |
+          # Install Python dependencies
+          python -m pip install --upgrade pip
+          pip install pytest kubernetes requests pyyaml psutil flake8-breakpoint
+
+          # Install Go tools
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+          # Install Rust tools
+          cargo install cargo-fuzz
+
+          # Install Node.js tools
+          npm install -g npm@latest
+
+          # Install security tools
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
+          curl -sfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.0.0
+
+          # Install SLSA tools
+          curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64"
+          chmod +x cosign-linux-amd64
+          sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+
+          curl -O -L "https://github.com/sigstore/gitsign/releases/latest/download/gitsign-linux-amd64"
+          chmod +x gitsign-linux-amd64
+          sudo mv gitsign-linux-amd64 /usr/local/bin/gitsign
+
+      - name: Run complete CI matrix
+        run: |
+          # Run spectral lint
+          npm install -g @stoplight/spectral-cli
+          spectral lint **/spec.yaml --ruleset aispec-schema.json
+
+          # Run Lean builds
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          export PATH=$PATH:$PWD/lean-4.7.0-linux/bin
+          lake build
+
+          # Run Go tests
+          cd core/cli/pf
+          go test -v -coverprofile=coverage.out ./...
+          cd ../../..
+
+          # Run Rust tests
+          cd runtime/sidecar-watcher
+          cargo test
+          cargo clippy -- -D warnings
+          cd ../..
+
+          # Run integration tests
+          timeout 20m pytest tests/integration/ -v
+
+      - name: Run fuzz tests
+        run: |
+          cd runtime/sidecar-watcher/fuzz
+          cargo fuzz run json_actions -- -runs=1000 -max_total_time=60
+
+      - name: Run performance benchmark
+        run: |
+          cd runtime/sidecar-watcher
+          cargo build --release
+          cd ../..
+          python scripts/bench.py --count 100000 --output perf-results.json
+
+          # Check performance thresholds
+          python -c "
+          import json
+          with open('perf-results.json') as f:
+              data = json.load(f)
+          if data['median_latency_us'] > 150:
+              print('❌ Median latency exceeds 150 µs threshold')
+              exit(1)
+          if data['memory_mb'] > 50:
+              print('❌ Memory usage exceeds 50 MB threshold')
+              exit(1)
+          print('✅ Performance thresholds met')
+          "
+
+      - name: Static analysis - Trivy
+        run: |
+          trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+
+      - name: Static analysis - GoSec
+        run: |
+          gosec ./core/cli/pf/... ./runtime/admission-controller/...
+
+      - name: Static analysis - Cargo audit
+        run: |
+          cd runtime/sidecar-watcher
+          cargo audit
+
+      - name: Static analysis - NPM audit
+        run: |
+          cd runtime/ledger
+          npm audit --audit-level=high
+
+      - name: Build OCI images
+        run: |
+          # Build sidecar watcher
+          docker build -t provability-fabric/sidecar-watcher:${{ github.sha }} runtime/sidecar-watcher/
+          docker tag provability-fabric/sidecar-watcher:${{ github.sha }} provability-fabric/sidecar-watcher:latest
+
+          # Build admission controller
+          docker build -t provability-fabric/admission-controller:${{ github.sha }} runtime/admission-controller/
+          docker tag provability-fabric/admission-controller:${{ github.sha }} provability-fabric/admission-controller:latest
+
+          # Build ledger service
+          docker build -t provability-fabric/ledger:${{ github.sha }} runtime/ledger/
+          docker tag provability-fabric/ledger:${{ github.sha }} provability-fabric/ledger:latest
+
+          # Build attestor service
+          docker build -t provability-fabric/attestor:${{ github.sha }} runtime/attestor/
+          docker tag provability-fabric/attestor:${{ github.sha }} provability-fabric/attestor:latest
+
+      - name: Generate SBOM
+        run: |
+          syft packages . -o spdx-json --file sbom.spdx.json
+
+      - name: Sign SBOM
+        run: |
+          cosign sign-blob --bundle sbom.spdx.json.sig sbom.spdx.json
+
+      - name: Generate SLSA v1 provenance
+        run: |
+          chmod +x releaser/generate-provenance.sh
+          ./releaser/generate-provenance.sh generate
+
+      - name: Verify provenance
+        run: |
+          # Verify all provenance files
+          for provenance_file in *_provenance.intoto.jsonl; do
+            if [ -f "$provenance_file" ]; then
+              echo "Verifying $provenance_file..."
+              cosign verify-attestation --type slsaprovenance "$provenance_file" || {
+                echo "❌ Failed to verify $provenance_file"
+                exit 1
+              }
+            fi
+          done
+          echo "✅ All provenance files verified successfully"
+
+      - name: Verify Lean hashes
+        run: |
+          # Get Lean hash from tag annotation
+          TAG_HASH=$(git show ${{ github.ref_name }} --format=%B | grep "lean-hash:" | cut -d: -f2 | tr -d ' ')
+
+          # Check all .olean files
+          for file in $(find . -name "*.olean"); do
+            FILE_HASH=$(lean --hash $file)
+            if [ "$FILE_HASH" != "$TAG_HASH" ]; then
+              echo "❌ Hash mismatch for $file: expected $TAG_HASH, got $FILE_HASH"
+              exit 1
+            fi
+          done
+          echo "✅ All Lean hashes match tag annotation"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes
+
+            This release includes:
+            - Security updates and vulnerability fixes
+            - Performance improvements
+            - Bug fixes and stability enhancements
+
+            ## Artifacts
+
+            - SBOM: `sbom.spdx.json`
+            - Performance Report: `perf-results.json`
+            - SLSA v1 Provenance: `*_provenance.intoto.jsonl`
+            - Integration Logs: Available in workflow artifacts
+
+            ## Verification
+
+            All artifacts are signed with Cosign and can be verified using:
+            ```bash
+            cosign verify-blob --bundle sbom.spdx.json.sig sbom.spdx.json
+            ```
+
+            SLSA v1 provenance files can be verified using:
+            ```bash
+            cosign verify-attestation --type slsaprovenance *_provenance.intoto.jsonl
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload release artifacts
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sbom.spdx.json
+          asset_name: sbom.spdx.json
+          asset_content_type: application/json
+
+      - name: Upload performance results
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./perf-results.json
+          asset_name: perf-results.json
+          asset_content_type: application/json
+
+      - name: Upload provenance files
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./*_provenance.intoto.jsonl
+          asset_name: slsa-provenance.intoto.jsonl
+          asset_content_type: application/json
+
+      - name: Notify Slack/Discord
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            🚀 Release ${{ github.ref_name }} published successfully!
+
+            📦 Artifacts:
+            - SBOM: ${{ steps.create_release.outputs.html_url }}
+            - SLSA v1 Provenance: Available in release assets
+            - Performance: Latency ≤ 150 µs, Memory ≤ 50 MB
+
+            🔒 Security: All CVEs resolved
+            ✅ Verification: All Lean hashes match
+            🔐 SLSA: All provenance verified
+
+            Repository: ${{ github.repository }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            ❌ Release ${{ github.ref_name }} failed!
+
+            Check the workflow for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

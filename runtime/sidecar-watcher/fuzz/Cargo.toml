@@ -1,0 +1,15 @@
+[package]
+name = "sidecar-watcher-fuzz"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+provability-fabric-sidecar-watcher = { path = "../" }
+
+[[bin]]
+name = "json_actions"
+path = "fuzz_targets/json_actions.rs"

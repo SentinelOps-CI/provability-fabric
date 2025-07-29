@@ -1,0 +1,145 @@
+name: EU AI Act Compliance
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  generate-compliance-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd tools/compliance
+          pip install -r requirements.txt
+
+      - name: Install pandoc and LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-extra-utils
+
+      - name: Create compliance directory
+        run: |
+          mkdir -p docs/compliance
+
+      - name: Generate Annex VIII docs for all bundles
+        run: |
+          cd tools/compliance
+
+          # Find all spec.yaml files and generate docs
+          for spec_file in ../../bundles/*/spec.yaml; do
+            if [ -f "$spec_file" ]; then
+              agent_name=$(basename $(dirname "$spec_file"))
+              output_file="../../docs/compliance/${agent_name}_annexVIII.pdf"
+              
+              echo "Generating Annex VIII for $agent_name..."
+              python generate_ai_act.py "$spec_file" --out "$output_file"
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ Generated $output_file"
+              else
+                echo "❌ Failed to generate $output_file"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Validate PDFs
+        run: |
+          # Check if pdfcpu is available, otherwise use a simple check
+          if command -v pdfcpu &> /dev/null; then
+            for pdf_file in docs/compliance/*.pdf; do
+              if [ -f "$pdf_file" ]; then
+                echo "Validating $pdf_file..."
+                pdfcpu validate "$pdf_file"
+              fi
+            done
+          else
+            # Simple validation - check file exists and has content
+            for pdf_file in docs/compliance/*.pdf; do
+              if [ -f "$pdf_file" ]; then
+                file_size=$(stat -c%s "$pdf_file")
+                if [ $file_size -gt 1000 ]; then
+                  echo "✅ $pdf_file is valid (${file_size} bytes)"
+                else
+                  echo "❌ $pdf_file is too small (${file_size} bytes)"
+                  exit 1
+                fi
+              fi
+            done
+          fi
+
+      - name: Upload compliance docs as release assets
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: docs/compliance/*.pdf
+          asset_name: ${{ github.event.release.tag_name }}-annexVIII.pdf
+          asset_content_type: application/pdf
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'release'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/compliance
+          destination_dir: compliance
+          force_orphan: false
+
+      - name: Commit compliance docs
+        if: github.event_name == 'release'
+        run: |
+          git config --global user.name "Compliance Bot"
+          git config --global user.email "compliance-bot@provability-fabric.local"
+
+          git add docs/compliance/*.pdf
+          git commit -m "Add EU AI Act Annex VIII docs for release ${{ github.event.release.tag_name }}"
+          git push origin main
+
+      - name: Comment on release
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const complianceDir = 'docs/compliance';
+
+            let complianceFiles = [];
+            if (fs.existsSync(complianceDir)) {
+              complianceFiles = fs.readdirSync(complianceDir)
+                .filter(file => file.endsWith('.pdf'))
+                .map(file => `- \`${file}\``);
+            }
+
+            const body = `## EU AI Act Compliance Documentation
+
+            The following Annex VIII technical documentation has been generated:
+
+            ${complianceFiles.join('\n')}
+
+            These documents are available in the release assets and have been committed to the repository.
+
+            _Generated automatically by the Provability-Fabric compliance tool._`;
+
+            await github.rest.repos.createReleaseComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: body
+            });

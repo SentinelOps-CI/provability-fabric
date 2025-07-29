@@ -1,0 +1,183 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          # Install Python dependencies
+          python -m pip install --upgrade pip
+          pip install pytest kubernetes requests pyyaml psutil flake8-breakpoint
+
+          # Install Go tools
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+          # Install Rust tools
+          cargo install cargo-fuzz
+
+          # Install Node.js tools
+          npm install -g @stoplight/spectral-cli
+
+          # Install security tools
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
+
+      - name: Run spectral lint
+        run: |
+          spectral lint **/spec.yaml --ruleset aispec-schema.json
+
+      - name: Set up Lean
+        run: |
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+
+      - name: Cache Lean artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/lean
+            .lake
+          key: ${{ runner.os }}-lean-${{ hashFiles('**/lakefile.lean') }}
+          restore-keys: |
+            ${{ runner.os }}-lean-
+
+      - name: Build Lean proofs
+        run: |
+          lake build
+
+      - name: Lean sanity check
+        run: |
+          # Check for any remaining 'by admit' or 'sorry' statements
+          # and fail if files are older than 3 days
+          echo "🔍 Checking for admits and sorry statements..."
+
+          # Find all Lean files with admits or sorry statements
+          ADMIT_FILES=$(grep -l -r "by admit\|sorry" --exclude-dir=.lake --include="*.lean" . || true)
+
+          if [ -n "$ADMIT_FILES" ]; then
+            echo "⚠️  Found files with admits or sorry statements:"
+            echo "$ADMIT_FILES"
+            echo ""
+            
+            # Check if any of these files are older than 3 days
+            CURRENT_TIME=$(date +%s)
+            THREE_DAYS_AGO=$((CURRENT_TIME - 259200))  # 3 days in seconds
+            
+            OLD_ADMIT_FILES=""
+            for file in $ADMIT_FILES; do
+              if [ -f "$file" ]; then
+                FILE_TIME=$(stat -c %Y "$file")
+                if [ $FILE_TIME -lt $THREE_DAYS_AGO ]; then
+                  OLD_ADMIT_FILES="$OLD_ADMIT_FILES $file"
+                fi
+              fi
+            done
+            
+            if [ -n "$OLD_ADMIT_FILES" ]; then
+              echo "❌ Found admits/sorry in files older than 3 days:"
+              echo "$OLD_ADMIT_FILES"
+              echo ""
+              echo "These files must be resolved by the APOLLO proof bot or manually."
+              echo "If this is a new file, it has 3 days to be resolved."
+              exit 1
+            else
+              echo "✅ All admits/sorry are in files newer than 3 days"
+            fi
+          else
+            echo "✅ No admits or sorry statements found in Lean files"
+          fi
+
+      - name: Test Go CLI
+        run: |
+          cd core/cli/pf
+          go test -v -coverprofile=coverage.out ./...
+
+          # Check coverage threshold
+          COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+          echo "Coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+            echo "❌ Coverage below 90% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage above 90% threshold"
+
+      - name: Test Rust sidecar
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test
+          cargo clippy -- -D warnings
+
+      - name: Test Go admission controller
+        run: |
+          cd runtime/admission-controller
+          go test -v ./...
+
+      - name: Test Node.js ledger
+        run: |
+          cd runtime/ledger
+          npm install
+          npm test
+
+      - name: Run integration tests
+        run: |
+          timeout 20m pytest tests/integration/ -v
+
+      - name: Cache Lean artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/lean
+            .lake
+          key: ${{ runner.os }}-lean-${{ hashFiles('**/lakefile.lean') }}
+
+      - name: Sign spec bundles
+        if: github.event_name == 'push'
+        run: |
+          # Install cosign
+          curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64"
+          chmod +x cosign-linux-amd64
+          sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+
+          # Sign bundles
+          find bundles -name "spec.sig" -exec cosign sign-blob --bundle {}.bundle {} \;
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}

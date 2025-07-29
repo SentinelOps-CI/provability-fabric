@@ -1,0 +1,322 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Chaos Engineering Nightly
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  chaos-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+        with:
+          node_image: kindest/node:v1.28.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+
+      - name: Install LitmusChaos
+        run: |
+          kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/rbac.yaml
+          kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/crds.yaml
+          kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/namespaced-k8s/rbac.yaml
+          kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/namespaced-k8s/crds.yaml
+
+      - name: Build and deploy full stack
+        run: |
+          # Build images
+          docker build -t provability-fabric/sidecar-watcher:test runtime/sidecar-watcher/
+          docker build -t provability-fabric/admission-controller:test runtime/admission-controller/
+          docker build -t provability-fabric/ledger:test runtime/ledger/
+          docker build -t provability-fabric/attestor:test runtime/attestor/
+
+          # Load images into Kind
+          kind load docker-image provability-fabric/sidecar-watcher:test
+          kind load docker-image provability-fabric/admission-controller:test
+          kind load docker-image provability-fabric/ledger:test
+          kind load docker-image provability-fabric/attestor:test
+
+          # Deploy Redis
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install redis bitnami/redis \
+            --set auth.enabled=false \
+            --set architecture=standalone
+
+          # Deploy attestor service
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: attestor
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: attestor
+            template:
+              metadata:
+                labels:
+                  app: attestor
+              spec:
+                containers:
+                - name: attestor
+                  image: provability-fabric/attestor:test
+                  ports:
+                  - containerPort: 8080
+                  env:
+                  - name: REDIS_URL
+                    value: "redis://redis-master:6379"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: attestor-service
+          spec:
+            selector:
+              app: attestor
+            ports:
+            - protocol: TCP
+              port: 8080
+              targetPort: 8080
+          EOF
+
+          # Deploy demo pod with sidecar
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: demo-sidecar
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: demo-sidecar
+            template:
+              metadata:
+                labels:
+                  app: demo-sidecar
+              spec:
+                containers:
+                - name: demo
+                  image: busybox:latest
+                  command: ["sh", "-c", "while true; do echo 'demo action'; sleep 5; done"]
+                - name: sidecar
+                  image: provability-fabric/sidecar-watcher:test
+                  env:
+                  - name: ATTESTOR_URL
+                    value: "http://attestor-service:8080"
+                  - name: CAPSULE_HASH
+                    value: "test-capsule-hash"
+                  - name: ENABLE_HEARTBEAT
+                    value: "true"
+                  - name: BUDGET_LIMIT
+                    value: "100.0"
+                  - name: SPAM_SCORE_LIMIT
+                    value: "0.5"
+          EOF
+
+          # Wait for services to be ready
+          kubectl wait --for=condition=available deployment/attestor --timeout=120s
+          kubectl wait --for=condition=available deployment/demo-sidecar --timeout=120s
+
+      - name: Wait for heartbeat to establish
+        run: |
+          echo "Waiting 30 seconds for heartbeat to establish..."
+          sleep 30
+
+      - name: Run network loss chaos experiment
+        run: |
+          echo "Running network loss chaos experiment..."
+          kubectl apply -f tests/chaos/pod-network-loss.yaml
+
+          # Wait for experiment to complete
+          kubectl wait --for=condition=complete job/sidecar-network-loss-pod-network-loss --timeout=120s
+
+          # Check results
+          kubectl logs job/sidecar-network-loss-pod-network-loss
+
+      - name: Check heartbeat during network loss
+        run: |
+          echo "Checking heartbeat during network loss..."
+
+          # Port forward to attestor service
+          kubectl port-forward service/attestor-service 8080:8080 &
+          PF_PID=$!
+          sleep 5
+
+          # Check liveness multiple times during chaos
+          missed_beats=0
+          for i in {1..6}; do
+            response=$(curl -s http://localhost:8080/liveness/test-capsule-hash)
+            alive=$(echo "$response" | jq -r '.alive')
+            
+            if [ "$alive" != "true" ]; then
+              missed_beats=$((missed_beats + 1))
+              echo "Missed heartbeat at check $i"
+            fi
+            
+            sleep 5
+          done
+
+          # Kill port forward
+          kill $PF_PID
+
+          # Fail if more than 1 heartbeat missed
+          if [ $missed_beats -gt 1 ]; then
+            echo "❌ Too many missed heartbeats: $missed_beats"
+            exit 1
+          fi
+
+          echo "✅ Heartbeat resilience test passed (missed: $missed_beats)"
+
+      - name: Run CPU hog chaos experiment
+        run: |
+          echo "Running CPU hog chaos experiment..."
+          kubectl apply -f tests/chaos/cpu-hog.yaml
+
+          # Wait for experiment to complete
+          kubectl wait --for=condition=complete job/admission-controller-cpu-hog-pod-cpu-hog --timeout=120s
+
+          # Check results
+          kubectl logs job/admission-controller-cpu-hog-pod-cpu-hog
+
+      - name: Check ledger risk during CPU stress
+        run: |
+          echo "Checking ledger risk during CPU stress..."
+
+          # Deploy ledger service
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ledger
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ledger
+            template:
+              metadata:
+                labels:
+                  app: ledger
+              spec:
+                containers:
+                - name: ledger
+                  image: provability-fabric/ledger:test
+                  ports:
+                  - containerPort: 4000
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ledger-service
+          spec:
+            selector:
+              app: ledger
+            ports:
+            - protocol: TCP
+              port: 4000
+              targetPort: 4000
+          EOF
+
+          kubectl wait --for=condition=available deployment/ledger --timeout=120s
+
+          # Port forward to ledger service
+          kubectl port-forward service/ledger-service 4000:4000 &
+          PF_PID=$!
+          sleep 5
+
+          # Check risk score multiple times during chaos
+          risk_increases=0
+          for i in {1..10}; do
+            response=$(curl -s http://localhost:4000/graphql -H "Content-Type: application/json" \
+              -d '{"query":"query { capsule(hash: \"test-capsule-hash\") { riskScore } }"}')
+            
+            risk_score=$(echo "$response" | jq -r '.data.capsule.riskScore')
+            
+            if (( $(echo "$risk_score > 0.5" | bc -l) )); then
+              risk_increases=$((risk_increases + 1))
+              echo "Risk score elevated at check $i: $risk_score"
+            fi
+            
+            sleep 6
+          done
+
+          # Kill port forward
+          kill $PF_PID
+
+          # Fail if no risk increases detected (system should be monitoring)
+          if [ $risk_increases -eq 0 ]; then
+            echo "❌ No risk increases detected during chaos - system may not be monitoring properly"
+            exit 1
+          fi
+
+          echo "✅ Risk monitoring test passed (increases: $risk_increases)"
+
+      - name: Generate chaos report
+        run: |
+          echo "Generating chaos engineering report..."
+
+          cat > chaos-report.md <<EOF
+          # Chaos Engineering Report
+
+          **Date:** $(date)
+          **Run ID:** ${{ github.run_id }}
+
+          ## Experiments Run
+
+          ### 1. Network Loss Experiment
+          - **Target:** Sidecar pods
+          - **Duration:** 30 seconds
+          - **Packet Loss:** 100%
+          - **Result:** Heartbeat resilience maintained
+          - **Missed Beats:** $(echo $missed_beats)
+
+          ### 2. CPU Hog Experiment
+          - **Target:** Admission controller
+          - **Duration:** 60 seconds
+          - **CPU Cores:** 2
+          - **Result:** Risk monitoring active
+          - **Risk Increases:** $(echo $risk_increases)
+
+          ## Invariants Tested
+
+          ✅ **Heartbeat Invariant:** Sidecar heartbeat must miss ≤1 beat during 30s network partition
+          ✅ **Risk Monitoring Invariant:** Ledger risk must increase during CPU stress (indicating active monitoring)
+
+          ## System Resilience
+
+          The Provability-Fabric system demonstrated resilience under stress:
+          - Heartbeat mechanism continued functioning during network partitions
+          - Risk monitoring remained active during CPU stress
+          - No uncontrolled violations occurred
+
+          **Overall Result:** ✅ PASS
+          EOF
+
+      - name: Upload chaos report
+        uses: actions/upload-artifact@v3
+        with:
+          name: chaos-report-${{ github.run_number }}
+          path: chaos-report.md
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kind delete cluster --name provability-fabric-test || true

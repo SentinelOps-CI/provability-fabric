@@ -1,0 +1,249 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Heartbeat Test
+
+on:
+  pull_request:
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "runtime/attestor/**"
+      - ".github/workflows/heartbeat-test.yaml"
+  workflow_dispatch:
+
+jobs:
+  heartbeat-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+        with:
+          node_image: kindest/node:v1.28.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+
+      - name: Build attestor image
+        run: |
+          cd runtime/attestor
+          docker build -t provability-fabric/attestor:test .
+
+      - name: Build sidecar image
+        run: |
+          cd runtime/sidecar-watcher
+          docker build -t provability-fabric/sidecar:test .
+
+      - name: Deploy Redis
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install redis bitnami/redis \
+            --set auth.enabled=false \
+            --set architecture=standalone
+
+      - name: Deploy attestor service
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: attestor
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: attestor
+            template:
+              metadata:
+                labels:
+                  app: attestor
+              spec:
+                containers:
+                - name: attestor
+                  image: provability-fabric/attestor:test
+                  ports:
+                  - containerPort: 8080
+                  env:
+                  - name: REDIS_URL
+                    value: "redis://redis-master:6379"
+                  resources:
+                    requests:
+                      memory: "64Mi"
+                      cpu: "50m"
+                    limits:
+                      memory: "128Mi"
+                      cpu: "100m"
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: attestor-service
+          spec:
+            selector:
+              app: attestor
+            ports:
+            - protocol: TCP
+              port: 8080
+              targetPort: 8080
+          EOF
+
+      - name: Deploy demo pod with sidecar
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: demo-pod
+            annotations:
+              spec.sig: "test-signature"
+          spec:
+            containers:
+            - name: demo
+              image: busybox:latest
+              command: ["sh", "-c", "while true; do echo 'demo action'; sleep 5; done"]
+            - name: sidecar
+              image: provability-fabric/sidecar:test
+              env:
+              - name: ATTESTOR_URL
+                value: "http://attestor-service:8080"
+              - name: CAPSULE_HASH
+                value: "test-capsule-hash"
+              - name: ENABLE_HEARTBEAT
+                value: "true"
+              - name: BUDGET_LIMIT
+                value: "100.0"
+              - name: SPAM_SCORE_LIMIT
+                value: "0.5"
+          EOF
+
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for attestor service..."
+          kubectl wait --for=condition=available deployment/attestor --timeout=60s
+
+          echo "Waiting for demo pod..."
+          kubectl wait --for=condition=ready pod/demo-pod --timeout=60s
+
+      - name: Wait for heartbeat to start
+        run: |
+          echo "Waiting 20 seconds for heartbeat to establish..."
+          sleep 20
+
+      - name: Test liveness endpoint
+        run: |
+          # Port forward to attestor service
+          kubectl port-forward service/attestor-service 8080:8080 &
+          PF_PID=$!
+
+          # Wait for port forward
+          sleep 5
+
+          # Test liveness endpoint
+          echo "Testing liveness endpoint..."
+          response=$(curl -s http://localhost:8080/liveness/test-capsule-hash)
+          echo "Liveness response: $response"
+
+          # Check if alive
+          alive=$(echo "$response" | jq -r '.alive')
+          if [ "$alive" != "true" ]; then
+            echo "❌ Liveness check failed - pod not alive"
+            exit 1
+          fi
+
+          echo "✅ Liveness check passed"
+
+          # Kill port forward
+          kill $PF_PID
+
+      - name: Test heartbeat failure scenario
+        run: |
+          echo "Testing heartbeat failure scenario..."
+
+          # Delete attestor pod to simulate failure
+          kubectl delete pod -l app=attestor
+
+          # Wait for attestor to be unavailable
+          sleep 10
+
+          # Test liveness endpoint (should fail)
+          kubectl port-forward service/attestor-service 8080:8080 &
+          PF_PID=$!
+          sleep 5
+
+          response=$(curl -s http://localhost:8080/liveness/test-capsule-hash)
+          echo "Liveness response after attestor failure: $response"
+
+          alive=$(echo "$response" | jq -r '.alive')
+          if [ "$alive" = "true" ]; then
+            echo "❌ Liveness should be false after attestor failure"
+            exit 1
+          fi
+
+          echo "✅ Heartbeat failure scenario passed"
+          kill $PF_PID
+
+      - name: Test missing heartbeat environment variable
+        run: |
+          echo "Testing missing heartbeat environment variable..."
+
+          # Create pod without ENABLE_HEARTBEAT
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: no-heartbeat-pod
+            annotations:
+              spec.sig: "test-signature"
+          spec:
+            containers:
+            - name: demo
+              image: busybox:latest
+              command: ["sh", "-c", "while true; do echo 'demo action'; sleep 5; done"]
+            - name: sidecar
+              image: provability-fabric/sidecar:test
+              env:
+              - name: ATTESTOR_URL
+                value: "http://attestor-service:8080"
+              - name: CAPSULE_HASH
+                value: "no-heartbeat-hash"
+              - name: BUDGET_LIMIT
+                value: "100.0"
+              - name: SPAM_SCORE_LIMIT
+                value: "0.5"
+          EOF
+
+          # Wait for pod to be ready
+          kubectl wait --for=condition=ready pod/no-heartbeat-pod --timeout=60s
+
+          # Wait and check liveness
+          sleep 30
+
+          kubectl port-forward service/attestor-service 8080:8080 &
+          PF_PID=$!
+          sleep 5
+
+          response=$(curl -s http://localhost:8080/liveness/no-heartbeat-hash)
+          echo "Liveness response for no-heartbeat pod: $response"
+
+          alive=$(echo "$response" | jq -r '.alive')
+          if [ "$alive" = "true" ]; then
+            echo "❌ Liveness should be false for pod without heartbeat"
+            exit 1
+          fi
+
+          echo "✅ Missing heartbeat environment variable test passed"
+          kill $PF_PID
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kind delete cluster --name provability-fabric-test || true

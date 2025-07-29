@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Provability-Fabric Contributors
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  auth0Id     String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  capsules    Capsule[]
+  premiumQuotes PremiumQuote[]
+}
+
+model Capsule {
+  id          String   @id @default(cuid())
+  hash        String   @unique
+  specSig     String
+  riskScore   Float    @default(0.0)
+  reason      String?
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  premiumQuotes PremiumQuote[]
+}
+
+model PremiumQuote {
+  id          String   @id @default(cuid())
+  capsuleHash String
+  riskScore   Float
+  annualUsd   Float
+  tenantId    String
+  createdAt   DateTime @default(now())
+  capsule     Capsule @relation(fields: [capsuleHash], references: [hash])
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+} 
