@@ -6,6 +6,10 @@
 
 An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification.
 
+<p align="center">
+  <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
+</p>
+
 ## Quick Start
 
 ```bash
