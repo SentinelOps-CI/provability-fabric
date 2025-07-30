@@ -1,0 +1,105 @@
+{
+  "$schema": "https://meta.stoplight.io/schemas/rule.json",
+  "extends": "spectral:oas",
+  "rules": {
+    "ai-spec-meta-required": {
+      "description": "AI specification must have meta section",
+      "given": "$",
+      "severity": "error",
+      "then": {
+        "field": "meta",
+        "function": "truthy"
+      }
+    },
+    "ai-spec-version-required": {
+      "description": "AI specification must have version in meta",
+      "given": "$.meta",
+      "severity": "error",
+      "then": {
+        "field": "version",
+        "function": "truthy"
+      }
+    },
+    "ai-spec-requirements-required": {
+      "description": "AI specification must have requirements section",
+      "given": "$",
+      "severity": "error",
+      "then": {
+        "field": "requirements",
+        "function": "truthy"
+      }
+    },
+    "ai-spec-acceptance-criteria-required": {
+      "description": "AI specification must have acceptance criteria",
+      "given": "$",
+      "severity": "error",
+      "then": {
+        "field": "acceptanceCriteria",
+        "function": "truthy"
+      }
+    },
+    "ai-spec-trace-required": {
+      "description": "AI specification must have traceability mapping",
+      "given": "$",
+      "severity": "error",
+      "then": {
+        "field": "trace",
+        "function": "truthy"
+      }
+    },
+    "requirement-statement-required": {
+      "description": "Each requirement must have a statement",
+      "given": "$.requirements[*]",
+      "severity": "error",
+      "then": {
+        "field": "statement",
+        "function": "truthy"
+      }
+    },
+    "requirement-rationale-required": {
+      "description": "Each requirement must have a rationale",
+      "given": "$.requirements[*]",
+      "severity": "error",
+      "then": {
+        "field": "rationale",
+        "function": "truthy"
+      }
+    },
+    "requirement-priority-required": {
+      "description": "Each requirement must have a priority",
+      "given": "$.requirements[*]",
+      "severity": "error",
+      "then": {
+        "field": "priority",
+        "function": "truthy"
+      }
+    },
+    "acceptance-criteria-description-required": {
+      "description": "Each acceptance criteria must have a description",
+      "given": "$.acceptanceCriteria[*]",
+      "severity": "error",
+      "then": {
+        "field": "description",
+        "function": "truthy"
+      }
+    },
+    "acceptance-criteria-test-procedure-required": {
+      "description": "Each acceptance criteria must have a test procedure",
+      "given": "$.acceptanceCriteria[*]",
+      "severity": "error",
+      "then": {
+        "field": "testProcedure",
+        "function": "truthy"
+      }
+    },
+    "acceptance-criteria-success-criteria-required": {
+      "description": "Each acceptance criteria must have success criteria",
+      "given": "$.acceptanceCriteria[*]",
+      "severity": "error",
+      "then": {
+        "field": "successCriteria",
+        "function": "truthy"
+      }
+    }
+  }
+}
