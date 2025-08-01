@@ -1,0 +1,127 @@
+name: ART Dataset Cache
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force re-download dataset"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  fetch-dataset:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 requests click
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Fetch ART dataset
+        run: |
+          python tools/art_fetch.py --force=${{ github.event.inputs.force == 'true' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Verify dataset checksum
+        run: |
+          python tools/art_fetch.py --verify
+
+      - name: Cache dataset path
+        id: cache-path
+        run: |
+          DATASET_PATH=$(python tools/art_fetch.py --path)
+          echo "dataset_path=$DATASET_PATH" >> $GITHUB_OUTPUT
+
+      - name: Check dataset size
+        run: |
+          DATASET_PATH=$(python tools/art_fetch.py --path)
+          if [ -f "$DATASET_PATH" ]; then
+            SIZE=$(wc -l < "$DATASET_PATH")
+            echo "Dataset contains $SIZE lines"
+            if [ "$SIZE" -lt 1000 ]; then
+              echo "Warning: Dataset seems too small"
+              exit 1
+            fi
+          else
+            echo "Dataset file not found"
+            exit 1
+          fi
+
+      - name: Validate JSONL format
+        run: |
+          DATASET_PATH=$(python tools/art_fetch.py --path)
+          if [ -f "$DATASET_PATH" ]; then
+            # Check first 10 lines for valid JSON
+            head -10 "$DATASET_PATH" | python -m json.tool > /dev/null
+            echo "✓ JSONL format validated"
+          else
+            echo "Dataset file not found"
+            exit 1
+          fi
+
+      - name: Check behavior categories
+        run: |
+          DATASET_PATH=$(python tools/art_fetch.py --path)
+          if [ -f "$DATASET_PATH" ]; then
+            # Extract unique behavior categories
+            BEHAVIORS=$(head -100 "$DATASET_PATH" | grep -o '"behavior":"[^"]*"' | cut -d'"' -f4 | sort | uniq)
+            echo "Found behavior categories:"
+            echo "$BEHAVIORS"
+            
+            # Check for expected categories
+            EXPECTED_CATEGORIES="confidentiality policy override budget"
+            for category in $EXPECTED_CATEGORIES; do
+              if echo "$BEHAVIORS" | grep -q "$category"; then
+                echo "✓ Found category: $category"
+              else
+                echo "✗ Missing category: $category"
+                exit 1
+              fi
+            done
+          else
+            echo "Dataset file not found"
+            exit 1
+          fi
+
+      - name: Upload dataset cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: art-dataset-cache
+          path: ${{ steps.cache-path.outputs.dataset_path }}
+          retention-days: 7
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "ART dataset cache job failed"
+          # TODO: Add notification logic (Slack, email, etc.)
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "ART dataset cache job completed successfully"
+          DATASET_PATH=$(python tools/art_fetch.py --path)
+          SIZE=$(wc -l < "$DATASET_PATH")
+          echo "Dataset cached: $SIZE entries"

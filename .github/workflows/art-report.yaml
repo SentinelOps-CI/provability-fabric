@@ -1,0 +1,43 @@
+name: ART Report Generation
+
+on:
+  workflow_run:
+    workflows: ["ART Benchmark"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install matplotlib pandas seaborn requests
+          
+      - name: Generate ART Overview Chart
+        run: |
+          python scripts/generate_art_chart.py
+          
+      - name: Update Badge
+        run: |
+          python scripts/update_art_badge.py
+          
+      - name: Commit and Push Changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/img/art_overview.png
+          git commit -m "Update ART overview chart and badge" || exit 0
+          git push 

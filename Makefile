@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
-.PHONY: help build test lint clean release docs compliance insurance insights
+.PHONY: help build test lint clean release docs compliance insurance insights art
 
 help: ## Show this help message
 	@echo "Provability-Fabric Makefile"
@@ -186,3 +186,28 @@ install-tools: ## Install development tools
 	npm install -g @stoplight/spectral-cli
 	curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
 	curl -sfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.0.0
+
+art: ## Run ART benchmark (requires ART_PREVIEW=true)
+	@echo "Running ART benchmark..."
+	@if [ "$$ART_PREVIEW" != "true" ]; then \
+		echo "Error: ART_PREVIEW=true is required to run ART benchmark"; \
+		echo "Usage: ART_PREVIEW=true make art"; \
+		exit 1; \
+	fi
+	@# Fetch dataset if not cached
+	@if [ ! -f "$$HOME/.cache/art/art_dataset.jsonl" ]; then \
+		echo "Fetching ART dataset..."; \
+		python tools/art_fetch.py; \
+	fi
+	@# Convert dataset to bundles
+	@if [ ! -d "bundles/art" ]; then \
+		echo "Converting ART dataset to bundles..."; \
+		python scripts/art_to_bundle.py $$HOME/.cache/art/art_dataset.jsonl bundles/art/; \
+	fi
+	@# Lint ART bundles
+	@echo "Linting ART bundles..."
+	pf lint bundles/art/*
+	@# Run ART benchmark (single shard)
+	@echo "Running ART benchmark..."
+	python tests/art_runner.py --shard 1/1
+	@echo "✅ ART benchmark completed successfully"

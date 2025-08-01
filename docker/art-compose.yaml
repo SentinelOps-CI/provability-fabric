@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+# ART Docker Compose Configuration
+
+version: "3.8"
+
+services:
+  # Mock LLM Agent (Echo Service)
+  agent:
+    image: busybox:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./art-agent.sh:/agent.sh:ro
+    command: ["/agent.sh"]
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - PORT=3000
+    networks:
+      - art-network
+
+  # Sidecar Watcher
+  watcher:
+    image: busybox:latest
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./art-watcher.sh:/watcher.sh:ro
+    command: ["/watcher.sh"]
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - PORT=3001
+      - PROOFMETER_URL=http://proofmeter:8080
+    depends_on:
+      - proofmeter
+    networks:
+      - art-network
+
+  # ProofMeter Stub
+  proofmeter:
+    image: busybox:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./art-proofmeter.sh:/proofmeter.sh:ro
+    command: ["/proofmeter.sh"]
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      - PORT=8080
+    networks:
+      - art-network
+
+networks:
+  art-network:
+    driver: bridge
+
+volumes:
+  art-data: 
