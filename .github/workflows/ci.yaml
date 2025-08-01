@@ -127,7 +127,7 @@ jobs:
           # Build core lean libs
           cd core/lean-libs
           lake build
-          
+
           # Build spec templates  
           cd ../../spec-templates/v1/proofs
           lake build
@@ -234,7 +234,7 @@ jobs:
         run: |
           # Install integration test dependencies
           pip install -r tests/integration/requirements.txt
-          
+
           # Run integration tests with timeout
           timeout 20m pytest tests/integration/ -v
 
