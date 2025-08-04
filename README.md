@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
-[![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/provability-fabric/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
+[![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/fraware/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
 
 An open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification.
 
