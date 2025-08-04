@@ -33,6 +33,12 @@ export const Header: React.FC = () => {
               to="/"
               className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
             >
+              Dashboard
+            </Link>
+            <Link
+              to="/packages"
+              className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
+            >
               Packages
             </Link>
             <Link
@@ -87,6 +93,13 @@ export const Header: React.FC = () => {
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
               <Link
                 to="/"
+                className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/packages"
                 className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
