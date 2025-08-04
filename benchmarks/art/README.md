@@ -137,7 +137,7 @@ python tests/art_runner.py --shard 1/1 --attack-id 123
 
 ## References
 
-- [ART Paper](https://arxiv.org/abs/2404.00702)
+- [ART Paper]([https://arxiv.org/abs/2404.00702](https://arxiv.org/abs/2507.20526#:~:text=We%20use%20these%20results%20to,transferability%20across%20models%20and%20tasks.))
 
 ## Contributing
 
