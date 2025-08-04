@@ -14,7 +14,7 @@ An open-source framework that binds every AI agent container image to a machine-
 
 ```bash
 # Install the CLI
-go install github.com/provability-fabric/pf@latest
+go install github.com/fraware/provability-fabric/pf@latest
 
 # Initialize a new agent specification
 pf init my-agent
