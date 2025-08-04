@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -253,7 +254,6 @@ func riskscoreCmd() *cobra.Command {
 }
 
 func copyDir(src, dst string) error {
-	// Simplified directory copy - in production, use a proper file copy library
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -270,9 +270,21 @@ func copyDir(src, dst string) error {
 			return os.MkdirAll(dstPath, info.Mode())
 		}
 
-		// For files, we'd copy the content
-		// This is a simplified version
-		return nil
+		// Copy file content
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(dstPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		_, err = dstFile.ReadFrom(srcFile)
+		return err
 	})
 }
 
@@ -516,7 +528,7 @@ func queryPodRisk(podName, ledgerURL string, jsonOutput bool) error {
 	}
 
 	// Get pod
-	pod, err := clientset.CoreV1().Pods("default").Get(podName, metav1.GetOptions{})
+	pod, err := clientset.CoreV1().Pods("default").Get(context.Background(), podName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get pod %s: %w", podName, err)
 	}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   StarIcon, 
-  DownloadIcon, 
+  ArrowDownTrayIcon, 
   CalendarIcon, 
   UserIcon, 
   CodeBracketIcon,
@@ -137,7 +137,7 @@ export const PackageDetail: React.FC = () => {
             {pkg.author}
           </div>
           <div className="flex items-center">
-            <DownloadIcon className="h-4 w-4 mr-2" />
+                            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
             {pkg.downloads} downloads
           </div>
           <div className="flex items-center">
