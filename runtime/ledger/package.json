@@ -6,7 +6,12 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
+    "dev:simple": "npx tsx src/simple-server.ts",
+    "dev:js": "node simple-server.js",
+    "dev:working": "npx tsx src/index-simple.ts",
+    "dev:minimal": "node minimal-server.js",
+    "dev:production": "npx tsx src/index-production.ts",
     "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -24,7 +29,9 @@
     "cors": "^2.8.5",
     "body-parser": "^1.20.2",
     "pdf-lib": "^1.17.1",
-    "date-fns": "^2.30.0"
+    "date-fns": "^2.30.0",
+    "axios": "^1.6.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -39,5 +46,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "type": "module",
   "license": "Apache-2.0"
 } 

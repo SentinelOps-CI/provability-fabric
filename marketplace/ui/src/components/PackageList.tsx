@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { StarIcon, DownloadIcon, CalendarIcon, UserIcon } from '@heroicons/react/24/outline';
+import { StarIcon, ArrowDownTrayIcon, CalendarIcon, UserIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { marketplaceAPI } from '../services/api';
 import { Package } from '../types';
@@ -165,7 +165,7 @@ export const PackageList: React.FC = () => {
                   {pkg.author}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
-                  <DownloadIcon className="h-4 w-4 mr-2" />
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                   {pkg.downloads} downloads
                 </div>
                 <div className="flex items-center text-sm text-gray-500">

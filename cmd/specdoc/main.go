@@ -4,24 +4,21 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
 
 type SpecDoc struct {
-	Meta            map[string]interface{} `yaml:"meta"`
-	Requirements    map[string]Requirement `yaml:"requirements"`
-	NonFunctional   map[string]Requirement `yaml:"nonFunctional"`
-	AcceptanceCriteria map[string]Criterion `yaml:"acceptanceCriteria"`
-	Trace           map[string][]string    `yaml:"trace"`
+	Meta               map[string]interface{} `yaml:"meta"`
+	Requirements       map[string]Requirement `yaml:"requirements"`
+	NonFunctional      map[string]Requirement `yaml:"nonFunctional"`
+	AcceptanceCriteria map[string]Criterion   `yaml:"acceptanceCriteria"`
+	Trace              map[string][]string    `yaml:"trace"`
 }
 
 type Requirement struct {
@@ -38,12 +35,13 @@ type Criterion struct {
 }
 
 type DocData struct {
-	ID              string
-	Requirements    []RequirementItem
-	NonFunctional   []RequirementItem
+	ID                 string
+	Requirements       []RequirementItem
+	NonFunctional      []RequirementItem
 	AcceptanceCriteria []CriterionItem
-	Traceability    string
-	LedgerQuery     string
+	Traceability       string
+	LedgerQuery        string
+	GeneratedAt        string
 }
 
 type RequirementItem struct {
@@ -60,69 +58,6 @@ type CriterionItem struct {
 	Description string
 	TestVector  string
 }
-
-const markdownTemplate = `# Specification Documentation: {{.ID}}
-
-## Requirements
-
-| ID | Statement | Rationale | Metric | Owner | Priority |
-|----|-----------|-----------|--------|-------|----------|
-{{range .Requirements}}| {{.ID}} | {{.Statement}} | {{.Rationale}} | {{.Metric}} | {{.Owner}} | {{.Priority}} |
-{{end}}
-
-## Non-Functional Requirements
-
-| ID | Statement | Rationale | Metric | Owner | Priority |
-|----|-----------|-----------|--------|-------|----------|
-{{range .NonFunctional}}| {{.ID}} | {{.Statement}} | {{.Rationale}} | {{.Metric}} | {{.Owner}} | {{.Priority}} |
-{{end}}
-
-## Acceptance Criteria
-
-| ID | Description | Test Vector |
-|----|-------------|-------------|
-{{range .AcceptanceCriteria}}| {{.ID}} | {{.Description}} | {{.TestVector}} |
-{{end}}
-
-## Traceability Matrix
-
-{{.Traceability}}
-
-## Ledger Risk History
-
-To query the risk history for this specification in the ledger:
-
-```graphql
-{{.LedgerQuery}}
-```
-
-## Generated on {{.GeneratedAt}}
-`
-
-const mermaidTemplate = `graph TD
-    {{range .Requirements}}
-    {{.ID}}[{{.ID}}<br/>{{.Statement}}]
-    {{end}}
-    
-    {{range .AcceptanceCriteria}}
-    {{.ID}}_AC[{{.ID}}<br/>{{.Description}}]
-    {{end}}
-    
-    {{range .TraceabilityLinks}}
-    {{.From}} --> {{.To}}
-    {{end}}
-    
-    classDef requirement fill:#e1f5fe
-    classDef criterion fill:#f3e5f5
-    
-    {{range .Requirements}}
-    class {{.ID}} requirement
-    {{end}}
-    
-    {{range .AcceptanceCriteria}}
-    class {{.ID}}_AC criterion
-    {{end}}
-`
 
 func main() {
 	if len(os.Args) < 3 {
@@ -218,12 +153,13 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 
 	// Prepare template data
 	data := DocData{
-		ID:                id,
-		Requirements:      requirements,
-		NonFunctional:     nonFunctional,
+		ID:                 id,
+		Requirements:       requirements,
+		NonFunctional:      nonFunctional,
 		AcceptanceCriteria: acceptanceCriteria,
-		Traceability:      traceability,
-		LedgerQuery:       ledgerQuery,
+		Traceability:       traceability,
+		LedgerQuery:        ledgerQuery,
+		GeneratedAt:        "2025-01-27",
 	}
 
 	// Create output directory
@@ -232,11 +168,8 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	// Generate markdown
-	tmpl, err := template.New("specdoc").Parse(markdownTemplate)
-	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
-	}
+	// Generate markdown using string concatenation instead of template
+	markdown := generateMarkdown(data)
 
 	file, err := os.Create(outputFile)
 	if err != nil {
@@ -244,11 +177,68 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 	}
 	defer file.Close()
 
-	if err := tmpl.Execute(file, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
+	if _, err := file.WriteString(markdown); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
 	return nil
+}
+
+func generateMarkdown(data DocData) string {
+	var lines []string
+
+	lines = append(lines, "# Specification Documentation: "+data.ID)
+	lines = append(lines, "")
+	lines = append(lines, "## Requirements")
+	lines = append(lines, "")
+	lines = append(lines, "| ID | Statement | Rationale | Metric | Owner | Priority |")
+	lines = append(lines, "|----|-----------|-----------|--------|-------|----------|")
+
+	for _, req := range data.Requirements {
+		lines = append(lines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |",
+			req.ID, req.Statement, req.Rationale, req.Metric, req.Owner, req.Priority))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, "## Non-Functional Requirements")
+	lines = append(lines, "")
+	lines = append(lines, "| ID | Statement | Rationale | Metric | Owner | Priority |")
+	lines = append(lines, "|----|-----------|-----------|--------|-------|----------|")
+
+	for _, req := range data.NonFunctional {
+		lines = append(lines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |",
+			req.ID, req.Statement, req.Rationale, req.Metric, req.Owner, req.Priority))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, "## Acceptance Criteria")
+	lines = append(lines, "")
+	lines = append(lines, "| ID | Description | Test Vector |")
+	lines = append(lines, "|----|-------------|-------------|")
+
+	for _, ac := range data.AcceptanceCriteria {
+		lines = append(lines, fmt.Sprintf("| %s | %s | %s |",
+			ac.ID, ac.Description, ac.TestVector))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, "## Traceability Matrix")
+	lines = append(lines, "")
+	lines = append(lines, data.Traceability)
+
+	lines = append(lines, "")
+	lines = append(lines, "## Ledger Risk History")
+	lines = append(lines, "")
+	lines = append(lines, "To query the risk history for this specification in the ledger:")
+	lines = append(lines, "")
+	lines = append(lines, "```graphql")
+	lines = append(lines, data.LedgerQuery)
+	lines = append(lines, "```")
+
+	lines = append(lines, "")
+	lines = append(lines, "## Generated on "+data.GeneratedAt)
+
+	return strings.Join(lines, "\n")
 }
 
 func extractID(outputFile string) string {

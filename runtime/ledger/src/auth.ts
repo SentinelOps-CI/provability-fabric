@@ -2,7 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 import { Request, Response, NextFunction } from 'express'
-import jwt from 'express-jwt'
+import { expressjwt as jwt } from 'express-jwt'
 import jwksRsa from 'jwks-rsa'
 import { PrismaClient } from '@prisma/client'
 
@@ -13,6 +13,9 @@ export interface AuthenticatedRequest extends Request {
     sub: string
     tid: string
     email: string
+  }
+  tenantFilter?: {
+    tenantId: string
   }
 }
 
