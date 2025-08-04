@@ -162,8 +162,7 @@ We welcome contributions! Please see our [Contributing Guide](docs/community/gov
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric/provability-fabric.git
-cd provability-fabric
+git clone https://github.com/fraware/provability-fabric.git
 
 # Install dependencies
 go mod download
