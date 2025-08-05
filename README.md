@@ -339,10 +339,10 @@ If you encounter path-related errors in Git Bash on Windows:
 
 3. **Command interpretation**: Git Bash interprets backslashes as escape characters:
    ```bash
-   # ✅ Correct
+   # Correct
    export PATH=$PATH:$(pwd)/core/cli/pf
    
-   # ❌ Incorrect
+   # Incorrect
    export PATH=$PATH:$(pwd)\core\cli\pf
    ```
 
