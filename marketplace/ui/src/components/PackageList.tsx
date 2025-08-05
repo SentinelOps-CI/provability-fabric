@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { StarIcon, ArrowDownTrayIcon, CalendarIcon, UserIcon } from '@heroicons/react/24/outline';
+import { StarIcon, ArrowDownTrayIcon, CalendarIcon, UserIcon, CloudArrowDownIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { marketplaceAPI } from '../services/api';
 import { Package } from '../types';
@@ -13,6 +13,7 @@ export const PackageList: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('');
   const [installing, setInstalling] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     loadPackages();
@@ -55,6 +56,18 @@ export const PackageList: React.FC = () => {
       console.error('Installation error:', err);
     } finally {
       setInstalling(null);
+    }
+  };
+
+  const handleDownload = async (pkg: Package) => {
+    try {
+      setDownloading(pkg.id);
+      await marketplaceAPI.downloadPackage(pkg.id);
+    } catch (err) {
+      alert('Download failed. Please try again.');
+      console.error('Download error:', err);
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -204,6 +217,13 @@ export const PackageList: React.FC = () => {
                 >
                   Details
                 </Link>
+                <button
+                  onClick={() => handleDownload(pkg)}
+                  disabled={downloading === pkg.id}
+                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {downloading === pkg.id ? 'Downloading...' : 'Download'}
+                </button>
                 <button
                   onClick={() => handleInstall(pkg)}
                   disabled={installing === pkg.id}

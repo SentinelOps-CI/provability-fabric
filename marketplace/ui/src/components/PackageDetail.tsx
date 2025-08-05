@@ -7,7 +7,8 @@ import {
   UserIcon, 
   CodeBracketIcon,
   GlobeAltIcon,
-  TagIcon
+  TagIcon,
+  CloudArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { marketplaceAPI } from '../services/api';
 import { Package } from '../types';
@@ -19,6 +20,7 @@ export const PackageDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -65,6 +67,20 @@ export const PackageDetail: React.FC = () => {
       console.error('Installation error:', err);
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!pkg) return;
+
+    try {
+      setDownloading(true);
+      await marketplaceAPI.downloadPackage(pkg.id);
+    } catch (err) {
+      alert('Download failed. Please try again.');
+      console.error('Download error:', err);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -121,13 +137,22 @@ export const PackageDetail: React.FC = () => {
             </div>
             <p className="text-lg text-gray-600">{pkg.description}</p>
           </div>
-          <button
-            onClick={handleInstall}
-            disabled={installing}
-            className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {installing ? 'Installing...' : 'Install Package'}
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="bg-green-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloading ? 'Downloading...' : 'Download'}
+            </button>
+            <button
+              onClick={handleInstall}
+              disabled={installing}
+              className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {installing ? 'Installing...' : 'Install Package'}
+            </button>
+          </div>
         </div>
 
         {/* Metadata */}
