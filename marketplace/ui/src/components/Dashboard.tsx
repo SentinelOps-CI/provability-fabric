@@ -34,28 +34,50 @@ export const Dashboard: React.FC = () => {
       
       // Load marketplace packages
       const packagesResponse = await marketplaceAPI.getPackages();
-      setPackages(packagesResponse.packages);
+      setPackages(packagesResponse.packages || []);
       
       // Load ledger data
-      const ledgerResponse = await fetch('http://localhost:8080/tenant/dev-tenant/capsules');
-      const ledgerData = await ledgerResponse.json();
-      setLedgerData(ledgerData);
+      try {
+        const ledgerResponse = await fetch('http://localhost:8080/tenant/dev-tenant/capsules');
+        if (ledgerResponse.ok) {
+          const ledgerData = await ledgerResponse.json();
+          setLedgerData(ledgerData);
+        } else {
+          console.warn('Ledger API not available, using mock data');
+          setLedgerData({ capsules: [] });
+        }
+      } catch (ledgerError) {
+        console.warn('Ledger API error, using mock data:', ledgerError);
+        setLedgerData({ capsules: [] });
+      }
       
       // Calculate stats
-      const totalDownloads = packagesResponse.packages.reduce((sum, pkg) => sum + pkg.downloads, 0);
-      const averageRating = packagesResponse.packages.reduce((sum, pkg) => sum + pkg.rating, 0) / packagesResponse.packages.length;
+      const totalDownloads = (packagesResponse.packages || []).reduce((sum, pkg) => sum + pkg.downloads, 0);
+      const averageRating = (packagesResponse.packages || []).length > 0 
+        ? (packagesResponse.packages || []).reduce((sum, pkg) => sum + pkg.rating, 0) / (packagesResponse.packages || []).length
+        : 0;
       
       setStats({
-        totalPackages: packagesResponse.packages.length,
+        totalPackages: (packagesResponse.packages || []).length,
         totalDownloads,
         averageRating: Math.round(averageRating * 10) / 10,
         activeTenants: 1, // Mock data
-        totalCapsules: ledgerData.capsules?.length || 0,
+        totalCapsules: ledgerData?.capsules?.length || 0,
         totalQuotes: 0 // Mock data
       });
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Set default values on error
+      setPackages([]);
+      setStats({
+        totalPackages: 0,
+        totalDownloads: 0,
+        averageRating: 0,
+        activeTenants: 0,
+        totalCapsules: 0,
+        totalQuotes: 0
+      });
     } finally {
       setLoading(false);
     }
@@ -73,13 +95,37 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Provability-Fabric Dashboard
-        </h1>
-        <p className="text-gray-600">
-          AI Agent Verification Platform - Marketplace & Ledger Integration
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Provability-Fabric Dashboard
+            </h1>
+            <p className="text-gray-600">
+              AI Agent Verification Platform - Marketplace & Ledger Integration
+            </p>
+          </div>
+          <button
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+        </div>
       </div>
+
+      {/* Debug Info (Development Only) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Debug Information</h3>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <p>API Base URL: {process.env.REACT_APP_API_URL || 'http://localhost:8080'}</p>
+            <p>Packages Loaded: {packages.length}</p>
+            <p>Ledger Data: {ledgerData ? 'Available' : 'Not Available'}</p>
+            <p>Last Updated: {new Date().toLocaleTimeString()}</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -149,7 +195,7 @@ export const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Recent Packages</h2>
           <Link 
-            to="/" 
+            to="/packages" 
             className="text-primary-600 hover:text-primary-700 font-medium"
           >
             View All →
@@ -219,7 +265,7 @@ export const Dashboard: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link 
-            to="/" 
+            to="/packages" 
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
           >
             <CubeIcon className="h-6 w-6 text-blue-600 mr-3" />
@@ -235,15 +281,47 @@ export const Dashboard: React.FC = () => {
           </Link>
           
           <button 
-            onClick={() => window.open('http://localhost:8080/graphql', '_blank')}
+            onClick={() => {
+              // Try to connect to GraphQL API, show alert if not available
+              fetch('http://localhost:4000/graphql', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: '{ __typename }' })
+              })
+              .then(response => {
+                if (response.ok) {
+                  window.open('http://localhost:4000/graphql', '_blank');
+                } else {
+                  alert('GraphQL API is not available. The ledger service needs to be started.');
+                }
+              })
+              .catch(() => {
+                alert('GraphQL API is not available. The ledger service needs to be started.');
+              });
+            }}
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
           >
-                          <Cog6ToothIcon className="h-6 w-6 text-orange-600 mr-3" />
+            <Cog6ToothIcon className="h-6 w-6 text-orange-600 mr-3" />
             <span className="font-medium text-gray-900">GraphQL API</span>
           </button>
           
           <button 
-            onClick={() => window.open('http://localhost:8080/health', '_blank')}
+            onClick={() => {
+              // Try to connect to health endpoint, show alert if not available
+              fetch('http://localhost:8080/health')
+              .then(response => {
+                if (response.ok) {
+                  window.open('http://localhost:8080/health', '_blank');
+                } else {
+                  alert('Health Check endpoint is not available.');
+                }
+              })
+              .catch(() => {
+                alert('Health Check endpoint is not available.');
+              });
+            }}
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
           >
             <ShieldCheckIcon className="h-6 w-6 text-purple-600 mr-3" />
