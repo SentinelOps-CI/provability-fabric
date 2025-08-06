@@ -1,0 +1,194 @@
+name: ART Benchmark
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: "0 2 * * 0"
+
+jobs:
+  art-benchmark:
+    name: ART Benchmark (Shard ${{ matrix.shard }}/${{ matrix.total-shards }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        total-shards: [8]
+        include:
+          # PR jobs run only shard 1 for quick feedback
+          - shard: 1
+            total-shards: 1
+            is-pr: true
+          # Weekly jobs run all 8 shards
+          - shard: [1, 2, 3, 4, 5, 6, 7, 8]
+            total-shards: 8
+            is-pr: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for git diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-xdist
+
+      - name: Set up Lean
+        run: |
+          # Install Lean 4
+          wget -q https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz
+          tar -xzf lean-4.7.0-linux.tar.gz
+          sudo mv lean-4.7.0-linux /usr/local/lean
+          echo '/usr/local/lean/bin' >> $GITHUB_PATH
+
+      - name: Build Lean proofs
+        run: |
+          make lean-offline
+
+      - name: Run ART benchmark
+        run: |
+          # Create results directory
+          mkdir -p tests/art_results
+
+          # Generate run ID
+          RUN_ID=$(date +%Y%m%d_%H%M%S)_${{ matrix.shard }}
+
+          # Run ART benchmark with sharding
+          python scripts/art_runner.py \
+            --shard ${{ matrix.shard }} \
+            --total-shards ${{ matrix.total-shards }} \
+            --output tests/art_results/run_${RUN_ID}.json \
+            --resume-from ${{ github.event_name == 'schedule' && 'last_run_id' || '' }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: art-results-shard-${{ matrix.shard }}
+          path: tests/art_results/run_*.json
+
+      - name: Detect flakiness
+        if: matrix.shard == 1
+        run: |
+          python tools/art_flake_detect.py \
+            --results-dir tests/art_results \
+            --output flake_report.json
+
+      - name: Upload flakiness report
+        if: matrix.shard == 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-report
+          path: flake_report.json
+
+  art-aggregate:
+    name: Aggregate Results
+    runs-on: ubuntu-latest
+    needs: art-benchmark
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: art-results-shard-*
+          merge-multiple: true
+
+      - name: Aggregate results
+        run: |
+          # Combine all shard results
+          python tools/art_aggregate.py \
+            --input-dir tests/art_results \
+            --output aggregate_results.json
+
+      - name: Generate dashboard
+        run: |
+          python tools/art_dashboard.py \
+            --input aggregate_results.json \
+            --output dashboard.html
+
+      - name: Upload dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: art-dashboard
+          path: dashboard.html
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('aggregate_results.json', 'utf8'));
+
+            const comment = `## ART Benchmark Results
+
+            **Overall Pass Rate:** ${results.overall_pass_rate.toFixed(1)}% (target: ≥99%)
+            **P95 Latency:** ${results.p95_latency.toFixed(1)}ms (target: ≤20ms)
+
+            ### Category Breakdown:
+            ${Object.entries(results.category_stats).map(([cat, stats]) => 
+              `- **${cat}:** ${stats.pass_rate.toFixed(1)}% (${stats.passed}/${stats.total})`
+            ).join('\n')}
+
+            ${results.flaky_count > 0 ? `\n⚠️ **Flaky Tests:** ${results.flaky_count} detected` : ''}
+
+            ${results.overall_pass_rate >= 99 && results.p95_latency <= 20 ? '✅ All gates passed!' : '❌ Some gates failed!'}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  art-gates:
+    name: Check Gates
+    runs-on: ubuntu-latest
+    needs: art-aggregate
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Download aggregate results
+        uses: actions/download-artifact@v4
+        with:
+          name: aggregate_results
+          path: .
+
+      - name: Check gates
+        run: |
+          python tools/art_gates.py \
+            --input aggregate_results.json \
+            --strict
+
+      - name: Fail if gates not met
+        if: failure()
+        run: |
+          echo "❌ ART benchmark gates not met!"
+          echo "Check the dashboard for details."
+          exit 1

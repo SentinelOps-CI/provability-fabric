@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
-.PHONY: help build test lint clean release docs compliance insurance insights
+.PHONY: help build test lint clean release docs compliance insurance insights lean-offline
 
 help: ## Show this help message
 	@echo "Provability-Fabric Makefile"
@@ -185,4 +185,67 @@ install-tools: ## Install development tools
 	cargo install cargo-fuzz
 	npm install -g @stoplight/spectral-cli
 	curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
-	curl -sfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.0.0
+	curl -sfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v0.1.0
+
+lean-offline: ## Build Lean proofs in offline mode
+	@echo "🔧 Building Lean proofs in offline mode..."
+	@# Check if vendor/mathlib exists
+	@if [ ! -d "vendor/mathlib" ]; then \
+		echo "❌ vendor/mathlib not found. Running vendor script..."; \
+		if [ -f "scripts/vendor-mathlib.sh" ]; then \
+			chmod +x scripts/vendor-mathlib.sh; \
+			./scripts/vendor-mathlib.sh; \
+		elif [ -f "scripts/vendor-mathlib.bat" ]; then \
+			scripts/vendor-mathlib.bat; \
+		else \
+			echo "❌ No vendor script found!"; \
+			exit 1; \
+		fi; \
+	fi
+	@# Verify mathlib commit
+	@cd vendor/mathlib && \
+		EXPECTED_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac" && \
+		ACTUAL_COMMIT=$$(git rev-parse HEAD) && \
+		if [ "$$ACTUAL_COMMIT" != "$$EXPECTED_COMMIT" ]; then \
+			echo "❌ Mathlib commit mismatch! Expected: $$EXPECTED_COMMIT, Got: $$ACTUAL_COMMIT"; \
+			echo "Running vendor script to fix..."; \
+			cd ../.. && \
+			if [ -f "scripts/vendor-mathlib.sh" ]; then \
+				./scripts/vendor-mathlib.sh; \
+			else \
+				scripts/vendor-mathlib.bat; \
+			fi; \
+		fi
+	@echo "🔨 Building all Lean projects..."
+	@cd core/lean-libs && lake build
+	@cd ../../spec-templates/v1/proofs && lake build
+	@cd ../../../bundles/my-agent/proofs && lake build
+	@cd ../../test-new-user-agent/proofs && lake build
+	@echo "✅ All Lean proofs built successfully in offline mode!"
+
+lean-quick: ## Build only impacted Lean proofs
+	@echo "🚀 Building impacted Lean proofs only..."
+	@# Get impacted targets
+	@IMPACTED_TARGETS=$$(python3 tools/select_impacted.py . | grep -A 1000 "--- TARGETS ---" | tail -n +2) && \
+	if [ -n "$$IMPACTED_TARGETS" ]; then \
+		echo "Building impacted targets: $$IMPACTED_TARGETS"; \
+		for target in $$IMPACTED_TARGETS; do \
+			echo "Building $$target..."; \
+			cd $$target && lake build && cd -; \
+		done; \
+		echo "✅ Impacted Lean proofs built successfully!"; \
+	else \
+		echo "No impacted targets found, building core only..."; \
+		cd core/lean-libs && lake build; \
+		echo "✅ Core Lean proofs built successfully!"; \
+	fi
+
+lean-check-duplicates: ## Check for duplicate Lean definitions
+	@echo "🔍 Checking for duplicate Lean definitions..."
+	@chmod +x scripts/check-dup-lean.sh
+	@./scripts/check-dup-lean.sh
+
+lean-forbid-shadowing: ## Check for forbidden shadowing of core DSL
+	@echo "🔍 Checking for forbidden shadowing..."
+	@chmod +x scripts/forbid-shadowing.sh
+	@./scripts/forbid-shadowing.sh

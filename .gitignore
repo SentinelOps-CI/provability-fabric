@@ -139,6 +139,9 @@ htmlcov/
 .lake/
 lake-manifest.json
 
+# Exception: vendor/mathlib should be tracked
+!vendor/mathlib/
+
 # Database
 *.db
 *.sqlite

@@ -1,0 +1,67 @@
+name: "Provability-Fabric Security Analysis"
+
+# Paths to include in analysis
+paths:
+  - "core/cli/pf"
+  - "runtime/admission-controller"
+  - "runtime/sidecar-watcher"
+  - "runtime/attestor"
+  - "runtime/ledger"
+  - "marketplace/ui"
+  - "tools/specgraph"
+
+# Paths to exclude from analysis
+paths-ignore:
+  - "vendor"
+  - "node_modules"
+  - "target"
+  - ".lake"
+  - "tests"
+  - "docs"
+
+# Query suites to run
+queries:
+  # Security queries
+  - uses: security-and-quality
+  - uses: security-extended
+  
+  # Language-specific queries
+  - uses: go-security-and-quality.qls
+  - uses: javascript-security-and-quality.qls
+  - uses: cpp-security-and-quality.qls
+
+# Query filters
+query-filters:
+  - include:
+      tags contain: security
+  - include:
+      tags contain: external
+  - exclude:
+      tags contain: experimental
+
+# Disable specific queries that are not relevant
+disable-default-queries: false
+
+# Additional query packs
+query-suites:
+  - security-and-quality
+  - security-extended
+
+# Custom queries (if any)
+# queries:
+#   - uses: ./custom-queries
+
+# Analysis timeout
+timeout: 3600
+
+# Memory settings
+memory: 8192
+
+# Threads
+threads: 4
+
+# Build mode
+build-mode: manual
+
+# Debug mode (set to true for debugging)
+debug: false 

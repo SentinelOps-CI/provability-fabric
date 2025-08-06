@@ -1,0 +1,191 @@
+# Egress Firewall Policy Templates
+# Defines rules for when to block, redact, or allow text egress
+
+version: "1.0"
+description: "Policy templates for egress filtering and content safety"
+
+# Global settings
+global:
+  default_action: "redact"  # allow, redact, block
+  max_processing_time_ms: 5000
+  enable_audit_logging: true
+
+# PII handling policies
+pii_policies:
+  - name: "strict_pii_blocking"
+    description: "Block all PII egress"
+    rules:
+      - detector: "pii_detector"
+        categories: ["ssn", "credit_card", "drivers_license"]
+        action: "block"
+        confidence_threshold: 0.8
+        
+      - detector: "pii_detector" 
+        categories: ["email", "phone"]
+        action: "redact"
+        confidence_threshold: 0.7
+        
+  - name: "moderate_pii_filtering"
+    description: "Redact sensitive PII, allow contact info"
+    rules:
+      - detector: "pii_detector"
+        categories: ["ssn", "credit_card"]
+        action: "block"
+        confidence_threshold: 0.9
+        
+      - detector: "pii_detector"
+        categories: ["email", "phone"] 
+        action: "allow"
+        confidence_threshold: 0.5
+
+# Secret detection policies
+secret_policies:
+  - name: "strict_secret_blocking"
+    description: "Block all detected secrets"
+    rules:
+      - detector: "secret_detector"
+        categories: ["api_key", "password", "token", "private_key"]
+        action: "block"
+        confidence_threshold: 0.7
+        
+      - detector: "secret_detector"
+        categories: ["high_entropy"]
+        action: "block"
+        confidence_threshold: 0.9
+        
+  - name: "enterprise_secret_policy"
+    description: "Block high-value secrets, redact others"
+    rules:
+      - detector: "secret_detector"
+        categories: ["aws_access_key", "aws_secret_key", "private_key"]
+        action: "block"
+        confidence_threshold: 0.8
+        
+      - detector: "secret_detector"
+        categories: ["github_token", "slack_token"]
+        action: "redact"
+        confidence_threshold: 0.7
+
+# Memorization and training data policies
+memorization_policies:
+  - name: "strict_memorization_blocking"
+    description: "Block potential memorized training data"
+    rules:
+      - detector: "near_dupe_detector"
+        similarity_threshold: 0.7
+        action: "block"
+        
+  - name: "moderate_memorization_filtering"
+    description: "Block high-similarity content"
+    rules:
+      - detector: "near_dupe_detector"
+        similarity_threshold: 0.85
+        action: "block"
+        
+      - detector: "near_dupe_detector"
+        similarity_threshold: 0.7
+        action: "redact"
+
+# Content safety policies
+safety_policies:
+  - name: "toxicity_filtering"
+    description: "Filter toxic content"
+    rules:
+      - detector: "toxicity_detector"
+        toxicity_threshold: 0.8
+        action: "block"
+        
+      - detector: "toxicity_detector"
+        toxicity_threshold: 0.5
+        action: "redact"
+        
+  - name: "bias_detection"
+    description: "Detect and handle biased content"
+    rules:
+      - detector: "bias_detector"
+        bias_threshold: 0.7
+        action: "redact"
+
+# Tenant-specific policies
+tenant_policies:
+  - tenant: "healthcare_tenant"
+    policy_set: "strict_pii_blocking"
+    additional_rules:
+      - detector: "medical_info_detector"
+        action: "block"
+        confidence_threshold: 0.6
+        
+  - tenant: "financial_tenant" 
+    policy_set: "strict_secret_blocking"
+    additional_rules:
+      - detector: "financial_data_detector"
+        action: "redact"
+        confidence_threshold: 0.5
+        
+  - tenant: "education_tenant"
+    policy_set: "moderate_pii_filtering"
+    additional_rules:
+      - detector: "student_record_detector"
+        action: "redact"
+        confidence_threshold: 0.7
+
+# Emergency overrides
+emergency_overrides:
+  - name: "security_incident"
+    description: "Emergency blocking during security incidents"
+    enabled: false
+    rules:
+      - detector: "*"
+        action: "block"
+        confidence_threshold: 0.1
+        
+  - name: "compliance_audit"
+    description: "Enhanced logging during compliance audits"
+    enabled: false
+    enhanced_logging: true
+    log_full_content: false
+
+# Redaction templates
+redaction_templates:
+  email: "[EMAIL_REDACTED]"
+  phone: "[PHONE_REDACTED]"
+  ssn: "[SSN_REDACTED]"
+  credit_card: "[CREDIT_CARD_REDACTED]"
+  api_key: "[API_KEY_REDACTED]"
+  password: "[PASSWORD_REDACTED]"
+  high_entropy: "[SECRET_REDACTED]"
+  default: "[REDACTED]"
+
+# Allowlist patterns (bypass filtering)
+allowlist:
+  domains:
+    - "example.com"
+    - "test.internal"
+    
+  patterns:
+    - "test@example.com"  # Test email addresses
+    - "555-123-4567"      # Test phone numbers
+    
+  api_keys:
+    - "AKIATEST"          # Test AWS keys
+    - "ghp_test"          # Test GitHub tokens
+
+# Alert thresholds
+alerts:
+  high_risk_threshold: 0.9
+  repeated_violations: 5
+  time_window_minutes: 60
+  
+  notification_channels:
+    - type: "webhook"
+      url: "https://alerts.example.com/webhook"
+      
+    - type: "email"
+      recipients: ["security@example.com"]
+
+# Performance tuning
+performance:
+  max_text_length: 100000
+  parallel_detection: true
+  cache_results: true
+  cache_ttl_minutes: 30

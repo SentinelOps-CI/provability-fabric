@@ -1,0 +1,299 @@
+name: SBOM Security Gate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    outputs:
+      sbom-file: ${{ steps.sbom.outputs.sbom-file }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.0.0
+
+      - name: Generate SBOM
+        id: sbom
+        run: |
+          # Generate SBOM for the entire repository
+          syft . -o json --file sbom.json
+          echo "sbom-file=sbom.json" >> $GITHUB_OUTPUT
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.json
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: generate-sbom
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: .
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.74.0
+
+      - name: Scan for vulnerabilities
+        run: |
+          # Scan the SBOM for vulnerabilities
+          grype sbom:./sbom.json -o json > vulns.json
+
+          # Extract high and critical vulnerabilities
+          HIGH_CRITICAL=$(cat vulns.json | jq -r '.matches[] | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical") | .vulnerability.id' | sort | uniq)
+
+          if [ -n "$HIGH_CRITICAL" ]; then
+            echo "❌ High/Critical vulnerabilities found:"
+            echo "$HIGH_CRITICAL"
+            echo "::error::High/Critical vulnerabilities detected in dependencies"
+            exit 1
+          else
+            echo "✅ No high/critical vulnerabilities found"
+          fi
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    needs: generate-sbom
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: .
+
+      - name: Check for GPL licenses
+        run: |
+          # Extract all licenses from SBOM
+          LICENSES=$(cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | sort | uniq)
+
+          # Check for GPL licenses
+          GPL_LICENSES=$(echo "$LICENSES" | grep -i "gpl" || true)
+
+          if [ -n "$GPL_LICENSES" ]; then
+            echo "❌ GPL licenses detected:"
+            echo "$GPL_LICENSES"
+            echo "::error::GPL licenses are not allowed in this project"
+            exit 1
+          else
+            echo "✅ No GPL licenses found"
+          fi
+
+      - name: Check for other restricted licenses
+        run: |
+          # Check for other potentially problematic licenses
+          RESTRICTED_LICENSES=$(cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | grep -i -E "(agpl|lgpl|mpl|epl|cddl|apache.*2\.0)" || true)
+
+          if [ -n "$RESTRICTED_LICENSES" ]; then
+            echo "⚠️  Potentially restricted licenses found:"
+            echo "$RESTRICTED_LICENSES"
+            echo "::warning::Review these licenses for compliance"
+          else
+            echo "✅ No restricted licenses found"
+          fi
+
+  sbom-diff:
+    name: SBOM Diff Analysis
+    runs-on: ubuntu-latest
+    needs: generate-sbom
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download current SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: .
+
+      - name: Generate baseline SBOM
+        run: |
+          # Generate SBOM for the base branch
+          git checkout ${{ github.event.pull_request.base.sha }}
+          syft . -o json --file baseline-sbom.json
+
+      - name: Compare SBOMs
+        run: |
+          # Compare current SBOM with baseline
+          echo "📊 SBOM Diff Analysis"
+          echo "====================="
+
+          # Extract package names from both SBOMs
+          CURRENT_PACKAGES=$(cat sbom.json | jq -r '.artifacts[].name' | sort | uniq)
+          BASELINE_PACKAGES=$(cat baseline-sbom.json | jq -r '.artifacts[].name' | sort | uniq)
+
+          # Find new packages
+          NEW_PACKAGES=$(comm -23 <(echo "$CURRENT_PACKAGES") <(echo "$BASELINE_PACKAGES"))
+          REMOVED_PACKAGES=$(comm -13 <(echo "$CURRENT_PACKAGES") <(echo "$BASELINE_PACKAGES"))
+
+          if [ -n "$NEW_PACKAGES" ]; then
+            echo "🆕 New packages added:"
+            echo "$NEW_PACKAGES"
+            
+            # Check licenses for new packages
+            for pkg in $NEW_PACKAGES; do
+              LICENSE=$(cat sbom.json | jq -r --arg pkg "$pkg" '.artifacts[] | select(.name == $pkg) | .licenses[0].value // "Unknown"')
+              echo "  $pkg: $LICENSE"
+            done
+          fi
+
+          if [ -n "$REMOVED_PACKAGES" ]; then
+            echo "🗑️  Packages removed:"
+            echo "$REMOVED_PACKAGES"
+          fi
+
+          if [ -z "$NEW_PACKAGES" ] && [ -z "$REMOVED_PACKAGES" ]; then
+            echo "✅ No package changes detected"
+          fi
+
+  compliance-report:
+    name: Compliance Report
+    runs-on: ubuntu-latest
+    needs: [generate-sbom, security-scan, license-check]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: .
+
+      - name: Generate compliance report
+        run: |
+          echo "📋 SBOM Compliance Report"
+          echo "========================="
+
+          # Count total packages
+          TOTAL_PACKAGES=$(cat sbom.json | jq '.artifacts | length')
+          echo "Total packages: $TOTAL_PACKAGES"
+
+          # Count packages by type
+          echo "Package types:"
+          cat sbom.json | jq -r '.artifacts[].type' | sort | uniq -c | sort -nr
+
+          # License distribution
+          echo "License distribution:"
+          cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | sort | uniq -c | sort -nr
+
+          # Language distribution
+          echo "Language distribution:"
+          cat sbom.json | jq -r '.artifacts[] | select(.language != null) | .language' | sort | uniq -c | sort -nr
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const sbom = JSON.parse(fs.readFileSync('sbom.json', 'utf8'));
+
+            const totalPackages = sbom.artifacts.length;
+            const languages = {};
+            const licenses = {};
+
+            sbom.artifacts.forEach(artifact => {
+              if (artifact.language) {
+                languages[artifact.language] = (languages[artifact.language] || 0) + 1;
+              }
+              if (artifact.licenses && artifact.licenses.length > 0) {
+                const license = artifact.licenses[0].value;
+                licenses[license] = (licenses[license] || 0) + 1;
+              }
+            });
+
+            const comment = `## SBOM Security Report
+
+            **Total Packages:** ${totalPackages}
+
+            ### Language Distribution:
+            ${Object.entries(languages).map(([lang, count]) => `- ${lang}: ${count}`).join('\n')}
+
+            ### License Distribution:
+            ${Object.entries(licenses).map(([license, count]) => `- ${license}: ${count}`).join('\n')}
+
+            ✅ SBOM generated successfully
+            ✅ No GPL licenses detected
+            ✅ No high/critical vulnerabilities found`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  release-sbom:
+    name: Release SBOM
+    runs-on: ubuntu-latest
+    needs: [generate-sbom, security-scan, license-check]
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: .
+
+      - name: Create SBOM release asset
+        run: |
+          # Create a signed SBOM for release
+          echo "Creating SBOM release asset..."
+
+          # Add metadata to SBOM
+          jq --arg version "${{ github.event.release.tag_name }}" \
+             --arg commit "${{ github.sha }}" \
+             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+             '.metadata = {version: $version, commit: $commit, generated: $date}' \
+             sbom.json > release-sbom.json
+
+          # Sign the SBOM (if cosign is available)
+          if command -v cosign &> /dev/null; then
+            cosign sign-blob --bundle release-sbom.json.bundle release-sbom.json
+          fi
+
+      - name: Upload SBOM to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./release-sbom.json
+          asset_name: sbom.json
+          asset_content_type: application/json

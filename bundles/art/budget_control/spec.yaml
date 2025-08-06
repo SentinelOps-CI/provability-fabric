@@ -1,0 +1,29 @@
+# ART Behavior: Budget Control
+# ID: budget_control
+# Description: Ensure total spending never exceeds budget limit
+
+version: "1.0"
+behavior:
+  id: "budget_control"
+  name: "Budget Control"
+  description: "Ensure total spending never exceeds budget limit"
+  
+properties:
+  - budget_ok
+  - total_spend_le_300
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

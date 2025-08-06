@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+package provability_fabric.capabilities;
+
+option go_package = "github.com/fraware/provability-fabric/core/capabilities";
+
+import "google/protobuf/timestamp.proto";
+
+// Capability token using DSSE (Dead Simple Signing Envelope) format
+message CapabilityToken {
+  // DSSE envelope
+  DSSEEnvelope envelope = 1;
+  
+  // Token payload
+  TokenPayload payload = 2;
+}
+
+// DSSE envelope for signing
+message DSSEEnvelope {
+  // Payload type (always "application/vnd.provability-fabric.capability-token")
+  string payload_type = 1;
+  
+  // Base64-encoded payload
+  string payload = 2;
+  
+  // Signatures
+  repeated DSSESignature signatures = 3;
+}
+
+// DSSE signature
+message DSSESignature {
+  // Key ID
+  string key_id = 1;
+  
+  // Signature algorithm (e.g., "ed25519")
+  string algorithm = 2;
+  
+  // Base64-encoded signature
+  string signature = 3;
+}
+
+// Token payload
+message TokenPayload {
+  // Token ID
+  string token_id = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Subject identifier
+  string subject_id = 3;
+  
+  // Capabilities granted to the subject
+  repeated string capabilities = 4;
+  
+  // Token expiration time
+  google.protobuf.Timestamp expires_at = 5;
+  
+  // Token issued time
+  google.protobuf.Timestamp issued_at = 6;
+  
+  // Issuer identifier
+  string issuer = 7;
+  
+  // Token version
+  string version = 8;
+  
+  // Additional claims
+  map<string, string> claims = 9;
+}
+
+// Token validation request
+message ValidateTokenRequest {
+  // Token to validate
+  CapabilityToken token = 1;
+  
+  // Required capabilities
+  repeated string required_capabilities = 2;
+  
+  // Tenant context
+  string tenant = 3;
+}
+
+// Token validation response
+message ValidateTokenResponse {
+  // Whether token is valid
+  bool valid = 1;
+  
+  // Validation error message (if invalid)
+  string error_message = 2;
+  
+  // Token payload (if valid)
+  TokenPayload payload = 3;
+  
+  // Missing capabilities (if any)
+  repeated string missing_capabilities = 4;
+}
+
+// Token minting request
+message MintTokenRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Subject identifier
+  string subject_id = 2;
+  
+  // Capabilities to grant
+  repeated string capabilities = 3;
+  
+  // Token expiration duration (in seconds)
+  int64 expires_in_seconds = 4;
+  
+  // Additional claims
+  map<string, string> claims = 5;
+}
+
+// Token minting response
+message MintTokenResponse {
+  // Minted token
+  CapabilityToken token = 1;
+  
+  // Token ID
+  string token_id = 2;
+  
+  // Expiration time
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+// Token revocation request
+message RevokeTokenRequest {
+  // Token ID to revoke
+  string token_id = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Reason for revocation
+  string reason = 3;
+}
+
+// Token revocation response
+message RevokeTokenResponse {
+  // Whether token was revoked
+  bool revoked = 1;
+  
+  // Error message (if failed)
+  string error_message = 2;
+}
+
+// Capability token service
+service CapabilityTokenService {
+  // Mint a new capability token
+  rpc MintToken(MintTokenRequest) returns (MintTokenResponse);
+  
+  // Validate a capability token
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // Revoke a capability token
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse);
+} 

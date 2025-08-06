@@ -1,0 +1,30 @@
+# ART Behavior: Capability Enforcement
+# ID: capability_enforcement
+# Description: Ensure only allowed tools are used
+
+version: "1.0"
+behavior:
+  id: "capability_enforcement"
+  name: "Capability Enforcement"
+  description: "Ensure only allowed tools are used"
+  
+properties:
+  - allowed_trace
+  - no_forbidden_tools
+
+actions:
+  - SendEmail
+  - LogSpend
+  - LogAction
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

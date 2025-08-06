@@ -1,0 +1,81 @@
+{
+  "type": "record",
+  "name": "CapabilityToken",
+  "namespace": "provability.fabric.evidence",
+  "doc": "Capability token (public parts only for evidence)",
+  "fields": [
+    {
+      "name": "token_id",
+      "type": "string",
+      "doc": "Unique token identifier"
+    },
+    {
+      "name": "tenant",
+      "type": "string",
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "subject_id",
+      "type": "string",
+      "doc": "Subject identifier"
+    },
+    {
+      "name": "capabilities",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "List of granted capabilities"
+    },
+    {
+      "name": "issued_at",
+      "type": "long",
+      "doc": "Unix timestamp when token was issued"
+    },
+    {
+      "name": "expires_at",
+      "type": "long",
+      "doc": "Unix timestamp when token expires"
+    },
+    {
+      "name": "issuer",
+      "type": "string",
+      "doc": "Token issuer identifier"
+    },
+    {
+      "name": "version",
+      "type": "string",
+      "default": "1.0",
+      "doc": "Token format version"
+    },
+    {
+      "name": "key_id",
+      "type": "string",
+      "doc": "Public key identifier used for verification"
+    },
+    {
+      "name": "algorithm",
+      "type": "string",
+      "default": "ed25519",
+      "doc": "Signing algorithm used"
+    },
+    {
+      "name": "revoked",
+      "type": "boolean",
+      "default": false,
+      "doc": "Whether token has been revoked"
+    },
+    {
+      "name": "usage_count",
+      "type": ["null", "int"],
+      "default": null,
+      "doc": "Number of times token was used (if tracked)"
+    },
+    {
+      "name": "last_used_at",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Unix timestamp of last usage"
+    }
+  ]
+}

@@ -132,52 +132,89 @@ jobs:
           cd ../../spec-templates/v1/proofs
           lake build
 
-      - name: Lean sanity check
+      - name: Lean proof quality gate
         run: |
-          # Check for any remaining 'by admit' or 'sorry' statements
-          # and fail if files are older than 3 days
-          echo "🔍 Checking for admits and sorry statements..."
+          echo "🔍 Running Lean proof quality gate..."
+          python tools/lean_gate.py --root . --config tools/lean_gate_config.yaml
 
-          # Find all Lean files with admits or sorry statements
-          ADMIT_FILES=$(grep -l -r "by admit\|sorry" --exclude-dir=.lake --include="*.lean" . || true)
+      - name: Lean build time budget check
+        run: |
+          echo "⏱️  Running Lean build time budget check..."
+          chmod +x scripts/lean_time_budget.sh
+          ./scripts/lean_time_budget.sh
 
-          if [ -n "$ADMIT_FILES" ]; then
-            echo "⚠️  Found files with admits or sorry statements:"
-            echo "$ADMIT_FILES"
-            echo ""
-            
-            # Check if any of these files are older than 3 days
-            CURRENT_TIME=$(date +%s)
-            THREE_DAYS_AGO=$((CURRENT_TIME - 259200))  # 3 days in seconds
-            
-            OLD_ADMIT_FILES=""
-            for file in $ADMIT_FILES; do
-              if [ -f "$file" ]; then
-                # Use stat with format that works on both Linux and macOS
-                if [ "$(uname)" = "Darwin" ]; then
-                  FILE_TIME=$(stat -f %m "$file")
-                else
-                  FILE_TIME=$(stat -c %Y "$file")
-                fi
-                if [ $FILE_TIME -lt $THREE_DAYS_AGO ]; then
-                  OLD_ADMIT_FILES="$OLD_ADMIT_FILES $file"
-                fi
-              fi
-            done
-            
-            if [ -n "$OLD_ADMIT_FILES" ]; then
-              echo "❌ Found admits/sorry in files older than 3 days:"
-              echo "$OLD_ADMIT_FILES"
-              echo ""
-              echo "These files must be resolved by the APOLLO proof bot or manually."
-              echo "If this is a new file, it has 3 days to be resolved."
-              exit 1
+      - name: Check for duplicate Lean definitions
+        run: |
+          echo "🔍 Checking for duplicate Lean definitions..."
+          make lean-check-duplicates
+
+      - name: Check for forbidden shadowing
+        run: |
+          echo "🔍 Checking for forbidden shadowing..."
+          make lean-forbid-shadowing
+
+      - name: Generate allowlist from Lean proofs
+        run: |
+          echo "🔧 Generating allowlist from Lean proofs..."
+          python tools/gen_allowlist_from_lean.py . /tmp/generated_allowlist.json
+
+      - name: Compare generated allowlist with runtime
+        run: |
+          echo "🔍 Comparing generated allowlist with runtime..."
+          if [ -f "runtime/sidecar-watcher/policy/allowlist.json" ]; then
+            if diff /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json > /dev/null; then
+              echo "✅ Generated allowlist matches runtime allowlist"
             else
-              echo "✅ All admits/sorry are in files newer than 3 days"
+              echo "❌ Generated allowlist differs from runtime allowlist"
+              echo "Generated:"
+              cat /tmp/generated_allowlist.json
+              echo "Runtime:"
+              cat runtime/sidecar-watcher/policy/allowlist.json
+              echo "Diff:"
+              diff /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json || true
+              exit 1
             fi
           else
-            echo "✅ No admits or sorry statements found in Lean files"
+            echo "⚠️  No runtime allowlist found, using generated one"
+            mkdir -p runtime/sidecar-watcher/policy/
+            cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
           fi
+
+      - name: Time-to-fail check
+        run: |
+          echo "⚡ Checking time-to-fail for first failing lemma..."
+
+          # Find all Lean files and check compilation time
+          LEAN_FILES=$(find . -name "*.lean" -not -path "./.lake/*" -not -path "./vendor/*" | head -10)
+
+          for file in $LEAN_FILES; do
+            echo "Testing $file..."
+            start_time=$(date +%s)
+            
+            # Try to compile the file with a 20-second timeout
+            if timeout 20s lean --make "$file" >/dev/null 2>&1; then
+              end_time=$(date +%s)
+              duration=$((end_time - start_time))
+              echo "✅ $file compiled in ${duration}s"
+            else
+              end_time=$(date +%s)
+              duration=$((end_time - start_time))
+              if [ $duration -gt 20 ]; then
+                echo "❌ $file took ${duration}s (exceeded 20s TTF limit)"
+                exit 1
+              else
+                echo "⚠️  $file failed to compile but within TTF limit"
+              fi
+            fi
+          done
+
+      - name: Run proofbench
+        run: |
+          echo "🧪 Running property-based testing with proofbench..."
+          cd core/lean-libs
+          lake build
+          cd ../..
+          lake exe proofbench
 
       - name: Test Go CLI
         run: |

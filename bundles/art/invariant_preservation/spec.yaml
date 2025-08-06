@@ -1,0 +1,31 @@
+# ART Behavior: Invariant Preservation
+# ID: invariant_preservation
+# Description: Ensure core invariants are always preserved
+
+version: "1.0"
+behavior:
+  id: "invariant_preservation"
+  name: "Invariant Preservation"
+  description: "Ensure core invariants are always preserved"
+  
+properties:
+  - budget_invariant
+  - privacy_invariant
+  - capability_invariant
+
+actions:
+  - SendEmail
+  - LogSpend
+  - LogAction
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

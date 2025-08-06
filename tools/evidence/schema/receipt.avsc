@@ -1,0 +1,96 @@
+{
+  "type": "record",
+  "name": "AccessReceipt",
+  "namespace": "provability.fabric.evidence",
+  "doc": "Access receipt from retrieval gateway",
+  "fields": [
+    {
+      "name": "receipt_id",
+      "type": "string",
+      "doc": "Unique identifier for the receipt"
+    },
+    {
+      "name": "tenant",
+      "type": "string",
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "subject_id",
+      "type": "string",
+      "doc": "Subject that performed the query"
+    },
+    {
+      "name": "query_hash",
+      "type": "string",
+      "doc": "SHA-256 hash of the query"
+    },
+    {
+      "name": "index_shard",
+      "type": "string",
+      "doc": "Index shard that was queried"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Unix timestamp of query execution"
+    },
+    {
+      "name": "result_hash",
+      "type": "string",
+      "doc": "SHA-256 hash of query results"
+    },
+    {
+      "name": "result_count",
+      "type": "int",
+      "doc": "Number of results returned"
+    },
+    {
+      "name": "query_time_ms",
+      "type": "int",
+      "doc": "Query execution time in milliseconds"
+    },
+    {
+      "name": "signature",
+      "type": "string",
+      "doc": "DSSE signature of the receipt"
+    },
+    {
+      "name": "labels_accessed",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Data labels that were accessed"
+    },
+    {
+      "name": "abac_decision",
+      "type": {
+        "type": "record",
+        "name": "AbacDecision",
+        "fields": [
+          {
+            "name": "allowed",
+            "type": "boolean",
+            "doc": "Whether ABAC allowed the query"
+          },
+          {
+            "name": "policy_version",
+            "type": "string",
+            "doc": "Version of ABAC policy used"
+          },
+          {
+            "name": "rules_applied",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": [],
+            "doc": "List of ABAC rules applied"
+          }
+        ]
+      },
+      "doc": "ABAC decision context"
+    }
+  ]
+}

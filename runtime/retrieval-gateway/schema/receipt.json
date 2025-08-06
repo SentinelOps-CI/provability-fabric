@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Access Receipt Schema",
+  "description": "Schema for signed access receipts from retrieval gateway",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "tenant",
+    "subject_id", 
+    "query_hash",
+    "index_shard",
+    "timestamp",
+    "result_hash",
+    "signature"
+  ],
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^receipt_[a-zA-Z0-9]+$",
+      "description": "Unique identifier for the receipt"
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Tenant identifier for multi-tenancy"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Subject that performed the query"
+    },
+    "query_hash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "SHA-256 hash of the query"
+    },
+    "index_shard": {
+      "type": "string",
+      "description": "Index shard that was queried"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp of query execution"
+    },
+    "result_hash": {
+      "type": "string", 
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "SHA-256 hash of query results"
+    },
+    "result_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of results returned"
+    },
+    "query_time_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Query execution time in milliseconds"
+    },
+    "signature": {
+      "type": "string",
+      "description": "DSSE signature of the receipt"
+    },
+    "labels_accessed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Data labels that were accessed in the query"
+    },
+    "abac_decision": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "boolean",
+          "description": "Whether ABAC allowed the query"
+        },
+        "policy_version": {
+          "type": "string",
+          "description": "Version of ABAC policy used"
+        },
+        "rules_applied": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of ABAC rules that were applied"
+        }
+      },
+      "required": ["allowed", "policy_version"],
+      "description": "ABAC decision context"
+    },
+    "privacy_budget": {
+      "type": "object",
+      "properties": {
+        "epsilon_consumed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Differential privacy epsilon consumed"
+        },
+        "delta_consumed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Differential privacy delta consumed"
+        },
+        "budget_remaining": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Remaining privacy budget"
+        }
+      },
+      "description": "Differential privacy budget tracking"
+    },
+    "audit_trail": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "description": "Unique request identifier for audit correlation"
+        },
+        "client_ip": {
+          "type": "string",
+          "description": "Client IP address (if logged)"
+        },
+        "user_agent": {
+          "type": "string",
+          "description": "Client user agent (if logged)"
+        }
+      },
+      "description": "Audit trail information"
+    }
+  },
+  "additionalProperties": false
+}

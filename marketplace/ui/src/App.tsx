@@ -6,6 +6,9 @@ import { Dashboard } from './components/Dashboard';
 import { PackageList } from './components/PackageList';
 import { PackageDetail } from './components/PackageDetail';
 import { SearchPage } from './components/SearchPage';
+import { Calls } from './components/Calls';
+import { Receipts } from './components/Receipts';
+import { EgressCertificates } from './components/EgressCertificates';
 
 const App: React.FC = () => {
   return (
@@ -19,6 +22,10 @@ const App: React.FC = () => {
             <Route path="/packages" element={<PackageList />} />
             <Route path="/package/:id" element={<PackageDetail />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/console/calls" element={<Calls />} />
+            <Route path="/console/calls/:callId" element={<Calls />} />
+            <Route path="/console/receipts" element={<Receipts />} />
+            <Route path="/console/certificates" element={<EgressCertificates />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

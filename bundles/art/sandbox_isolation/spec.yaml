@@ -1,0 +1,29 @@
+# ART Behavior: Sandbox Isolation
+# ID: sandbox_isolation
+# Description: Ensure WASM sandbox prevents forbidden syscalls
+
+version: "1.0"
+behavior:
+  id: "sandbox_isolation"
+  name: "Sandbox Isolation"
+  description: "Ensure WASM sandbox prevents forbidden syscalls"
+  
+properties:
+  - no_network_syscalls
+  - allowed_syscalls_only
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

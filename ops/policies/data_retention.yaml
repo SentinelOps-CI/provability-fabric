@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-retention-policy
+  namespace: provability-fabric
+data:
+  retention.yaml: |
+    # Zero-Retention Policy Configuration
+    retention_policy:
+      version: "1.0"
+      effective_date: "2025-01-15T00:00:00Z"
+      
+      # Global retention settings
+      global:
+        zero_retention_enabled: true
+        max_raw_content_ttl: "10m"  # Maximum 10 minutes
+        hash_retention_period: "7d"  # Keep hashes for 7 days
+        receipt_retention_period: "1y"  # Keep receipts for compliance
+        
+      # Per-component settings
+      components:
+        retrieval_gateway:
+          raw_query_ttl: "5m"
+          raw_result_ttl: "5m"
+          index_cache_ttl: "10m"
+          sanitize_logs: true
+          
+        egress_firewall:
+          raw_text_ttl: "2m"
+          detector_cache_ttl: "5m"
+          sanitize_logs: true
+          
+        sidecar_watcher:
+          action_data_ttl: "1m"
+          metrics_retention: "24h"
+          sanitize_logs: true
+          
+        ledger:
+          raw_content_storage: false
+          hash_only_mode: true
+          audit_log_retention: "90d"
+          
+      # Sanitization rules
+      sanitization:
+        patterns:
+          - name: "email"
+            regex: "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+            replacement: "[EMAIL_REDACTED]"
+            
+          - name: "phone"
+            regex: "\\b\\d{3}-\\d{3}-\\d{4}\\b"
+            replacement: "[PHONE_REDACTED]"
+            
+          - name: "ssn"
+            regex: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+            replacement: "[SSN_REDACTED]"
+            
+          - name: "api_key"
+            regex: "\\b[sS][kK]-[a-zA-Z0-9]{20,}\\b"
+            replacement: "[API_KEY_REDACTED]"
+            
+          - name: "bearer_token"
+            regex: "Bearer\\s+[a-zA-Z0-9+/=]{20,}"
+            replacement: "Bearer [TOKEN_REDACTED]"
+            
+        # Log level sanitization
+        log_levels:
+          production:
+            max_level: "INFO"
+            sanitize_user_content: true
+            include_stack_traces: false
+            
+          development:
+            max_level: "DEBUG"
+            sanitize_user_content: false
+            include_stack_traces: true
+            
+      # Compliance and attestation
+      attestation:
+        heartbeat_interval: "30s"
+        include_retention_status: true
+        include_sanitization_status: true
+        zero_retention_attestation: true
+        
+      # Monitoring and alerts
+      monitoring:
+        ttl_violation_alert: true
+        retention_probe_interval: "60s"
+        compliance_check_interval: "300s"
+        
+        alerts:
+          - name: "ttl_exceeded"
+            condition: "raw_content_age > max_ttl"
+            severity: "critical"
+            
+          - name: "sanitization_failed"
+            condition: "pii_pattern_detected AND not_sanitized"
+            severity: "high"
+            
+          - name: "zero_retention_breach"
+            condition: "raw_content_found_after_ttl"
+            severity: "critical"

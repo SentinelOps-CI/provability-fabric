@@ -12,6 +12,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+mod attest;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Heartbeat {
     pub capsule_hash: String,

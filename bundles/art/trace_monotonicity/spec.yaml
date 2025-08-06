@@ -1,0 +1,29 @@
+# ART Behavior: Trace Monotonicity
+# ID: trace_monotonicity
+# Description: Ensure adding actions preserves safety
+
+version: "1.0"
+behavior:
+  id: "trace_monotonicity"
+  name: "Trace Monotonicity"
+  description: "Ensure adding actions preserves safety"
+  
+properties:
+  - budget_monotone
+  - privacy_monotone
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

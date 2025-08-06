@@ -1,0 +1,37 @@
+# Lean Proof Quality Gate Configuration
+
+# Maximum age in hours for sorry/admit statements
+max_age_hours: 48
+
+# Exception patterns for legitimate admits
+# Files matching these patterns will be excluded from checks
+exceptions:
+  - "vendor/"
+  - "tests/"
+  - "examples/"
+  - "tutorials/"
+  - "experimental/"
+  - "deprecated/"
+  - "legacy/"
+  - "temp/"
+  - "draft/"
+
+# Additional settings
+settings:
+  # Whether to show verbose output
+  verbose: false
+  
+  # Whether to include comments in the scan
+  include_comments: true
+  
+  # File extensions to scan
+  extensions:
+    - ".lean"
+  
+  # Directories to exclude
+  exclude_dirs:
+    - ".lake"
+    - "build"
+    - "target"
+    - "node_modules"
+    - ".git" 

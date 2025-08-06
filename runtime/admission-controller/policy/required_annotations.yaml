@@ -1,0 +1,145 @@
+apiVersion: config.gatekeeper.sh/v1alpha1
+kind: Config
+metadata:
+  name: plan-required-annotations
+spec:
+  sync:
+    syncOnly:
+      - group: ""
+        version: "v1"
+        kind: "Pod"
+  validation:
+    name: plan-required-annotations
+    openAPIV3Schema:
+      type: object
+      properties:
+        annotations:
+          type: object
+          properties:
+            provability-fabric.io/plan-id:
+              type: string
+              pattern: "^plan_[a-zA-Z0-9_-]+$"
+            provability-fabric.io/tenant:
+              type: string
+              pattern: "^[a-zA-Z0-9_-]+$"
+            provability-fabric.io/subject-id:
+              type: string
+            provability-fabric.io/system-prompt-hash:
+              type: string
+              pattern: "^[a-fA-F0-9]{64}$"
+            provability-fabric.io/plan-expires-at:
+              type: string
+              format: date-time
+          required:
+            - provability-fabric.io/plan-id
+            - provability-fabric.io/tenant
+            - provability-fabric.io/subject-id
+            - provability-fabric.io/system-prompt-hash
+            - provability-fabric.io/plan-expires-at
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: planrequiredannotations
+spec:
+  crd:
+    spec:
+      names:
+        kind: PlanRequiredAnnotations
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            message:
+              type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package planrequiredannotations
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.metadata.annotations
+          not input.review.object.metadata.annotations["provability-fabric.io/plan-id"]
+          msg := sprintf("Pod %v must have provability-fabric.io/plan-id annotation", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.metadata.annotations
+          not input.review.object.metadata.annotations["provability-fabric.io/tenant"]
+          msg := sprintf("Pod %v must have provability-fabric.io/tenant annotation", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.metadata.annotations
+          not input.review.object.metadata.annotations["provability-fabric.io/subject-id"]
+          msg := sprintf("Pod %v must have provability-fabric.io/subject-id annotation", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.metadata.annotations
+          not input.review.object.metadata.annotations["provability-fabric.io/system-prompt-hash"]
+          msg := sprintf("Pod %v must have provability-fabric.io/system-prompt-hash annotation", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          input.review.object.metadata.annotations
+          not input.review.object.metadata.annotations["provability-fabric.io/plan-expires-at"]
+          msg := sprintf("Pod %v must have provability-fabric.io/plan-expires-at annotation", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          plan_id := input.review.object.metadata.annotations["provability-fabric.io/plan-id"]
+          not regex.match("^plan_[a-zA-Z0-9_-]+$", plan_id)
+          msg := sprintf("Pod %v has invalid plan-id format: %v", [input.review.object.metadata.name, plan_id])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          tenant := input.review.object.metadata.annotations["provability-fabric.io/tenant"]
+          not regex.match("^[a-zA-Z0-9_-]+$", tenant)
+          msg := sprintf("Pod %v has invalid tenant format: %v", [input.review.object.metadata.name, tenant])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          hash := input.review.object.metadata.annotations["provability-fabric.io/system-prompt-hash"]
+          not regex.match("^[a-fA-F0-9]{64}$", hash)
+          msg := sprintf("Pod %v has invalid system-prompt-hash format: %v", [input.review.object.metadata.name, hash])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          expires_at := input.review.object.metadata.annotations["provability-fabric.io/plan-expires-at"]
+          time.parse_rfc3339_ns(expires_at, _)
+          msg := sprintf("Pod %v has invalid plan-expires-at format: %v", [input.review.object.metadata.name, expires_at])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          expires_at := input.review.object.metadata.annotations["provability-fabric.io/plan-expires-at"]
+          time.parse_rfc3339_ns(expires_at, exp_time)
+          now := time.now_ns()
+          exp_time < now
+          msg := sprintf("Pod %v has expired plan: %v", [input.review.object.metadata.name, expires_at])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: PlanRequiredAnnotations
+metadata:
+  name: plan-required-annotations
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces:
+      - "default"
+      - "provability-fabric"
+  parameters:
+    message: "All pods must have valid plan annotations" 

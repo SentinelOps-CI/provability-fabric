@@ -1,0 +1,211 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Allowlist Sync Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "core/lean-libs/**"
+      - "bundles/**/proofs/**"
+      - "tools/gen_allowlist_from_lean.py"
+      - "runtime/sidecar-watcher/policy/allowlist.json"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "core/lean-libs/**"
+      - "bundles/**/proofs/**"
+      - "tools/gen_allowlist_from_lean.py"
+      - "runtime/sidecar-watcher/policy/allowlist.json"
+
+jobs:
+  validate-allowlist-sync:
+    runs-on: ubuntu-latest
+    name: Validate Allowlist Sync
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tools/requirements.txt || echo "No requirements.txt found"
+
+      - name: Install Lean 4
+        run: |
+          wget -q https://github.com/leanprover/elan/releases/latest/download/elan-x86_64-unknown-linux-gnu.tar.gz
+          tar xzf elan-x86_64-unknown-linux-gnu.tar.gz
+          ./elan-init -y --default-toolchain leanprover/lean4:v4.3.0
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Build Lean proofs
+        run: |
+          cd core/lean-libs
+          if [ -f "lakefile.lean" ]; then
+            lake build
+          else
+            echo "No lakefile.lean found, skipping Lean build"
+          fi
+
+      - name: Generate allowlist from Lean
+        run: |
+          python3 tools/gen_allowlist_from_lean.py . /tmp/generated_allowlist.json
+
+      - name: Compare with committed allowlist
+        run: |
+          echo "Comparing generated allowlist with committed version..."
+
+          # Check if committed allowlist exists
+          if [ ! -f "runtime/sidecar-watcher/policy/allowlist.json" ]; then
+            echo "❌ Committed allowlist not found!"
+            exit 1
+          fi
+
+          # Compare generated vs committed
+          if ! diff -u runtime/sidecar-watcher/policy/allowlist.json /tmp/generated_allowlist.json; then
+            echo ""
+            echo "❌ ALLOWLIST SYNC VALIDATION FAILED!"
+            echo "The committed allowlist differs from what would be generated from Lean proofs."
+            echo ""
+            echo "To fix this:"
+            echo "1. Run: python3 tools/gen_allowlist_from_lean.py . runtime/sidecar-watcher/policy/allowlist.json"
+            echo "2. Commit the updated allowlist.json"
+            echo "3. Ensure all Lean proofs are properly defined for tools that need access"
+            echo ""
+            echo "Differences found:"
+            echo "- Left side: committed allowlist"
+            echo "- Right side: generated from Lean"
+            exit 1
+          else
+            echo "✅ Allowlist sync validation PASSED!"
+            echo "Committed allowlist matches generated allowlist from Lean proofs."
+          fi
+
+      - name: Validate allowlist structure
+        run: |
+          echo "Validating allowlist structure..."
+          python3 -c "
+          import json
+          import sys
+
+          with open('runtime/sidecar-watcher/policy/allowlist.json', 'r') as f:
+              allowlist = json.load(f)
+
+          # Check required fields
+          required_fields = ['version', 'generated_from', 'tools', 'sync_with_lean']
+          missing_fields = [field for field in required_fields if field not in allowlist]
+
+          if missing_fields:
+              print(f'❌ Missing required fields: {missing_fields}')
+              sys.exit(1)
+
+          # Check sync_with_lean is true
+          if not allowlist.get('sync_with_lean', False):
+              print('❌ sync_with_lean must be true')
+              sys.exit(1)
+
+          # Check each tool has required fields
+          for tool_name, tool_config in allowlist['tools'].items():
+              required_tool_fields = ['can_use', 'conditions', 'source_file']
+              missing_tool_fields = [field for field in required_tool_fields if field not in tool_config]
+              
+              if missing_tool_fields:
+                  print(f'❌ Tool {tool_name} missing fields: {missing_tool_fields}')
+                  sys.exit(1)
+
+          print('✅ Allowlist structure validation PASSED!')
+          print(f'Validated {len(allowlist[\"tools\"])} tools')
+          "
+
+      - name: Check for drift indicators
+        run: |
+          echo "Checking for drift indicators..."
+
+          # Check if any tools have default_deny without Lean proofs
+          python3 -c "
+          import json
+
+          with open('runtime/sidecar-watcher/policy/allowlist.json', 'r') as f:
+              allowlist = json.load(f)
+
+          drift_issues = []
+
+          for tool_name, tool_config in allowlist['tools'].items():
+              # Check for tools that default to deny due to missing Lean proofs
+              if (tool_config.get('capability_type') == 'default_deny' or 
+                  not tool_config.get('lean_definition', True)):
+                  drift_issues.append(f'Tool {tool_name} lacks explicit Lean capability proof')
+
+          if drift_issues:
+              print('⚠️  DRIFT DETECTED:')
+              for issue in drift_issues:
+                  print(f'  - {issue}')
+              print('')
+              print('Consider adding explicit CanUse proofs in Lean for these tools.')
+              # Don't fail CI for drift warnings, just notify
+          else:
+              print('✅ No drift detected - all tools have explicit Lean proofs')
+          "
+
+      - name: Generate drift report
+        if: always()
+        run: |
+          echo "Generating drift report..."
+
+          python3 -c "
+          import json
+          from datetime import datetime
+
+          with open('runtime/sidecar-watcher/policy/allowlist.json', 'r') as f:
+              allowlist = json.load(f)
+
+          report = {
+              'timestamp': datetime.utcnow().isoformat(),
+              'commit_sha': '${{ github.sha }}',
+              'branch': '${{ github.ref_name }}',
+              'total_tools': len(allowlist['tools']),
+              'explicit_proofs': len([t for t in allowlist['tools'].values() if t.get('lean_definition', True)]),
+              'default_deny': len([t for t in allowlist['tools'].values() if t.get('capability_type') == 'default_deny']),
+              'sync_status': 'in_sync' if allowlist.get('sync_with_lean') else 'drift_detected'
+          }
+
+          with open('/tmp/drift_report.json', 'w') as f:
+              json.dump(report, f, indent=2)
+
+          print('Drift report:')
+          print(json.dumps(report, indent=2))
+          "
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: allowlist-drift-report
+          path: /tmp/drift_report.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **Allowlist Sync Validation Failed**
+              
+              The runtime allowlist is out of sync with Lean proofs. Please run:
+              
+              \`\`\`bash
+              python3 tools/gen_allowlist_from_lean.py . runtime/sidecar-watcher/policy/allowlist.json
+              \`\`\`
+              
+              Then commit the updated allowlist to ensure runtime configuration matches formal specifications.`
+            })
