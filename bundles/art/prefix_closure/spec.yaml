@@ -1,0 +1,29 @@
+# ART Behavior: Prefix Closure
+# ID: prefix_closure
+# Description: Ensure safety is prefix-closed
+
+version: "1.0"
+behavior:
+  id: "prefix_closure"
+  name: "Prefix Closure"
+  description: "Ensure safety is prefix-closed"
+  
+properties:
+  - budget_prefix_closed
+  - privacy_prefix_closed
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

@@ -9,3 +9,6 @@ package spec {
 lean_lib Spec {
   -- add library configuration options here
 }
+
+-- Use vendored mathlib instead of fetching from git
+require mathlib from "../../../vendor/mathlib"

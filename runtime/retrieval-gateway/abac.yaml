@@ -1,0 +1,148 @@
+# ABAC (Attribute-Based Access Control) Policy Configuration
+# for Retrieval Gateway
+
+version: "1.0"
+description: "ABAC policies for multi-tenant retrieval with label-based access control"
+
+# Default policy: deny all unless explicitly allowed
+default_policy: deny
+
+# Tenant isolation rules
+tenant_isolation:
+  enabled: true
+  strict_mode: true
+  cross_tenant_queries: false
+
+# Label-based access control
+label_policies:
+  # Public data accessible to all subjects within tenant
+  - label: "public"
+    access_rule: "tenant_match"
+    description: "Public data within tenant boundaries"
+    
+  # Private data requires explicit subject authorization
+  - label: "private"
+    access_rule: "subject_authorized AND tenant_match"
+    description: "Private data with subject authorization"
+    
+  # Confidential data requires elevated privileges
+  - label: "confidential"
+    access_rule: "elevated_privileges AND tenant_match AND audit_log"
+    description: "Confidential data with audit trail"
+    
+  # Financial data requires financial access capability
+  - label: "financial"
+    access_rule: "capability:financial_access AND tenant_match AND audit_log"
+    description: "Financial data access with capability check"
+    
+  # PII data requires PII access capability and DP budget
+  - label: "pii"
+    access_rule: "capability:pii_access AND dp_budget_available AND tenant_match AND audit_log"
+    description: "PII data with differential privacy budget"
+    
+  # Secret data is never accessible via retrieval
+  - label: "secret"
+    access_rule: "false"
+    description: "Secret data always denied"
+
+# Subject authorization rules
+subject_rules:
+  # Admin users have elevated privileges
+  - subject_pattern: "admin_*"
+    privileges: ["elevated_privileges", "audit_access"]
+    
+  # Service accounts have specific capabilities
+  - subject_pattern: "service_*"
+    capabilities: ["system_access", "bulk_retrieval"]
+    
+  # Regular users have basic access
+  - subject_pattern: "*"
+    privileges: ["basic_access"]
+
+# Capability requirements
+capabilities:
+  financial_access:
+    description: "Access to financial data"
+    required_for: ["financial"]
+    
+  pii_access:
+    description: "Access to personally identifiable information"
+    required_for: ["pii"]
+    dp_budget_required: true
+    
+  system_access:
+    description: "System-level access for service accounts"
+    required_for: ["system"]
+
+# Query context rules
+query_context:
+  # Rate limiting per tenant/subject
+  rate_limits:
+    - scope: "tenant"
+      requests_per_minute: 1000
+      
+    - scope: "subject"
+      requests_per_minute: 100
+      
+    - scope: "subject+label:pii"
+      requests_per_minute: 10
+  
+  # Query complexity limits
+  complexity_limits:
+    max_query_length: 1000
+    max_results_per_query: 100
+    max_concurrent_queries: 10
+
+# Audit and logging rules
+audit:
+  # Always audit these access patterns
+  always_audit:
+    - "label:confidential"
+    - "label:financial" 
+    - "label:pii"
+    - "elevated_privileges"
+    
+  # Log query patterns for analysis
+  query_logging:
+    enabled: true
+    log_query_text: false  # For privacy
+    log_query_hash: true
+    log_result_count: true
+    log_timing: true
+
+# Cross-tenant validation
+cross_tenant:
+  # Ensure no data leakage between tenants
+  validation_rules:
+    - rule: "result_tenant == query_tenant"
+      violation_action: "block_and_alert"
+      
+    - rule: "index_shard == tenant_shard"
+      violation_action: "block_and_alert"
+
+# Emergency access controls
+emergency:
+  # Break-glass access for incidents
+  break_glass:
+    enabled: false
+    requires_approval: true
+    audit_level: "maximum"
+    auto_revoke_minutes: 60
+
+# Integration settings
+integration:
+  capability_token_validation:
+    enabled: true
+    required_algorithms: ["ed25519"]
+    max_token_age_minutes: 60
+    
+  differential_privacy:
+    enabled: true
+    default_epsilon: 1.0
+    default_delta: 1e-5
+    budget_tracking: true
+    
+  receipt_generation:
+    enabled: true
+    sign_receipts: true
+    store_in_ledger: true

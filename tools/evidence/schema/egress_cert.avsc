@@ -1,0 +1,110 @@
+{
+  "type": "record",
+  "name": "EgressCertificate",
+  "namespace": "provability.fabric.evidence",
+  "doc": "Egress certificate from firewall",
+  "fields": [
+    {
+      "name": "cert_id",
+      "type": "string",
+      "doc": "Unique certificate identifier"
+    },
+    {
+      "name": "plan_id",
+      "type": "string",
+      "doc": "Associated plan identifier"
+    },
+    {
+      "name": "tenant",
+      "type": "string",
+      "doc": "Tenant identifier"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Unix timestamp of certificate generation"
+    },
+    {
+      "name": "detectors",
+      "type": {
+        "type": "record",
+        "name": "DetectorResults",
+        "fields": [
+          {
+            "name": "pii",
+            "type": "int",
+            "doc": "Number of PII detections"
+          },
+          {
+            "name": "secret",
+            "type": "int",
+            "doc": "Number of secret detections"
+          },
+          {
+            "name": "near_dupe",
+            "type": "double",
+            "doc": "Near-duplicate similarity score"
+          },
+          {
+            "name": "toxicity",
+            "type": ["null", "double"],
+            "default": null,
+            "doc": "Toxicity score if detected"
+          },
+          {
+            "name": "bias",
+            "type": ["null", "double"],
+            "default": null,
+            "doc": "Bias score if detected"
+          }
+        ]
+      },
+      "doc": "Detector results summary"
+    },
+    {
+      "name": "policy_hash",
+      "type": "string",
+      "doc": "Hash of policy configuration used"
+    },
+    {
+      "name": "text_hash",
+      "type": "string",
+      "doc": "SHA-256 hash of processed text"
+    },
+    {
+      "name": "signer",
+      "type": "string",
+      "doc": "Certificate signer identifier"
+    },
+    {
+      "name": "signature",
+      "type": "string",
+      "doc": "DSSE signature of certificate"
+    },
+    {
+      "name": "action_taken",
+      "type": {
+        "type": "enum",
+        "name": "EgressAction",
+        "symbols": ["ALLOW", "REDACT", "BLOCK"]
+      },
+      "doc": "Action taken on the text"
+    },
+    {
+      "name": "redaction_count",
+      "type": "int",
+      "default": 0,
+      "doc": "Number of redactions applied"
+    },
+    {
+      "name": "risk_score",
+      "type": "double",
+      "doc": "Overall risk score (0.0 to 1.0)"
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int",
+      "doc": "Processing time in milliseconds"
+    }
+  ]
+}

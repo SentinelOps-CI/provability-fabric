@@ -1,0 +1,29 @@
+# ART Behavior: Differential Privacy
+# ID: differential_privacy
+# Description: Ensure ε-differential privacy is maintained
+
+version: "1.0"
+behavior:
+  id: "differential_privacy"
+  name: "Differential Privacy"
+  description: "Ensure ε-differential privacy is maintained"
+  
+properties:
+  - eps_le_max
+  - privacy_ok
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

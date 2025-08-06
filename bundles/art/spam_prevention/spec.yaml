@@ -1,0 +1,28 @@
+# ART Behavior: Spam Prevention
+# ID: spam_prevention
+# Description: Prevent excessive email sending
+
+version: "1.0"
+behavior:
+  id: "spam_prevention"
+  name: "Spam Prevention"
+  description: "Prevent excessive email sending"
+  
+properties:
+  - spam_score_le_100
+  - email_rate_limit
+
+actions:
+  - SendEmail
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

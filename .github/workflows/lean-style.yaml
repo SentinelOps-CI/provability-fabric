@@ -1,0 +1,155 @@
+name: Lean Style Check
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.lean'
+      - 'scripts/check-dup-lean.sh'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.lean'
+      - 'scripts/check-dup-lean.sh'
+  workflow_dispatch:
+
+jobs:
+  lean-style:
+    runs-on: ubuntu-latest
+    name: "Lean Style Check"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git operations
+
+      - name: Set up Lean
+        run: |
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+
+      - name: Make duplicate check script executable
+        run: |
+          chmod +x scripts/check-dup-lean.sh
+
+      - name: Check for duplicate definitions
+        id: dup-check
+        run: |
+          echo "🔍 Running duplicate definition check..."
+          ./scripts/check-dup-lean.sh
+
+      - name: Build all Lean projects
+        run: |
+          echo "🔨 Building all Lean projects to verify imports..."
+          
+          # Build core lean-libs first
+          cd core/lean-libs
+          lake build
+          echo "✅ core/lean-libs built successfully"
+          
+          # Build spec templates
+          cd ../../spec-templates/v1/proofs
+          lake build
+          echo "✅ spec-templates built successfully"
+          
+          # Build my-agent
+          cd ../../../bundles/my-agent/proofs
+          lake build
+          echo "✅ my-agent built successfully"
+          
+          # Build test-new-user-agent
+          cd ../../test-new-user-agent/proofs
+          lake build
+          echo "✅ test-new-user-agent built successfully"
+
+      - name: Generate Lean documentation
+        run: |
+          echo "📚 Generating Lean documentation..."
+          
+          # Generate docs for core lean-libs
+          cd core/lean-libs
+          lean --doc=on ActionDSL.lean > ActionDSL.md || true
+          echo "✅ Generated docs for ActionDSL.lean"
+          
+          # Generate docs for agent specs
+          cd ../../bundles/my-agent/proofs
+          lean --doc=on Spec.lean > Spec.md || true
+          echo "✅ Generated docs for my-agent Spec.lean"
+          
+          cd ../../test-new-user-agent/proofs
+          lean --doc=on Spec.lean > Spec.md || true
+          echo "✅ Generated docs for test-new-user-agent Spec.lean"
+
+      - name: Check for 'sorry' or 'by admit' statements
+        run: |
+          echo "🔍 Checking for placeholder proofs..."
+          
+          # Check for any 'sorry' or 'by admit' statements
+          if find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \; | grep -q .; then
+            echo "❌ Found 'sorry' or 'by admit' statements in proofs:"
+            find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \;
+            exit 1
+          fi
+          echo "✅ No placeholder proofs found"
+
+      - name: Verify imports from core DSL
+        run: |
+          echo "🔍 Verifying imports from core DSL..."
+          
+          # Check that agent files import from core DSL
+          for file in bundles/*/proofs/Spec.lean; do
+            if [ -f "$file" ]; then
+              if grep -q "import Fabric" "$file"; then
+                echo "✅ $file imports from core DSL"
+              else
+                echo "❌ $file does not import from core DSL"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Check for duplicate core definitions
+        run: |
+          echo "🔍 Checking for duplicate core definitions..."
+          
+          # Check for duplicate Action definitions
+          action_defs=$(find bundles -name "*.lean" -exec grep -l "inductive Action" {} \; 2>/dev/null || true)
+          if [ -n "$action_defs" ]; then
+            echo "❌ Found duplicate Action definitions in:"
+            echo "$action_defs"
+            exit 1
+          fi
+          
+          # Check for duplicate budget_ok definitions
+          budget_defs=$(find bundles -name "*.lean" -exec grep -l "def budget_ok" {} \; 2>/dev/null || true)
+          if [ -n "$budget_defs" ]; then
+            echo "❌ Found duplicate budget_ok definitions in:"
+            echo "$budget_defs"
+            exit 1
+          fi
+          
+          echo "✅ No duplicate core definitions found"
+
+      - name: Generate style report
+        run: |
+          echo "📊 Lean Style Check Report" > lean-style-report.md
+          echo "=========================" >> lean-style-report.md
+          echo "" >> lean-style-report.md
+          echo "- ✅ No duplicate definitions found" >> lean-style-report.md
+          echo "- ✅ All Lean projects compile successfully" >> lean-style-report.md
+          echo "- ✅ No placeholder proofs ('sorry' or 'by admit') found" >> lean-style-report.md
+          echo "- ✅ All agent files import from core DSL" >> lean-style-report.md
+          echo "- ✅ No duplicate core definitions in bundles" >> lean-style-report.md
+          echo "" >> lean-style-report.md
+          echo "Checked files:" >> lean-style-report.md
+          echo "- core/lean-libs/ActionDSL.lean" >> lean-style-report.md
+          echo "- bundles/my-agent/proofs/Spec.lean" >> lean-style-report.md
+          echo "- bundles/test-new-user-agent/proofs/Spec.lean" >> lean-style-report.md
+          echo "- spec-templates/v1/proofs/Spec.lean" >> lean-style-report.md
+
+      - name: Upload style report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-style-report
+          path: lean-style-report.md 

@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Plan DSL Schema",
+  "description": "Schema for typed plans with capabilities, constraints, and validation",
+  "type": "object",
+  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash"],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Unique identifier for the plan"
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Tenant identifier for multi-tenancy"
+    },
+    "subject": {
+      "type": "object",
+      "required": ["id", "caps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Subject identifier"
+        },
+        "caps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Capabilities possessed by the subject"
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool", "args", "caps_required", "labels_in", "labels_out"],
+        "properties": {
+          "tool": {
+            "type": "string",
+            "description": "Tool identifier to be called"
+          },
+          "args": {
+            "type": "object",
+            "description": "Arguments for the tool call"
+          },
+          "caps_required": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Capabilities required for this step"
+          },
+          "labels_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Input labels for this step"
+          },
+          "labels_out": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Output labels for this step"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["budget", "pii", "dp_epsilon"],
+      "properties": {
+        "budget": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Budget limit in USD"
+        },
+        "pii": {
+          "type": "boolean",
+          "description": "Whether PII is allowed"
+        },
+        "dp_epsilon": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Differential privacy epsilon parameter"
+        },
+        "dp_delta": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e-5,
+          "description": "Differential privacy delta parameter"
+        },
+        "latency_max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum allowed latency in seconds"
+        }
+      }
+    },
+    "system_prompt_hash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "SHA-256 hash of the system prompt"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Plan creation timestamp"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Plan expiration timestamp"
+    }
+  }
+} 

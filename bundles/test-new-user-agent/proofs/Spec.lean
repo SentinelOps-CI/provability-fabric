@@ -14,28 +14,46 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 
+import Fabric
+
 namespace Spec
 
-/-- Action types that an agent can perform -/
-inductive Action where
-  | SendEmail (score : Nat)
-  | LogSpend (usd : Nat)
+-- Import core definitions from ActionDSL
+open Fabric
 
-/-- Check if a list of actions respects budget constraints -/
-def budget_ok : List Action → Prop
-  | [] => True
-  | (Action.SendEmail _) :: rest => budget_ok rest
-  | (Action.LogSpend usd) :: rest =>
-    usd ≤ 300 ∧ budget_ok rest
+/-- Test-new-user-agent specific budget configuration -/
+def CFG : BudgetCfg := {
+  dailyLimit := 300.0,
+  spamLimit := 0.07
+}
 
-/-- Helper lemma: sum of LogSpend amounts in a list -/
-def total_spend : List Action → Nat
-  | [] => 0
-  | (Action.SendEmail _) :: rest => total_spend rest
-  | (Action.LogSpend usd) :: rest => usd + total_spend rest
-
-/-- Simple example theorem -/
-theorem example_theorem : budget_ok [] := by
-  simp [budget_ok]
+/-- Test-new-user-agent specific theorem: budget constraint verification with config -/
+theorem test_user_budget_verification : ∀ (tr : List Action), budget_ok CFG tr → total_spend tr ≤ 300 := by
+  intro tr
+  induction tr with
+  | nil =>
+    simp [budget_ok, total_spend]
+    exact le_refl 0
+  | cons head tail ih =>
+    cases head with
+    | SendEmail score =>
+      simp [budget_ok, total_spend]
+      exact ih
+    | LogSpend usd =>
+      simp [budget_ok, total_spend]
+      intro h
+      have ⟨h1, h2⟩ := h
+      have ih_result := ih h2
+      have add_le : usd + total_spend tail ≤ usd + 300 := by
+        apply add_le_add_left
+        exact ih_result
+      have usd_le_300 : usd ≤ 300 := h1
+      have usd_plus_300_le_600 : usd + 300 ≤ 300 + 300 := by
+        apply add_le_add_right
+        exact usd_le_300
+      have usd_plus_300_le_300 : usd + 300 ≤ 300 := by
+        simp at usd_plus_300_le_600
+        exact usd_plus_300_le_600
+      exact le_trans add_le usd_plus_300_le_300
 
 end Spec
