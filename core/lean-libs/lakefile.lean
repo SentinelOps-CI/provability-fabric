@@ -10,4 +10,25 @@ lean_lib ActionDSL {
   -- add library configuration options here
 }
 
-require mathlib from git "https://github.com/leanprover-community/mathlib4.git" @ "2025-07-15-abe123"
+lean_lib Capability {
+  -- add library configuration options here
+}
+
+lean_lib Redaction {
+  -- add library configuration options here
+}
+
+lean_lib Privacy {
+  -- add library configuration options here
+}
+
+lean_lib Sandbox {
+  -- add library configuration options here
+}
+
+lean_lib GenTrace {
+  -- add library configuration options here
+}
+
+-- Use vendored mathlib instead of fetching from git
+require mathlib from "../../../vendor/mathlib"

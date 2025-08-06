@@ -1,0 +1,140 @@
+name: Lean Offline Build
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "**/*.lean"
+      - "**/lakefile.lean"
+      - "**/lean-toolchain"
+      - "vendor/mathlib/**"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "**/*.lean"
+      - "**/lakefile.lean"
+      - "**/lean-toolchain"
+      - "vendor/mathlib/**"
+  workflow_dispatch:
+
+jobs:
+  lean-offline:
+    runs-on: ubuntu-latest
+    name: "Lean Offline Build"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for git operations
+          submodules: recursive # Include vendor/mathlib
+
+      - name: Set up Lean
+        run: |
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+
+      - name: Verify vendor/mathlib exists
+        run: |
+          if [ ! -d "vendor/mathlib" ]; then
+            echo "❌ vendor/mathlib directory not found!"
+            echo "Please run: ./scripts/vendor-mathlib.sh"
+            exit 1
+          fi
+          echo "✅ vendor/mathlib found"
+
+      - name: Verify mathlib commit
+        run: |
+          cd vendor/mathlib
+          EXPECTED_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac"
+          ACTUAL_COMMIT=$(git rev-parse HEAD)
+          if [ "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]; then
+            echo "❌ Mathlib commit mismatch!"
+            echo "Expected: $EXPECTED_COMMIT"
+            echo "Actual: $ACTUAL_COMMIT"
+            echo "Please run: ./scripts/vendor-mathlib.sh"
+            exit 1
+          fi
+          echo "✅ Mathlib commit verified: $ACTUAL_COMMIT"
+
+      - name: Block network access
+        run: |
+          # Block all outbound network traffic
+          sudo iptables -P OUTPUT DROP
+          sudo iptables -A OUTPUT -d 127.0.0.1 -j ACCEPT
+          sudo iptables -A OUTPUT -d ::1 -j ACCEPT
+          echo "🌐 Network access blocked for offline build"
+
+      - name: Build Lean proofs (offline)
+        run: |
+          echo "🔨 Building Lean proofs in offline mode..."
+
+          # Build core lean-libs
+          cd core/lean-libs
+          lake build
+          echo "✅ core/lean-libs built successfully"
+
+          # Build spec templates
+          cd ../../spec-templates/v1/proofs
+          lake build
+          echo "✅ spec-templates built successfully"
+
+          # Build my-agent
+          cd ../../../bundles/my-agent/proofs
+          lake build
+          echo "✅ my-agent built successfully"
+
+          # Build test-new-user-agent
+          cd ../../test-new-user-agent/proofs
+          lake build
+          echo "✅ test-new-user-agent built successfully"
+
+      - name: Test offline build failure
+        run: |
+          echo "🧪 Testing that network access is properly blocked..."
+
+          # Try to fetch from git (should fail)
+          if git fetch origin 2>/dev/null; then
+            echo "❌ Network access not properly blocked!"
+            exit 1
+          fi
+          echo "✅ Network access properly blocked"
+
+      - name: Restore network access
+        run: |
+          sudo iptables -P OUTPUT ACCEPT
+          echo "🌐 Network access restored"
+
+      - name: Verify all proofs compile
+        run: |
+          echo "🔍 Verifying all Lean proofs compile..."
+
+          # Check for any 'sorry' or 'by admit' statements
+          if find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \; | grep -q .; then
+            echo "❌ Found 'sorry' or 'by admit' statements in proofs:"
+            find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \;
+            exit 1
+          fi
+          echo "✅ No placeholder proofs found"
+
+      - name: Generate build report
+        run: |
+          echo "📊 Lean Offline Build Report" > lean-build-report.md
+          echo "==========================" >> lean-build-report.md
+          echo "" >> lean-build-report.md
+          echo "- ✅ All Lean proofs compile without network access" >> lean-build-report.md
+          echo "- ✅ Mathlib vendored at commit: b5eba595428809e96f3ed113bc7ba776c5f801ac" >> lean-build-report.md
+          echo "- ✅ No placeholder proofs ('sorry' or 'by admit') found" >> lean-build-report.md
+          echo "- ✅ Network access properly blocked during build" >> lean-build-report.md
+          echo "" >> lean-build-report.md
+          echo "Built projects:" >> lean-build-report.md
+          echo "- core/lean-libs" >> lean-build-report.md
+          echo "- spec-templates/v1/proofs" >> lean-build-report.md
+          echo "- bundles/my-agent/proofs" >> lean-build-report.md
+          echo "- bundles/test-new-user-agent/proofs" >> lean-build-report.md
+
+      - name: Upload build report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-offline-build-report
+          path: lean-build-report.md

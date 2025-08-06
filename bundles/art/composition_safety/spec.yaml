@@ -1,0 +1,29 @@
+# ART Behavior: Composition Safety
+# ID: composition_safety
+# Description: Ensure safety properties compose correctly
+
+version: "1.0"
+behavior:
+  id: "composition_safety"
+  name: "Composition Safety"
+  description: "Ensure safety properties compose correctly"
+  
+properties:
+  - budget_composes
+  - privacy_composes
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

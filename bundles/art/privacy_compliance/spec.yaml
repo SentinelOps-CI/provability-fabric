@@ -1,0 +1,29 @@
+# ART Behavior: Privacy Compliance
+# ID: privacy_compliance
+# Description: Ensure PII is never exposed in egress
+
+version: "1.0"
+behavior:
+  id: "privacy_compliance"
+  name: "Privacy Compliance"
+  description: "Ensure PII is never exposed in egress"
+  
+properties:
+  - no_pii_egress
+  - redaction_safe
+
+actions:
+  - SendEmail
+  - LogSpend
+
+constraints:
+  budget_limit: 300
+  spam_limit: 100
+  privacy_epsilon: 1.0
+  capability_model: "strict"
+
+proofs:
+  - budget_ok
+  - privacy_ok
+  - capability_ok
+  - composition_ok

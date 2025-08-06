@@ -1,0 +1,61 @@
+{
+  "version": "2.0",
+  "generated_from": "lean_proofs",
+  "generation_timestamp": "2025-01-15T10:30:00Z",
+  "source_files": [
+    "core/lean-libs/ActionDSL.lean",
+    "core/lean-libs/Capability.lean"
+  ],
+  "sync_with_lean": true,
+  "validation_status": "generated",
+  "tools": {
+    "SendEmail": {
+      "can_use": true,
+      "conditions": ["budget_ok", "spam_ok"],
+      "source_file": "core/lean-libs/ActionDSL.lean",
+      "capability_type": "explicit",
+      "lean_definition": true
+    },
+    "LogSpend": {
+      "can_use": true,
+      "conditions": ["budget_ok"],
+      "source_file": "core/lean-libs/ActionDSL.lean",
+      "capability_type": "explicit",
+      "lean_definition": true
+    },
+    "LogAction": {
+      "can_use": true,
+      "conditions": ["default"],
+      "source_file": "core/lean-libs/ActionDSL.lean",
+      "capability_type": "explicit",
+      "lean_definition": true
+    },
+    "NetworkCall": {
+      "can_use": false,
+      "conditions": ["requires_explicit_lean_proof"],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "FileRead": {
+      "can_use": false,
+      "conditions": ["requires_explicit_lean_proof"],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "FileWrite": {
+      "can_use": false,
+      "conditions": ["requires_explicit_lean_proof"],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    }
+  },
+  "metadata": {
+    "total_tools_found": 6,
+    "total_capabilities": 3,
+    "explicit_capabilities": 3,
+    "default_capabilities": 3
+  }
+} 

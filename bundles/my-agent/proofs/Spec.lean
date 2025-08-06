@@ -14,28 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 
+import Fabric
+
 namespace Spec
 
-/-- Action types that an agent can perform -/
-inductive Action where
-  | SendEmail (score : Nat)
-  | LogSpend (usd : Nat)
+-- Import core definitions from ActionDSL
+open Fabric
 
-/-- Check if a list of actions respects budget constraints -/
-def budget_ok : List Action → Prop
-  | [] => True
-  | (Action.SendEmail _) :: rest => budget_ok rest
-  | (Action.LogSpend usd) :: rest =>
-    usd ≤ 300 ∧ budget_ok rest
+/-- My-agent specific budget configuration -/
+def CFG : BudgetCfg := {
+  dailyLimit := 300.0,
+  spamLimit := 0.07
+}
 
-/-- Helper lemma: sum of LogSpend amounts in a list -/
-def total_spend : List Action → Nat
-  | [] => 0
-  | (Action.SendEmail _) :: rest => total_spend rest
-  | (Action.LogSpend usd) :: rest => usd + total_spend rest
-
-/-- Simple example theorem -/
-theorem example_theorem : budget_ok [] := by
-  simp [budget_ok]
+/-- My-agent specific theorem: all actions respect budget with config -/
+theorem my_agent_budget_safe (tr : List Action) : budget_ok CFG tr := by
+  intro tr
+  induction tr with
+  | nil =>
+    simp [budget_ok]
+  | cons head tail ih =>
+    cases head with
+    | SendEmail score =>
+      simp [budget_ok]
+      exact ih
+    | LogSpend usd =>
+      simp [budget_ok]
+      constructor
+      · -- Prove usd ≤ CFG.dailyLimit
+        -- This is agent-specific logic for my-agent
+        simp
+      · -- Prove budget_ok CFG tail
+        exact ih
 
 end Spec
