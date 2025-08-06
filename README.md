@@ -6,7 +6,7 @@
 [![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
 
-An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails. **All 12 security mechanisms fully implemented with production-ready code.**
+An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails. 
 
 <p align="center">
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
@@ -50,14 +50,6 @@ npm start
 
 # The UI will be available at http://localhost:3000
 ```
-
-**UI Features:**
-- **Dashboard** - Overview of packages, downloads, and system metrics
-- **Package Management** - Browse, search, and install AI agent packages
-- **Ledger Integration** - View capsule data and risk scores
-- **Health Monitoring** - Quick access to GraphQL API and health checks
-- **Real-time Updates** - Live data from the marketplace and ledger services
-- **Security Console** - Plan validation, receipt viewing, certificate monitoring
 
 ### Option 3: Manual Installation
 
