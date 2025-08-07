@@ -2,10 +2,11 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 pub mod assumption;
+pub mod broker;
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use assumption::{Assumption, AssumptionMonitor};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Action {
@@ -39,14 +40,14 @@ impl JsonProcessor {
                 return self.process_action(&action);
             }
         }
-        
+
         // Process assumption messages
         if line.contains("\"assumption\":") {
             if let Ok(assumption) = serde_json::from_str::<Assumption>(line) {
                 return self.process_assumption(assumption);
             }
         }
-        
+
         Ok(true)
     }
 

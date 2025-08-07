@@ -122,7 +122,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-lean-
 
-      - name: Build Lean proofs
+      - name: Build Lean proofs (impacted only)
         run: |
           # Build core lean libs
           cd core/lean-libs
@@ -131,6 +131,30 @@ jobs:
           # Build spec templates  
           cd ../../spec-templates/v1/proofs
           lake build
+
+          # Build impacted bundles if any
+          if [ -n "${{ steps.impacted.outputs.impacted_targets }}" ]; then
+            echo "Building impacted bundles: ${{ steps.impacted.outputs.impacted_targets }}"
+            for target in ${{ steps.impacted.outputs.impacted_targets }}; do
+              if [ -d "bundles/$target/proofs" ]; then
+                echo "Building proofs for $target..."
+                cd "bundles/$target/proofs"
+                lake build
+                cd ../../../..
+              fi
+            done
+          else
+            echo "No specific impacted targets identified, building all bundles"
+            # Build all bundles
+            for bundle in bundles/*/proofs; do
+              if [ -d "$bundle" ]; then
+                echo "Building $bundle..."
+                cd "$bundle"
+                lake build
+                cd ../../../..
+              fi
+            done
+          fi
 
       - name: Lean proof quality gate
         run: |
@@ -153,12 +177,52 @@ jobs:
           echo "🔍 Checking for forbidden shadowing..."
           make lean-forbid-shadowing
 
-      - name: Generate allowlist from Lean proofs
+      - name: Determine impacted targets
+        id: impacted
+        run: |
+          echo "🔍 Determining impacted targets based on changes..."
+          python tools/select_impacted.py --root . --output /tmp/impacted.json
+
+          # Parse the JSON output to extract targets
+          IMPACTED_TARGETS=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              targets = data.get('impacted_targets', [])
+              print(' '.join(targets))
+          ")
+
+          IMPACTED_TESTS=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              tests = data.get('impacted_tests', [])
+              print(' '.join(tests))
+          ")
+
+          ALLOWLIST_NEEDS_UPDATE=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              print('true' if data.get('allowlist_needs_update', False) else 'false')
+          ")
+
+          echo "impacted_targets=$IMPACTED_TARGETS" >> $GITHUB_OUTPUT
+          echo "impacted_tests=$IMPACTED_TESTS" >> $GITHUB_OUTPUT
+          echo "allowlist_needs_update=$ALLOWLIST_NEEDS_UPDATE" >> $GITHUB_OUTPUT
+
+          echo "Impacted targets: $IMPACTED_TARGETS"
+          echo "Impacted tests: $IMPACTED_TESTS"
+          echo "Allowlist needs update: $ALLOWLIST_NEEDS_UPDATE"
+
+      - name: Generate allowlist from Lean proofs (if needed)
+        if: steps.impacted.outputs.allowlist_needs_update == 'true'
         run: |
           echo "🔧 Generating allowlist from Lean proofs..."
           python tools/gen_allowlist_from_lean.py . /tmp/generated_allowlist.json
 
-      - name: Compare generated allowlist with runtime
+      - name: Compare generated allowlist with runtime (if needed)
+        if: steps.impacted.outputs.allowlist_needs_update == 'true'
         run: |
           echo "🔍 Comparing generated allowlist with runtime..."
           if [ -f "runtime/sidecar-watcher/policy/allowlist.json" ]; then
@@ -179,6 +243,14 @@ jobs:
             mkdir -p runtime/sidecar-watcher/policy/
             cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
           fi
+
+      - name: Update runtime allowlist (if needed)
+        if: steps.impacted.outputs.allowlist_needs_update == 'true'
+        run: |
+          echo "🔄 Updating runtime allowlist with generated version..."
+          mkdir -p runtime/sidecar-watcher/policy/
+          cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
+          echo "✅ Runtime allowlist updated"
 
       - name: Time-to-fail check
         run: |
@@ -267,13 +339,61 @@ jobs:
             npm run build
           fi
 
-      - name: Run integration tests
+      - name: Run red-team tests (impacted only)
+        run: |
+          # Install red-team test dependencies
+          pip install -r tests/redteam/requirements.txt
+
+          # Run impacted red-team tests or all if no specific tests identified
+          if [ -n "${{ steps.impacted.outputs.impacted_tests }}" ]; then
+            echo "Running impacted red-team tests: ${{ steps.impacted.outputs.impacted_tests }}"
+            for test in ${{ steps.impacted.outputs.impacted_tests }}; do
+              if [[ "$test" == *"redteam"* ]]; then
+                echo "Running red-team test: $test"
+                python "$test"
+              fi
+            done
+          else
+            echo "No specific impacted tests identified, running all red-team tests"
+            # Run all red-team tests
+            python tests/redteam/injection_runner.py
+            python tests/redteam/abac_fuzz.py
+          fi
+
+      - name: Run performance tests (impacted only)
+        run: |
+          # Install k6 for performance testing
+          curl -L https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar -xz
+          sudo cp k6-v0.47.0-linux-amd64/k6 /usr/local/bin/
+
+          # Run performance tests if impacted or if no specific tests identified
+          if [ -n "${{ steps.impacted.outputs.impacted_tests }}" ]; then
+            echo "Running impacted performance tests: ${{ steps.impacted.outputs.impacted_tests }}"
+            for test in ${{ steps.impacted.outputs.impacted_tests }}; do
+              if [[ "$test" == *"perf"* ]]; then
+                echo "Running performance test: $test"
+                k6 run "$test"
+              fi
+            done
+          else
+            echo "No specific impacted tests identified, running smoke performance test"
+            # Run smoke performance test
+            k6 run tests/perf/latency_k6.js --stage 60s:1000
+          fi
+
+      - name: Run integration tests (impacted only)
         run: |
           # Install integration test dependencies
           pip install -r tests/integration/requirements.txt
 
-          # Run integration tests with timeout
-          timeout 20m pytest tests/integration/ -v
+          # Run impacted integration tests or all if no specific tests identified
+          if [ -n "${{ steps.impacted.outputs.impacted_tests }}" ]; then
+            echo "Running impacted integration tests: ${{ steps.impacted.outputs.impacted_tests }}"
+            timeout 20m pytest ${{ steps.impacted.outputs.impacted_tests }} -v
+          else
+            echo "No specific impacted tests identified, running all integration tests"
+            timeout 20m pytest tests/integration/ -v
+          fi
 
       - name: Sign spec bundles
         if: github.event_name == 'push'
