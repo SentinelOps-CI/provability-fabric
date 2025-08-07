@@ -3,7 +3,7 @@
   "title": "Plan DSL Schema",
   "description": "Schema for typed plans with capabilities, constraints, and validation",
   "type": "object",
-  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash"],
+  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash", "input_channels"],
   "properties": {
     "plan_id": {
       "type": "string",
@@ -31,6 +31,99 @@
           "description": "Capabilities possessed by the subject"
         }
       }
+    },
+    "input_channels": {
+      "type": "object",
+      "required": ["system", "user"],
+      "properties": {
+        "system": {
+          "type": "object",
+          "required": ["hash", "policy_hash"],
+          "properties": {
+            "hash": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$",
+              "description": "SHA-256 hash of system prompt"
+            },
+            "policy_hash": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$",
+              "description": "SHA-256 hash of policy configuration"
+            }
+          },
+          "description": "Trusted system channel - cannot be modified by untrusted inputs"
+        },
+        "user": {
+          "type": "object",
+          "required": ["content_hash", "quoted"],
+          "properties": {
+            "content_hash": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$",
+              "description": "SHA-256 hash of user content"
+            },
+            "quoted": {
+              "type": "boolean",
+              "description": "Must be true for untrusted user input"
+            }
+          },
+          "description": "Untrusted user channel - must be quoted and cannot alter instructions"
+        },
+        "retrieved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["receipt_id", "content_hash", "quoted", "labels"],
+            "properties": {
+              "receipt_id": {
+                "type": "string",
+                "description": "Access receipt identifier"
+              },
+              "content_hash": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$",
+                "description": "SHA-256 hash of retrieved content"
+              },
+              "quoted": {
+                "type": "boolean",
+                "description": "Must be true for untrusted retrieved content"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Labels associated with retrieved content"
+              }
+            }
+          },
+          "description": "Untrusted retrieved content - must be quoted and labeled"
+        },
+        "file": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sha256", "media_type", "quoted"],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$",
+                "description": "SHA-256 hash of file content"
+              },
+              "media_type": {
+                "type": "string",
+                "description": "MIME type of the file"
+              },
+              "quoted": {
+                "type": "boolean",
+                "description": "Must be true for untrusted file content"
+              }
+            }
+          },
+          "description": "Untrusted file content - must be quoted and typed"
+        }
+      },
+      "description": "Input channel classification for injection hardening"
     },
     "steps": {
       "type": "array",
@@ -66,6 +159,24 @@
               "type": "string"
             },
             "description": "Output labels for this step"
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "receipt_id": {"type": "string"},
+                "tenant": {"type": "string"},
+                "subject_id": {"type": "string"},
+                "query_hash": {"type": "string"},
+                "index_shard": {"type": "string"},
+                "timestamp": {"type": "integer"},
+                "result_hash": {"type": "string"},
+                "sign_alg": {"type": "string"},
+                "sig": {"type": "string"}
+              }
+            },
+            "description": "Access receipts for retrieval steps"
           }
         }
       }

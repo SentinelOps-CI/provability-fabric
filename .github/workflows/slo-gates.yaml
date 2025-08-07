@@ -1,0 +1,256 @@
+name: SLO Gates
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  schedule:
+    # Nightly performance test
+    - cron: '0 2 * * *'
+
+env:
+  BASE_URL: http://localhost:8080
+  K6_BINARY: k6
+  NODE_VERSION: '18'
+
+jobs:
+  # PR Smoke Test - Quick performance validation
+  pr-smoke-test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm install -g k6
+        
+    - name: Start services
+      run: |
+        docker-compose up -d
+        sleep 30  # Wait for services to be ready
+        
+    - name: Run SLO smoke test
+      run: |
+        k6 run tests/perf/latency_k6.js \
+          --env BASE_URL=${{ env.BASE_URL }} \
+          --stage 30s:100 \
+          --stage 60s:1000 \
+          --stage 60s:1000 \
+          --stage 30s:0 \
+          --threshold 'p(95)<2200' \
+          --threshold 'p(99)<4200' \
+          --threshold 'errors<0.001'
+          
+    - name: Run component budget test
+      run: |
+        npm run test:component-budgets
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pr-smoke-results
+        path: |
+          k6-results.json
+          component-budget-results.json
+          
+  # Nightly Performance Test - Comprehensive validation
+  nightly-performance-test:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm install -g k6
+        
+    - name: Start services with monitoring
+      run: |
+        docker-compose up -d
+        sleep 60  # Wait for services to be ready
+        
+    - name: Run comprehensive SLO test
+      run: |
+        k6 run tests/perf/latency_k6.js \
+          --env BASE_URL=${{ env.BASE_URL }} \
+          --stage 2m:500 \
+          --stage 10m:1000 \
+          --stage 2m:0 \
+          --threshold 'p(95)<2000' \
+          --threshold 'p(99)<4000' \
+          --threshold 'errors<0.001'
+          
+    - name: Run component budget validation
+      run: |
+        npm run test:component-budgets -- --iterations=5
+        
+    - name: Run injection hardening test
+      run: |
+        python tests/redteam/injection_runner.py \
+          --corpus tests/redteam/injection_corpus.jsonl \
+          --kernel-url ${{ env.BASE_URL }} \
+          --output injection-results.json
+          
+    - name: Generate performance report
+      run: |
+        node scripts/generate-slo-report.js \
+          --k6-results k6-results.json \
+          --component-results component-budget-results.json \
+          --injection-results injection-results.json \
+          --output slo-report.json
+          
+    - name: Upload performance report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nightly-performance-report
+        path: |
+          slo-report.json
+          k6-results.json
+          component-budget-results.json
+          injection-results.json
+          
+    - name: Check SLO compliance
+      run: |
+        node scripts/check-slo-compliance.js slo-report.json
+        if [ $? -ne 0 ]; then
+          echo "❌ SLO compliance check failed"
+          exit 1
+        fi
+        echo "✅ SLO compliance check passed"
+        
+  # Component Budget Validation
+  component-budgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Start services
+      run: |
+        docker-compose up -d
+        sleep 30
+        
+    - name: Run component budget tests
+      run: |
+        npm run test:component-budgets -- --verbose
+        
+    - name: Check budget violations
+      run: |
+        node scripts/check-component-budgets.js component-budget-results.json
+        if [ $? -ne 0 ]; then
+          echo "❌ Component budget violations detected"
+          exit 1
+        fi
+        echo "✅ All components within budget"
+        
+  # Performance Regression Detection
+  performance-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Download baseline results
+      uses: actions/download-artifact@v4
+      with:
+        name: baseline-performance
+        path: baseline/
+        
+    - name: Run current performance test
+      run: |
+        docker-compose up -d
+        sleep 30
+        k6 run tests/perf/latency_k6.js \
+          --env BASE_URL=${{ env.BASE_URL }} \
+          --stage 1m:500 \
+          --stage 5m:1000 \
+          --stage 1m:0 \
+          --out json=current-results.json
+          
+    - name: Compare performance
+      run: |
+        node scripts/compare-performance.js \
+          --baseline baseline/k6-results.json \
+          --current current-results.json \
+          --threshold 0.1
+        if [ $? -ne 0 ]; then
+          echo "❌ Performance regression detected"
+          exit 1
+        fi
+        echo "✅ No performance regression"
+        
+  # SLO Dashboard Update
+  update-slo-dashboard:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    needs: [nightly-performance-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download performance results
+      uses: actions/download-artifact@v4
+      with:
+        name: nightly-performance-report
+        path: results/
+        
+    - name: Update SLO dashboard
+      run: |
+        node scripts/update-slo-dashboard.js \
+          --results results/slo-report.json \
+          --dashboard docs/runtime/slo.md
+          
+    - name: Commit dashboard updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docs/runtime/slo.md
+        git commit -m "Update SLO dashboard with latest metrics" || exit 0
+        git push
