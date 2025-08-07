@@ -43,6 +43,38 @@ impl SecretDetector {
             "jwt_token".to_string(),
             Regex::new(r"eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*").unwrap(),
         ));
+        api_key_patterns.push((
+            "openai_api_key".to_string(),
+            Regex::new(r"sk-[A-Za-z0-9]{48}").unwrap(),
+        ));
+        api_key_patterns.push((
+            "google_api_key".to_string(),
+            Regex::new(r"AIza[A-Za-z0-9]{35}").unwrap(),
+        ));
+        api_key_patterns.push((
+            "stripe_secret_key".to_string(),
+            Regex::new(r"sk_live_[A-Za-z0-9]{24}").unwrap(),
+        ));
+        api_key_patterns.push((
+            "stripe_publishable_key".to_string(),
+            Regex::new(r"pk_live_[A-Za-z0-9]{24}").unwrap(),
+        ));
+        api_key_patterns.push((
+            "firebase_api_key".to_string(),
+            Regex::new(r"AIza[A-Za-z0-9]{35}").unwrap(),
+        ));
+        api_key_patterns.push((
+            "private_key".to_string(),
+            Regex::new(r"-----BEGIN PRIVATE KEY-----").unwrap(),
+        ));
+        api_key_patterns.push((
+            "rsa_private_key".to_string(),
+            Regex::new(r"-----BEGIN RSA PRIVATE KEY-----").unwrap(),
+        ));
+        api_key_patterns.push((
+            "ssh_private_key".to_string(),
+            Regex::new(r"-----BEGIN OPENSSH PRIVATE KEY-----").unwrap(),
+        ));
 
         Self {
             api_key_patterns,

@@ -54,6 +54,14 @@ jobs:
             --output evidence-manifest.json \
             ${{ github.event.inputs.run_id && format('--run-id {0}', github.event.inputs.run_id) || '' }}
 
+      - name: Generate session bundles
+        run: |
+          # Generate bundles for all sessions in last 24 hours
+          python tools/evidence/session_bundle.py \
+            --config tools/evidence/session_config.yaml \
+            --start-time $(date -d '24 hours ago' -Iseconds) \
+            --end-time $(date -Iseconds)
+
       - name: Upload manifest artifact
         uses: actions/upload-artifact@v4
         with:

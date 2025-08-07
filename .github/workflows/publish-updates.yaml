@@ -1,0 +1,60 @@
+name: Publish Updates
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Allow manual triggering
+  push:
+    branches: [main]
+    paths:
+      - "tools/metrics/**"
+      - ".github/workflows/publish-updates.yaml"
+
+jobs:
+  publish-updates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Publish updates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python tools/metrics/publish_updates.py
+
+      - name: Check for critical failures
+        id: check-failures
+        run: |
+          if python tools/metrics/publish_updates.py; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push updates
+        if: steps.check-failures.outputs.status == 'success'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/updates.md
+          git commit -m "Update metrics [skip ci]" || exit 0
+          git push
+
+      - name: Fail on critical violations
+        if: steps.check-failures.outputs.status == 'failure'
+        run: |
+          echo "❌ Critical metrics failing - check docs/updates.md for details"
+          exit 1

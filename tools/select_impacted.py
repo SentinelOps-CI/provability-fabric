@@ -10,6 +10,7 @@ Reads changed files from git diff and returns affected Lean targets via reverse-
 import json
 import subprocess
 import sys
+import re
 from pathlib import Path
 from typing import List, Set
 from lean_dep_graph import LeanDepGraph
@@ -67,6 +68,64 @@ def get_impacted_targets(workspace_root: str, changed_files: List[str]) -> Set[s
     return set(build_targets)
 
 
+def get_impacted_tests(workspace_root: str, changed_files: List[str]) -> Set[str]:
+    """Get impacted tests from changed files."""
+    impacted_tests = set()
+
+    # Map file patterns to test types
+    test_patterns = {
+        r"tests/.*\.py$": "python_test",
+        r"tests/.*\.js$": "javascript_test",
+        r"tests/.*\.go$": "go_test",
+        r"tests/.*\.rs$": "rust_test",
+        r"bundles/.*/proofs/.*\.lean$": "lean_proof",
+        r"core/.*\.lean$": "lean_spec",
+    }
+
+    for file_path in changed_files:
+        for pattern, test_type in test_patterns.items():
+            if re.match(pattern, file_path):
+                # Extract test name from path
+                test_name = Path(file_path).stem
+                impacted_tests.add(f"{test_type}:{test_name}")
+                break
+
+    return impacted_tests
+
+
+def get_impacted_allowlist(workspace_root: str, changed_files: List[str]) -> bool:
+    """Check if allowlist needs to be regenerated."""
+    allowlist_triggers = [
+        "core/lean-libs/",
+        "bundles/",
+        "tools/gen_allowlist_from_lean.py",
+        "runtime/sidecar-watcher/policy/allowlist.json",
+    ]
+
+    for file_path in changed_files:
+        for trigger in allowlist_triggers:
+            if trigger in file_path:
+                return True
+
+    return False
+
+
+def get_impacted_agents(workspace_root: str, changed_files: List[str]) -> Set[str]:
+    """Get impacted agents from changed files."""
+    impacted_agents = set()
+
+    # Look for bundle changes
+    for file_path in changed_files:
+        if "bundles/" in file_path:
+            # Extract agent name from bundle path
+            parts = file_path.split("/")
+            if len(parts) >= 3 and parts[0] == "bundles":
+                agent_name = parts[1]
+                impacted_agents.add(agent_name)
+
+    return impacted_agents
+
+
 def main():
     """Main entry point."""
     if len(sys.argv) < 2:
@@ -89,24 +148,45 @@ def main():
 
     # Get impacted targets
     impacted_targets = get_impacted_targets(workspace_root, changed_files)
+    impacted_tests = get_impacted_tests(workspace_root, changed_files)
+    impacted_agents = get_impacted_agents(workspace_root, changed_files)
+    allowlist_impacted = get_impacted_allowlist(workspace_root, changed_files)
 
-    if not impacted_targets:
-        print("\nNo impacted Lean targets found")
-        sys.exit(0)
-
+    # Print summary
     print(f"\nImpacted targets: {len(impacted_targets)}")
     for target in sorted(impacted_targets):
         print(f"  - {target}")
 
-    # Output for CI consumption (one target per line)
+    print(f"\nImpacted tests: {len(impacted_tests)}")
+    for test in sorted(impacted_tests):
+        print(f"  - {test}")
+
+    print(f"\nImpacted agents: {len(impacted_agents)}")
+    for agent in sorted(impacted_agents):
+        print(f"  - {agent}")
+
+    print(f"\nAllowlist impacted: {allowlist_impacted}")
+
+    # Output for CI consumption
     print("\n--- TARGETS ---")
     for target in sorted(impacted_targets):
         print(target)
+
+    print("\n--- TESTS ---")
+    for test in sorted(impacted_tests):
+        print(test)
+
+    print("\n--- AGENTS ---")
+    for agent in sorted(impacted_agents):
+        print(agent)
 
     # Output JSON for further processing
     result = {
         "changed_files": changed_files,
         "impacted_targets": list(impacted_targets),
+        "impacted_tests": list(impacted_tests),
+        "impacted_agents": list(impacted_agents),
+        "allowlist_impacted": allowlist_impacted,
     }
     print(f"\nJSON output:\n{json.dumps(result, indent=2)}")
 

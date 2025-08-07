@@ -155,6 +155,15 @@ theorem thm_plan_sound (plan : Plan) (subject : Subject) :
   -- Proof that kernel validation implies trace safety
   -- This ensures that any plan approved by the kernel
   -- will produce a safe execution trace
+  --
+  -- The proof follows from:
+  -- 1. Kernel validation checks capability requirements
+  -- 2. Each step in the plan has required capabilities
+  -- 3. The subject possesses all required capabilities
+  -- 4. Therefore, the executed trace is safe
+  --
+  -- This is a foundational theorem that ensures
+  -- the kernel's approval guarantees execution safety
   sorry
 
 /-- Theorem: Plan validation is prefix-closed -/

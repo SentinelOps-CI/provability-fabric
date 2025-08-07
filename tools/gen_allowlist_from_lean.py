@@ -182,13 +182,17 @@ class AllowlistGenerator:
 
         # Build allowlist with enhanced metadata
         allowlist = {
-            "version": "2.0",
+            "version": "3.0",
             "generated_from": "lean_proofs",
             "generation_timestamp": datetime.utcnow().isoformat(),
             "source_files": [str(f) for f in lean_files],
             "sync_with_lean": True,
             "validation_status": "pending",
+            "lean_environment": self.get_lean_environment_info(),
+            "workspace_hash": self.compute_workspace_hash(),
             "tools": {},
+            "capabilities": {},
+            "policies": {},
             "metadata": {
                 "total_tools_found": len(self.tools),
                 "total_capabilities": len(all_capabilities),
@@ -237,7 +241,147 @@ class AllowlistGenerator:
         allowlist["metadata"]["default_capabilities"] = default_count
         allowlist["validation_status"] = "generated"
 
+        # Extract capabilities from Lean environment
+        allowlist["capabilities"] = self.extract_capabilities_from_lean_env()
+
+        # Extract policies from Lean environment
+        allowlist["policies"] = self.extract_policies_from_lean_env()
+
         return allowlist
+
+    def get_lean_environment_info(self) -> Dict:
+        """Get information about the Lean environment."""
+        try:
+            # Get Lean version
+            result = subprocess.run(
+                ["lean", "--version"],
+                capture_output=True,
+                text=True,
+                cwd=self.workspace_root,
+            )
+            lean_version = (
+                result.stdout.strip() if result.returncode == 0 else "unknown"
+            )
+
+            # Get Lake version
+            result = subprocess.run(
+                ["lake", "--version"],
+                capture_output=True,
+                text=True,
+                cwd=self.workspace_root,
+            )
+            lake_version = (
+                result.stdout.strip() if result.returncode == 0 else "unknown"
+            )
+
+            return {
+                "lean_version": lean_version,
+                "lake_version": lake_version,
+                "workspace_hash": self.compute_workspace_hash(),
+            }
+        except Exception as e:
+            return {
+                "error": str(e),
+                "lean_version": "unknown",
+                "lake_version": "unknown",
+            }
+
+    def compute_workspace_hash(self) -> str:
+        """Compute hash of workspace for change detection."""
+        import hashlib
+
+        hash_input = ""
+        lean_files = self.find_lean_files()
+
+        for file_path in sorted(lean_files):
+            try:
+                with open(file_path, "rb") as f:
+                    hash_input += f.read().decode("utf-8", errors="ignore")
+            except Exception:
+                continue
+
+        return hashlib.sha256(hash_input.encode()).hexdigest()
+
+    def extract_capabilities_from_lean_env(self) -> Dict:
+        """Extract capabilities from Lean environment using Lake."""
+        capabilities = {}
+
+        try:
+            # Use Lake to query the Lean environment
+            result = subprocess.run(
+                ["lake", "build"],
+                capture_output=True,
+                text=True,
+                cwd=self.workspace_root,
+            )
+
+            if result.returncode == 0:
+                # Parse Lake output for capability information
+                for line in result.stdout.split("\n"):
+                    if "capability" in line.lower() or "canuse" in line.lower():
+                        # Extract capability information
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            capability_name = parts[0]
+                            capabilities[capability_name] = {
+                                "type": "capability",
+                                "source": "lean_env",
+                                "status": "active",
+                            }
+
+        except Exception as e:
+            print(f"Warning: Failed to extract capabilities from Lean environment: {e}")
+
+        return capabilities
+
+    def extract_policies_from_lean_env(self) -> Dict:
+        """Extract policies from Lean environment."""
+        policies = {}
+
+        try:
+            # Look for policy files
+            policy_files = list(self.workspace_root.rglob("*.lean"))
+            policy_files = [
+                f
+                for f in policy_files
+                if "policy" in str(f).lower() or "spec" in str(f).lower()
+            ]
+
+            for file_path in policy_files:
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+
+                    # Extract policy information
+                    policy_name = file_path.stem
+                    policies[policy_name] = {
+                        "file": str(file_path.relative_to(self.workspace_root)),
+                        "theorems": self.extract_theorems(content),
+                        "lemmas": self.extract_lemmas(content),
+                        "axioms": self.extract_axioms(content),
+                    }
+                except Exception:
+                    continue
+
+        except Exception as e:
+            print(f"Warning: Failed to extract policies from Lean environment: {e}")
+
+        return policies
+
+    def extract_theorems(self, content: str) -> List[str]:
+        """Extract theorem names from content."""
+        pattern = r"theorem\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:"
+        return re.findall(pattern, content)
+
+    def extract_lemmas(self, content: str) -> List[str]:
+        """Extract lemma names from content."""
+        pattern = r"lemma\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:"
+        return re.findall(pattern, content)
+
+    def extract_axioms(self, content: str) -> List[str]:
+        """Extract axiom names from content."""
+        pattern = r"axiom\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:"
+        return re.findall(pattern, content)
 
     def output_json(self, allowlist: Dict) -> str:
         """Output allowlist as JSON."""

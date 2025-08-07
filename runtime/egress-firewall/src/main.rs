@@ -31,11 +31,32 @@ pub struct EgressCertificate {
     pub cert_id: String,
     pub plan_id: Option<String>,
     pub tenant: String,
-    pub detectors: DetectorResults,
+    pub detector_flags: DetectorFlags,
+    pub near_dupe_score: f64,
     pub policy_hash: String,
     pub text_hash: String,
     pub timestamp: u64,
     pub signer: Option<String>,
+    // Non-interference verdict fields
+    pub non_interference: NonInterferenceVerdict,
+    pub influencing_labels: Vec<String>,
+    pub attestation_ref: Option<String>,
+}
+
+/// Non-interference verdict for formal security verification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum NonInterferenceVerdict {
+    Passed,
+    Failed { reason: String },
+}
+
+/// Detector flags for quick reference
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetectorFlags {
+    pub pii_detected: bool,
+    pub secrets_detected: bool,
+    pub near_dupe_detected: bool,
+    pub policy_violations: bool,
 }
 
 /// Detector results
@@ -537,44 +558,106 @@ impl EgressFirewall {
             .unwrap()
             .as_secs();
 
-        let cert_id = format!("cert_{}", Uuid::new_v4().to_string().replace("-", ""));
-        
-        // Hash the text
-        let mut hasher = Sha256::new();
-        hasher.update(request.text.as_bytes());
-        let text_hash = hex::encode(hasher.finalize());
-        
-        // Hash the policy
-        let policy = self.policies.get(&request.tenant)
-            .ok_or_else(|| format!("No policy found for tenant: {}", request.tenant))?;
-        let mut hasher = Sha256::new();
-        hasher.update(format!("{:?}", policy).as_bytes());
-        let policy_hash = hex::encode(hasher.finalize());
+        let cert_id = Uuid::new_v4().to_string();
+        let text_hash = self.calculate_text_hash(&request.text);
+        let policy_hash = self.calculate_policy_hash(request.tenant.as_str());
 
-        let detectors = DetectorResults {
-            pii: pii_result.clone(),
-            secrets: secrets_result.clone(),
-            near_dupe: near_dupe_result.clone(),
-            policy_violations: policy_violations.to_vec(),
-        };
+        // Compute non-interference verdict
+        let (non_interference, influencing_labels) = self.compute_non_interference_verdict(request)?;
 
-        let mut certificate = EgressCertificate {
+        let certificate = EgressCertificate {
             cert_id,
             plan_id: request.plan_id.clone(),
             tenant: request.tenant.clone(),
-            detectors,
+            detector_flags: DetectorFlags {
+                pii_detected: pii_result.detected,
+                secrets_detected: secrets_result.detected,
+                near_dupe_detected: near_dupe_result.is_duplicate,
+                policy_violations: !policy_violations.is_empty(),
+            },
+            near_dupe_score: near_dupe_result.score,
             policy_hash,
             text_hash,
             timestamp: now,
             signer: None,
+            non_interference,
+            influencing_labels,
+            attestation_ref: None,
         };
 
-        // Sign the certificate if signing key is available
+        // Sign certificate if signing key is available
         if let Some(key) = &self.signing_key {
-            certificate.signer = self.sign_certificate(&certificate, key).await;
+            if let Some(signature) = self.sign_certificate(&certificate, key).await {
+                // Update certificate with signature
+                let mut signed_cert = certificate.clone();
+                signed_cert.signer = Some(signature);
+                return Ok(signed_cert);
+            }
         }
 
         Ok(certificate)
+    }
+
+    /// Calculate SHA-256 hash of text
+    fn calculate_text_hash(&self, text: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(text.as_bytes());
+        hex::encode(hasher.finalize())
+    }
+
+    /// Calculate SHA-256 hash of policy
+    fn calculate_policy_hash(&self, tenant: &str) -> String {
+        let policy = self.policies.get(tenant)
+            .unwrap_or_else(|| panic!("No policy found for tenant: {}", tenant));
+        let mut hasher = Sha256::new();
+        hasher.update(format!("{:?}", policy).as_bytes());
+        hex::encode(hasher.finalize())
+    }
+
+    /// Compute non-interference verdict based on label flow
+    fn compute_non_interference_verdict(&self, request: &EgressRequest) -> Result<(NonInterferenceVerdict, Vec<String>), String> {
+        // Extract labels from context
+        let labels_out: Vec<String> = request.context
+            .get("labels_out")
+            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default();
+
+        let allowed_out: Vec<String> = request.context
+            .get("allowed_out")
+            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default();
+
+        let labels_in: Vec<String> = request.context
+            .get("labels_in")
+            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default();
+
+        // Check if labels_out are properly contained within allowed_out
+        let mut violating_labels = Vec::new();
+        for label in &labels_out {
+            if !allowed_out.contains(label) {
+                violating_labels.push(label.clone());
+            }
+        }
+
+        if !violating_labels.is_empty() {
+            return Ok((
+                NonInterferenceVerdict::Failed {
+                    reason: format!("Labels {} not allowed in output", violating_labels.join(", "))
+                },
+                labels_in
+            ));
+        }
+
+        // Check if any labels from input influenced the output
+        let influencing_labels: Vec<String> = labels_in.into_iter()
+            .filter(|label| labels_out.contains(label))
+            .collect();
+
+        Ok((
+            NonInterferenceVerdict::Passed,
+            influencing_labels
+        ))
     }
 
     /// Sign certificate

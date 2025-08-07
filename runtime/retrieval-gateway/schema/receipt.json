@@ -57,9 +57,14 @@
       "minimum": 0,
       "description": "Query execution time in milliseconds"
     },
-    "signature": {
+    "sign_alg": {
       "type": "string",
-      "description": "DSSE signature of the receipt"
+      "enum": ["ed25519"],
+      "description": "Signature algorithm used"
+    },
+    "sig": {
+      "type": "string",
+      "description": "Ed25519 signature of the receipt"
     },
     "labels_accessed": {
       "type": "array",

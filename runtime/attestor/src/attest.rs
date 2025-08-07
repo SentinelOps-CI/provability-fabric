@@ -68,7 +68,13 @@ impl RuntimeAttestation {
 
     pub fn sign(mut self, _private_key: &[u8]) -> Self {
         // In production, would use proper cryptographic signing
-        let content = format!("{}{}", self.timestamp.timestamp(), self.capsule_hash);
+        let content = format!(
+            "{}{}{}{}",
+            self.timestamp.timestamp(),
+            self.capsule_hash,
+            self.policy_config.policy_hash,
+            self.zero_retention_attestation
+        );
         self.signature = Some(format!("sig_{}", content.len()));
         self
     }

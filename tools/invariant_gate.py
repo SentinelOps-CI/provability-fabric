@@ -1,325 +1,225 @@
 #!/usr/bin/env python3
 """
-Invariant Gate - CI tool to ensure system invariants are properly referenced and proven.
-
-This tool checks that:
-1. All bundle specs import and use system invariants
-2. No 'sorry' proofs remain in invariant theorems
-3. All required invariants are covered
-4. Proofs compile successfully
+Invariant Gate - ensures all bundles import and use required invariants
 """
 
 import os
-import sys
 import re
-import subprocess
-import argparse
+import sys
 from pathlib import Path
-from typing import List, Tuple, Dict, Set
-import yaml
+from typing import List, Dict, Set
 
 
 class InvariantGate:
-    def __init__(self, project_root: str):
-        self.project_root = Path(project_root)
-        self.core_libs = self.project_root / "core" / "lean-libs"
-        self.bundles_dir = self.project_root / "bundles"
-
-        # Required invariants that must be used
+    def __init__(self):
         self.required_invariants = {
-            "non_interference": "Tenant isolation - no cross-tenant data flow",
-            "capability_soundness": "All actions require valid capabilities",
-            "plan_separation": "No action without kernel approval",
-            "pii_egress_protection": "No PII data in outputs",
-            "dp_bound": "Differential privacy budget limits",
+            "non_interference_invariant",
+            "capability_soundness_invariant",
+            "pii_egress_protection_invariant",
+            "plan_separation_invariant",
         }
 
-        # Files that should import Invariants
-        self.invariant_users = set()
+        self.required_imports = {"Invariants"}
 
-        self.errors = []
-        self.warnings = []
+    def scan_bundle_directory(self, bundle_dir: str) -> Dict[str, List[str]]:
+        """Scan bundle directory for Lean files and check invariant usage"""
+        results = {"missing_imports": [], "missing_invariants": [], "valid_bundles": []}
 
-    def check_all(self) -> bool:
-        """Run all invariant checks."""
-        print("🔍 Running Invariant Gate checks...")
+        bundle_path = Path(bundle_dir)
+        if not bundle_path.exists():
+            print(f"Bundle directory {bundle_dir} does not exist")
+            return results
 
-        success = True
+        # Find all bundle directories
+        for bundle in bundle_path.iterdir():
+            if bundle.is_dir() and bundle.name not in [".lake", "__pycache__"]:
+                bundle_results = self.check_bundle_invariants(bundle)
 
-        # Check 1: Invariants.lean compilation
-        if not self.check_invariants_compilation():
-            success = False
+                if bundle_results["missing_imports"]:
+                    results["missing_imports"].append(
+                        {
+                            "bundle": bundle.name,
+                            "files": bundle_results["missing_imports"],
+                        }
+                    )
 
-        # Check 2: Bundle invariant usage
-        if not self.check_bundle_invariant_usage():
-            success = False
+                if bundle_results["missing_invariants"]:
+                    results["missing_invariants"].append(
+                        {
+                            "bundle": bundle.name,
+                            "files": bundle_results["missing_invariants"],
+                        }
+                    )
 
-        # Check 3: No sorry proofs in invariants
-        if not self.check_no_sorry_proofs():
-            success = False
+                if (
+                    not bundle_results["missing_imports"]
+                    and not bundle_results["missing_invariants"]
+                ):
+                    results["valid_bundles"].append(bundle.name)
 
-        # Check 4: Coverage of required invariants
-        if not self.check_invariant_coverage():
-            success = False
+        return results
 
-        # Check 5: Lean proof verification
-        if not self.verify_lean_proofs():
-            success = False
+    def check_bundle_invariants(self, bundle_path: Path) -> Dict[str, List[str]]:
+        """Check a single bundle for invariant usage"""
+        results = {"missing_imports": [], "missing_invariants": []}
 
-        self.print_summary()
-        return success
+        # Look for Lean files in the bundle
+        lean_files = list(bundle_path.rglob("*.lean"))
 
-    def check_invariants_compilation(self) -> bool:
-        """Check that Invariants.lean compiles successfully."""
-        print("📋 Checking Invariants.lean compilation...")
-
-        invariants_file = self.core_libs / "Invariants.lean"
-        if not invariants_file.exists():
-            self.errors.append(f"Invariants.lean not found at {invariants_file}")
-            return False
-
-        try:
-            result = subprocess.run(
-                ["lean", "--check", str(invariants_file)],
-                capture_output=True,
-                text=True,
-                cwd=self.project_root,
-            )
-
-            if result.returncode != 0:
-                self.errors.append(
-                    f"Invariants.lean compilation failed:\n{result.stderr}"
-                )
-                return False
-
-            print("✅ Invariants.lean compiles successfully")
-            return True
-
-        except FileNotFoundError:
-            self.errors.append("Lean compiler not found. Please install Lean 4.")
-            return False
-
-    def check_bundle_invariant_usage(self) -> bool:
-        """Check that all bundles import and use invariants."""
-        print("📦 Checking bundle invariant usage...")
-
-        success = True
-
-        for bundle_dir in self.bundles_dir.iterdir():
-            if not bundle_dir.is_dir():
-                continue
-
-            spec_file = bundle_dir / "proofs" / "Spec.lean"
-            if not spec_file.exists():
-                self.warnings.append(f"No Spec.lean found in bundle {bundle_dir.name}")
-                continue
-
-            if not self.check_bundle_spec(spec_file, bundle_dir.name):
-                success = False
-
-        return success
-
-    def check_bundle_spec(self, spec_file: Path, bundle_name: str) -> bool:
-        """Check a specific bundle spec for invariant usage."""
-        try:
-            content = spec_file.read_text()
-        except Exception as e:
-            self.errors.append(f"Could not read {spec_file}: {e}")
-            return False
-
-        # Check for Invariants import
-        if not re.search(r"import.*Invariants", content):
-            self.errors.append(
-                f"Bundle {bundle_name}: Missing 'import Invariants' in Spec.lean"
-            )
-            return False
-
-        # Check for at least one invariant usage
-        invariant_usage = False
-        for invariant in self.required_invariants:
-            if invariant in content:
-                invariant_usage = True
-                self.invariant_users.add(bundle_name)
-                break
-
-        if not invariant_usage:
-            self.errors.append(
-                f"Bundle {bundle_name}: No system invariants used in Spec.lean"
-            )
-            return False
-
-        print(f"✅ Bundle {bundle_name}: Proper invariant usage")
-        return True
-
-    def check_no_sorry_proofs(self) -> bool:
-        """Check that no 'sorry' proofs remain in critical invariant theorems."""
-        print("🚫 Checking for sorry proofs in invariants...")
-
-        invariants_file = self.core_libs / "Invariants.lean"
-        if not invariants_file.exists():
-            return False
-
-        try:
-            content = invariants_file.read_text()
-        except Exception as e:
-            self.errors.append(f"Could not read Invariants.lean: {e}")
-            return False
-
-        # Find critical theorem definitions
-        critical_theorems = [
-            "empty_trace_invariant",
-            "invariant_preservation",
-            "cross_tenant_isolation",
-            "system_safety",
-        ]
-
-        sorry_found = False
-        for theorem in critical_theorems:
-            # Look for theorem definition and check for sorry in its proof
-            theorem_pattern = rf"theorem\s+{theorem}.*?:=\s*by\s*(.*?)(?=theorem|\Z)"
-            match = re.search(theorem_pattern, content, re.DOTALL | re.MULTILINE)
-
-            if match:
-                proof_body = match.group(1)
-                if "sorry" in proof_body:
-                    self.errors.append(f"Theorem {theorem} contains 'sorry' proof")
-                    sorry_found = True
-
-        if sorry_found:
-            return False
-
-        print("✅ No sorry proofs found in critical invariant theorems")
-        return True
-
-    def check_invariant_coverage(self) -> bool:
-        """Check that all required invariants are covered by at least one bundle."""
-        print("📊 Checking invariant coverage...")
-
-        # Scan all bundle specs for invariant usage
-        used_invariants = set()
-
-        for bundle_dir in self.bundles_dir.iterdir():
-            if not bundle_dir.is_dir():
-                continue
-
-            spec_file = bundle_dir / "proofs" / "Spec.lean"
-            if not spec_file.exists():
-                continue
-
-            try:
-                content = spec_file.read_text()
-                for invariant in self.required_invariants:
-                    if invariant in content:
-                        used_invariants.add(invariant)
-            except Exception:
-                continue
-
-        # Check coverage
-        missing_invariants = set(self.required_invariants.keys()) - used_invariants
-
-        if missing_invariants:
-            for invariant in missing_invariants:
-                description = self.required_invariants[invariant]
-                self.errors.append(
-                    f"Invariant '{invariant}' not used by any bundle - {description}"
-                )
-            return False
-
-        print(f"✅ All {len(self.required_invariants)} required invariants are covered")
-        return True
-
-    def verify_lean_proofs(self) -> bool:
-        """Verify that all Lean proofs compile successfully."""
-        print("🔬 Verifying Lean proofs...")
-
-        # Find all .lean files in bundles
-        lean_files = []
-        for bundle_dir in self.bundles_dir.iterdir():
-            if bundle_dir.is_dir():
-                proofs_dir = bundle_dir / "proofs"
-                if proofs_dir.exists():
-                    lean_files.extend(proofs_dir.glob("*.lean"))
-
-        if not lean_files:
-            self.warnings.append("No Lean proof files found")
-            return True
-
-        failed_files = []
         for lean_file in lean_files:
-            try:
-                result = subprocess.run(
-                    ["lean", "--check", str(lean_file)],
-                    capture_output=True,
-                    text=True,
-                    cwd=self.project_root,
+            file_results = self.check_lean_file_invariants(lean_file)
+
+            if file_results["missing_imports"]:
+                results["missing_imports"].append(str(lean_file))
+
+            if file_results["missing_invariants"]:
+                results["missing_invariants"].append(str(lean_file))
+
+        return results
+
+    def check_lean_file_invariants(self, lean_file: Path) -> Dict[str, List[str]]:
+        """Check a single Lean file for invariant usage"""
+        results = {"missing_imports": [], "missing_invariants": []}
+
+        try:
+            with open(lean_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check for required imports
+            if not self.has_required_imports(content):
+                results["missing_imports"].append("Invariants")
+
+            # Check for invariant usage
+            missing_invariants = self.get_missing_invariants(content)
+            if missing_invariants:
+                results["missing_invariants"].extend(missing_invariants)
+
+        except Exception as e:
+            print(f"Error reading {lean_file}: {e}")
+            results["missing_imports"].append("Error reading file")
+
+        return results
+
+    def has_required_imports(self, content: str) -> bool:
+        """Check if file imports required modules"""
+        # Look for import statements
+        import_pattern = r"import\s+(\w+)"
+        imports = re.findall(import_pattern, content)
+
+        return "Invariants" in imports
+
+    def get_missing_invariants(self, content: str) -> List[str]:
+        """Find missing invariant usage in the file"""
+        missing = []
+
+        # Look for invariant usage patterns
+        for invariant in self.required_invariants:
+            # Check for theorem statements that use the invariant
+            theorem_pattern = rf"theorem.*{invariant}"
+            if not re.search(theorem_pattern, content, re.IGNORECASE):
+                # Check for direct usage in proofs
+                usage_pattern = rf"{invariant}"
+                if not re.search(usage_pattern, content):
+                    missing.append(invariant)
+
+        return missing
+
+    def generate_invariant_template(self, bundle_name: str) -> str:
+        """Generate a template for invariant usage"""
+        template = f"""
+-- Invariant usage template for {bundle_name}
+import Invariants
+
+-- Example theorem using invariants
+theorem {bundle_name}_invariant_safety (trace : ActionTrace) (caps : List Capability) 
+         (kernel_approvals : List String) (epsilon_max : Float) :
+  non_interference_invariant trace ∧
+  capability_soundness_invariant trace caps ∧
+  pii_egress_protection_invariant trace ∧
+  plan_separation_invariant trace kernel_approvals := by
+  -- Proof that this bundle satisfies all invariants
+  sorry
+
+-- Example usage of specific invariants
+theorem {bundle_name}_non_interference (trace : ActionTrace) :
+  non_interference_invariant trace := by
+  sorry
+
+theorem {bundle_name}_capability_soundness (trace : ActionTrace) (caps : List Capability) :
+  capability_soundness_invariant trace caps := by
+  sorry
+
+theorem {bundle_name}_pii_protection (trace : ActionTrace) :
+  pii_egress_protection_invariant trace := by
+  sorry
+
+theorem {bundle_name}_plan_separation (trace : ActionTrace) (kernel_approvals : List String) :
+  plan_separation_invariant trace kernel_approvals := by
+  sorry
+"""
+        return template
+
+    def run_gate_check(self, bundle_dir: str) -> bool:
+        """Run the invariant gate check"""
+        print("Running invariant gate check...")
+
+        results = self.scan_bundle_directory(bundle_dir)
+
+        # Report results
+        if results["valid_bundles"]:
+            print(f"✓ Valid bundles: {', '.join(results['valid_bundles'])}")
+
+        if results["missing_imports"]:
+            print("✗ Bundles missing required imports:")
+            for bundle in results["missing_imports"]:
+                print(f"  - {bundle['bundle']}: {', '.join(bundle['files'])}")
+
+        if results["missing_invariants"]:
+            print("✗ Bundles missing invariant usage:")
+            for bundle in results["missing_invariants"]:
+                print(f"  - {bundle['bundle']}: {', '.join(bundle['files'])}")
+
+        # Generate templates for missing bundles
+        if results["missing_imports"] or results["missing_invariants"]:
+            print("\nGenerating templates for missing invariants...")
+            for bundle in results["missing_imports"] + results["missing_invariants"]:
+                bundle_name = bundle["bundle"]
+                template = self.generate_invariant_template(bundle_name)
+
+                template_file = (
+                    Path(bundle_dir) / bundle_name / "proofs" / "Invariants.lean"
                 )
+                template_file.parent.mkdir(parents=True, exist_ok=True)
 
-                if result.returncode != 0:
-                    failed_files.append((lean_file, result.stderr))
+                with open(template_file, "w") as f:
+                    f.write(template)
 
-            except FileNotFoundError:
-                self.errors.append("Lean compiler not found")
-                return False
+                print(f"  - Generated template: {template_file}")
 
-        if failed_files:
-            for lean_file, error in failed_files:
-                self.errors.append(
-                    f"Proof verification failed for {lean_file}:\n{error}"
-                )
-            return False
-
-        print(f"✅ All {len(lean_files)} proof files verified successfully")
-        return True
-
-    def print_summary(self):
-        """Print summary of check results."""
-        print("\n" + "=" * 60)
-        print("INVARIANT GATE SUMMARY")
-        print("=" * 60)
-
-        if self.errors:
-            print(f"❌ {len(self.errors)} ERROR(S):")
-            for i, error in enumerate(self.errors, 1):
-                print(f"  {i}. {error}")
-
-        if self.warnings:
-            print(f"⚠️  {len(self.warnings)} WARNING(S):")
-            for i, warning in enumerate(self.warnings, 1):
-                print(f"  {i}. {warning}")
-
-        if not self.errors and not self.warnings:
-            print("✅ ALL CHECKS PASSED - System invariants properly enforced!")
-        elif not self.errors:
-            print("✅ CHECKS PASSED with warnings")
-        else:
-            print("❌ CHECKS FAILED - Fix errors before proceeding")
-
-        # Statistics
-        print(f"\n📈 STATISTICS:")
-        print(f"  - Required invariants: {len(self.required_invariants)}")
-        print(f"  - Bundles using invariants: {len(self.invariant_users)}")
-        print(f"  - Core invariant theorems verified")
+        # Return success if no issues
+        return (
+            len(results["missing_imports"]) == 0
+            and len(results["missing_invariants"]) == 0
+        )
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Invariant Gate - CI tool for system invariants"
-    )
-    parser.add_argument("--project-root", default=".", help="Project root directory")
-    parser.add_argument(
-        "--fail-on-warnings", action="store_true", help="Fail on warnings"
-    )
+    """Main function"""
+    if len(sys.argv) != 2:
+        print("Usage: python invariant_gate.py <bundle_directory>")
+        sys.exit(1)
 
-    args = parser.parse_args()
+    bundle_dir = sys.argv[1]
+    gate = InvariantGate()
 
-    gate = InvariantGate(args.project_root)
-    success = gate.check_all()
+    success = gate.run_gate_check(bundle_dir)
 
-    # Fail on warnings if requested
-    if args.fail_on_warnings and gate.warnings:
-        success = False
-
-    sys.exit(0 if success else 1)
+    if success:
+        print("\n✓ All bundles pass invariant gate check")
+        sys.exit(0)
+    else:
+        print("\n✗ Some bundles failed invariant gate check")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

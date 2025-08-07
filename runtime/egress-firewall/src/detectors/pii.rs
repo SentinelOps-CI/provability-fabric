@@ -17,6 +17,11 @@ pub struct PIIDetector {
     phone_regex: Regex,
     ssn_regex: Regex,
     credit_card_regex: Regex,
+    ip_address_regex: Regex,
+    mac_address_regex: Regex,
+    passport_regex: Regex,
+    driver_license_regex: Regex,
+    address_regex: Regex,
 }
 
 impl PIIDetector {
@@ -27,6 +32,11 @@ impl PIIDetector {
             phone_regex: Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").unwrap(),
             ssn_regex: Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap(),
             credit_card_regex: Regex::new(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b").unwrap(),
+            ip_address_regex: Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").unwrap(),
+            mac_address_regex: Regex::new(r"\b([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})\b").unwrap(),
+            passport_regex: Regex::new(r"\b[A-Z]{1,2}[0-9]{6,9}\b").unwrap(),
+            driver_license_regex: Regex::new(r"\b[A-Z]{1,2}[0-9]{6,8}\b").unwrap(),
+            address_regex: Regex::new(r"\b\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl|Way|Terrace|Ter)\b").unwrap(),
         }
     }
 
@@ -81,6 +91,63 @@ impl PIIDetector {
             }
         }
 
+        // IP address detection
+        for mat in self.ip_address_regex.find_iter(text) {
+            if self.is_valid_ip_address(mat.as_str()) {
+                detections.push(PIIDetection {
+                    category: "ip_address".to_string(),
+                    confidence: 0.85,
+                    start: mat.start(),
+                    end: mat.end(),
+                    text: mat.as_str().to_string(),
+                });
+            }
+        }
+
+        // MAC address detection
+        for mat in self.mac_address_regex.find_iter(text) {
+            detections.push(PIIDetection {
+                category: "mac_address".to_string(),
+                confidence: 0.95,
+                start: mat.start(),
+                end: mat.end(),
+                text: mat.as_str().to_string(),
+            });
+        }
+
+        // Passport detection
+        for mat in self.passport_regex.find_iter(text) {
+            detections.push(PIIDetection {
+                category: "passport".to_string(),
+                confidence: 0.80,
+                start: mat.start(),
+                end: mat.end(),
+                text: mat.as_str().to_string(),
+            });
+        }
+
+        // Driver license detection
+        for mat in self.driver_license_regex.find_iter(text) {
+            detections.push(PIIDetection {
+                category: "driver_license".to_string(),
+                confidence: 0.80,
+                start: mat.start(),
+                end: mat.end(),
+                text: mat.as_str().to_string(),
+            });
+        }
+
+        // Address detection
+        for mat in self.address_regex.find_iter(text) {
+            detections.push(PIIDetection {
+                category: "address".to_string(),
+                confidence: 0.75,
+                start: mat.start(),
+                end: mat.end(),
+                text: mat.as_str().to_string(),
+            });
+        }
+
         detections
     }
 
@@ -112,6 +179,23 @@ impl PIIDetector {
         }
 
         sum % 10 == 0
+    }
+
+    /// Validate IP address format
+    fn is_valid_ip_address(&self, ip: &str) -> bool {
+        let parts: Vec<&str> = ip.split('.').collect();
+        if parts.len() != 4 {
+            return false;
+        }
+
+        for part in parts {
+            match part.parse::<u8>() {
+                Ok(_) => continue,
+                Err(_) => return false,
+            }
+        }
+
+        true
     }
 }
 

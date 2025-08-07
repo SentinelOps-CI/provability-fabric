@@ -61,6 +61,7 @@ pub struct QueryResponse {
 pub struct SearchResult {
     pub document_id: String,
     pub content: String,
+    pub content_hash: String, // SHA-256 hash of content for evidence linking
     pub score: f64,
     pub metadata: HashMap<String, String>,
     pub labels: Vec<String>,
@@ -127,74 +128,58 @@ async fn handle_query(
     State(state): State<AppState>,
     Json(request): Json<QueryRequest>,
 ) -> Result<Json<QueryResponse>, StatusCode> {
-    let start_time = SystemTime::now();
+    let start_time = std::time::Instant::now();
 
     // Validate capability token
     if !validate_capability_token(&request.capability_token, &request.tenant, &request.subject_id).await {
-        warn!("Invalid capability token for tenant: {}", request.tenant);
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err(StatusCode::FORBIDDEN);
     }
 
     // Create query context
-    let query_context = QueryContext {
+    let context = QueryContext {
         tenant: request.tenant.clone(),
         subject_id: request.subject_id.clone(),
+        query: request.query.clone(),
+        query_hash: compute_query_hash(&request.query).await,
+        index_shard: format!("shard_{}", request.tenant),
         labels_filter: request.labels_filter.clone(),
-        query_hash: compute_query_hash(&request.query),
     };
 
-    // ABAC authorization check
-    match state.abac_policy.authorize_query(&query_context).await {
-        Ok(authorized) if !authorized => {
-            warn!("ABAC denied query for tenant: {}", request.tenant);
-            return Err(StatusCode::FORBIDDEN);
-        }
-        Err(e) => {
-            error!("ABAC evaluation failed: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-        _ => {}
+    // Check ABAC policy
+    if !state.abac_policy.evaluate(&context).await {
+        return Err(StatusCode::FORBIDDEN);
     }
 
-    // Execute query with tenant isolation
-    let results = match state
-        .storage
-        .search_with_tenant_isolation(
-            &request.query,
-            &request.tenant,
-            &request.labels_filter,
-            request.limit.unwrap_or(10),
-        )
-        .await
-    {
-        Ok(results) => results,
-        Err(e) => {
-            error!("Search failed: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
+    // Perform search
+    let results = state.storage.search(&request.query, request.limit.unwrap_or(10)).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Compute query metrics
-    let query_time_ms = start_time
-        .elapsed()
-        .unwrap_or_default()
-        .as_millis() as u64;
+    // Add content hashes to results for evidence linking
+    let results_with_hashes: Vec<SearchResult> = results
+        .into_iter()
+        .map(|result| {
+            let content_hash = compute_content_hash(&result.content);
+            SearchResult {
+                document_id: result.document_id,
+                content: result.content,
+                content_hash, // Include content hash for evidence linking
+                score: result.score,
+                metadata: result.metadata,
+                labels: result.labels,
+            }
+        })
+        .collect();
+
+    let query_time_ms = start_time.elapsed().as_millis() as u64;
 
     // Generate access receipt
-    let receipt = match generate_access_receipt(
+    let receipt = generate_access_receipt(
         &state.receipt_signer,
-        &query_context,
-        &results,
+        &context,
+        &results_with_hashes,
         query_time_ms,
-    )
-    .await
-    {
-        Ok(receipt) => receipt,
-        Err(e) => {
-            error!("Failed to generate receipt: {}", e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
+    ).await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Cache receipt
     {
@@ -202,19 +187,17 @@ async fn handle_query(
         cache.insert(receipt.receipt_id.clone(), receipt.clone());
     }
 
-    // Submit receipt to ledger
+    // Submit to ledger
     if let Err(e) = submit_receipt_to_ledger(&receipt).await {
         warn!("Failed to submit receipt to ledger: {}", e);
     }
 
-    let response = QueryResponse {
-        results,
+    Ok(Json(QueryResponse {
+        results: results_with_hashes,
         receipt,
-        total_count: results.len(),
+        total_count: results_with_hashes.len(),
         query_time_ms,
-    };
-
-    Ok(Json(response))
+    }))
 }
 
 /// Get access receipt by ID
@@ -249,7 +232,7 @@ async fn validate_capability_token(token: &str, tenant: &str, subject_id: &str) 
 }
 
 /// Compute hash of query for receipt
-fn compute_query_hash(query: &str) -> String {
+async fn compute_query_hash(query: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(query.as_bytes());
@@ -263,31 +246,34 @@ async fn generate_access_receipt(
     results: &[SearchResult],
     query_time_ms: u64,
 ) -> Result<AccessReceipt> {
-    let receipt_id = format!("receipt_{}", Uuid::new_v4().to_string().replace("-", ""));
-    
-    let now = SystemTime::now()
+    let receipt_id = Uuid::new_v4().to_string();
+    let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .context("Failed to get current time")?
+        .unwrap()
         .as_secs();
 
-    // Compute result hash
-    let result_hash = compute_result_hash(results);
+    // Extract content hashes for evidence linking
+    let content_hashes: Vec<String> = results
+        .iter()
+        .map(|result| result.content_hash.clone())
+        .collect();
 
     let receipt = AccessReceipt {
         receipt_id,
         tenant: context.tenant.clone(),
         subject_id: context.subject_id.clone(),
         query_hash: context.query_hash.clone(),
-        index_shard: format!("shard_{}", context.tenant),
-        timestamp: now,
-        result_hash,
-        result_count: results.len(),
-        query_time_ms,
-        signature: "placeholder_signature".to_string(), // Would be actual DSSE signature
+        index_shard: context.index_shard.clone(),
+        timestamp,
+        result_hash: compute_result_hash(results),
+        content_hashes, // Include content hashes for evidence linking
+        sign_alg: "ed25519".to_string(),
+        sig: String::new(), // Will be populated by signer
     };
 
-    // Sign receipt
-    signer.sign_receipt(&receipt).await
+    // Sign the receipt
+    let signed_receipt = signer.sign_receipt(&receipt).await?;
+    Ok(signed_receipt)
 }
 
 /// Compute hash of search results
@@ -301,6 +287,14 @@ fn compute_result_hash(results: &[SearchResult]) -> String {
     }
     
     format!("{:x}", hasher.finalize())
+}
+
+/// Compute SHA-256 hash of content for evidence linking
+fn compute_content_hash(content: &str) -> String {
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 /// Submit receipt to ledger
@@ -333,8 +327,8 @@ mod tests {
     #[tokio::test]
     async fn test_query_hash() {
         let query = "test query";
-        let hash1 = compute_query_hash(query);
-        let hash2 = compute_query_hash(query);
+        let hash1 = compute_query_hash(query).await;
+        let hash2 = compute_query_hash(query).await;
         
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 64); // SHA-256 hex string

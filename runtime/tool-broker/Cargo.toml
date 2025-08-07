@@ -1,0 +1,19 @@
+[package]
+name = "tool-broker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4" 

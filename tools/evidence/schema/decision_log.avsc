@@ -1,0 +1,84 @@
+{
+  "type": "record",
+  "name": "DecisionLog",
+  "namespace": "provability.evidence",
+  "doc": "Kernel decision log entry for session evidence",
+  "fields": [
+    {
+      "name": "decision_id",
+      "type": "string",
+      "doc": "Unique identifier for the decision"
+    },
+    {
+      "name": "session_id",
+      "type": "string",
+      "doc": "Session identifier"
+    },
+    {
+      "name": "timestamp",
+      "type": "string",
+      "doc": "ISO 8601 timestamp of decision"
+    },
+    {
+      "name": "decision_type",
+      "type": {
+        "type": "enum",
+        "name": "DecisionType",
+        "symbols": ["ALLOW", "DENY", "QUARANTINE", "ESCALATE"]
+      },
+      "doc": "Type of decision made"
+    },
+    {
+      "name": "resource_requested",
+      "type": "string",
+      "doc": "Resource that was requested"
+    },
+    {
+      "name": "capability_id",
+      "type": ["null", "string"],
+      "doc": "Capability ID if decision was based on capability"
+    },
+    {
+      "name": "policy_rules",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "Policy rules that were evaluated"
+    },
+    {
+      "name": "risk_score",
+      "type": ["null", "double"],
+      "doc": "Risk score if calculated"
+    },
+    {
+      "name": "reasoning",
+      "type": "string",
+      "doc": "Human-readable reasoning for decision"
+    },
+    {
+      "name": "evidence_hashes",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "Hashes of evidence used in decision"
+    },
+    {
+      "name": "attestation_refs",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "doc": "References to attestations used"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "doc": "Additional metadata about the decision"
+    }
+  ]
+}
