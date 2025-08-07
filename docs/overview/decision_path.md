@@ -6,12 +6,12 @@ This document describes the end-to-end decision path for the Provability Fabric 
 
 ```mermaid
 graph TD
-    A[🔍 Observe Request] --> B[📋 Retrieve Access Receipt]
-    B --> C[📝 Plan with DSL]
-    C --> D[🔒 Kernel Checks]
-    D --> E[🤝 Broker Decision]
-    E --> F[📜 Generate Egress Certificate]
-    F --> G[📦 Safety Case Bundle]
+    A[Observe Request] --> B[Retrieve Access Receipt]
+    B --> C[Plan with DSL]
+    C --> D[Kernel Checks]
+    D --> E[Broker Decision]
+    E --> F[Generate Egress Certificate]
+    F --> G[Safety Case Bundle]
     
     subgraph "Kernel Checks"
         D1[Capability Match]
