@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Plan DSL Schema",
-  "description": "Schema for typed plans with capabilities, constraints, and validation",
+  "title": "Plan DSL Schema - Strict Injection Protection",
+  "description": "Enhanced schema for typed plans with strict capability matching, receipt validation, and injection hardening",
   "type": "object",
-  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash", "input_channels"],
+  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash", "input_channels", "allowed_operations"],
   "properties": {
     "plan_id": {
       "type": "string",
@@ -31,6 +31,19 @@
           "description": "Capabilities possessed by the subject"
         }
       }
+    },
+    "allowed_operations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "data_query", "retrieve", "search", "fetch", "get",
+          "compute", "analyze", "transform", "aggregate",
+          "notify", "alert", "report", "export",
+          "validate", "verify", "audit", "compliance_check"
+        ]
+      },
+      "description": "Whitelist of allowed operations - any step not in this list will be rejected"
     },
     "input_channels": {
       "type": "object",
@@ -64,10 +77,11 @@
             },
             "quoted": {
               "type": "boolean",
-              "description": "Must be true for untrusted user input"
+              "const": true,
+              "description": "MUST be true for untrusted user input - enforced by strict kernel"
             }
           },
-          "description": "Untrusted user channel - must be quoted and cannot alter instructions"
+          "description": "Untrusted user channel - MUST be quoted=true and cannot alter instructions"
         },
         "retrieved": {
           "type": "array",
@@ -86,7 +100,8 @@
               },
               "quoted": {
                 "type": "boolean",
-                "description": "Must be true for untrusted retrieved content"
+                "const": true,
+                "description": "MUST be true for untrusted retrieved content - enforced by strict kernel"
               },
               "labels": {
                 "type": "array",
@@ -97,7 +112,7 @@
               }
             }
           },
-          "description": "Untrusted retrieved content - must be quoted and labeled"
+          "description": "Untrusted retrieved content - MUST be quoted=true and labeled"
         },
         "file": {
           "type": "array",
@@ -116,14 +131,15 @@
               },
               "quoted": {
                 "type": "boolean",
-                "description": "Must be true for untrusted file content"
+                "const": true,
+                "description": "MUST be true for untrusted file content - enforced by strict kernel"
               }
             }
           },
-          "description": "Untrusted file content - must be quoted and typed"
+          "description": "Untrusted file content - MUST be quoted=true and typed"
         }
       },
-      "description": "Input channel classification for injection hardening"
+      "description": "Input channel classification for injection hardening - strict kernel enforces quoted=true on all untrusted channels"
     },
     "steps": {
       "type": "array",
@@ -133,7 +149,7 @@
         "properties": {
           "tool": {
             "type": "string",
-            "description": "Tool identifier to be called"
+            "description": "Tool identifier to be called - must be in allowed_operations list"
           },
           "args": {
             "type": "object",
@@ -144,14 +160,14 @@
             "items": {
               "type": "string"
             },
-            "description": "Capabilities required for this step"
+            "description": "Capabilities required for this step - strict kernel validates against subject.caps"
           },
           "labels_in": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Input labels for this step"
+            "description": "Input labels for this step - strict kernel validates label flow"
           },
           "labels_out": {
             "type": "array",
@@ -176,7 +192,7 @@
                 "sig": {"type": "string"}
               }
             },
-            "description": "Access receipts for retrieval steps"
+            "description": "Access receipts for retrieval steps - strict kernel validates presence and signature"
           }
         }
       }
@@ -188,7 +204,8 @@
         "budget": {
           "type": "number",
           "minimum": 0,
-          "description": "Budget limit in USD"
+          "maximum": 10000,
+          "description": "Budget limit in USD - strict kernel enforces maximum"
         },
         "pii": {
           "type": "boolean",
@@ -198,18 +215,31 @@
           "type": "number",
           "minimum": 0,
           "maximum": 10,
-          "description": "Differential privacy epsilon parameter"
+          "description": "Differential privacy epsilon parameter - strict kernel enforces maximum"
         },
         "dp_delta": {
           "type": "number",
           "minimum": 0,
           "maximum": 1e-5,
-          "description": "Differential privacy delta parameter"
+          "description": "Differential privacy delta parameter - strict kernel enforces maximum"
         },
         "latency_max": {
           "type": "number",
           "minimum": 0,
-          "description": "Maximum allowed latency in seconds"
+          "maximum": 300,
+          "description": "Maximum allowed latency in seconds - strict kernel enforces maximum"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000,
+          "description": "Maximum tokens allowed - strict kernel enforces maximum"
+        },
+        "max_retrieval_results": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Maximum retrieval results allowed - strict kernel enforces maximum"
         }
       }
     },
@@ -227,6 +257,12 @@
       "type": "string",
       "format": "date-time",
       "description": "Plan expiration timestamp"
+    },
+    "security_level": {
+      "type": "string",
+      "enum": ["strict", "permissive"],
+      "default": "strict",
+      "description": "Security level - strict enforces all injection protections"
     }
   }
 } 
