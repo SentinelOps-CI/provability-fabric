@@ -59,15 +59,17 @@ type AccessReceipt struct {
 
 // Plan represents a typed plan with capabilities and constraints
 type Plan struct {
-	PlanID           string        `json:"plan_id"`
-	Tenant           string        `json:"tenant"`
-	Subject          Subject       `json:"subject"`
-	InputChannels    InputChannels `json:"input_channels"`
-	Steps            []Step        `json:"steps"`
-	Constraints      Constraints   `json:"constraints"`
-	SystemPromptHash string        `json:"system_prompt_hash"`
-	CreatedAt        time.Time     `json:"created_at"`
-	ExpiresAt        time.Time     `json:"expires_at"`
+	PlanID            string        `json:"plan_id"`
+	Tenant            string        `json:"tenant"`
+	Subject           Subject       `json:"subject"`
+	InputChannels     InputChannels `json:"input_channels"`
+	Steps             []Step        `json:"steps"`
+	Constraints       Constraints   `json:"constraints"`
+	SystemPromptHash  string        `json:"system_prompt_hash"`
+	AllowedOperations []string      `json:"allowed_operations"`
+	CreatedAt         time.Time     `json:"created_at"`
+	ExpiresAt         time.Time     `json:"expires_at"`
+	SecurityLevel     string        `json:"security_level,omitempty"`
 }
 
 // Subject represents the entity executing the plan
@@ -88,20 +90,33 @@ type Step struct {
 
 // Constraints represents plan-level constraints
 type Constraints struct {
-	Budget     float64 `json:"budget"`
-	PII        bool    `json:"pii"`
-	DPEpsilon  float64 `json:"dp_epsilon"`
-	DPDelta    float64 `json:"dp_delta,omitempty"`
-	LatencyMax float64 `json:"latency_max,omitempty"`
+	Budget              float64 `json:"budget"`
+	PII                 bool    `json:"pii"`
+	DPEpsilon           float64 `json:"dp_epsilon"`
+	DPDelta             float64 `json:"dp_delta,omitempty"`
+	LatencyMax          float64 `json:"latency_max,omitempty"`
+	MaxTokens           int     `json:"max_tokens,omitempty"`
+	MaxRetrievalResults int     `json:"max_retrieval_results,omitempty"`
 }
 
 // Decision represents the kernel's decision on plan execution
 type Decision struct {
-	ApprovedSteps []ApprovedStep `json:"approved_steps"`
-	Reason        string         `json:"reason"`
-	Valid         bool           `json:"valid"`
-	Errors        []string       `json:"errors,omitempty"`
-	Warnings      []string       `json:"warnings,omitempty"`
+	ApprovedSteps  []ApprovedStep       `json:"approved_steps"`
+	Reason         string               `json:"reason"`
+	Valid          bool                 `json:"valid"`
+	Errors         []string             `json:"errors,omitempty"`
+	Warnings       []string             `json:"warnings,omitempty"`
+	ReasonCodes    []string             `json:"reason_codes,omitempty"`
+	SecurityChecks SecurityCheckResults `json:"security_checks"`
+}
+
+// SecurityCheckResults tracks the three core security checks
+type SecurityCheckResults struct {
+	CapabilityMatch      bool     `json:"capability_match"`
+	ReceiptValidation    bool     `json:"receipt_validation"`
+	LabelFlowRefinements bool     `json:"label_flow_refinements"`
+	InjectionProtection  bool     `json:"injection_protection"`
+	Details              []string `json:"details,omitempty"`
 }
 
 // ApprovedStep represents a step that has been approved for execution
@@ -129,15 +144,17 @@ type Kernel struct {
 
 // KernelConfig represents kernel configuration
 type KernelConfig struct {
-	MaxBudget      float64
-	MaxEpsilon     float64
-	MaxLatency     float64
-	AllowedTenants []string
-	StrictKernel   bool          // New flag for strict kernel checks
-	CacheEnabled   bool          // Enable fast-path decision caching
-	CacheMaxSize   int           // Maximum number of cached decisions
-	CacheTTL       time.Duration // TTL for cached decisions
-	RedisAddr      string        // Redis address for distributed caching
+	MaxBudget           float64
+	MaxEpsilon          float64
+	MaxLatency          float64
+	MaxTokens           int
+	MaxRetrievalResults int
+	AllowedTenants      []string
+	StrictKernel        bool          // New flag for strict kernel checks
+	CacheEnabled        bool          // Enable fast-path decision caching
+	CacheMaxSize        int           // Maximum number of cached decisions
+	CacheTTL            time.Duration // TTL for cached decisions
+	RedisAddr           string        // Redis address for distributed caching
 }
 
 // NewKernel creates a new policy kernel
@@ -184,19 +201,25 @@ func (k *Kernel) ValidatePlan(plan *Plan) ValidationResult {
 	// Check plan expiration
 	if time.Now().After(plan.ExpiresAt) {
 		result.Valid = false
-		result.Errors = append(result.Errors, "Plan has expired")
+		result.Errors = append(result.Errors, "PLAN_EXPIRED: Plan has expired")
 	}
 
 	// Validate tenant
 	if !k.isValidTenant(plan.Tenant) {
 		result.Valid = false
-		result.Errors = append(result.Errors, "Invalid tenant")
+		result.Errors = append(result.Errors, "INVALID_TENANT: Invalid tenant")
 	}
 
 	// Validate system prompt hash
 	if !k.isValidHash(plan.SystemPromptHash) {
 		result.Valid = false
-		result.Errors = append(result.Errors, "Invalid system prompt hash")
+		result.Errors = append(result.Errors, "INVALID_SYSTEM_HASH: Invalid system prompt hash")
+	}
+
+	// Validate allowed operations
+	if opErrors := k.validateAllowedOperations(plan.AllowedOperations, plan.Steps); len(opErrors) > 0 {
+		result.Valid = false
+		result.Errors = append(result.Errors, opErrors...)
 	}
 
 	// Validate input channels
@@ -311,6 +334,12 @@ func (k *Kernel) ApprovePlan(plan *Plan) Decision {
 	decision := Decision{
 		Valid:  true,
 		Reason: "Plan approved for execution",
+		SecurityChecks: SecurityCheckResults{
+			CapabilityMatch:      true,
+			ReceiptValidation:    true,
+			LabelFlowRefinements: true,
+			InjectionProtection:  true,
+		},
 	}
 
 	// First validate the plan
@@ -320,6 +349,13 @@ func (k *Kernel) ApprovePlan(plan *Plan) Decision {
 		decision.Reason = "Plan validation failed"
 		decision.Errors = validation.Errors
 		decision.Warnings = validation.Warnings
+
+		// Extract reason codes from errors
+		decision.ReasonCodes = k.extractReasonCodes(validation.Errors)
+
+		// Update security check results based on errors
+		decision.SecurityChecks = k.updateSecurityCheckResults(validation.Errors)
+
 		return decision
 	}
 
@@ -335,6 +371,30 @@ func (k *Kernel) ApprovePlan(plan *Plan) Decision {
 	}
 
 	return decision
+}
+
+// validateAllowedOperations ensures all steps use only allowed operations
+func (k *Kernel) validateAllowedOperations(allowedOps []string, steps []Step) []string {
+	var errors []string
+
+	if len(allowedOps) == 0 {
+		return []string{"ALLOWED_OPS_MISSING: Plan must specify allowed operations"}
+	}
+
+	for i, step := range steps {
+		allowed := false
+		for _, allowedOp := range allowedOps {
+			if step.Tool == allowedOp {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			errors = append(errors, fmt.Sprintf("OPERATION_NOT_ALLOWED: Step %d tool '%s' not in allowed operations list", i, step.Tool))
+		}
+	}
+
+	return errors
 }
 
 // InvalidateCacheByPolicy invalidates all cached decisions for a specific policy
@@ -367,15 +427,23 @@ func (k *Kernel) validateConstraints(constraints Constraints) []string {
 	var errors []string
 
 	if constraints.Budget > k.config.MaxBudget {
-		errors = append(errors, fmt.Sprintf("Budget %f exceeds maximum %f", constraints.Budget, k.config.MaxBudget))
+		errors = append(errors, fmt.Sprintf("BUDGET_EXCEEDED: Budget %f exceeds maximum %f", constraints.Budget, k.config.MaxBudget))
 	}
 
 	if constraints.DPEpsilon > k.config.MaxEpsilon {
-		errors = append(errors, fmt.Sprintf("DP epsilon %f exceeds maximum %f", constraints.DPEpsilon, k.config.MaxEpsilon))
+		errors = append(errors, fmt.Sprintf("EPSILON_EXCEEDED: DP epsilon %f exceeds maximum %f", constraints.DPEpsilon, k.config.MaxEpsilon))
 	}
 
 	if constraints.LatencyMax > k.config.MaxLatency {
-		errors = append(errors, fmt.Sprintf("Latency %f exceeds maximum %f", constraints.LatencyMax, k.config.MaxLatency))
+		errors = append(errors, fmt.Sprintf("LATENCY_EXCEEDED: Latency %f exceeds maximum %f", constraints.LatencyMax, k.config.MaxLatency))
+	}
+
+	if constraints.MaxTokens > k.config.MaxTokens {
+		errors = append(errors, fmt.Sprintf("TOKENS_EXCEEDED: Max tokens %d exceeds maximum %d", constraints.MaxTokens, k.config.MaxTokens))
+	}
+
+	if constraints.MaxRetrievalResults > k.config.MaxRetrievalResults {
+		errors = append(errors, fmt.Sprintf("RETRIEVAL_RESULTS_EXCEEDED: Max retrieval results %d exceeds maximum %d", constraints.MaxRetrievalResults, k.config.MaxRetrievalResults))
 	}
 
 	return errors
@@ -387,51 +455,51 @@ func (k *Kernel) validateInputChannels(channels InputChannels, systemPromptHash 
 
 	// Validate system channel (trusted)
 	if !k.isValidHash(channels.System.Hash) {
-		errors = append(errors, "Invalid system channel hash")
+		errors = append(errors, "INVALID_SYSTEM_HASH: Invalid system channel hash")
 	}
 	if !k.isValidHash(channels.System.PolicyHash) {
-		errors = append(errors, "Invalid system policy hash")
+		errors = append(errors, "INVALID_POLICY_HASH: Invalid system policy hash")
 	}
 
 	// System hash must match the plan's system prompt hash
 	if channels.System.Hash != systemPromptHash {
-		errors = append(errors, "System channel hash does not match plan system prompt hash")
+		errors = append(errors, "SYSTEM_HASH_MISMATCH: System channel hash does not match plan system prompt hash")
 	}
 
-	// Validate user channel (untrusted)
+	// Validate user channel (untrusted) - STRICT: quoted=true required
 	if !k.isValidHash(channels.User.ContentHash) {
-		errors = append(errors, "Invalid user content hash")
+		errors = append(errors, "INVALID_USER_HASH: Invalid user content hash")
 	}
 	if !channels.User.Quoted {
-		errors = append(errors, "User input must be quoted (quoted=true)")
+		errors = append(errors, "UNTRUSTED_NOT_QUOTED: User input must be quoted (quoted=true) - injection protection required")
 	}
 
-	// Validate retrieved channels (untrusted)
+	// Validate retrieved channels (untrusted) - STRICT: quoted=true required
 	for i, retrieved := range channels.Retrieved {
 		if !k.isValidHash(retrieved.ContentHash) {
-			errors = append(errors, fmt.Sprintf("Invalid retrieved content hash at index %d", i))
+			errors = append(errors, fmt.Sprintf("INVALID_RETRIEVED_HASH: Invalid retrieved content hash at index %d", i))
 		}
 		if !retrieved.Quoted {
-			errors = append(errors, fmt.Sprintf("Retrieved content at index %d must be quoted (quoted=true)", i))
+			errors = append(errors, fmt.Sprintf("UNTRUSTED_NOT_QUOTED: Retrieved content at index %d must be quoted (quoted=true) - injection protection required", i))
 		}
 		if retrieved.ReceiptID == "" {
-			errors = append(errors, fmt.Sprintf("Retrieved content at index %d must have receipt_id", i))
+			errors = append(errors, fmt.Sprintf("RECEIPT_MISSING: Retrieved content at index %d must have receipt_id", i))
 		}
 		if len(retrieved.Labels) == 0 {
-			errors = append(errors, fmt.Sprintf("Retrieved content at index %d must have labels", i))
+			errors = append(errors, fmt.Sprintf("LABELS_MISSING: Retrieved content at index %d must have labels", i))
 		}
 	}
 
-	// Validate file channels (untrusted)
+	// Validate file channels (untrusted) - STRICT: quoted=true required
 	for i, file := range channels.File {
 		if !k.isValidHash(file.SHA256) {
-			errors = append(errors, fmt.Sprintf("Invalid file SHA256 at index %d", i))
+			errors = append(errors, fmt.Sprintf("INVALID_FILE_HASH: Invalid file SHA256 at index %d", i))
 		}
 		if !file.Quoted {
-			errors = append(errors, fmt.Sprintf("File content at index %d must be quoted (quoted=true)", i))
+			errors = append(errors, fmt.Sprintf("UNTRUSTED_NOT_QUOTED: File content at index %d must be quoted (quoted=true) - injection protection required", i))
 		}
 		if file.MediaType == "" {
-			errors = append(errors, fmt.Sprintf("File content at index %d must have media_type", i))
+			errors = append(errors, fmt.Sprintf("MEDIA_TYPE_MISSING: File content at index %d must have media_type", i))
 		}
 	}
 
@@ -445,29 +513,29 @@ func (k *Kernel) validateStep(subject Subject, step Step, stepIndex int) []strin
 	// Check capability match
 	for _, requiredCap := range step.CapsRequired {
 		if !k.hasCapability(subject.Caps, requiredCap) {
-			errors = append(errors, fmt.Sprintf("Step %d: missing required capability '%s'", stepIndex, requiredCap))
+			errors = append(errors, fmt.Sprintf("CAP_MISS: Step %d: missing required capability '%s'", stepIndex, requiredCap))
 		}
 	}
 
 	// Validate tool name
 	if step.Tool == "" {
-		errors = append(errors, fmt.Sprintf("Step %d: tool name is required", stepIndex))
+		errors = append(errors, fmt.Sprintf("TOOL_MISSING: Step %d: tool name is required", stepIndex))
 	}
 
 	// Validate arguments
 	if step.Args == nil {
-		errors = append(errors, fmt.Sprintf("Step %d: arguments are required", stepIndex))
+		errors = append(errors, fmt.Sprintf("ARGS_MISSING: Step %d: arguments are required", stepIndex))
 	}
 
 	// Validate receipts for retrieval steps
 	if step.Tool == "retrieval" || step.Tool == "search" {
 		if len(step.Receipts) == 0 {
-			errors = append(errors, fmt.Sprintf("Step %d: retrieval step requires access receipts", stepIndex))
+			errors = append(errors, fmt.Sprintf("RECEIPT_MISSING: Step %d: retrieval step requires access receipts", stepIndex))
 		} else {
 			// Verify each receipt
 			for i, receipt := range step.Receipts {
 				if receiptErr := k.verifyReceipt(receipt); receiptErr != nil {
-					errors = append(errors, fmt.Sprintf("Step %d: receipt %d verification failed: %s", stepIndex, i, receiptErr.Error()))
+					errors = append(errors, fmt.Sprintf("RECEIPT_INVALID: Step %d: receipt %d verification failed: %s", stepIndex, i, receiptErr.Error()))
 				}
 			}
 		}
@@ -514,7 +582,7 @@ func (k *Kernel) validateLabelFlow(steps []Step) []string {
 		// Check that input labels are available
 		for _, labelIn := range step.LabelsIn {
 			if !availableLabels[labelIn] {
-				errors = append(errors, fmt.Sprintf("Step %d: input label '%s' not available", i, labelIn))
+				errors = append(errors, fmt.Sprintf("LABEL_FLOW: Step %d: input label '%s' not available", i, labelIn))
 			}
 		}
 
@@ -584,7 +652,7 @@ func (k *Kernel) validateCapabilityMatch(subject Subject, steps []Step) []string
 	for i, step := range steps {
 		for _, requiredCap := range step.CapsRequired {
 			if !k.hasCapability(subject.Caps, requiredCap) {
-				errors = append(errors, fmt.Sprintf("Step %d: CAP_MISS - subject lacks capability '%s'", i, requiredCap))
+				errors = append(errors, fmt.Sprintf("CAP_MISS: Step %d: subject lacks capability '%s'", i, requiredCap))
 			}
 		}
 	}
@@ -601,14 +669,14 @@ func (k *Kernel) validateReceiptPresence(steps []Step) []string {
 		// Check if this step requires data access (read operations)
 		if k.isReadOperation(step.Tool) {
 			if len(step.Receipts) == 0 {
-				errors = append(errors, fmt.Sprintf("Step %d: RECEIPT_MISSING - read operation requires access receipt", i))
+				errors = append(errors, fmt.Sprintf("RECEIPT_MISSING: Step %d: read operation requires access receipt", i))
 				continue
 			}
 
 			// Verify each receipt
 			for j, receipt := range step.Receipts {
 				if err := k.verifyReceipt(receipt); err != nil {
-					errors = append(errors, fmt.Sprintf("Step %d, Receipt %d: RECEIPT_MISSING - %v", i, j, err))
+					errors = append(errors, fmt.Sprintf("RECEIPT_INVALID: Step %d, Receipt %d: %v", i, j, err))
 				}
 			}
 		}
@@ -627,25 +695,25 @@ func (k *Kernel) validateLabelFlowAndRefinements(steps []Step, constraints Const
 		// Validate input labels
 		for _, labelIn := range step.LabelsIn {
 			if !k.isValidLabel(labelIn) {
-				errors = append(errors, fmt.Sprintf("Step %d: LABEL_FLOW - invalid input label '%s'", i, labelIn))
+				errors = append(errors, fmt.Sprintf("LABEL_FLOW: Step %d: invalid input label '%s'", i, labelIn))
 			}
 		}
 
 		// Validate output labels
 		for _, labelOut := range step.LabelsOut {
 			if !k.isValidLabel(labelOut) {
-				errors = append(errors, fmt.Sprintf("Step %d: LABEL_FLOW - invalid output label '%s'", i, labelOut))
+				errors = append(errors, fmt.Sprintf("LABEL_FLOW: Step %d: invalid output label '%s'", i, labelOut))
 			}
 		}
 	}
 
 	// Check numeric refinements (budgets and epsilon)
 	if constraints.Budget > k.config.MaxBudget {
-		errors = append(errors, fmt.Sprintf("BUDGET - budget %f exceeds maximum %f", constraints.Budget, k.config.MaxBudget))
+		errors = append(errors, fmt.Sprintf("BUDGET_EXCEEDED: budget %f exceeds maximum %f", constraints.Budget, k.config.MaxBudget))
 	}
 
 	if constraints.DPEpsilon > k.config.MaxEpsilon {
-		errors = append(errors, fmt.Sprintf("BUDGET - epsilon %f exceeds maximum %f", constraints.DPEpsilon, k.config.MaxEpsilon))
+		errors = append(errors, fmt.Sprintf("EPSILON_EXCEEDED: epsilon %f exceeds maximum %f", constraints.DPEpsilon, k.config.MaxEpsilon))
 	}
 
 	return errors
@@ -676,4 +744,45 @@ func (k *Kernel) isValidLabel(label string) bool {
 		return false
 	}
 	return true
+}
+
+// extractReasonCodes extracts reason codes from error messages
+func (k *Kernel) extractReasonCodes(errors []string) []string {
+	var codes []string
+	for _, err := range errors {
+		if strings.Contains(err, ":") {
+			parts := strings.SplitN(err, ":", 2)
+			if len(parts) > 0 {
+				codes = append(codes, strings.TrimSpace(parts[0]))
+			}
+		}
+	}
+	return codes
+}
+
+// updateSecurityCheckResults updates security check results based on validation errors
+func (k *Kernel) updateSecurityCheckResults(errors []string) SecurityCheckResults {
+	results := SecurityCheckResults{
+		CapabilityMatch:      true,
+		ReceiptValidation:    true,
+		LabelFlowRefinements: true,
+		InjectionProtection:  true,
+	}
+
+	for _, err := range errors {
+		if strings.Contains(err, "CAP_MISS") {
+			results.CapabilityMatch = false
+		}
+		if strings.Contains(err, "RECEIPT_MISSING") || strings.Contains(err, "RECEIPT_INVALID") {
+			results.ReceiptValidation = false
+		}
+		if strings.Contains(err, "LABEL_FLOW") || strings.Contains(err, "BUDGET_EXCEEDED") || strings.Contains(err, "EPSILON_EXCEEDED") {
+			results.LabelFlowRefinements = false
+		}
+		if strings.Contains(err, "UNTRUSTED_NOT_QUOTED") || strings.Contains(err, "OPERATION_NOT_ALLOWED") {
+			results.InjectionProtection = false
+		}
+	}
+
+	return results
 }
