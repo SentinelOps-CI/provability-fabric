@@ -12,18 +12,21 @@ use std::{
     net::SocketAddr,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
+    Duration,
 };
 use tokio::sync::RwLock;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 mod abac;
+mod cache;
 mod receipt;
 mod storage;
 
 use abac::{AbacPolicy, QueryContext};
+use cache::SemanticCache;
 use receipt::{AccessReceipt, ReceiptSigner};
 use storage::{StorageAdapter, VectorIndex};
 
@@ -34,6 +37,7 @@ pub struct AppState {
     abac_policy: Arc<AbacPolicy>,
     receipt_signer: Arc<ReceiptSigner>,
     receipt_cache: Arc<RwLock<HashMap<String, AccessReceipt>>>,
+    semantic_cache: Arc<SemanticCache>,
 }
 
 /// Query request payload
@@ -91,18 +95,35 @@ async fn main() -> Result<()> {
     let abac_policy = Arc::new(AbacPolicy::load_from_file("abac.yaml").await?);
     let receipt_signer = Arc::new(ReceiptSigner::new().await?);
     let receipt_cache = Arc::new(RwLock::new(HashMap::new()));
+    let semantic_cache = Arc::new(SemanticCache::new());
 
     let state = AppState {
         storage,
         abac_policy,
         receipt_signer,
         receipt_cache,
+        semantic_cache,
     };
+
+    // Create optimized HTTP client with connection pooling
+    lazy_static::lazy_static! {
+        static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10) // Optimize for typical load
+            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+            .http2_prior_knowledge() // Force HTTP/2 for better performance
+            .timeout(Duration::from_secs(30)) // Request timeout
+            .connect_timeout(Duration::from_secs(10)) // Connection timeout
+            .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+            .build()
+            .expect("Failed to create HTTP client");
+    }
 
     // Build router
     let app = Router::new()
         .route("/query", post(handle_query))
         .route("/receipts", get(get_receipt))
+        .route("/cache/stats", get(get_cache_stats))
+        .route("/cache/invalidate/:tenant", post(invalidate_cache))
         .route("/health", get(health_check))
         .layer(
             ServiceBuilder::new()
@@ -150,9 +171,36 @@ async fn handle_query(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Perform search
-    let results = state.storage.search(&request.query, request.limit.unwrap_or(10)).await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Try to get results from cache first
+    let query_hash = context.query_hash.clone();
+    let cached_results = state.semantic_cache.get(
+        &query_hash,
+        &request.labels_filter,
+        &request.tenant,
+    ).await;
+
+    let results = if let Some(cached) = cached_results {
+        debug!("Cache hit for query: {}", request.query);
+        cached
+    } else {
+        debug!("Cache miss for query: {}", request.query);
+        // Perform search
+        let search_results = state.storage.search(&request.query, request.limit.unwrap_or(10)).await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        
+        // Cache the results
+        if let Err(e) = state.semantic_cache.put(
+            &query_hash,
+            &request.labels_filter,
+            &request.tenant,
+            search_results.clone(),
+            None,
+        ).await {
+            warn!("Failed to cache results: {}", e);
+        }
+        
+        search_results
+    };
 
     // Add content hashes to results for evidence linking
     let results_with_hashes: Vec<SearchResult> = results
@@ -213,6 +261,28 @@ async fn get_receipt(
             warn!("Receipt not found: {}", params.receipt_id);
             Err(StatusCode::NOT_FOUND)
         }
+    }
+}
+
+/// Get cache statistics for all tenants
+async fn get_cache_stats(
+    State(state): State<AppState>,
+) -> Json<Vec<cache::TenantCacheStats>> {
+    let stats = state.semantic_cache.get_all_stats().await;
+    Json(stats)
+}
+
+/// Invalidate cache for a specific tenant
+async fn invalidate_cache(
+    State(state): State<AppState>,
+    axum::extract::Path(tenant): axum::extract::Path<String>,
+) -> StatusCode {
+    match state.semantic_cache.invalidate_tenant(&tenant).await {
+        Ok(_) => {
+            info!("Cache invalidated for tenant: {}", tenant);
+            StatusCode::OK
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -299,7 +369,18 @@ fn compute_content_hash(content: &str) -> String {
 
 /// Submit receipt to ledger
 async fn submit_receipt_to_ledger(receipt: &AccessReceipt) -> Result<()> {
-    let client = reqwest::Client::new();
+    let client = &*lazy_static::lazy_static! {
+        static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10) // Optimize for typical load
+            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+            .http2_prior_knowledge() // Force HTTP/2 for better performance
+            .timeout(Duration::from_secs(30)) // Request timeout
+            .connect_timeout(Duration::from_secs(10)) // Connection timeout
+            .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+            .build()
+            .expect("Failed to create HTTP client");
+    };
+
     let ledger_endpoint = std::env::var("LEDGER_ENDPOINT")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
 

@@ -249,3 +249,62 @@ lean-forbid-shadowing: ## Check for forbidden shadowing of core DSL
 	@echo "🔍 Checking for forbidden shadowing..."
 	@chmod +x scripts/forbid-shadowing.sh
 	@./scripts/forbid-shadowing.sh
+
+# Optimization targets
+optimization: ## Run all optimization tasks
+	@echo "🚀 Running all optimization tasks..."
+	@$(MAKE) opt-11-semantic-cache
+	@$(MAKE) opt-12-plan-compiler
+	@$(MAKE) opt-13-hyperscan-pii
+	@$(MAKE) opt-14-protobuf-logs
+	@$(MAKE) opt-15-arm-graviton
+	@echo "✅ All optimization tasks completed!"
+
+opt-11-semantic-cache: ## OPT-11: Semantic Cache for Retrieval
+	@echo "🔍 OPT-11: Semantic Cache for Retrieval"
+	@echo "✅ Already implemented - checking performance..."
+	@cd runtime/retrieval-gateway && cargo test --test cache_tests -- --nocapture
+
+opt-12-plan-compiler: ## OPT-12: Plan Compiler (DFA)
+	@echo "🔧 OPT-12: Plan Compiler (DFA)"
+	@echo "✅ Already implemented - checking performance..."
+	@cd core/policy-kernel/compiler && go test -v -bench=.
+
+opt-13-hyperscan-pii: ## OPT-13: Hyperscan for PII Dictionary
+	@echo "🚀 OPT-13: Hyperscan for PII Dictionary"
+	@echo "✅ Already implemented - checking performance..."
+	@cd runtime/egress-firewall && cargo test --test pii_tests -- --nocapture
+
+opt-14-protobuf-logs: ## OPT-14: Protobuf/Flatbuffers Logs
+	@echo "📝 OPT-14: Protobuf/Flatbuffers Logs"
+	@echo "Building logger module..."
+	@cd runtime/retrieval-gateway && cargo test --test logger_tests -- --nocapture
+
+opt-15-arm-graviton: ## OPT-15: ARM/Graviton Build & Deploy
+	@echo "🏗️ OPT-15: ARM/Graviton Build & Deploy"
+	@echo "Building multi-architecture Docker images..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		scripts/build-multiarch.bat test-local; \
+	else \
+		chmod +x scripts/build-multiarch.sh; \
+		./scripts/build-multiarch.sh test-local; \
+	fi
+	@echo "✅ Multi-architecture builds completed!"
+
+multiarch-build: ## Build and push multi-architecture Docker images
+	@echo "🐳 Building and pushing multi-architecture Docker images..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		scripts/build-multiarch.bat build; \
+	else \
+		chmod +x scripts/build-multiarch.sh; \
+		./scripts/build-multiarch.sh build; \
+	fi
+	@echo "✅ Multi-architecture images built and pushed!"
+
+performance-test: ## Run performance tests for optimization
+	@echo "⚡ Running performance tests for optimization..."
+	@$(MAKE) opt-11-semantic-cache
+	@$(MAKE) opt-12-plan-compiler
+	@$(MAKE) opt-13-hyperscan-pii
+	@$(MAKE) opt-14-protobuf-logs
+	@echo "✅ Performance tests completed!"

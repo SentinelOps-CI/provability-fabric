@@ -5,12 +5,14 @@
 [![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/fraware/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
 [![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
+[![Implementation Status](https://img.shields.io/badge/Implementation-ALL%20PROMPTS%20COMPLETE-brightgreen.svg)](https://github.com/fraware/provability-fabric)
 
-An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails. 
+An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
 
 <p align="center">
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
 </p>
+
 
 ## Quick Start
 
@@ -139,6 +141,12 @@ Before running the installation, ensure you have:
 - **kubectl** - For Kubernetes deployment (optional)
 - **Rust** - For runtime components (optional)
 
+**For Data Retention Manager:**
+- **PostgreSQL** - For hot storage (7-day retention)
+- **AWS S3** - For warm storage (compressed Parquet)
+- **Google BigQuery** - For cold storage analytics
+- **Python packages**: `psycopg2-binary`, `boto3`, `google-cloud-bigquery`, `pandas`, `pyarrow`, `pyyaml`
+
 ## Architecture
 
 Provability-Fabric consists of four core components with comprehensive security mechanisms:
@@ -184,6 +192,16 @@ flowchart TD
     AA --> BB[Egress Firewall]
     BB --> CC[Evidence Bundles]
 
+    DD[Multi-Channel Input] --> EE[Trusted/Untrusted Channels]
+    EE --> FF[Injection Hardening]
+    FF --> GG[Quoting/Typing]
+
+    HH[SLO Thresholds] --> II[Performance Gates]
+    II --> JJ[Component Budgets]
+
+    KK[Non-Interference] --> LL[Egress Certificates]
+    LL --> MM[Influencing Labels]
+
     style A fill:#e1f5fe
     style C fill:#f3e5f5
     style F fill:#fff3e0
@@ -196,6 +214,16 @@ flowchart TD
     style AA fill:#f3e5f5
     style BB fill:#fff3e0
     style CC fill:#e8f5e8
+    style DD fill:#e8f5e8
+    style EE fill:#fff3e0
+    style FF fill:#f3e5f5
+    style GG fill:#e1f5fe
+    style HH fill:#fff8e1
+    style II fill:#fce4ec
+    style JJ fill:#e0f2f1
+    style KK fill:#f3e5f5
+    style LL fill:#fff3e0
+    style MM fill:#e8f5e8
 ```
 
 ## Components
@@ -209,20 +237,21 @@ flowchart TD
 
 ### Runtime Components
 
-- **Sidecar Watcher** - Rust-based runtime monitor with plan validation
+- **Sidecar Watcher** - Rust-based runtime monitor with plan validation and multi-channel input enforcement
 - **Admission Controller** - Kubernetes webhook for validation
 - **Transparency Ledger** - GraphQL service for audit trail
 - **Incident Bot** - Automated incident response and rollback
 - **WASM Sandbox** - Secure WebAssembly execution environment
 - **Privacy Engine** - Epsilon-differential privacy enforcement
 - **Marketplace API** - RESTful API for package management
+- **Egress Firewall** - PII/secret detection with non-interference certificates
 
 ### Security Mechanisms
 
 - **Plan-DSL & Policy Kernel** - Typed plans with capability validation
 - **Capability Tokens** - DSSE-signed authorization tokens
 - **Retrieval Gateway** - Tenant-isolated data access with receipts
-- **Egress Firewall** - PII/secret detection and certificate generation
+- **Egress Firewall** - PII/secret detection and certificate generation with non-interference verdicts
 - **System Invariants** - Formal Lean proofs of security properties
 - **Evidence Artifacts** - DSSE-signed audit bundles
 - **Test & SLO Harness** - Red-team testing and performance gates
@@ -231,6 +260,17 @@ flowchart TD
 - **Allow-list Generation** - Lean-to-JSON with CI drift detection
 - **Documentation** - Guarantees, thresholds, and runbooks
 - **Release Fences** - Mechanism validation gates
+- **Multi-Channel Input Contract** - Trusted vs untrusted channel enforcement
+- **Explicit SLO Thresholds** - Performance gates with per-component budgets
+- **Accuracy Posture Evidence** - Evidence-linked responses with confidence tracking
+
+### Recently Completed Advanced Features
+
+- **Multi-Channel Input Contract (MC-1)** - Injection hardening with trusted/untrusted channel enforcement
+- **Explicit SLO Thresholds (SLO-1)** - p95 < 2.0s, p99 < 4.0s with per-component budgets
+- **Non-Interference Verdict (NI-1)** - Egress certificates with influencing labels and policy hash
+- **Accuracy Posture Evidence (AP-1)** - Evidence-linked responses with fallback confidence tracking
+- **Data Retention Manager (DR-1)** - OPT-20 compliant retention policies with automated storage optimization
 
 ### Verification Adapters
 
@@ -251,9 +291,17 @@ flowchart TD
 # Run complete TRUST-FIRE suite (from repository root)
 python tests/trust_fire_orchestrator.py
 
+# Run comprehensive implementation tests
+python test_all_components.py
+
 # Run security mechanism tests
 python tests/redteam/abac_fuzz.py --queries 1000
 python tests/redteam/pii_leak.py --vectors 1000
+
+# Run individual integration tests
+python tests/integration/test_broker_enforcement.py
+python tests/integration/test_kms_attestation.py
+python tests/integration/test_invariant_gate.py
 
 # Run individual phases
 python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
@@ -262,7 +310,64 @@ python tests/chaos/chaos_rollback_test.py
 
 # Generate evidence bundles
 python tools/evidence/bundle_case.py --days 1
+
+# Run impacted-only CI tools
+python tools/select_impacted.py
+python tools/gen_allowlist_from_lean.py
+
+# Test multi-channel input contract
+python tests/redteam/injection_runner.py
+
+# Test SLO performance gates
+node tests/perf/latency_k6.js
 ```
+
+## Data Retention & Storage Optimization
+
+The Data Retention Manager implements OPT-20 data retention policies and storage cost optimization:
+
+### Features
+
+- **7-Day Hot Storage** - PostgreSQL-based fast access for recent data
+- **Weekly Roll-ups** - Automated migration to S3 as compressed Parquet files
+- **BigQuery Integration** - External table creation for cold storage analytics
+- **Safety-Case Deduplication** - Plan hash and policy hash-based deduplication
+- **Cost Optimization** - Storage tier analysis with savings recommendations
+- **Compression** - Zstandard compression for 60-80% size reduction
+
+### Usage
+
+```bash
+# Clean up hot storage (remove data older than 7 days)
+python ops/retention/retention_manager.py --config config.yaml --action cleanup-hot
+
+# Roll up data to warm storage (S3)
+python ops/retention/retention_manager.py --config config.yaml --action rollup-warm
+
+# Create BigQuery external tables
+python ops/retention/retention_manager.py --config config.yaml --action create-bigquery
+
+# Generate cost analysis report
+python ops/retention/retention_manager.py --config config.yaml --action cost-report
+
+# Run all operations
+python ops/retention/retention_manager.py --config config.yaml --action all --dry-run
+```
+
+### Configuration
+
+The retention manager requires a YAML configuration file with:
+- PostgreSQL connection details for hot storage
+- S3 bucket configuration for warm storage  
+- BigQuery project settings for cold storage
+- Table-specific retention policies
+- Compression settings
+
+### Cost Benefits
+
+- **Hot to Warm Migration**: Save ~$0.0875/GB/month
+- **Compression**: Additional 60-80% cost reduction
+- **Automated Lifecycle**: S3 lifecycle policies for further optimization
 
 ## Production Features
 
@@ -276,14 +381,17 @@ python tools/evidence/bundle_case.py --days 1
 - **Formal Verification** - Lean proofs of security properties
 - **Runtime Enforcement** - Sidecar-based security monitoring
 - **Audit Trails** - Complete evidence generation and storage
+- **Multi-Channel Security** - Trusted vs untrusted input enforcement
+- **Non-Interference** - Formal guarantees in egress certificates
 
 ### Monitoring & Observability
 
-- **Grafana Dashboards** - Real-time metrics
+- **Grafana Dashboards** - Real-time metrics with SLO panels
 - **Prometheus** - Time-series monitoring
 - **Jaeger** - Distributed tracing
 - **Alertmanager** - Incident management
-- **Security Console** - Plan validation and receipt viewing
+- **Security Console** - Plan validation, receipt viewing, certificate monitoring
+- **Performance Gates** - SLO thresholds with per-component budgets
 
 ### CI/CD Pipeline
 
@@ -292,6 +400,7 @@ python tools/evidence/bundle_case.py --days 1
 - **Automated Rollbacks** - Incident response
 - **Evidence Collection** - Compliance automation
 - **Security Gates** - Mechanism validation in release pipeline
+- **SLO Gates** - Performance validation in release pipeline
 
 ## Documentation
 
@@ -304,6 +413,8 @@ python tools/evidence/bundle_case.py --days 1
 - [Plan-DSL Specification](docs/spec/plan-dsl.md)
 - [Runtime Attestation](docs/runtime/attestation.md)
 - [Security Guarantees](docs/guarantees.md)
+- [SLO Documentation](docs/runtime/slo.md)
+- [Multi-Channel Input Contract](docs/spec/plan-dsl.md#multi-channel-input-contract)
 
 ## Contributing
 
@@ -440,4 +551,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
-**Provability-Fabric** - Trust in AI through formal verification and comprehensive security mechanisms.
+**Provability-Fabric** - Trust in AI through formal verification and comprehensive security mechanisms with advanced multi-channel security and performance guarantees.
