@@ -1,0 +1,65 @@
+[package]
+name = "egress-firewall"
+version = "0.1.0"
+edition = "2021"
+authors = ["Provability Fabric Team"]
+description = "Egress firewall with PII detection using Hyperscan"
+
+[dependencies]
+actix-web = "4.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+tokio = { version = "1.0", features = ["full", "rt-multi-thread", "macros", "time", "sync", "net", "io-util"] }
+uuid = { version = "1.0", features = ["v4"] }
+sha2 = "0.10"
+regex = "1.0"
+aho-corasick = "1.0"
+hyperscan = "0.3"
+lazy_static = "1.4"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+# Performance optimizations
+mimalloc = "0.1"
+bytes = "1.0"
+dashmap = "5.0"
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+rayon = "1.0"
+# Zero-copy optimizations
+serde_bytes = "0.11"
+
+[build-dependencies]
+cc = "1.0"
+pkg-config = "0.3"
+
+[features]
+default = ["hyperscan", "mimalloc"]
+hyperscan = ["hyperscan/hyperscan"]
+fallback = []
+mimalloc = ["mimalloc/override"]
+io_uring = ["tokio/io-util"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+# Additional performance optimizations
+strip = true
+overflow-checks = false
+# Profile-guided optimization hints
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+# Enable additional checks in development
+overflow-checks = true
+
+# Profile for performance analysis
+[profile.release.pgo]
+inherits = "release"
+profile = "release"
