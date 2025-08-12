@@ -6,6 +6,7 @@ use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use regex::Regex;
 use std::collections::HashSet;
+use std::time::Duration;
 
 /// Egress request with text to be checked
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -681,7 +682,20 @@ impl EgressFirewall {
 
     /// Store certificate in ledger
     async fn store_certificate_in_ledger(&self, certificate: &EgressCertificate) -> Result<(), String> {
-        let client = reqwest::Client::new();
+        // Create optimized HTTP client with connection pooling
+        lazy_static! {
+            static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
+                .pool_max_idle_per_host(10) // Optimize for typical load
+                .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+                .http2_prior_knowledge() // Force HTTP/2 for better performance
+                .timeout(Duration::from_secs(30)) // Request timeout
+                .connect_timeout(Duration::from_secs(10)) // Connection timeout
+                .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+                .build()
+                .expect("Failed to create HTTP client");
+        }
+        let client = &*HTTP_CLIENT;
+
         let response = client
             .post(&format!("{}/egress-certificates", self.ledger_url))
             .json(certificate)

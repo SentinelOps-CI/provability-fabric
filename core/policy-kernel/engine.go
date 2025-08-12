@@ -121,7 +121,10 @@ type ValidationResult struct {
 
 // Kernel represents the policy kernel
 type Kernel struct {
-	config KernelConfig
+	config       KernelConfig
+	cache        *DecisionCache
+	pfKeyPair    *PFSignatureKeyPair
+	cacheEnabled bool
 }
 
 // KernelConfig represents kernel configuration
@@ -130,7 +133,11 @@ type KernelConfig struct {
 	MaxEpsilon     float64
 	MaxLatency     float64
 	AllowedTenants []string
-	StrictKernel   bool // New flag for strict kernel checks
+	StrictKernel   bool          // New flag for strict kernel checks
+	CacheEnabled   bool          // Enable fast-path decision caching
+	CacheMaxSize   int           // Maximum number of cached decisions
+	CacheTTL       time.Duration // TTL for cached decisions
+	RedisAddr      string        // Redis address for distributed caching
 }
 
 // NewKernel creates a new policy kernel
@@ -139,7 +146,35 @@ func NewKernel(config KernelConfig) *Kernel {
 	if !config.StrictKernel {
 		config.StrictKernel = true
 	}
-	return &Kernel{config: config}
+
+	// Set default cache values if not specified
+	if config.CacheMaxSize == 0 {
+		config.CacheMaxSize = 10000 // Default to 10k cached decisions
+	}
+	if config.CacheTTL == 0 {
+		config.CacheTTL = 60 * time.Second // Default to 60s TTL
+	}
+
+	kernel := &Kernel{
+		config:       config,
+		cacheEnabled: config.CacheEnabled,
+	}
+
+	// Initialize cache if enabled
+	if config.CacheEnabled {
+		kernel.cache = NewDecisionCache(config.CacheMaxSize, config.CacheTTL, config.RedisAddr)
+
+		// Generate PF signature key pair
+		var err error
+		kernel.pfKeyPair, err = NewPFSignatureKeyPair()
+		if err != nil {
+			// Log error but continue without PF signatures
+			// In production, this should be a fatal error
+			kernel.cacheEnabled = false
+		}
+	}
+
+	return kernel
 }
 
 // ValidatePlan validates a plan against all policy rules
@@ -214,6 +249,63 @@ func (k *Kernel) ValidatePlan(plan *Plan) ValidationResult {
 	return result
 }
 
+// ValidatePlanWithCache validates a plan with fast-path caching
+func (k *Kernel) ValidatePlanWithCache(plan *Plan, capsTokenID string) (*Decision, *PFSignature, error) {
+	// Check if cache is enabled
+	if !k.cacheEnabled || k.cache == nil {
+		// Fall back to normal validation
+		validation := k.ValidatePlan(plan)
+		if !validation.Valid {
+			return nil, nil, fmt.Errorf("plan validation failed: %v", validation.Errors)
+		}
+
+		decision := k.ApprovePlan(plan)
+		return &decision, nil, nil
+	}
+
+	// Create cache key
+	cacheKey := CacheKey{
+		PlanHash:    plan.PlanID, // Using PlanID as hash for now
+		CapsTokenID: capsTokenID,
+		PolicyHash:  plan.InputChannels.System.PolicyHash,
+	}
+
+	// Try to get from cache first
+	if cached, exists := k.cache.Get(cacheKey); exists {
+		// Return cached decision with PF signature
+		pfSig, err := k.pfKeyPair.SignDecision(cacheKey, cacheKey.PolicyHash, k.config.CacheTTL)
+		if err != nil {
+			// Log error but continue with cached decision
+			return cached, nil, nil
+		}
+		return cached, pfSig, nil
+	}
+
+	// Not in cache, perform full validation
+	validation := k.ValidatePlan(plan)
+	if !validation.Valid {
+		return nil, nil, fmt.Errorf("plan validation failed: %v", validation.Errors)
+	}
+
+	// Approve the plan
+	decision := k.ApprovePlan(plan)
+
+	// Cache the decision
+	if err := k.cache.Set(cacheKey, decision); err != nil {
+		// Log error but continue
+		// In production, this should be logged
+	}
+
+	// Generate PF signature
+	pfSig, err := k.pfKeyPair.SignDecision(cacheKey, cacheKey.PolicyHash, k.config.CacheTTL)
+	if err != nil {
+		// Log error but continue without signature
+		return &decision, nil, nil
+	}
+
+	return &decision, pfSig, nil
+}
+
 // ApprovePlan returns a Decision with approved steps for execution
 func (k *Kernel) ApprovePlan(plan *Plan) Decision {
 	decision := Decision{
@@ -243,6 +335,31 @@ func (k *Kernel) ApprovePlan(plan *Plan) Decision {
 	}
 
 	return decision
+}
+
+// InvalidateCacheByPolicy invalidates all cached decisions for a specific policy
+func (k *Kernel) InvalidateCacheByPolicy(policyHash string) error {
+	if k.cacheEnabled && k.cache != nil {
+		return k.cache.InvalidateByPolicyHash(policyHash)
+	}
+	return nil
+}
+
+// GetCacheStats returns cache performance statistics
+func (k *Kernel) GetCacheStats() *CacheStats {
+	if k.cacheEnabled && k.cache != nil {
+		stats := k.cache.GetStats()
+		return &stats
+	}
+	return nil
+}
+
+// Close cleans up the kernel and its cache
+func (k *Kernel) Close() error {
+	if k.cacheEnabled && k.cache != nil {
+		return k.cache.Close()
+	}
+	return nil
 }
 
 // validateConstraints validates plan-level constraints

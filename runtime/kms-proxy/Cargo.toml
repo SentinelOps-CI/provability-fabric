@@ -19,4 +19,7 @@ hmac = "0.12"
 hex = "0.4"
 hyper = { version = "0.14", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.4", features = ["cors", "trace"] } 
+tower-http = { version = "0.4", features = ["cors", "trace"] }
+redis = { version = "0.23", features = ["tokio-comp"] }
+metrics = "0.21"
+metrics-exporter-prometheus = "0.12" 

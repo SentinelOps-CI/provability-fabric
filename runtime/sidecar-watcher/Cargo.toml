@@ -25,6 +25,10 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.11", features = ["json"] }
+ed25519-dalek = { version = "2.0", features = ["batch"] }
+rand = "0.8"
+metrics = "0.21"
+metrics-exporter-prometheus = "0.12"
 
 [dev-dependencies]
 tokio-test = "0.4" 

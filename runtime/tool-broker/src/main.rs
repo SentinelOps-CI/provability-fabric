@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn, error};
+use metrics::{counter, histogram, gauge};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
@@ -69,16 +72,34 @@ struct ToolBroker {
 }
 
 impl ToolBroker {
-    fn new(kernel_url: String) -> Self {
+    pub fn new(kernel_url: String) -> Self {
+        // Create optimized HTTP client with connection pooling
+        let http_client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10) // Optimize for typical load
+            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+            .http2_prior_knowledge() // Force HTTP/2 for better performance
+            .timeout(Duration::from_secs(30)) // Request timeout
+            .connect_timeout(Duration::from_secs(10)) // Connection timeout
+            .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self {
             kernel_url,
-            http_client: reqwest::Client::new(),
+            http_client,
             approved_steps: Arc::new(RwLock::new(HashMap::new())),
             violation_log: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
     async fn submit_plan(&self, plan_json: &str) -> Result<KernelDecision> {
+        let start_time = std::time::Instant::now();
+        
+        // Record connection pool metrics
+        let pool_status = self.http_client.get_pool_status();
+        gauge!("http_connection_pool_size", pool_status.idle_connections as f64);
+        gauge!("http_connection_pool_available", pool_status.available_connections as f64);
+        
         let response = self
             .http_client
             .post(&format!("{}/approve", self.kernel_url))
@@ -87,6 +108,9 @@ impl ToolBroker {
             .send()
             .await
             .context("Failed to submit plan to kernel")?;
+
+        let latency = start_time.elapsed();
+        histogram!("http_request_duration_seconds", latency.as_secs_f64());
 
         let decision: KernelDecision = response
             .json()
@@ -98,8 +122,10 @@ impl ToolBroker {
             let mut approved_steps = self.approved_steps.write().await;
             approved_steps.insert(plan_id, decision.approved_steps.clone());
             info!("Plan approved with {} steps", decision.approved_steps.len());
+            counter!("plans_approved_total", 1);
         } else {
             warn!("Plan rejected: {}", decision.reason);
+            counter!("plans_rejected_total", 1);
         }
 
         Ok(decision)
@@ -116,6 +142,7 @@ impl ToolBroker {
     }
 
     async fn execute_tool(&self, tool_call: &ToolCall, plan_id: &str) -> Result<ToolResult> {
+        let start_time = std::time::Instant::now();
         let execution_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now();
 
@@ -133,66 +160,54 @@ impl ToolBroker {
 
                 match approved_step {
                     Some(step) => {
-                        info!("Executing approved tool: {}", step.tool);
-                        let result = self.execute_approved_tool(step, &execution_id).await?;
-                        Ok(ToolResult {
-                            success: true,
-                            result: Some(result),
-                            error: None,
-                            execution_id,
-                            timestamp,
-                        })
+                        // Execute the approved tool
+                        let result = self.execute_approved_tool(tool_call, step).await?;
+                        
+                        let latency = start_time.elapsed();
+                        histogram!("tool_execution_duration_seconds", latency.as_secs_f64());
+                        counter!("tool_executions_total", 1);
+                        
+                        Ok(result)
                     }
                     None => {
                         let violation = Violation {
                             violation_type: "UNAPPROVED_TOOL".to_string(),
-                            reason: format!("Tool '{}' not in approved steps", tool_call.tool),
+                            reason: "Tool call not in approved plan".to_string(),
                             tool_call: tool_call.clone(),
                             timestamp,
                         };
-
-                        {
-                            let mut violations = self.violation_log.write().await;
-                            violations.push(violation.clone());
-                        }
-
-                        error!("Tool execution blocked: {}", violation.reason);
-                        Ok(ToolResult {
-                            success: false,
-                            result: None,
-                            error: Some(violation.reason),
-                            execution_id,
-                            timestamp,
-                        })
+                        
+                        let mut violation_log = self.violation_log.write().await;
+                        violation_log.push(violation.clone());
+                        
+                        counter!("tool_violations_total", 1);
+                        
+                        Err(anyhow::anyhow!("Tool call not approved"))
                     }
                 }
             }
             None => {
                 let violation = Violation {
-                    violation_type: "NO_PLAN_APPROVAL".to_string(),
-                    reason: "No approved plan found".to_string(),
+                    violation_type: "NO_APPROVED_PLAN".to_string(),
+                    reason: "No approved plan found for plan ID".to_string(),
                     tool_call: tool_call.clone(),
                     timestamp,
                 };
-
-                {
-                    let mut violations = self.violation_log.write().await;
-                    violations.push(violation.clone());
-                }
-
-                error!("Tool execution blocked: {}", violation.reason);
-                Ok(ToolResult {
-                    success: false,
-                    result: None,
-                    error: Some(violation.reason),
-                    execution_id,
-                    timestamp,
-                })
+                
+                let mut violation_log = self.violation_log.write().await;
+                violation_log.push(violation.clone());
+                
+                counter!("tool_violations_total", 1);
+                
+                Err(anyhow::anyhow!("No approved plan found"))
             }
         }
     }
 
-    async fn execute_approved_tool(&self, step: &ApprovedStep, execution_id: &str) -> Result<serde_json::Value> {
+    async fn execute_approved_tool(&self, tool_call: &ToolCall, step: &ApprovedStep) -> Result<ToolResult> {
+        let execution_id = Uuid::new_v4().to_string();
+        let timestamp = Utc::now();
+
         // Simulate tool execution based on tool type
         match step.tool.as_str() {
             "retrieval" => {
@@ -204,35 +219,59 @@ impl ToolBroker {
                 }
                 
                 // Simulate retrieval result
-                Ok(serde_json::json!({
-                    "type": "retrieval_result",
-                    "documents": ["doc1", "doc2"],
-                    "execution_id": execution_id
-                }))
+                Ok(ToolResult {
+                    success: true,
+                    result: Some(serde_json::json!({
+                        "type": "retrieval_result",
+                        "documents": ["doc1", "doc2"],
+                        "execution_id": execution_id
+                    })),
+                    error: None,
+                    execution_id,
+                    timestamp,
+                })
             }
             "search" => {
                 // Simulate search result
-                Ok(serde_json::json!({
-                    "type": "search_result",
-                    "results": ["result1", "result2"],
-                    "execution_id": execution_id
-                }))
+                Ok(ToolResult {
+                    success: true,
+                    result: Some(serde_json::json!({
+                        "type": "search_result",
+                        "results": ["result1", "result2"],
+                        "execution_id": execution_id
+                    })),
+                    error: None,
+                    execution_id,
+                    timestamp,
+                })
             }
             "email" => {
                 // Simulate email sending
-                Ok(serde_json::json!({
-                    "type": "email_sent",
-                    "recipient": step.args.get("to"),
-                    "execution_id": execution_id
-                }))
+                Ok(ToolResult {
+                    success: true,
+                    result: Some(serde_json::json!({
+                        "type": "email_sent",
+                        "recipient": step.args.get("to"),
+                        "execution_id": execution_id
+                    })),
+                    error: None,
+                    execution_id,
+                    timestamp,
+                })
             }
             _ => {
                 // Generic tool execution
-                Ok(serde_json::json!({
-                    "type": "tool_result",
-                    "tool": step.tool,
-                    "execution_id": execution_id
-                }))
+                Ok(ToolResult {
+                    success: true,
+                    result: Some(serde_json::json!({
+                        "type": "tool_result",
+                        "tool": step.tool,
+                        "execution_id": execution_id
+                    })),
+                    error: None,
+                    execution_id,
+                    timestamp,
+                })
             }
         }
     }

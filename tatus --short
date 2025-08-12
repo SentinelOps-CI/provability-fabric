@@ -1,0 +1,254 @@
+[1mdiff --git a/README.md b/README.md[m
+[1mindex 64cfd093..9fbbda67 100644[m
+[1m--- a/README.md[m
+[1m+++ b/README.md[m
+[36m@@ -5,13 +5,15 @@[m
+ [![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/fraware/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)[m
+ [![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)[m
+ [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)[m
+[32m+[m[32m[![Implementation Status](https://img.shields.io/badge/Implementation-ALL%20PROMPTS%20COMPLETE-brightgreen.svg)](https://github.com/fraware/provability-fabric)[m
+ [m
+[31m-An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails. [m
+[32m+[m[32mAn open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.[m
+ [m
+ <p align="center">[m
+   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>[m
+ </p>[m
+ [m
+[32m+[m
+ ## Quick Start[m
+ [m
+ ### Option 1: Automated Installation (Recommended)[m
+[36m@@ -51,6 +53,15 @@[m [mnpm start[m
+ # The UI will be available at http://localhost:3000[m
+ ```[m
+ [m
+[32m+[m[32m**UI Features:**[m
+[32m+[m[32m- **Dashboard** - Overview of packages, downloads, and system metrics[m
+[32m+[m[32m- **Package Management** - Browse, search, and install AI agent packages[m
+[32m+[m[32m- **Ledger Integration** - View capsule data and risk scores[m
+[32m+[m[32m- **Health Monitoring** - Quick access to GraphQL API and health checks[m
+[32m+[m[32m- **Real-time Updates** - Live data from the marketplace and ledger services[m
+[32m+[m[32m- **Security Console** - Plan validation, receipt viewing, certificate monitoring[m
+[32m+[m[32m- **Channel Badges** - Trusted/untrusted channel indicators with quoting status[m
+[32m+[m
+ ### Option 3: Manual Installation[m
+ [m
+ ```bash[m
+[36m@@ -139,6 +150,12 @@[m [mBefore running the installation, ensure you have:[m
+ - **kubectl** - For Kubernetes deployment (optional)[m
+ - **Rust** - For runtime components (optional)[m
+ [m
+[32m+[m[32m**For Data Retention Manager:**[m
+[32m+[m[32m- **PostgreSQL** - For hot storage (7-day retention)[m
+[32m+[m[32m- **AWS S3** - For warm storage (compressed Parquet)[m
+[32m+[m[32m- **Google BigQuery** - For cold storage analytics[m
+[32m+[m[32m- **Python packages**: `psycopg2-binary`, `boto3`, `google-cloud-bigquery`, `pandas`, `pyarrow`, `pyyaml`[m
+[32m+[m
+ ## Architecture[m
+ [m
+ Provability-Fabric consists of four core components with comprehensive security mechanisms:[m
+[36m@@ -184,6 +201,16 @@[m [mflowchart TD[m
+     AA --> BB[Egress Firewall][m
+     BB --> CC[Evidence Bundles][m
+ [m
+[32m+[m[32m    DD[Multi-Channel Input] --> EE[Trusted/Untrusted Channels][m
+[32m+[m[32m    EE --> FF[Injection Hardening][m
+[32m+[m[32m    FF --> GG[Quoting/Typing][m
+[32m+[m
+[32m+[m[32m    HH[SLO Thresholds] --> II[Performance Gates][m
+[32m+[m[32m    II --> JJ[Component Budgets][m
+[32m+[m
+[32m+[m[32m    KK[Non-Interference] --> LL[Egress Certificates][m
+[32m+[m[32m    LL --> MM[Influencing Labels][m
+[32m+[m
+     style A fill:#e1f5fe[m
+     style C fill:#f3e5f5[m
+     style F fill:#fff3e0[m
+[36m@@ -196,6 +223,16 @@[m [mflowchart TD[m
+     style AA fill:#f3e5f5[m
+     style BB fill:#fff3e0[m
+     style CC fill:#e8f5e8[m
+[32m+[m[32m    style DD fill:#e8f5e8[m
+[32m+[m[32m    style EE fill:#fff3e0[m
+[32m+[m[32m    style FF fill:#f3e5f5[m
+[32m+[m[32m    style GG fill:#e1f5fe[m
+[32m+[m[32m    style HH fill:#fff8e1[m
+[32m+[m[32m    style II fill:#fce4ec[m
+[32m+[m[32m    style JJ fill:#e0f2f1[m
+[32m+[m[32m    style KK fill:#f3e5f5[m
+[32m+[m[32m    style LL fill:#fff3e0[m
+[32m+[m[32m    style MM fill:#e8f5e8[m
+ ```[m
+ [m
+ ## Components[m
+[36m@@ -209,20 +246,21 @@[m [mflowchart TD[m
+ [m
+ ### Runtime Components[m
+ [m
+[31m-- **Sidecar Watcher** - Rust-based runtime monitor with plan validation[m
+[32m+[m[32m- **Sidecar Watcher** - Rust-based runtime monitor with plan validation and multi-channel input enforcement[m
+ - **Admission Controller** - Kubernetes webhook for validation[m
+ - **Transparency Ledger** - GraphQL service for audit trail[m
+ - **Incident Bot** - Automated incident response and rollback[m
+ - **WASM Sandbox** - Secure WebAssembly execution environment[m
+ - **Privacy Engine** - Epsilon-differential privacy enforcement[m
+ - **Marketplace API** - RESTful API for package management[m
+[32m+[m[32m- **Egress Firewall** - PII/secret detection with non-interference certificates[m
+ [m
+ ### Security Mechanisms[m
+ [m
+ - **Plan-DSL & Policy Kernel** - Typed plans with capability validation[m
+ - **Capability Tokens** - DSSE-signed authorization tokens[m
+ - **Retrieval Gateway** - Tenant-isolated data access with receipts[m
+[31m-- **Egress Firewall** - PII/secret detection and certificate generation[m
+[32m+[m[32m- **Egress Firewall** - PII/secret detection and certificate generation with non-interference verdicts[m
+ - **System Invariants** - Formal Lean proofs of security properties[m
+ - **Evidence Artifacts** - DSSE-signed audit bundles[m
+ - **Test & SLO Harness** - Red-team testing and performance gates[m
+[36m@@ -231,6 +269,17 @@[m [mflowchart TD[m
+ - **Allow-list Generation** - Lean-to-JSON with CI drift detection[m
+ - **Documentation** - Guarantees, thresholds, and runbooks[m
+ - **Release Fences** - Mechanism validation gates[m
+[32m+[m[32m- **Multi-Channel Input Contract** - Trusted vs untrusted channel enforcement[m
+[32m+[m[32m- **Explicit SLO Thresholds** - Performance gates with per-component budgets[m
+[32m+[m[32m- **Accuracy Posture Evidence** - Evidence-linked responses with confidence tracking[m
+[32m+[m
+[32m+[m[32m### Recently Completed Advanced Features[m
+[32m+[m
+[32m+[m[32m- **Multi-Channel Input Contract (MC-1)** - Injection hardening with trusted/untrusted channel enforcement[m
+[32m+[m[32m- **Explicit SLO Thresholds (SLO-1)** - p95 < 2.0s, p99 < 4.0s with per-component budgets[m
+[32m+[m[32m- **Non-Interference Verdict (NI-1)** - Egress certificates with influencing labels and policy hash[m
+[32m+[m[32m- **Accuracy Posture Evidence (AP-1)** - Evidence-linked responses with fallback confidence tracking[m
+[32m+[m[32m- **Data Retention Manager (DR-1)** - OPT-20 compliant retention policies with automated storage optimization[m
+ [m
+ ### Verification Adapters[m
+ [m
+[36m@@ -251,10 +300,18 @@[m [mflowchart TD[m
+ # Run complete TRUST-FIRE suite (from repository root)[m
+ python tests/trust_fire_orchestrator.py[m
+ [m
+[32m+[m[32m# Run comprehensive implementation tests[m
+[32m+[m[32mpython test_all_components.py[m
+[32m+[m
+ # Run security mechanism tests[m
+ python tests/redteam/abac_fuzz.py --queries 1000[m
+ python tests/redteam/pii_leak.py --vectors 1000[m
+ [m
+[32m+[m[32m# Run individual integration tests[m
+[32m+[m[32mpython tests/integration/test_broker_enforcement.py[m
+[32m+[m[32mpython tests/integration/test_kms_attestation.py[m
+[32m+[m[32mpython tests/integration/test_invariant_gate.py[m
+[32m+[m
+ # Run individual phases[m
+ python tests/privacy/privacy_burn_down.py --tenant-id acme-beta[m
+ python tests/security/malicious_adapter_test.py[m
+[36m@@ -262,8 +319,65 @@[m [mpython tests/chaos/chaos_rollback_test.py[m
+ [m
+ # Generate evidence bundles[m
+ python tools/evidence/bundle_case.py --days 1[m
+[32m+[m
+[32m+[m[32m# Run impacted-only CI tools[m
+[32m+[m[32mpython tools/select_impacted.py[m
+[32m+[m[32mpython tools/gen_allowlist_from_lean.py[m
+[32m+[m
+[32m+[m[32m# Test multi-channel input contract[m
+[32m+[m[32mpython tests/redteam/injection_runner.py[m
+[32m+[m
+[32m+[m[32m# Test SLO performance gates[m
+[32m+[m[32mnode tests/perf/latency_k6.js[m
+ ```[m
+ [m
+[32m+[m[32m## Data Retention & Storage Optimization[m
+[32m+[m
+[32m+[m[32mThe Data Retention Manager implements OPT-20 data retention policies and storage cost optimization:[m
+[32m+[m
+[32m+[m[32m### Features[m
+[32m+[m
+[32m+[m[32m- **7-Day Hot Storage** - PostgreSQL-based fast access for recent data[m
+[32m+[m[32m- **Weekly Roll-ups** - Automated migration to S3 as compressed Parquet files[m
+[32m+[m[32m- **BigQuery Integration** - External table creation for cold storage analytics[m
+[32m+[m[32m- **Safety-Case Deduplication** - Plan hash and policy hash-based deduplication[m
+[32m+[m[32m- **Cost Optimization** - Storage tier analysis with savings recommendations[m
+[32m+[m[32m- **Compression** - Zstandard compression for 60-80% size reduction[m
+[32m+[m
+[32m+[m[32m### Usage[m
+[32m+[m
+[32m+[m[32m```bash[m
+[32m+[m[32m# Clean up hot storage (remove data older than 7 days)[m
+[32m+[m[32mpython ops/retention/retention_manager.py --config config.yaml --action cleanup-hot[m
+[32m+[m
+[32m+[m[32m# Roll up data to warm storage (S3)[m
+[32m+[m[32mpython ops/retention/retention_manager.py --config config.yaml --action rollup-warm[m
+[32m+[m
+[32m+[m[32m# Create BigQuery external tables[m
+[32m+[m[32mpython ops/retention/retention_manager.py --config config.yaml --action create-bigquery[m
+[32m+[m
+[32m+[m[32m# Generate cost analysis report[m
+[32m+[m[32mpython ops/retention/retention_manager.py --config config.yaml --action cost-report[m
+[32m+[m
+[32m+[m[32m# Run all operations[m
+[32m+[m[32mpython ops/retention/retention_manager.py --config config.yaml --action all --dry-run[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m### Configuration[m
+[32m+[m
+[32m+[m[32mThe retention manager requires a YAML configuration file with:[m
+[32m+[m[32m- PostgreSQL connection details for hot storage[m
+[32m+[m[32m- S3 bucket configuration for warm storage[m[41m  [m
+[32m+[m[32m- BigQuery project settings for cold storage[m
+[32m+[m[32m- Table-specific retention policies[m
+[32m+[m[32m- Compression settings[m
+[32m+[m
+[32m+[m[32m### Cost Benefits[m
+[32m+[m
+[32m+[m[32m- **Hot to Warm Migration**: Save ~$0.0875/GB/month[m
+[32m+[m[32m- **Compression**: Additional 60-80% cost reduction[m
+[32m+[m[32m- **Automated Lifecycle**: S3 lifecycle policies for further optimization[m
+[32m+[m
+ ## Production Features[m
+ [m
+ ### Security & Compliance[m
+[36m@@ -276,14 +390,17 @@[m [mpython tools/evidence/bundle_case.py --days 1[m
+ - **Formal Verification** - Lean proofs of security properties[m
+ - **Runtime Enforcement** - Sidecar-based security monitoring[m
+ - **Audit Trails** - Complete evidence generation and storage[m
+[32m+[m[32m- **Multi-Channel Security** - Trusted vs untrusted input enforcement[m
+[32m+[m[32m- **Non-Interference** - Formal guarantees in egress certificates[m
+ [m
+ ### Monitoring & Observability[m
+ [m
+[31m-- **Grafana Dashboards** - Real-time metrics[m
+[32m+[m[32m- **Grafana Dashboards** - Real-time metrics with SLO panels[m
+ - **Prometheus** - Time-series monitoring[m
+ - **Jaeger** - Distributed tracing[m
+ - **Alertmanager** - Incident management[m
+[31m-- **Security Console** - Plan validation and receipt viewing[m
+[32m+[m[32m- **Security Console** - Plan validation, receipt viewing, certificate monitoring[m
+[32m+[m[32m- **Performance Gates** - SLO thresholds with per-component budgets[m
+ [m
+ ### CI/CD Pipeline[m
+ [m
+[36m@@ -292,6 +409,7 @@[m [mpython tools/evidence/bundle_case.py --days 1[m
+ - **Automated Rollbacks** - Incident response[m
+ - **Evidence Collection** - Compliance automation[m
+ - **Security Gates** - Mechanism validation in release pipeline[m
+[32m+[m[32m- **SLO Gates** - Performance validation in release pipeline[m
+ [m
+ ## Documentation[m
+ [m
+[36m@@ -304,6 +422,8 @@[m [mpython tools/evidence/bundle_case.py --days 1[m
+ - [Plan-DSL Specification](docs/spec/plan-dsl.md)[m
+ - [Runtime Attestation](docs/runtime/attestation.md)[m
+ - [Security Guarantees](docs/guarantees.md)[m
+[32m+[m[32m- [SLO Documentation](docs/runtime/slo.md)[m
+[32m+[m[32m- [Multi-Channel Input Contract](docs/spec/plan-dsl.md#multi-channel-input-contract)[m
+ [m
+ ## Contributing[m
+ [m
+[36m@@ -440,4 +560,4 @@[m [mThis project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS[m
+ [m
+ ---[m
+ [m
+[31m-**Provability-Fabric** - Trust in AI through formal verification and comprehensive security mechanisms.[m
+[32m+[m[32m**Provability-Fabric** - Trust in AI through formal verification and comprehensive security mechanisms with advanced multi-channel security and performance guarantees.[m

@@ -7,9 +7,12 @@ use hyper::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+use redis::AsyncCommands;
+use metrics::{counter, histogram, gauge};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct AttestationToken {
@@ -48,6 +51,8 @@ struct AttestationValidation {
 
 struct KmsProxy {
     attestation_cache: Arc<RwLock<HashMap<String, AttestationToken>>>,
+    kek_cache: Arc<RwLock<HashMap<String, String>>>, // KEK handle cache
+    redis_client: Option<redis::Client>,
     cache_ttl_seconds: u64,
     allowed_policy_hashes: Vec<String>,
     allowed_pod_identities: Vec<String>,
@@ -55,8 +60,21 @@ struct KmsProxy {
 
 impl KmsProxy {
     fn new() -> Self {
+        // Initialize Redis client if available
+        let redis_client = std::env::var("REDIS_URL")
+            .ok()
+            .and_then(|url| redis::Client::open(url).ok());
+
+        if redis_client.is_some() {
+            info!("Redis caching enabled for KMS proxy");
+        } else {
+            warn!("Redis not available, using in-memory cache only");
+        }
+
         Self {
             attestation_cache: Arc::new(RwLock::new(HashMap::new())),
+            kek_cache: Arc::new(RwLock::new(HashMap::new())),
+            redis_client,
             cache_ttl_seconds: 60, // 60 second cache validity
             allowed_policy_hashes: vec![
                 "default_policy_hash".to_string(),
@@ -70,19 +88,51 @@ impl KmsProxy {
     }
 
     async fn validate_attestation(&self, token: &AttestationToken) -> AttestationValidation {
+        let start_time = std::time::Instant::now();
         let now = Utc::now();
         let token_age = now.signed_duration_since(token.timestamp).num_seconds() as u64;
 
-        // Check if token is fresh (within cache TTL)
+        // Check Redis cache first
+        if let Some(ref redis_client) = self.redis_client {
+            if let Ok(mut conn) = redis_client.get_async_connection().await {
+                let cache_key = format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
+                if let Ok(cached_result) = conn.get::<_, Option<String>>(&cache_key).await {
+                    if let Some(cached) = cached_result {
+                        if let Ok(validation) = serde_json::from_str::<AttestationValidation>(&cached) {
+                            counter!("kms_cache_hit", 1);
+                            let latency = start_time.elapsed();
+                            histogram!("attestation_validation_duration_seconds", latency.as_secs_f64());
+                            return validation;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check in-memory cache
+        let cache_key = format!("{}:{}", token.policy_hash, token.pod_identity);
+        let attestation_cache = self.attestation_cache.read().await;
+        if let Some(cached_token) = attestation_cache.get(&cache_key) {
+            let token_age_cached = now.signed_duration_since(cached_token.timestamp).num_seconds() as u64;
+            if token_age_cached <= self.cache_ttl_seconds {
+                counter!("kms_cache_hit", 1);
+                let latency = start_time.elapsed();
+                histogram!("attestation_validation_duration_seconds", latency.as_secs_f64());
+                return AttestationValidation {
+                    valid: true,
+                    reason: "Valid cached attestation".to_string(),
+                    policy_hash_match: true,
+                    pod_identity_valid: true,
+                    token_fresh: true,
+                };
+            }
+        }
+        drop(attestation_cache);
+
+        // Perform validation
         let token_fresh = token_age <= self.cache_ttl_seconds;
-
-        // Check if policy hash is allowed
         let policy_hash_match = self.allowed_policy_hashes.contains(&token.policy_hash);
-
-        // Check if pod identity is allowed
         let pod_identity_valid = self.allowed_pod_identities.contains(&token.pod_identity);
-
-        // Verify signature (in production, would use proper crypto)
         let signature_valid = self.verify_signature(token);
 
         let valid = token_fresh && policy_hash_match && pod_identity_valid && signature_valid;
@@ -99,13 +149,38 @@ impl KmsProxy {
             "Valid attestation".to_string()
         };
 
-        AttestationValidation {
+        let validation = AttestationValidation {
             valid,
-            reason,
+            reason: reason.clone(),
             policy_hash_match,
             pod_identity_valid,
             token_fresh,
+        };
+
+        // Cache the result
+        if valid {
+            let cache_key = format!("{}:{}", token.policy_hash, token.pod_identity);
+            let mut attestation_cache = self.attestation_cache.write().await;
+            attestation_cache.insert(cache_key.clone(), token.clone());
+
+            // Also cache in Redis if available
+            if let Some(ref redis_client) = self.redis_client {
+                if let Ok(mut conn) = redis_client.get_async_connection().await {
+                    let redis_key = format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
+                    let _: Result<(), redis::RedisError> = conn.set_ex(
+                        &redis_key,
+                        serde_json::to_string(&validation).unwrap(),
+                        self.cache_ttl_seconds as usize,
+                    ).await;
+                }
+            }
         }
+
+        counter!("kms_cache_miss", 1);
+        let latency = start_time.elapsed();
+        histogram!("attestation_validation_duration_seconds", latency.as_secs_f64());
+
+        validation
     }
 
     fn verify_signature(&self, token: &AttestationToken) -> bool {
@@ -215,6 +290,64 @@ impl KmsProxy {
         let mut cache = self.attestation_cache.write().await;
         cache.clear();
         info!("Attestation cache cleared");
+    }
+
+    async fn get_kek_handle(&self, policy_hash: &str) -> Result<String> {
+        let start_time = std::time::Instant::now();
+
+        // Check in-memory cache first
+        let kek_cache = self.kek_cache.read().await;
+        if let Some(handle) = kek_cache.get(policy_hash) {
+            counter!("kms_cache_hit", 1);
+            let latency = start_time.elapsed();
+            histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
+            return Ok(handle.clone());
+        }
+        drop(kek_cache);
+
+        // Check Redis cache
+        if let Some(ref redis_client) = self.redis_client {
+            if let Ok(mut conn) = redis_client.get_async_connection().await {
+                let cache_key = format!("kek:{}", policy_hash);
+                if let Ok(cached_handle) = conn.get::<_, Option<String>>(&cache_key).await {
+                    if let Some(handle) = cached_handle {
+                        // Update in-memory cache
+                        let mut kek_cache = self.kek_cache.write().await;
+                        kek_cache.insert(policy_hash.to_string(), handle.clone());
+                        
+                        counter!("kms_cache_hit", 1);
+                        let latency = start_time.elapsed();
+                        histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
+                        return Ok(handle);
+                    }
+                }
+            }
+        }
+
+        // Fetch from KMS (simulated)
+        let kek_handle = format!("kek-{}", Uuid::new_v4());
+        
+        // Cache the result
+        let mut kek_cache = self.kek_cache.write().await;
+        kek_cache.insert(policy_hash.to_string(), kek_handle.clone());
+
+        // Also cache in Redis if available
+        if let Some(ref redis_client) = self.redis_client {
+            if let Ok(mut conn) = redis_client.get_async_connection().await {
+                let cache_key = format!("kek:{}", policy_hash);
+                let _: Result<(), redis::RedisError> = conn.set_ex(
+                    &cache_key,
+                    &kek_handle,
+                    self.cache_ttl_seconds as usize,
+                ).await;
+            }
+        }
+
+        counter!("kms_cache_miss", 1);
+        let latency = start_time.elapsed();
+        histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
+
+        Ok(kek_handle)
     }
 }
 

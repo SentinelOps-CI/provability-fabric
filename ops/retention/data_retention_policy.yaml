@@ -1,0 +1,356 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-retention-policy
+  namespace: provability-fabric
+  labels:
+    app: data-retention
+    component: storage-optimization
+data:
+  # Data retention configuration
+  retention_policy.yaml: |
+    # Data Retention and Storage Cost Optimization Policy
+    # OPT-20 Implementation
+    
+    # Hot Storage Configuration (PostgreSQL)
+    hot_storage:
+      enabled: true
+      database: provability_fabric
+      table_prefix: "hot_"
+      retention_days: 7
+      cleanup_schedule: "0 2 * * *"  # Daily at 2 AM
+      
+      # Tables to manage
+      tables:
+        - name: "hot_safety_cases"
+          retention_days: 7
+          compression: "zstd"
+          deduplication: true
+          
+        - name: "hot_audit_logs"
+          retention_days: 7
+          compression: "zstd"
+          deduplication: false
+          
+        - name: "hot_metrics"
+          retention_days: 7
+          compression: "zstd"
+          deduplication: true
+    
+    # Warm Storage Configuration (Object Store)
+    warm_storage:
+      enabled: true
+      provider: "s3"  # or gcs, azure
+      bucket: "provability-fabric-warm"
+      region: "us-west-2"
+      rollup_schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+      
+      # Rollup configuration
+      rollup:
+        format: "parquet"
+        compression: "zstd"
+        partitioning:
+          - field: "date"
+            type: "date"
+            format: "YYYY-MM-DD"
+          - field: "tenant"
+            type: "string"
+          - field: "component"
+            type: "string"
+        
+        # Retention periods for different data types
+        retention:
+          safety_cases: "1 year"
+          audit_logs: "3 years"
+          metrics: "2 years"
+          performance_data: "1 year"
+    
+    # Cold Storage Configuration (BigQuery)
+    cold_storage:
+      enabled: true
+      project: "provability-fabric"
+      dataset: "cold_storage"
+      location: "US"
+      
+      # External table configuration
+      external_tables:
+        - name: "safety_cases_parquet"
+          source_uris: ["gs://provability-fabric-warm/safety_cases/*.parquet"]
+          format: "PARQUET"
+          compression: "ZSTD"
+          
+        - name: "audit_logs_parquet"
+          source_uris: ["gs://provability-fabric-warm/audit_logs/*.parquet"]
+          format: "PARQUET"
+          compression: "ZSTD"
+          
+        - name: "metrics_parquet"
+          source_uris: ["gs://provability-fabric-warm/metrics/*.parquet"]
+          format: "PARQUET"
+          compression: "ZSTD"
+    
+    # Deduplication Configuration
+    deduplication:
+      enabled: true
+      algorithms:
+        - name: "plan_hash"
+          fields: ["plan_hash", "policy_hash", "tenant_id"]
+          method: "exact_match"
+          
+        - name: "content_hash"
+          fields: ["content_hash", "metadata_hash"]
+          method: "exact_match"
+          
+        - name: "semantic_similarity"
+          fields: ["content_embedding"]
+          method: "cosine_similarity"
+          threshold: 0.95
+    
+    # Compression Configuration
+    compression:
+      algorithm: "zstd"
+      level: 6  # Balance between speed and compression
+      dictionary_size: "1MB"
+      
+      # Per-table compression settings
+      tables:
+        safety_cases:
+          algorithm: "zstd"
+          level: 9  # Maximum compression for large data
+          
+        audit_logs:
+          algorithm: "zstd"
+          level: 6  # Balanced compression
+          
+        metrics:
+          algorithm: "zstd"
+          level: 4  # Fast compression for real-time data
+    
+    # Cost Optimization
+    cost_optimization:
+      # Storage class optimization
+      storage_classes:
+        hot: "STANDARD"  # PostgreSQL
+        warm: "STANDARD_IA"  # S3/Infrequent Access
+        cold: "GLACIER"  # S3/Glacier for long-term
+        
+      # Lifecycle policies
+      lifecycle:
+        - name: "hot_to_warm"
+          trigger: "age"
+          days: 7
+          action: "move_to_warm"
+          
+        - name: "warm_to_cold"
+          trigger: "age"
+          days: 30
+          action: "move_to_cold"
+          
+        - name: "cold_to_deep_archive"
+          trigger: "age"
+          days: 365
+          action: "move_to_deep_archive"
+      
+      # Budget controls
+      budget:
+        monthly_storage_budget: "$1000"
+        alert_threshold: 0.8  # Alert at 80% of budget
+        enforcement_threshold: 0.95  # Enforce at 95% of budget
+    
+    # Monitoring and Alerting
+    monitoring:
+      metrics:
+        - name: "storage_size_bytes"
+          type: "gauge"
+          labels: ["storage_tier", "table", "tenant"]
+          
+        - name: "retention_cleanup_duration_seconds"
+          type: "histogram"
+          labels: ["table", "operation"]
+          
+        - name: "deduplication_savings_bytes"
+          type: "counter"
+          labels: ["table", "algorithm"]
+          
+        - name: "compression_ratio"
+          type: "gauge"
+          labels: ["table", "algorithm"]
+      
+      alerts:
+        - name: "storage_budget_exceeded"
+          condition: "storage_cost > monthly_budget * 0.95"
+          severity: "critical"
+          
+        - name: "retention_cleanup_failed"
+          condition: "retention_cleanup_duration > 300"
+          severity: "warning"
+          
+        - name: "deduplication_failed"
+          condition: "deduplication_errors > 0"
+          severity: "warning"
+    
+    # Backup and Recovery
+    backup:
+      enabled: true
+      schedule: "0 1 * * *"  # Daily at 1 AM
+      retention: "30 days"
+      
+      # Backup verification
+      verification:
+        enabled: true
+        schedule: "0 4 * * *"  # Daily at 4 AM
+        restore_test: true
+        integrity_check: true
+    
+    # Compliance and Audit
+    compliance:
+      # Data retention compliance
+      retention_compliance:
+        enabled: true
+        regulations:
+          - "GDPR"
+          - "CCPA"
+          - "SOX"
+          - "HIPAA"
+        
+        # Data subject rights
+        data_subject_rights:
+          - "right_to_access"
+          - "right_to_rectification"
+          - "right_to_erasure"
+          - "right_to_portability"
+      
+      # Audit trail
+      audit_trail:
+        enabled: true
+        events:
+          - "data_access"
+          - "data_modification"
+          - "data_deletion"
+          - "retention_cleanup"
+          - "deduplication"
+        
+        retention: "7 years"
+        storage: "audit_logs"
+    
+    # Performance Optimization
+    performance:
+      # Query optimization
+      query_optimization:
+        enabled: true
+        materialized_views:
+          - name: "safety_cases_summary"
+            query: |
+              SELECT 
+                tenant_id,
+                DATE(created_at) as date,
+                COUNT(*) as total_cases,
+                COUNT(DISTINCT plan_hash) as unique_plans,
+                AVG(compression_ratio) as avg_compression
+              FROM safety_cases
+              GROUP BY tenant_id, DATE(created_at)
+            refresh_schedule: "0 5 * * *"  # Daily at 5 AM
+            
+        - name: "audit_logs_summary"
+          query: |
+            SELECT 
+              tenant_id,
+              DATE(timestamp) as date,
+              action,
+              COUNT(*) as action_count
+            FROM audit_logs
+            GROUP BY tenant_id, DATE(timestamp), action
+          refresh_schedule: "0 5 * * *"  # Daily at 5 AM
+      
+      # Index optimization
+      index_optimization:
+        enabled: true
+        auto_indexing: true
+        index_maintenance: "0 6 * * *"  # Daily at 6 AM
+        
+        # Critical indexes
+        critical_indexes:
+          - table: "safety_cases"
+            columns: ["tenant_id", "created_at", "plan_hash"]
+            type: "btree"
+            
+          - table: "audit_logs"
+            columns: ["tenant_id", "timestamp", "action"]
+            type: "btree"
+            
+          - table: "metrics"
+            columns: ["tenant_id", "timestamp", "metric_name"]
+            type: "btree"
+    
+    # Security
+    security:
+      # Encryption
+      encryption:
+        at_rest: true
+        in_transit: true
+        algorithm: "AES-256"
+        
+      # Access control
+      access_control:
+        enabled: true
+        authentication: "oauth2"
+        authorization: "rbac"
+        
+        # Role-based access
+        roles:
+          - name: "data_analyst"
+            permissions: ["read", "query"]
+            tables: ["safety_cases", "metrics"]
+            
+          - name: "data_engineer"
+            permissions: ["read", "write", "admin"]
+            tables: ["*"]
+            
+          - name: "auditor"
+            permissions: ["read", "query"]
+            tables: ["audit_logs", "safety_cases"]
+      
+      # Data masking
+      data_masking:
+        enabled: true
+        rules:
+          - table: "safety_cases"
+            columns: ["user_id", "email"]
+            method: "hash"
+            
+          - table: "audit_logs"
+            columns: ["ip_address", "user_agent"]
+            method: "partial_mask"
+    
+    # Implementation Notes
+    implementation:
+      # Migration strategy
+      migration:
+        phase: 1
+        steps:
+          - "Deploy retention policies"
+          - "Enable compression and deduplication"
+          - "Migrate existing data to new structure"
+          - "Enable monitoring and alerting"
+          - "Validate cost savings"
+      
+      # Rollback plan
+      rollback:
+        enabled: true
+        triggers:
+          - "data_loss_detected"
+          - "performance_degradation"
+          - "cost_increase"
+        
+        actions:
+          - "restore_from_backup"
+          - "disable_optimizations"
+          - "revert_to_previous_structure"
+      
+      # Success metrics
+      success_metrics:
+        - "storage_cost_reduction_percent"
+        - "query_performance_improvement"
+        - "data_retention_compliance"
+        - "backup_recovery_time"
+        - "deduplication_efficiency"

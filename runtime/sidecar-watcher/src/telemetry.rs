@@ -31,7 +31,7 @@ pub struct TerminateFrame {
 }
 
 pub struct TelemetryClient {
-    client: Option<tonic::transport::Channel>,
+    client: Option<reqwest::Client>,
     attestor_url: String,
     capsule_hash: String,
     assumption_monitor: Arc<Mutex<AssumptionMonitor>>,
@@ -45,8 +45,19 @@ impl TelemetryClient {
         assumption_monitor: Arc<Mutex<AssumptionMonitor>>,
         metrics: Arc<Mutex<HeartbeatMetrics>>,
     ) -> Self {
+        // Create optimized HTTP client with connection pooling
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10) // Optimize for typical load
+            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+            .http2_prior_knowledge() // Force HTTP/2 for better performance
+            .timeout(Duration::from_secs(30)) // Request timeout
+            .connect_timeout(Duration::from_secs(10)) // Connection timeout
+            .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self {
-            client: None,
+            client: Some(client),
             attestor_url,
             capsule_hash,
             assumption_monitor,
@@ -78,6 +89,7 @@ impl TelemetryClient {
     }
 
     async fn send_heartbeat(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let start_time = std::time::Instant::now();
         let metrics = self.metrics.lock().await;
         let assumption_monitor = self.assumption_monitor.lock().await;
         
@@ -94,40 +106,61 @@ impl TelemetryClient {
             },
         };
 
-        // For now, we'll use HTTP since we haven't defined the gRPC proto
-        // In a real implementation, this would be a gRPC stream
-        let client = reqwest::Client::new();
+        // Use the optimized client from the struct
+        let client = self.client.as_ref().expect("Client not initialized");
+        
+        // Record connection reuse metrics
+        let pool_status = client.get_pool_status();
+        gauge!("http_connection_pool_size", pool_status.idle_connections as f64);
+        gauge!("http_connection_pool_available", pool_status.available_connections as f64);
+        
         let response = client
             .post(&format!("{}/heartbeat", self.attestor_url))
             .json(&heartbeat)
             .send()
             .await?;
 
+        let latency = start_time.elapsed();
+        histogram!("http_request_duration_seconds", latency.as_secs_f64());
+        
         if !response.status().is_success() {
+            counter!("http_requests_failed_total", 1);
             return Err(format!("Heartbeat failed: {}", response.status()).into());
         }
 
+        counter!("http_requests_success_total", 1);
+        counter!("heartbeat_sent_total", 1);
+        
         Ok(())
     }
 
     pub async fn send_terminate(&self, reason: String) -> Result<(), Box<dyn std::error::Error>> {
+        let start_time = std::time::Instant::now();
         let terminate = TerminateFrame {
             capsule_hash: self.capsule_hash.clone(),
             timestamp: chrono::Utc::now().timestamp(),
             reason,
         };
 
-        let client = reqwest::Client::new();
+        let client = self.client.as_ref().expect("Client not initialized");
+        
         let response = client
             .post(&format!("{}/terminate", self.attestor_url))
             .json(&terminate)
             .send()
             .await?;
 
+        let latency = start_time.elapsed();
+        histogram!("http_request_duration_seconds", latency.as_secs_f64());
+
         if !response.status().is_success() {
+            counter!("http_requests_failed_total", 1);
             return Err(format!("Terminate failed: {}", response.status()).into());
         }
 
+        counter!("http_requests_success_total", 1);
+        counter!("terminate_sent_total", 1);
+        
         Ok(())
     }
 }

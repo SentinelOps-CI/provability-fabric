@@ -3,6 +3,7 @@
 
 pub mod assumption;
 pub mod broker;
+pub mod queue_manager;
 
 use anyhow::Result;
 use assumption::{Assumption, AssumptionMonitor};

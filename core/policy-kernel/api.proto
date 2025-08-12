@@ -1,0 +1,325 @@
+syntax = "proto3";
+
+package policykernel;
+
+option go_package = "github.com/provability-fabric/core/policy-kernel/proto";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.policykernel";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+// Policy Kernel Service for internal gRPC communication
+service PolicyKernelService {
+  // Verify a plan with fast-path caching
+  rpc VerifyPlan(VerifyPlanRequest) returns (VerifyPlanResponse);
+  
+  // Verify a receipt
+  rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+  
+  // Scan egress content
+  rpc ScanEgress(ScanEgressRequest) returns (ScanEgressResponse);
+  
+  // Get cache statistics
+  rpc GetCacheStats(GetCacheStatsRequest) returns (GetCacheStatsResponse);
+  
+  // Invalidate cache by policy
+  rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Plan verification request
+message VerifyPlanRequest {
+  string plan_id = 1;
+  string tenant = 2;
+  Subject subject = 3;
+  InputChannels input_channels = 4;
+  repeated Step steps = 5;
+  Constraints constraints = 6;
+  string system_prompt_hash = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  string caps_token_id = 9;
+  bool use_cache = 10;
+}
+
+// Plan verification response
+message VerifyPlanResponse {
+  bool valid = 1;
+  string reason = 2;
+  repeated string errors = 3;
+  repeated string warnings = 4;
+  repeated ApprovedStep approved_steps = 5;
+  string pf_signature = 6; // Policy Fast-Path Signature
+  google.protobuf.Timestamp signature_expires_at = 7;
+  bool cache_hit = 8;
+  int64 processing_time_ms = 9;
+}
+
+// Receipt verification request
+message VerifyReceiptRequest {
+  string receipt_id = 1;
+  string tenant = 2;
+  string subject_id = 3;
+  string query_hash = 4;
+  string result_hash = 5;
+  string signature = 6;
+  string signature_algorithm = 7;
+  google.protobuf.Timestamp timestamp = 8;
+}
+
+// Receipt verification response
+message VerifyReceiptResponse {
+  bool valid = 1;
+  string reason = 2;
+  repeated string errors = 3;
+  bool signature_valid = 4;
+  bool timestamp_valid = 5;
+  bool policy_compliant = 6;
+  int64 processing_time_ms = 7;
+}
+
+// Egress scan request
+message ScanEgressRequest {
+  string text = 1;
+  string tenant = 2;
+  string subject_id = 3;
+  string plan_id = 4;
+  map<string, string> context = 5;
+  bool enable_early_exit = 6;
+  int32 max_processing_time_ms = 7;
+}
+
+// Egress scan response
+message ScanEgressResponse {
+  string text = 1;
+  EgressCertificate certificate = 2;
+  repeated string warnings = 3;
+  bool early_exit = 4;
+  string exit_reason = 5;
+  int64 processing_time_ms = 6;
+  DetectorResults detector_results = 7;
+}
+
+// Cache statistics request
+message GetCacheStatsRequest {
+  string tenant = 1;
+}
+
+// Cache statistics response
+message GetCacheStatsResponse {
+  int64 hit_count = 1;
+  int64 miss_count = 2;
+  double hit_rate = 3;
+  int64 total_items = 4;
+  int64 evicted_count = 5;
+  int64 total_requests = 6;
+}
+
+// Cache invalidation request
+message InvalidateCacheRequest {
+  string policy_hash = 1;
+  string tenant = 2;
+  bool invalidate_all = 3;
+}
+
+// Cache invalidation response
+message InvalidateCacheResponse {
+  bool success = 1;
+  int64 invalidated_items = 2;
+  string message = 3;
+}
+
+// Health check request
+message HealthCheckRequest {
+  string service = 1;
+}
+
+// Health check response
+message HealthCheckResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+  map<string, string> metadata = 4;
+}
+
+// Subject information
+message Subject {
+  string id = 1;
+  repeated string caps = 2;
+}
+
+// Input channels
+message InputChannels {
+  SystemChannel system = 1;
+  UserChannel user = 2;
+  repeated RetrievedChannel retrieved = 3;
+  repeated FileChannel file = 4;
+}
+
+// System channel
+message SystemChannel {
+  string hash = 1;
+  string policy_hash = 2;
+}
+
+// User channel
+message UserChannel {
+  string content_hash = 1;
+  bool quoted = 2;
+}
+
+// Retrieved channel
+message RetrievedChannel {
+  string receipt_id = 1;
+  string content_hash = 2;
+  bool quoted = 3;
+  repeated string labels = 4;
+}
+
+// File channel
+message FileChannel {
+  string sha256 = 1;
+  string media_type = 2;
+  bool quoted = 3;
+}
+
+// Plan step
+message Step {
+  string tool = 1;
+  map<string, google.protobuf.Any> args = 2;
+  repeated string caps_required = 3;
+  repeated string labels_in = 4;
+  repeated string labels_out = 5;
+  repeated AccessReceipt receipts = 6;
+}
+
+// Approved step
+message ApprovedStep {
+  int32 step_index = 1;
+  string tool = 2;
+  map<string, google.protobuf.Any> args = 3;
+  repeated AccessReceipt receipts = 4;
+}
+
+// Access receipt
+message AccessReceipt {
+  string receipt_id = 1;
+  string tenant = 2;
+  string subject_id = 3;
+  string query_hash = 4;
+  string index_shard = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  string result_hash = 7;
+  string sign_alg = 8;
+  string sig = 9;
+}
+
+// Constraints
+message Constraints {
+  double budget = 1;
+  bool pii = 2;
+  double dp_epsilon = 3;
+  double dp_delta = 4;
+  double latency_max = 5;
+}
+
+// Egress certificate
+message EgressCertificate {
+  string cert_id = 1;
+  string plan_id = 2;
+  string tenant = 3;
+  DetectorFlags detector_flags = 4;
+  double near_dupe_score = 5;
+  string policy_hash = 6;
+  string text_hash = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  string signer = 9;
+  NonInterferenceVerdict non_interference = 10;
+  repeated string influencing_labels = 11;
+  string attestation_ref = 12;
+}
+
+// Detector flags
+message DetectorFlags {
+  bool pii_detected = 1;
+  bool secrets_detected = 2;
+  bool near_dupe_detected = 3;
+  bool policy_violations = 4;
+}
+
+// Non-interference verdict
+message NonInterferenceVerdict {
+  oneof verdict {
+    bool passed = 1;
+    string failed_reason = 2;
+  }
+}
+
+// Detector results
+message DetectorResults {
+  bool pii_detected = 1;
+  bool secrets_detected = 2;
+  bool near_dupe_detected = 3;
+  repeated string policy_violations = 4;
+  map<string, double> confidence_scores = 5;
+  repeated string critical_hits = 6;
+}
+
+// Error details
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+  map<string, string> metadata = 4;
+}
+
+// Batch verification request for multiple signatures
+message BatchVerifyRequest {
+  repeated VerifyPlanRequest plans = 1;
+  repeated VerifyReceiptRequest receipts = 2;
+  repeated ScanEgressRequest egress_scans = 3;
+  int32 max_batch_size = 4;
+  int32 timeout_ms = 5;
+}
+
+// Batch verification response
+message BatchVerifyResponse {
+  repeated VerifyPlanResponse plan_results = 1;
+  repeated VerifyReceiptResponse receipt_results = 2;
+  repeated ScanEgressResponse egress_results = 3;
+  int64 total_processing_time_ms = 4;
+  int32 successful_verifications = 5;
+  int32 failed_verifications = 6;
+  repeated ErrorDetail errors = 7;
+}
+
+// Metrics and monitoring
+message ServiceMetrics {
+  int64 total_requests = 1;
+  int64 successful_requests = 2;
+  int64 failed_requests = 3;
+  double average_response_time_ms = 4;
+  int64 cache_hits = 5;
+  int64 cache_misses = 6;
+  double cache_hit_rate = 7;
+  map<string, double> detector_performance = 8;
+  google.protobuf.Timestamp timestamp = 9;
+}
+
+// Configuration update request
+message UpdateConfigRequest {
+  string tenant = 1;
+  map<string, string> config_updates = 2;
+  bool restart_required = 3;
+}
+
+// Configuration update response
+message UpdateConfigResponse {
+  bool success = 1;
+  repeated string updated_keys = 2;
+  repeated string failed_keys = 3;
+  string message = 4;
+  bool restart_required = 5;
+}
