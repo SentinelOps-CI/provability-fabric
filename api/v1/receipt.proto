@@ -1,0 +1,665 @@
+syntax = "proto3";
+
+package provability_fabric.api.v1;
+
+option go_package = "github.com/provability-fabric/api/v1;v1";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.api.v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Access Receipt Service for managing and verifying data access receipts
+service AccessReceiptService {
+  // Create a new access receipt
+  rpc CreateReceipt(CreateReceiptRequest) returns (CreateReceiptResponse);
+  
+  // Verify an access receipt
+  rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+  
+  // Revoke an access receipt
+  rpc RevokeReceipt(RevokeReceiptRequest) returns (RevokeReceiptResponse);
+  
+  // Get receipt details
+  rpc GetReceipt(GetReceiptRequest) returns (GetReceiptResponse);
+  
+  // List receipts for a subject
+  rpc ListReceipts(ListReceiptsRequest) returns (ListReceiptsResponse);
+  
+  // Batch verify multiple receipts
+  rpc BatchVerifyReceipts(BatchVerifyReceiptsRequest) returns (BatchVerifyReceiptsResponse);
+  
+  // Get receipt statistics
+  rpc GetReceiptStats(GetReceiptStatsRequest) returns (GetReceiptStatsResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Access receipt for data access operations
+message AccessReceipt {
+  // Unique receipt identifier
+  string receipt_id = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Subject identifier (who accessed the data)
+  string subject_id = 3;
+  
+  // Query hash (SHA-256 of the query)
+  string query_hash = 4;
+  
+  // Index shard identifier (physical partition)
+  string index_shard = 5;
+  
+  // Receipt creation timestamp
+  google.protobuf.Timestamp timestamp = 6;
+  
+  // Result hash (SHA-256 of the result)
+  string result_hash = 7;
+  
+  // Result count (number of items returned)
+  uint32 result_count = 8;
+  
+  // Query execution time in milliseconds
+  uint64 query_time_ms = 9;
+  
+  // Signature algorithm used
+  string sign_alg = 10;
+  
+  // Cryptographic signature
+  string sig = 11;
+  
+  // Receipt expiration timestamp
+  google.protobuf.Timestamp expires_at = 12;
+  
+  // Receipt status
+  ReceiptStatus status = 13;
+  
+  // Access level granted
+  AccessLevel access_level = 14;
+  
+  // Data labels associated with the access
+  repeated string data_labels = 15;
+  
+  // Purpose of access
+  string access_purpose = 16;
+  
+  // Legal basis for access
+  string legal_basis = 17;
+  
+  // Audit trail reference
+  string audit_trail_ref = 18;
+}
+
+// Receipt status
+enum ReceiptStatus {
+  RECEIPT_STATUS_UNSPECIFIED = 0;
+  RECEIPT_STATUS_ACTIVE = 1;
+  RECEIPT_STATUS_EXPIRED = 2;
+  RECEIPT_STATUS_REVOKED = 3;
+  RECEIPT_STATUS_SUSPENDED = 4;
+}
+
+// Access level granted
+enum AccessLevel {
+  ACCESS_LEVEL_UNSPECIFIED = 0;
+  ACCESS_LEVEL_READ = 1;
+  ACCESS_LEVEL_WRITE = 2;
+  ACCESS_LEVEL_DELETE = 3;
+  ACCESS_LEVEL_ADMIN = 4;
+}
+
+// Create receipt request
+message CreateReceiptRequest {
+  // Receipt data
+  AccessReceipt receipt = 1;
+  
+  // Signing key identifier
+  string signing_key_id = 2;
+  
+  // Receipt context
+  ReceiptContext context = 3;
+  
+  // Enable replay protection
+  bool enable_replay_protection = 4;
+  
+  // Custom TTL in seconds (overrides default)
+  uint32 custom_ttl_seconds = 5;
+}
+
+// Receipt context
+message ReceiptContext {
+  // Request timestamp
+  google.protobuf.Timestamp request_time = 1;
+  
+  // Client identifier
+  string client_id = 2;
+  
+  // Session identifier
+  string session_id = 3;
+  
+  // IP address of the request
+  string client_ip = 4;
+  
+  // User agent string
+  string user_agent = 5;
+  
+  // Additional metadata
+  map<string, string> metadata = 6;
+}
+
+// Create receipt response
+message CreateReceiptResponse {
+  // Created receipt
+  AccessReceipt receipt = 1;
+  
+  // Creation success
+  bool success = 2;
+  
+  // Creation message
+  string message = 3;
+  
+  // Receipt signature
+  string signature = 4;
+  
+  // Signature verification URL
+  string verification_url = 5;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 6;
+}
+
+// Verify receipt request
+message VerifyReceiptRequest {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Receipt signature
+  string signature = 2;
+  
+  // Verification context
+  VerificationContext context = 3;
+  
+  // Verification level
+  VerificationLevel level = 4;
+  
+  // Enable replay protection check
+  bool check_replay_protection = 5;
+}
+
+// Verification context
+message VerificationContext {
+  // Verification timestamp
+  google.protobuf.Timestamp verification_time = 1;
+  
+  // Verifier identifier
+  string verifier_id = 2;
+  
+  // Verification purpose
+  string purpose = 3;
+  
+  // Additional context
+  map<string, string> metadata = 4;
+}
+
+// Verification level
+enum VerificationLevel {
+  VERIFICATION_LEVEL_UNSPECIFIED = 0;
+  VERIFICATION_LEVEL_BASIC = 1;
+  VERIFICATION_LEVEL_STRICT = 2;
+  VERIFICATION_LEVEL_CRITICAL = 3;
+}
+
+// Verify receipt response
+message VerifyReceiptResponse {
+  // Verification result
+  bool valid = 1;
+  
+  // Verification reason
+  string reason = 2;
+  
+  // Verification errors
+  repeated string errors = 3;
+  
+  // Signature validity
+  bool signature_valid = 4;
+  
+  // Timestamp validity
+  bool timestamp_valid = 5;
+  
+  // Expiration validity
+  bool expiration_valid = 6;
+  
+  // Replay protection status
+  bool replay_protection_valid = 7;
+  
+  // Policy compliance
+  bool policy_compliant = 8;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 9;
+  
+  // Verification score (0.0 to 1.0)
+  float score = 10;
+  
+  // Receipt details (if valid)
+  AccessReceipt receipt = 11;
+}
+
+// Revoke receipt request
+message RevokeReceiptRequest {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Revocation reason
+  string reason = 2;
+  
+  // Revocation timestamp
+  google.protobuf.Timestamp revoked_at = 3;
+  
+  // Revoker identifier
+  string revoker_id = 4;
+  
+  // Force revocation (bypass checks)
+  bool force = 5;
+}
+
+// Revoke receipt response
+message RevokeReceiptResponse {
+  // Revocation success
+  bool success = 1;
+  
+  // Revocation message
+  string message = 2;
+  
+  // Revoked receipt
+  AccessReceipt receipt = 3;
+  
+  // Revocation timestamp
+  google.protobuf.Timestamp revoked_at = 4;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 5;
+}
+
+// Get receipt request
+message GetReceiptRequest {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Include revoked receipts
+  bool include_revoked = 2;
+  
+  // Include expired receipts
+  bool include_expired = 3;
+}
+
+// Get receipt response
+message GetReceiptResponse {
+  // Receipt details
+  AccessReceipt receipt = 1;
+  
+  // Receipt found
+  bool found = 2;
+  
+  // Error message if not found
+  string error_message = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+}
+
+// List receipts request
+message ListReceiptsRequest {
+  // Subject identifier filter
+  string subject_id = 1;
+  
+  // Tenant identifier filter
+  string tenant = 2;
+  
+  // Status filter
+  ReceiptStatus status = 3;
+  
+  // Access level filter
+  AccessLevel access_level = 4;
+  
+  // Time range filter
+  TimeRange time_range = 5;
+  
+  // Pagination
+  Pagination pagination = 6;
+  
+  // Sort order
+  SortOrder sort_order = 7;
+}
+
+// Time range
+message TimeRange {
+  // Start timestamp
+  google.protobuf.Timestamp start_time = 1;
+  
+  // End timestamp
+  google.protobuf.Timestamp end_time = 2;
+}
+
+// Pagination
+message Pagination {
+  // Page number (1-based)
+  uint32 page = 1;
+  
+  // Page size
+  uint32 page_size = 2;
+  
+  // Maximum page size
+  uint32 max_page_size = 3;
+}
+
+// Sort order
+message SortOrder {
+  // Sort field
+  string field = 1;
+  
+  // Sort direction
+  SortDirection direction = 2;
+}
+
+// Sort direction
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_DIRECTION_ASC = 1;
+  SORT_DIRECTION_DESC = 2;
+}
+
+// List receipts response
+message ListReceiptsResponse {
+  // Receipts list
+  repeated AccessReceipt receipts = 1;
+  
+  // Pagination info
+  PaginationInfo pagination_info = 2;
+  
+  // Total count
+  uint64 total_count = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+}
+
+// Pagination info
+message PaginationInfo {
+  // Current page
+  uint32 current_page = 1;
+  
+  // Page size
+  uint32 page_size = 2;
+  
+  // Total pages
+  uint32 total_pages = 3;
+  
+  // Has next page
+  bool has_next = 4;
+  
+  // Has previous page
+  bool has_previous = 5;
+}
+
+// Batch verify receipts request
+message BatchVerifyReceiptsRequest {
+  // Receipts to verify
+  repeated ReceiptVerificationRequest receipts = 1;
+  
+  // Batch configuration
+  BatchConfig config = 2;
+  
+  // Verification context
+  VerificationContext context = 3;
+}
+
+// Receipt verification request
+message ReceiptVerificationRequest {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Receipt signature
+  string signature = 2;
+  
+  // Verification level
+  VerificationLevel level = 3;
+}
+
+// Batch configuration
+message BatchConfig {
+  // Maximum batch size
+  uint32 max_batch_size = 1;
+  
+  // Timeout in milliseconds
+  uint32 timeout_ms = 2;
+  
+  // Enable parallel processing
+  bool enable_parallel = 3;
+  
+  // Maximum concurrent verifications
+  uint32 max_concurrent = 4;
+}
+
+// Batch verify receipts response
+message BatchVerifyReceiptsResponse {
+  // Verification results
+  repeated ReceiptVerificationResult results = 1;
+  
+  // Batch statistics
+  BatchStats stats = 2;
+  
+  // Total processing time in milliseconds
+  uint64 total_processing_time_ms = 3;
+  
+  // Successful verifications
+  uint32 successful_verifications = 4;
+  
+  // Failed verifications
+  uint32 failed_verifications = 5;
+  
+  // Batch errors
+  repeated string errors = 6;
+}
+
+// Receipt verification result
+message ReceiptVerificationResult {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Verification result
+  VerifyReceiptResponse result = 2;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 3;
+}
+
+// Batch statistics
+message BatchStats {
+  // Total receipts processed
+  uint32 total_receipts = 1;
+  
+  // Valid receipts
+  uint32 valid_receipts = 2;
+  
+  // Invalid receipts
+  uint32 invalid_receipts = 3;
+  
+  // Average processing time in milliseconds
+  uint64 avg_processing_time_ms = 4;
+  
+  // Verification success rate (0.0 to 1.0)
+  float success_rate = 5;
+}
+
+// Get receipt statistics request
+message GetReceiptStatsRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Statistics scope
+  StatsScope scope = 2;
+  
+  // Time range
+  TimeRange time_range = 3;
+  
+  // Group by field
+  string group_by = 4;
+}
+
+// Statistics scope
+enum StatsScope {
+  STATS_SCOPE_UNSPECIFIED = 0;
+  STATS_SCOPE_TENANT = 1;
+  STATS_SCOPE_GLOBAL = 2;
+  STATS_SCOPE_SUBJECT = 3;
+  STATS_SCOPE_SHARD = 4;
+}
+
+// Get receipt statistics response
+message GetReceiptStatsResponse {
+  // Receipt statistics
+  ReceiptStatistics statistics = 1;
+  
+  // Time series data
+  repeated TimeSeriesPoint time_series = 2;
+  
+  // Grouped statistics
+  repeated GroupedStatistics grouped_stats = 3;
+  
+  // Statistics timestamp
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Receipt statistics
+message ReceiptStatistics {
+  // Total receipts
+  uint64 total_receipts = 1;
+  
+  // Active receipts
+  uint64 active_receipts = 2;
+  
+  // Expired receipts
+  uint64 expired_receipts = 3;
+  
+  // Revoked receipts
+  uint64 revoked_receipts = 4;
+  
+  // Suspended receipts
+  uint64 suspended_receipts = 5;
+  
+  // Average receipt lifetime in seconds
+  uint64 avg_lifetime_seconds = 6;
+  
+  // Total access operations
+  uint64 total_access_operations = 7;
+  
+  // Unique subjects
+  uint64 unique_subjects = 8;
+  
+  // Unique shards accessed
+  uint64 unique_shards = 9;
+}
+
+// Time series point
+message TimeSeriesPoint {
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 1;
+  
+  // Value
+  double value = 2;
+  
+  // Metric name
+  string metric = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Grouped statistics
+message GroupedStatistics {
+  // Group key
+  string group_key = 1;
+  
+  // Group value
+  string group_value = 2;
+  
+  // Statistics for this group
+  ReceiptStatistics statistics = 3;
+}
+
+// Health check request
+message HealthCheckRequest {
+  // Service identifier
+  string service = 1;
+  
+  // Health check level
+  HealthCheckLevel level = 2;
+}
+
+// Health check level
+enum HealthCheckLevel {
+  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
+  HEALTH_CHECK_LEVEL_BASIC = 1;
+  HEALTH_CHECK_LEVEL_DETAILED = 2;
+  HEALTH_CHECK_LEVEL_CRITICAL = 3;
+}
+
+// Health check response
+message HealthCheckResponse {
+  // Service status
+  ServiceStatus status = 1;
+  
+  // Service version
+  string version = 2;
+  
+  // Uptime in seconds
+  uint64 uptime_seconds = 3;
+  
+  // Service metadata
+  map<string, string> metadata = 4;
+  
+  // Health check details
+  repeated HealthCheckDetail details = 5;
+  
+  // Last health check timestamp
+  google.protobuf.Timestamp last_check = 6;
+}
+
+// Service status
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_HEALTHY = 1;
+  SERVICE_STATUS_DEGRADED = 2;
+  SERVICE_STATUS_UNHEALTHY = 3;
+  SERVICE_STATUS_UNKNOWN = 4;
+}
+
+// Health check detail
+message HealthCheckDetail {
+  // Component name
+  string component = 1;
+  
+  // Component status
+  ComponentStatus status = 2;
+  
+  // Component message
+  string message = 3;
+  
+  // Component metrics
+  map<string, string> metrics = 4;
+  
+  // Last check timestamp
+  google.protobuf.Timestamp last_check = 5;
+}
+
+// Component status
+enum ComponentStatus {
+  COMPONENT_STATUS_UNSPECIFIED = 0;
+  COMPONENT_STATUS_HEALTHY = 1;
+  COMPONENT_STATUS_DEGRADED = 2;
+  COMPONENT_STATUS_UNHEALTHY = 3;
+  COMPONENT_STATUS_UNKNOWN = 4;
+}

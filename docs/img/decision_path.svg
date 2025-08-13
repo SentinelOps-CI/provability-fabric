@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; fill: #2c3e50; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; fill: #34495e; }
+      .label { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #2c3e50; }
+      .text { font-family: Arial, sans-serif; font-size: 12px; fill: #34495e; }
+      .box { fill: #ecf0f1; stroke: #bdc3c7; stroke-width: 2; rx: 8; }
+      .decision { fill: #f39c12; stroke: #e67e22; stroke-width: 2; rx: 8; }
+      .service { fill: #3498db; stroke: #2980b9; stroke-width: 2; rx: 8; }
+      .security { fill: #e74c3c; stroke: #c0392b; stroke-width: 2; rx: 8; }
+      .arrow { stroke: #2c3e50; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .arrowhead { fill: #2c3e50; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" class="title">Provability Fabric Decision Path</text>
+  
+  <!-- Start: Observe -->
+  <rect x="50" y="80" width="120" height="60" class="box" />
+  <text x="110" y="105" text-anchor="middle" class="label">Observe</text>
+  <text x="110" y="120" text-anchor="middle" class="text">Data Access</text>
+  <text x="110" y="135" text-anchor="middle" class="text">Request</text>
+  
+  <!-- Decision 1: Authentication -->
+  <rect x="250" y="80" width="120" height="60" class="decision" />
+  <text x="310" y="105" text-anchor="middle" class="label">Authenticate</text>
+  <text x="310" y="120" text-anchor="middle" class="text">User/Service</text>
+  <text x="310" y="135" text-anchor="middle" class="text">Identity</text>
+  
+  <!-- Decision 2: Authorization -->
+  <rect x="450" y="80" width="120" height="60" class="decision" />
+  <text x="510" y="105" text-anchor="middle" class="label">Authorize</text>
+  <text x="510" y="120" text-anchor="middle" class="text">Capabilities</text>
+  <text x="510" y="135" text-anchor="middle" class="text">Check</text>
+  
+  <!-- Retrieve: Receipt Service -->
+  <rect x="650" y="80" width="120" height="60" class="service" />
+  <text x="710" y="105" text-anchor="middle" class="label">Receipt</text>
+  <text x="710" y="120" text-anchor="middle" class="text">Service</text>
+  <text x="710" y="135" text-anchor="middle" class="text">Validation</text>
+  
+  <!-- Plan Creation -->
+  <rect x="850" y="80" width="120" height="60" class="box" />
+  <text x="910" y="105" text-anchor="middle" class="label">Plan</text>
+  <text x="910" y="120" text-anchor="middle" class="text">Creation</text>
+  <text x="910" y="135" text-anchor="middle" class="text">&amp; Validation</text>
+  
+  <!-- Policy Kernel -->
+  <rect x="450" y="200" width="120" height="60" class="security" />
+  <text x="510" y="225" text-anchor="middle" class="label">Policy</text>
+  <text x="510" y="240" text-anchor="middle" class="text">Kernel</text>
+  <text x="510" y="255" text-anchor="middle" class="text">Enforcement</text>
+  
+  <!-- Tool Broker -->
+  <rect x="650" y="200" width="120" height="60" class="service" />
+  <text x="710" y="225" text-anchor="middle" class="label">Tool</text>
+  <text x="710" y="240" text-anchor="middle" class="text">Broker</text>
+  <text x="710" y="255" text-anchor="middle" class="text">Execution</text>
+  
+  <!-- Egress Firewall -->
+  <rect x="850" y="200" width="120" height="60" class="security" />
+  <text x="910" y="225" text-anchor="middle" class="label">Egress</text>
+  <text x="910" y="240" text-anchor="middle" class="text">Firewall</text>
+  <text x="910" y="255" text-anchor="middle" class="text">Content Scan</text>
+  
+  <!-- Safety Case -->
+  <rect x="1050" y="200" width="120" height="60" class="box" />
+  <text x="1110" y="225" text-anchor="middle" class="label">Safety</text>
+  <text x="1110" y="240" text-anchor="middle" class="text">Case</text>
+  <text x="1110" y="255" text-anchor="middle" class="text">Validation</text>
+  
+  <!-- Attestation Service -->
+  <rect x="250" y="320" width="120" height="60" class="security" />
+  <text x="310" y="345" text-anchor="middle" class="label">Attestation</text>
+  <text x="310" y="360" text-anchor="middle" class="text">Service</text>
+  <text x="310" y="375" text-anchor="middle" class="text">Enclave Verify</text>
+  
+  <!-- KMS Binding -->
+  <rect x="450" y="320" width="120" height="60" class="security" />
+  <text x="510" y="345" text-anchor="middle" class="label">KMS</text>
+  <text x="510" y="360" text-anchor="middle" class="text">Binding</text>
+  <text x="510" y="375" text-anchor="middle" class="text">Key Release</text>
+  
+  <!-- Final Decision -->
+  <rect x="650" y="320" width="120" height="60" class="decision" />
+  <text x="710" y="345" text-anchor="middle" class="label">Final</text>
+  <text x="710" y="360" text-anchor="middle" class="text">Decision</text>
+  <text x="710" y="375" text-anchor="middle" class="text">Allow/Deny</text>
+  
+  <!-- Arrows -->
+  <!-- Observe -> Authenticate -->
+  <line x1="170" y1="110" x2="250" y2="110" class="arrow" />
+  
+  <!-- Authenticate -> Authorize -->
+  <line x1="370" y1="110" x2="450" y2="110" class="arrow" />
+  
+  <!-- Authorize -> Receipt -->
+  <line x1="570" y1="110" x2="650" y2="110" class="arrow" />
+  
+  <!-- Receipt -> Plan -->
+  <line x1="770" y1="110" x2="850" y2="110" class="arrow" />
+  
+  <!-- Plan -> Policy Kernel -->
+  <line x1="910" y1="140" x2="510" y2="200" class="arrow" />
+  
+  <!-- Policy Kernel -> Tool Broker -->
+  <line x1="570" y1="230" x2="650" y2="230" class="arrow" />
+  
+  <!-- Tool Broker -> Egress Firewall -->
+  <line x1="770" y1="230" x2="850" y2="230" class="arrow" />
+  
+  <!-- Egress Firewall -> Safety Case -->
+  <line x1="970" y1="230" x2="1050" y2="230" class="arrow" />
+  
+  <!-- Safety Case -> Attestation -->
+  <line x1="1050" y1="260" x2="310" y2="320" class="arrow" />
+  
+  <!-- Attestation -> KMS -->
+  <line x1="370" y1="350" x2="450" y2="350" class="arrow" />
+  
+  <!-- KMS -> Final Decision -->
+  <line x1="570" y1="350" x2="650" y2="350" class="arrow" />
+  
+  <!-- Decision outcomes -->
+  <text x="710" y="420" text-anchor="middle" class="subtitle">Decision Outcomes</text>
+  
+  <!-- Allow path -->
+  <rect x="600" y="440" width="80" height="40" class="box" />
+  <text x="640" y="465" text-anchor="middle" class="label">ALLOW</text>
+  <line x1="710" y1="380" x2="640" y2="440" class="arrow" />
+  
+  <!-- Deny path -->
+  <rect x="760" y="440" width="80" height="40" class="box" />
+  <text x="800" y="465" text-anchor="middle" class="label">DENY</text>
+  <line x1="710" y1="380" x2="800" y2="440" class="arrow" />
+  
+  <!-- Require Approval path -->
+  <rect x="680" y="500" width="100" height="40" class="box" />
+  <text x="730" y="525" text-anchor="middle" class="label">APPROVAL</text>
+  <text x="730" y="540" text-anchor="middle" class="text">REQUIRED</text>
+  <line x1="710" y1="380" x2="730" y2="500" class="arrow" />
+  
+  <!-- Legend -->
+  <rect x="50" y="600" width="200" height="120" class="box" />
+  <text x="150" y="625" text-anchor="middle" class="subtitle">Legend</text>
+  
+  <rect x="70" y="640" width="20" height="20" class="box" />
+  <text x="100" y="655" text-anchor="start" class="text">Process Step</text>
+  
+  <rect x="70" y="665" width="20" height="20" class="decision" />
+  <text x="100" y="680" text-anchor="start" class="text">Decision Point</text>
+  
+  <rect x="70" y="690" width="20" height="20" class="service" />
+  <text x="100" y="705" text-anchor="start" class="text">Service Component</text>
+  
+  <rect x="70" y="715" width="20" height="20" class="security" />
+  <text x="100" y="730" text-anchor="start" class="text">Security Control</text>
+  
+  <!-- Non-interference statement -->
+  <rect x="300" y="600" width="400" height="120" class="box" />
+  <text x="500" y="625" text-anchor="middle" class="subtitle">Non-Interference Guarantee</text>
+  <text x="500" y="650" text-anchor="middle" class="text">The system ensures that high-security-level</text>
+  <text x="500" y="665" text-anchor="middle" class="text">operations cannot interfere with or be</text>
+  <text x="500" y="680" text-anchor="middle" class="text">influenced by low-security-level operations.</text>
+  <text x="500" y="695" text-anchor="middle" class="text">This is enforced through cryptographic</text>
+  <text x="500" y="710" text-anchor="middle" class="text">isolation and capability-based access control.</text>
+  
+  <!-- Certificate example -->
+  <rect x="750" y="600" width="400" height="120" class="box" />
+  <text x="950" y="625" text-anchor="middle" class="subtitle">Certificate JSON Example</text>
+  <text x="950" y="645" text-anchor="middle" class="text">{</text>
+  <text x="950" y="660" text-anchor="middle" class="text">  "type": "egress_certificate",</text>
+  <text x="950" y="675" text-anchor="middle" class="text">  "version": "1.0",</text>
+  <text x="950" y="690" text-anchor="middle" class="text">  "content_hash": "sha256:...",</text>
+  <text x="950" y="705" text-anchor="middle" class="text">  "policy_verdict": "ALLOW",</text>
+  <text x="950" y="720" text-anchor="middle" class="text">  "timestamp": "2025-01-27T..."</text>
+  <text x="950" y="735" text-anchor="middle" class="text">}</text>
+</svg>

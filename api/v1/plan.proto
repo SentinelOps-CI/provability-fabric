@@ -1,0 +1,422 @@
+syntax = "proto3";
+
+package provability_fabric.api.v1;
+
+option go_package = "github.com/provability-fabric/api/v1;v1";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.api.v1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+// Plan represents a typed plan with capabilities and constraints
+message Plan {
+  // Unique identifier for the plan
+  string plan_id = 1;
+  
+  // Tenant identifier for multi-tenancy
+  string tenant = 2;
+  
+  // Subject executing the plan
+  Subject subject = 3;
+  
+  // Input channels classification
+  InputChannels input_channels = 4;
+  
+  // Plan execution steps
+  repeated Step steps = 5;
+  
+  // Plan-level constraints
+  Constraints constraints = 6;
+  
+  // Hash of system prompt (immutable)
+  string system_prompt_hash = 7;
+  
+  // Plan creation timestamp
+  google.protobuf.Timestamp created_at = 8;
+  
+  // Plan expiration timestamp
+  google.protobuf.Timestamp expires_at = 9;
+  
+  // Version of the plan schema
+  string schema_version = 10;
+  
+  // Policy hash for validation
+  string policy_hash = 11;
+}
+
+// Subject represents the entity executing the plan
+message Subject {
+  // Unique subject identifier
+  string id = 1;
+  
+  // Capabilities possessed by the subject
+  repeated string caps = 2;
+  
+  // Subject type (user, service, agent)
+  SubjectType subject_type = 3;
+  
+  // Authentication context
+  AuthContext auth_context = 4;
+}
+
+// Subject type enumeration
+enum SubjectType {
+  SUBJECT_TYPE_UNSPECIFIED = 0;
+  SUBJECT_TYPE_USER = 1;
+  SUBJECT_TYPE_SERVICE = 2;
+  SUBJECT_TYPE_AGENT = 3;
+  SUBJECT_TYPE_SYSTEM = 4;
+}
+
+// Authentication context
+message AuthContext {
+  // Authentication method used
+  string auth_method = 1;
+  
+  // Authentication timestamp
+  google.protobuf.Timestamp auth_time = 2;
+  
+  // Session identifier
+  string session_id = 3;
+  
+  // Multi-factor authentication status
+  bool mfa_completed = 4;
+}
+
+// Input channels classification
+message InputChannels {
+  // Trusted system input (immutable)
+  SystemChannel system = 1;
+  
+  // Untrusted user input (must be quoted)
+  UserChannel user = 2;
+  
+  // Untrusted retrieved content (must have receipts)
+  repeated RetrievedChannel retrieved = 3;
+  
+  // Untrusted file content (must be quoted)
+  repeated FileChannel file = 4;
+}
+
+// System channel (trusted)
+message SystemChannel {
+  // Hash of system prompt
+  string hash = 1;
+  
+  // Hash of policy configuration
+  string policy_hash = 2;
+  
+  // System version
+  string version = 3;
+  
+  // Build identifier
+  string build_id = 4;
+}
+
+// User channel (untrusted)
+message UserChannel {
+  // Hash of user content
+  string content_hash = 1;
+  
+  // Must be true for untrusted input
+  bool quoted = 2;
+  
+  // User input type
+  UserInputType input_type = 3;
+  
+  // Content language (ISO 639-1)
+  string language = 4;
+}
+
+// User input type
+enum UserInputType {
+  USER_INPUT_TYPE_UNSPECIFIED = 0;
+  USER_INPUT_TYPE_TEXT = 1;
+  USER_INPUT_TYPE_IMAGE = 2;
+  USER_INPUT_TYPE_AUDIO = 3;
+  USER_INPUT_TYPE_VIDEO = 4;
+  USER_INPUT_TYPE_FILE = 5;
+}
+
+// Retrieved channel (untrusted)
+message RetrievedChannel {
+  // Access receipt identifier
+  string receipt_id = 1;
+  
+  // Hash of retrieved content
+  string content_hash = 2;
+  
+  // Must be true for untrusted content
+  bool quoted = 3;
+  
+  // Labels associated with content
+  repeated string labels = 4;
+  
+  // Source identifier
+  string source_id = 5;
+  
+  // Retrieval timestamp
+  google.protobuf.Timestamp retrieved_at = 6;
+}
+
+// File channel (untrusted)
+message FileChannel {
+  // SHA-256 hash of file content
+  string sha256 = 1;
+  
+  // MIME type of file
+  string media_type = 2;
+  
+  // Must be true for untrusted content
+  bool quoted = 3;
+  
+  // File size in bytes
+  uint64 size_bytes = 4;
+  
+  // File name
+  string filename = 5;
+}
+
+// Plan execution step
+message Step {
+  // Tool identifier
+  string tool = 1;
+  
+  // Tool arguments (JSON-encoded)
+  map<string, google.protobuf.Any> args = 2;
+  
+  // Required capabilities for this step
+  repeated string caps_required = 3;
+  
+  // Input labels required
+  repeated string labels_in = 4;
+  
+  // Output labels produced
+  repeated string labels_out = 5;
+  
+  // Access receipts for data access
+  repeated AccessReceipt receipts = 6;
+  
+  // Step timeout in milliseconds
+  uint32 timeout_ms = 7;
+  
+  // Retry configuration
+  RetryConfig retry_config = 8;
+}
+
+// Retry configuration
+message RetryConfig {
+  // Maximum retry attempts
+  uint32 max_attempts = 1;
+  
+  // Base delay between retries (ms)
+  uint32 base_delay_ms = 2;
+  
+  // Maximum delay between retries (ms)
+  uint32 max_delay_ms = 3;
+  
+  // Backoff multiplier
+  float backoff_multiplier = 4;
+}
+
+// Access receipt for data access
+message AccessReceipt {
+  // Unique receipt identifier
+  string receipt_id = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Subject identifier
+  string subject_id = 3;
+  
+  // Hash of query
+  string query_hash = 4;
+  
+  // Index shard identifier
+  string index_shard = 5;
+  
+  // Receipt timestamp
+  google.protobuf.Timestamp timestamp = 6;
+  
+  // Hash of result
+  string result_hash = 6;
+  
+  // Signature algorithm
+  string sign_alg = 7;
+  
+  // Cryptographic signature
+  string sig = 8;
+  
+  // Receipt expiration
+  google.protobuf.Timestamp expires_at = 9;
+}
+
+// Plan constraints
+message Constraints {
+  // Budget limit in USD
+  double budget = 1;
+  
+  // PII handling flag
+  bool pii = 2;
+  
+  // Differential privacy epsilon
+  double dp_epsilon = 3;
+  
+  // Differential privacy delta
+  double dp_delta = 4;
+  
+  // Maximum latency in milliseconds
+  double latency_max = 5;
+  
+  // Maximum memory usage in MB
+  uint64 memory_max_mb = 6;
+  
+  // Maximum CPU usage in cores
+  float cpu_max_cores = 7;
+  
+  // Network bandwidth limit in MB/s
+  double network_max_mbps = 8;
+}
+
+// Plan validation request
+message ValidatePlanRequest {
+  // Plan to validate
+  Plan plan = 1;
+  
+  // Validation context
+  ValidationContext context = 2;
+  
+  // Enable caching for validation
+  bool enable_cache = 3;
+  
+  // Cache TTL in seconds
+  uint32 cache_ttl_seconds = 4;
+}
+
+// Validation context
+message ValidationContext {
+  // Request timestamp
+  google.protobuf.Timestamp request_time = 1;
+  
+  // Client identifier
+  string client_id = 2;
+  
+  // Request priority
+  RequestPriority priority = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Request priority
+enum RequestPriority {
+  REQUEST_PRIORITY_UNSPECIFIED = 0;
+  REQUEST_PRIORITY_LOW = 1;
+  REQUEST_PRIORITY_NORMAL = 2;
+  REQUEST_PRIORITY_HIGH = 3;
+  REQUEST_PRIORITY_CRITICAL = 4;
+}
+
+// Plan validation response
+message ValidatePlanResponse {
+  // Validation result
+  ValidationResult result = 1;
+  
+  // Approved steps for execution
+  repeated ApprovedStep approved_steps = 2;
+  
+  // Validation warnings
+  repeated string warnings = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+  
+  // Cache hit indicator
+  bool cache_hit = 5;
+  
+  // Policy signature
+  string policy_signature = 6;
+  
+  // Signature expiration
+  google.protobuf.Timestamp signature_expires_at = 7;
+}
+
+// Validation result
+message ValidationResult {
+  // Overall validation status
+  bool valid = 1;
+  
+  // Validation reason
+  string reason = 2;
+  
+  // Validation errors
+  repeated ValidationError errors = 3;
+  
+  // Validation score (0.0 to 1.0)
+  float score = 4;
+}
+
+// Validation error
+message ValidationError {
+  // Error code
+  string code = 1;
+  
+  // Error message
+  string message = 2;
+  
+  // Field path
+  string field_path = 3;
+  
+  // Error severity
+  ErrorSeverity severity = 4;
+  
+  // Additional context
+  map<string, string> context = 5;
+}
+
+// Error severity
+enum ErrorSeverity {
+  ERROR_SEVERITY_UNSPECIFIED = 0;
+  ERROR_SEVERITY_LOW = 1;
+  ERROR_SEVERITY_MEDIUM = 2;
+  ERROR_SEVERITY_HIGH = 3;
+  ERROR_SEVERITY_CRITICAL = 4;
+}
+
+// Approved step for execution
+message ApprovedStep {
+  // Step index in original plan
+  uint32 step_index = 1;
+  
+  // Tool identifier
+  string tool = 2;
+  
+  // Tool arguments
+  map<string, google.protobuf.Any> args = 3;
+  
+  // Required access receipts
+  repeated AccessReceipt receipts = 4;
+  
+  // Execution constraints
+  StepConstraints constraints = 5;
+  
+  // Approval timestamp
+  google.protobuf.Timestamp approved_at = 6;
+}
+
+// Step execution constraints
+message StepConstraints {
+  // Maximum execution time in milliseconds
+  uint32 max_execution_time_ms = 1;
+  
+  // Maximum memory usage in MB
+  uint64 max_memory_mb = 2;
+  
+  // Maximum CPU usage in cores
+  float max_cpu_cores = 3;
+  
+  // Network bandwidth limit in MB/s
+  double max_network_mbps = 4;
+}

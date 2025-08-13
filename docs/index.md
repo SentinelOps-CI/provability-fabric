@@ -35,14 +35,34 @@ flowchart TD
     C --> O[Transparency Ledger]
     O --> P[GraphQL API]
 
+    %% New PF-CORE Components
+    Q[Attestation Service] --> R[Enclave Verification]
+    R --> S[KMS Binding]
+    S --> T[Key Release]
+
+    U[Client SDKs] --> V[Middleware Layer]
+    V --> W[Circuit Breaker]
+    W --> X[Retry Logic]
+
+    Y[Cross-repo Testing] --> Z[Release Validation]
+    Z --> AA[Quality Gates]
+
+    BB[Performance Benchmarks] --> CC[WASM Pool]
+    CC --> DD[Batch Crypto]
+
     style A fill:#e1f5fe
     style C fill:#f3e5f5
     style F fill:#fff3e0
     style O fill:#e8f5e8
+    style Q fill:#ffebee
+    style U fill:#e3f2fd
+    style Y fill:#f1f8e9
+    style BB fill:#fff8e1
 ```
 
 ## Quick Start
 
+### Core Services
 ```bash
 # Initialize a new agent specification
 pf init my-agent
@@ -52,6 +72,30 @@ lake build
 
 # Deploy with runtime monitoring
 kubectl apply -f deployment.yaml
+```
+
+### Client SDKs
+```bash
+# TypeScript/Node.js
+npm install @provability-fabric/core-sdk-typescript
+
+# Go
+go get github.com/provability-fabric/core/sdk/go
+
+# Rust
+cargo add provability-fabric-core-sdk-rust
+```
+
+### Performance Testing
+```bash
+# Run performance benchmarks
+cargo bench
+
+# WASM worker pool testing
+cargo test --package wasm-sandbox
+
+# Batch signature verification
+cargo test --package crypto
 ```
 
 ## License

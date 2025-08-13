@@ -1,0 +1,1097 @@
+syntax = "proto3";
+
+package provability_fabric.api.v1;
+
+option go_package = "github.com/provability-fabric/api/v1;v1";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.api.v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Egress Firewall Service for content scanning and certificate generation
+service EgressFirewallService {
+  // Scan content for policy violations
+  rpc ScanContent(ScanContentRequest) returns (ScanContentResponse);
+  
+  // Generate egress certificate
+  rpc GenerateCertificate(GenerateCertificateRequest) returns (GenerateCertificateResponse);
+  
+  // Verify egress certificate
+  rpc VerifyCertificate(VerifyCertificateRequest) returns (VerifyCertificateResponse);
+  
+  // Batch scan multiple content items
+  rpc BatchScanContent(BatchScanContentRequest) returns (BatchScanContentResponse);
+  
+  // Get firewall configuration
+  rpc GetFirewallConfig(GetFirewallConfigRequest) returns (GetFirewallConfigResponse);
+  
+  // Update firewall configuration
+  rpc UpdateFirewallConfig(UpdateFirewallConfigRequest) returns (UpdateFirewallConfigResponse);
+  
+  // Get firewall statistics
+  rpc GetFirewallStats(GetFirewallStatsRequest) returns (GetFirewallStatsResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Content scan request
+message ScanContentRequest {
+  // Content to scan
+  string text = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Subject identifier
+  string subject_id = 3;
+  
+  // Plan identifier
+  string plan_id = 4;
+  
+  // Scan context
+  map<string, string> context = 5;
+  
+  // Enable early exit for performance
+  bool enable_early_exit = 6;
+  
+  // Maximum processing time in milliseconds
+  uint32 max_processing_time_ms = 7;
+  
+  // Scan priority
+  ScanPriority priority = 8;
+  
+  // Enable caching
+  bool enable_cache = 9;
+  
+  // Custom detector configuration
+  DetectorConfig detector_config = 10;
+}
+
+// Scan priority
+enum ScanPriority {
+  SCAN_PRIORITY_UNSPECIFIED = 0;
+  SCAN_PRIORITY_LOW = 1;
+  SCAN_PRIORITY_NORMAL = 2;
+  SCAN_PRIORITY_HIGH = 3;
+  SCAN_PRIORITY_CRITICAL = 4;
+}
+
+// Detector configuration
+message DetectorConfig {
+  // Enable PII detection
+  bool enable_pii_detection = 1;
+  
+  // Enable secrets detection
+  bool enable_secrets_detection = 2;
+  
+  // Enable near-duplicate detection
+  bool enable_near_dupe_detection = 3;
+  
+  // Enable policy violation detection
+  bool enable_policy_violation_detection = 4;
+  
+  // Custom PII patterns
+  repeated string custom_pii_patterns = 5;
+  
+  // Custom secret patterns
+  repeated string custom_secret_patterns = 6;
+  
+  // Detection thresholds
+  map<string, double> detection_thresholds = 7;
+}
+
+// Content scan response
+message ScanContentResponse {
+  // Scanned text
+  string text = 1;
+  
+  // Egress certificate
+  EgressCertificate certificate = 2;
+  
+  // Scan warnings
+  repeated string warnings = 3;
+  
+  // Early exit indicator
+  bool early_exit = 4;
+  
+  // Exit reason
+  string exit_reason = 5;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 6;
+  
+  // Detector results
+  DetectorResults detector_results = 7;
+  
+  // Scan metadata
+  ScanMetadata metadata = 8;
+}
+
+// Egress certificate
+message EgressCertificate {
+  // Certificate identifier
+  string cert_id = 1;
+  
+  // Plan identifier
+  string plan_id = 2;
+  
+  // Tenant identifier
+  string tenant = 3;
+  
+  // Detector flags
+  DetectorFlags detector_flags = 4;
+  
+  // Near-duplicate score (0.0 to 1.0)
+  double near_dupe_score = 5;
+  
+  // Policy hash
+  string policy_hash = 6;
+  
+  // Text hash (BLAKE3)
+  string text_hash = 7;
+  
+  // Certificate timestamp
+  google.protobuf.Timestamp timestamp = 8;
+  
+  // Certificate signer
+  string signer = 9;
+  
+  // Non-interference verdict
+  NonInterferenceVerdict non_interference = 10;
+  
+  // Influencing labels
+  repeated string influencing_labels = 11;
+  
+  // Attestation reference
+  string attestation_ref = 12;
+  
+  // Certificate signature
+  string signature = 13;
+  
+  // Signature algorithm
+  string signature_algorithm = 14;
+  
+  // Certificate expiration
+  google.protobuf.Timestamp expires_at = 15;
+  
+  // Certificate status
+  CertificateStatus status = 16;
+}
+
+// Detector flags
+message DetectorFlags {
+  // PII detected
+  bool pii_detected = 1;
+  
+  // Secrets detected
+  bool secrets_detected = 2;
+  
+  // Near-duplicate detected
+  bool near_dupe_detected = 3;
+  
+  // Policy violations detected
+  bool policy_violations = 4;
+  
+  // Critical violations detected
+  bool critical_violations = 5;
+  
+  // Compliance violations detected
+  bool compliance_violations = 6;
+}
+
+// Non-interference verdict
+message NonInterferenceVerdict {
+  oneof verdict {
+    // Passed verification
+    bool passed = 1;
+    
+    // Failed with reason
+    string failed_reason = 2;
+  }
+  
+  // Verification timestamp
+  google.protobuf.Timestamp verified_at = 3;
+  
+  // Verification method
+  string verification_method = 4;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence_score = 5;
+}
+
+// Certificate status
+enum CertificateStatus {
+  CERTIFICATE_STATUS_UNSPECIFIED = 0;
+  CERTIFICATE_STATUS_ACTIVE = 1;
+  CERTIFICATE_STATUS_EXPIRED = 2;
+  CERTIFICATE_STATUS_REVOKED = 3;
+  CERTIFICATE_STATUS_SUSPENDED = 4;
+}
+
+// Detector results
+message DetectorResults {
+  // PII detection results
+  PiiDetectionResult pii_result = 1;
+  
+  // Secrets detection results
+  SecretsDetectionResult secrets_result = 2;
+  
+  // Near-duplicate detection results
+  NearDupeDetectionResult near_dupe_result = 3;
+  
+  // Policy violation results
+  PolicyViolationResult policy_violation_result = 4;
+  
+  // Overall risk score (0.0 to 1.0)
+  double overall_risk_score = 5;
+  
+  // Risk level
+  RiskLevel risk_level = 6;
+  
+  // Detection confidence (0.0 to 1.0)
+  double detection_confidence = 7;
+}
+
+// PII detection result
+message PiiDetectionResult {
+  // PII detected
+  bool detected = 1;
+  
+  // Detected PII types
+  repeated string pii_types = 2;
+  
+  // PII locations in text
+  repeated PiiLocation locations = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence_score = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// PII location
+message PiiLocation {
+  // Start position in text
+  uint32 start_pos = 1;
+  
+  // End position in text
+  uint32 end_pos = 2;
+  
+  // PII type
+  string pii_type = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// Secrets detection result
+message SecretsDetectionResult {
+  // Secrets detected
+  bool detected = 1;
+  
+  // Detected secret types
+  repeated string secret_types = 2;
+  
+  // Secret locations in text
+  repeated SecretLocation locations = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence_score = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// Secret location
+message SecretLocation {
+  // Start position in text
+  uint32 start_pos = 1;
+  
+  // End position in text
+  uint32 end_pos = 2;
+  
+  // Secret type
+  string secret_type = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// Near-duplicate detection result
+message NearDupeDetectionResult {
+  // Near-duplicate detected
+  bool detected = 1;
+  
+  // Similarity score (0.0 to 1.0)
+  double similarity_score = 2;
+  
+  // Similar content references
+  repeated string similar_content_refs = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence_score = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// Policy violation result
+message PolicyViolationResult {
+  // Policy violations detected
+  bool detected = 1;
+  
+  // Violation types
+  repeated string violation_types = 2;
+  
+  // Violation details
+  repeated PolicyViolation violations = 3;
+  
+  // Confidence score (0.0 to 1.0)
+  double confidence_score = 4;
+  
+  // Risk level
+  RiskLevel risk_level = 5;
+}
+
+// Policy violation
+message PolicyViolation {
+  // Violation type
+  string violation_type = 1;
+  
+  // Violation description
+  string description = 2;
+  
+  // Violation severity
+  ViolationSeverity severity = 3;
+  
+  // Violation location in text
+  uint32 start_pos = 4;
+  uint32 end_pos = 5;
+  
+  // Policy rule reference
+  string policy_rule_ref = 6;
+  
+  // Remediation suggestion
+  string remediation = 7;
+}
+
+// Violation severity
+enum ViolationSeverity {
+  VIOLATION_SEVERITY_UNSPECIFIED = 0;
+  VIOLATION_SEVERITY_LOW = 1;
+  VIOLATION_SEVERITY_MEDIUM = 2;
+  VIOLATION_SEVERITY_HIGH = 3;
+  VIOLATION_SEVERITY_CRITICAL = 4;
+}
+
+// Risk level
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+  RISK_LEVEL_CRITICAL = 4;
+}
+
+// Scan metadata
+message ScanMetadata {
+  // Scan identifier
+  string scan_id = 1;
+  
+  // Scan timestamp
+  google.protobuf.Timestamp scan_time = 2;
+  
+  // Scanner version
+  string scanner_version = 3;
+  
+  // Detector versions
+  map<string, string> detector_versions = 4;
+  
+  // Scan configuration hash
+  string config_hash = 5;
+  
+  // Cache hit indicator
+  bool cache_hit = 6;
+  
+  // Processing pipeline used
+  repeated string pipeline_steps = 7;
+}
+
+// Generate certificate request
+message GenerateCertificateRequest {
+  // Content scan result
+  ScanContentResponse scan_result = 1;
+  
+  // Certificate configuration
+  CertificateConfig config = 2;
+  
+  // Signing key identifier
+  string signing_key_id = 3;
+  
+  // Certificate context
+  CertificateContext context = 4;
+}
+
+// Certificate configuration
+message CertificateConfig {
+  // Certificate validity period in seconds
+  uint32 validity_period_seconds = 1;
+  
+  // Enable non-interference verification
+  bool enable_non_interference = 2;
+  
+  // Enable influencing labels
+  bool enable_influencing_labels = 3;
+  
+  // Custom certificate fields
+  map<string, string> custom_fields = 4;
+  
+  // Certificate format
+  CertificateFormat format = 5;
+}
+
+// Certificate format
+enum CertificateFormat {
+  CERTIFICATE_FORMAT_UNSPECIFIED = 0;
+  CERTIFICATE_FORMAT_JSON = 1;
+  CERTIFICATE_FORMAT_PROTOBUF = 2;
+  CERTIFICATE_FORMAT_PEM = 3;
+}
+
+// Certificate context
+message CertificateContext {
+  // Request timestamp
+  google.protobuf.Timestamp request_time = 1;
+  
+  // Client identifier
+  string client_id = 2;
+  
+  // Session identifier
+  string session_id = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Generate certificate response
+message GenerateCertificateResponse {
+  // Generated certificate
+  EgressCertificate certificate = 1;
+  
+  // Generation success
+  bool success = 2;
+  
+  // Generation message
+  string message = 3;
+  
+  // Certificate signature
+  string signature = 4;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 5;
+  
+  // Certificate verification URL
+  string verification_url = 6;
+}
+
+// Verify certificate request
+message VerifyCertificateRequest {
+  // Certificate to verify
+  EgressCertificate certificate = 1;
+  
+  // Certificate signature
+  string signature = 2;
+  
+  // Verification context
+  VerificationContext context = 3;
+  
+  // Verification level
+  VerificationLevel level = 4;
+}
+
+// Verification context
+message VerificationContext {
+  // Verification timestamp
+  google.protobuf.Timestamp verification_time = 1;
+  
+  // Verifier identifier
+  string verifier_id = 2;
+  
+  // Verification purpose
+  string purpose = 3;
+  
+  // Additional context
+  map<string, string> metadata = 4;
+}
+
+// Verification level
+enum VerificationLevel {
+  VERIFICATION_LEVEL_UNSPECIFIED = 0;
+  VERIFICATION_LEVEL_BASIC = 1;
+  VERIFICATION_LEVEL_STRICT = 2;
+  VERIFICATION_LEVEL_CRITICAL = 3;
+}
+
+// Verify certificate response
+message VerifyCertificateResponse {
+  // Verification result
+  bool valid = 1;
+  
+  // Verification reason
+  string reason = 2;
+  
+  // Verification errors
+  repeated string errors = 3;
+  
+  // Signature validity
+  bool signature_valid = 4;
+  
+  // Certificate expiration validity
+  bool expiration_valid = 5;
+  
+  // Non-interference verification
+  bool non_interference_valid = 6;
+  
+  // Policy compliance
+  bool policy_compliant = 7;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 8;
+  
+  // Verification score (0.0 to 1.0)
+  float score = 9;
+  
+  // Certificate details (if valid)
+  EgressCertificate certificate = 10;
+}
+
+// Batch scan request
+message BatchScanContentRequest {
+  // Content items to scan
+  repeated ContentItem content_items = 1;
+  
+  // Batch configuration
+  BatchConfig config = 2;
+  
+  // Scan context
+  map<string, string> context = 3;
+}
+
+// Content item
+message ContentItem {
+  // Content identifier
+  string content_id = 1;
+  
+  // Content text
+  string text = 2;
+  
+  // Content metadata
+  map<string, string> metadata = 3;
+  
+  // Scan priority
+  ScanPriority priority = 4;
+}
+
+// Batch configuration
+message BatchConfig {
+  // Maximum batch size
+  uint32 max_batch_size = 1;
+  
+  // Timeout in milliseconds
+  uint32 timeout_ms = 2;
+  
+  // Enable parallel processing
+  bool enable_parallel = 3;
+  
+  // Maximum concurrent scans
+  uint32 max_concurrent = 4;
+}
+
+// Batch scan response
+message BatchScanContentResponse {
+  // Scan results for each content item
+  repeated ContentScanResult results = 1;
+  
+  // Batch statistics
+  BatchStats stats = 2;
+  
+  // Total processing time in milliseconds
+  uint64 total_processing_time_ms = 3;
+  
+  // Successful scans
+  uint32 successful_scans = 4;
+  
+  // Failed scans
+  uint32 failed_scans = 5;
+  
+  // Batch errors
+  repeated string errors = 6;
+}
+
+// Content scan result
+message ContentScanResult {
+  // Content identifier
+  string content_id = 1;
+  
+  // Scan result
+  ScanContentResponse scan_result = 2;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 3;
+  
+  // Scan success
+  bool success = 4;
+}
+
+// Batch statistics
+message BatchStats {
+  // Total content items processed
+  uint32 total_items = 1;
+  
+  // Successfully scanned items
+  uint32 successful_items = 2;
+  
+  // Failed scans
+  uint32 failed_items = 3;
+  
+  // Average processing time in milliseconds
+  uint64 avg_processing_time_ms = 4;
+  
+  // Scan success rate (0.0 to 1.0)
+  float success_rate = 5;
+}
+
+// Get firewall configuration request
+message GetFirewallConfigRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Configuration scope
+  ConfigScope scope = 2;
+}
+
+// Configuration scope
+enum ConfigScope {
+  CONFIG_SCOPE_UNSPECIFIED = 0;
+  CONFIG_SCOPE_TENANT = 1;
+  CONFIG_SCOPE_GLOBAL = 2;
+  CONFIG_SCOPE_ALL = 3;
+}
+
+// Get firewall configuration response
+message GetFirewallConfigResponse {
+  // Firewall configuration
+  FirewallConfig config = 1;
+  
+  // Configuration version
+  string version = 2;
+  
+  // Last updated timestamp
+  google.protobuf.Timestamp last_updated = 3;
+  
+  // Configuration hash
+  string config_hash = 4;
+}
+
+// Firewall configuration
+message FirewallConfig {
+  // Detector configuration
+  DetectorConfig detector_config = 1;
+  
+  // Performance thresholds
+  PerformanceThresholds performance_thresholds = 2;
+  
+  // Policy rules
+  repeated FirewallPolicyRule policy_rules = 3;
+  
+  // Cache configuration
+  CacheConfig cache_config = 4;
+  
+  // Backpressure configuration
+  BackpressureConfig backpressure_config = 5;
+}
+
+// Performance thresholds
+message PerformanceThresholds {
+  // Maximum processing time in milliseconds
+  uint64 max_processing_time_ms = 1;
+  
+  // Maximum memory usage in MB
+  uint64 max_memory_mb = 2;
+  
+  // Maximum CPU usage in cores
+  float max_cpu_cores = 3;
+  
+  // Maximum concurrent scans
+  uint32 max_concurrent_scans = 4;
+  
+  // Cache hit rate threshold (0.0 to 1.0)
+  float min_cache_hit_rate = 5;
+}
+
+// Firewall policy rule
+message FirewallPolicyRule {
+  // Rule identifier
+  string rule_id = 1;
+  
+  // Rule type
+  PolicyRuleType rule_type = 2;
+  
+  // Rule conditions
+  repeated PolicyCondition conditions = 3;
+  
+  // Rule actions
+  repeated PolicyAction actions = 4;
+  
+  // Rule priority
+  uint32 priority = 5;
+  
+  // Rule enabled
+  bool enabled = 6;
+}
+
+// Policy rule type
+enum PolicyRuleType {
+  POLICY_RULE_TYPE_UNSPECIFIED = 0;
+  POLICY_RULE_TYPE_PII = 1;
+  POLICY_RULE_TYPE_SECRETS = 2;
+  POLICY_RULE_TYPE_NEAR_DUPE = 3;
+  POLICY_RULE_TYPE_POLICY_VIOLATION = 4;
+  POLICY_RULE_TYPE_COMPLIANCE = 5;
+}
+
+// Policy condition
+message PolicyCondition {
+  // Condition field
+  string field = 1;
+  
+  // Condition operator
+  ConditionOperator operator = 2;
+  
+  // Condition value
+  string value = 3;
+  
+  // Additional parameters
+  map<string, string> parameters = 4;
+}
+
+// Condition operator
+enum ConditionOperator {
+  CONDITION_OPERATOR_UNSPECIFIED = 0;
+  CONDITION_OPERATOR_EQUALS = 1;
+  CONDITION_OPERATOR_NOT_EQUALS = 2;
+  CONDITION_OPERATOR_GREATER_THAN = 3;
+  CONDITION_OPERATOR_LESS_THAN = 4;
+  CONDITION_OPERATOR_CONTAINS = 5;
+  CONDITION_OPERATOR_NOT_CONTAINS = 6;
+  CONDITION_OPERATOR_REGEX = 7;
+}
+
+// Policy action
+message PolicyAction {
+  // Action type
+  ActionType action_type = 1;
+  
+  // Action parameters
+  map<string, string> parameters = 2;
+  
+  // Action severity
+  ActionSeverity severity = 3;
+}
+
+// Action type
+enum ActionType {
+  ACTION_TYPE_UNSPECIFIED = 0;
+  ACTION_TYPE_ALLOW = 1;
+  ACTION_TYPE_BLOCK = 2;
+  ACTION_TYPE_QUARANTINE = 3;
+  ACTION_TYPE_LOG = 4;
+  ACTION_TYPE_ALERT = 5;
+  ACTION_TYPE_RATE_LIMIT = 6;
+}
+
+// Action severity
+enum ActionSeverity {
+  ACTION_SEVERITY_UNSPECIFIED = 0;
+  ACTION_SEVERITY_LOW = 1;
+  ACTION_SEVERITY_MEDIUM = 2;
+  ACTION_SEVERITY_HIGH = 3;
+  ACTION_SEVERITY_CRITICAL = 4;
+}
+
+// Cache configuration
+message CacheConfig {
+  // Enable caching
+  bool enabled = 1;
+  
+  // Maximum cache size
+  uint32 max_size = 2;
+  
+  // Cache TTL in seconds
+  uint32 ttl_seconds = 3;
+  
+  // Redis address for distributed caching
+  string redis_addr = 4;
+  
+  // Cache eviction policy
+  EvictionPolicy eviction_policy = 5;
+}
+
+// Eviction policy
+enum EvictionPolicy {
+  EVICTION_POLICY_UNSPECIFIED = 0;
+  EVICTION_POLICY_LRU = 1;
+  EVICTION_POLICY_LFU = 2;
+  EVICTION_POLICY_FIFO = 3;
+  EVICTION_POLICY_RANDOM = 4;
+}
+
+// Backpressure configuration
+message BackpressureConfig {
+  // Enable backpressure control
+  bool enabled = 1;
+  
+  // Maximum queue length
+  uint32 max_queue_length = 2;
+  
+  // P95 response time budget in milliseconds
+  uint64 p95_response_time_budget_ms = 3;
+  
+  // Strict mode threshold (0.0 to 1.0)
+  float strict_mode_threshold = 4;
+  
+  // Critical detectors
+  repeated string critical_detectors = 5;
+  
+  // Non-critical detectors
+  repeated string non_critical_detectors = 6;
+}
+
+// Update firewall configuration request
+message UpdateFirewallConfigRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Configuration updates
+  map<string, string> config_updates = 2;
+  
+  // Restart required
+  bool restart_required = 3;
+  
+  // Update reason
+  string update_reason = 4;
+}
+
+// Update firewall configuration response
+message UpdateFirewallConfigResponse {
+  // Update success
+  bool success = 1;
+  
+  // Updated configuration keys
+  repeated string updated_keys = 2;
+  
+  // Failed configuration keys
+  repeated string failed_keys = 3;
+  
+  // Update message
+  string message = 4;
+  
+  // Restart required
+  bool restart_required = 5;
+}
+
+// Get firewall statistics request
+message GetFirewallStatsRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Statistics scope
+  StatsScope scope = 2;
+  
+  // Time range
+  TimeRange time_range = 3;
+}
+
+// Statistics scope
+enum StatsScope {
+  STATS_SCOPE_UNSPECIFIED = 0;
+  STATS_SCOPE_TENANT = 1;
+  STATS_SCOPE_GLOBAL = 2;
+  STATS_SCOPE_PERFORMANCE = 3;
+  STATS_SCOPE_SECURITY = 4;
+}
+
+// Time range
+message TimeRange {
+  // Start timestamp
+  google.protobuf.Timestamp start_time = 1;
+  
+  // End timestamp
+  google.protobuf.Timestamp end_time = 2;
+  
+  // Time granularity in seconds
+  uint32 granularity_seconds = 3;
+}
+
+// Get firewall statistics response
+message GetFirewallStatsResponse {
+  // Firewall statistics
+  FirewallStatistics statistics = 1;
+  
+  // Time series data
+  repeated TimeSeriesPoint time_series = 2;
+  
+  // Detector performance statistics
+  repeated DetectorPerformanceStats detector_stats = 3;
+  
+  // Statistics timestamp
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Firewall statistics
+message FirewallStatistics {
+  // Total content scans
+  uint64 total_scans = 1;
+  
+  // Successful scans
+  uint64 successful_scans = 2;
+  
+  // Failed scans
+  uint64 failed_scans = 3;
+  
+  // Blocked content
+  uint64 blocked_content = 4;
+  
+  // Quarantined content
+  uint64 quarantined_content = 5;
+  
+  // Average processing time in milliseconds
+  uint64 avg_processing_time_ms = 6;
+  
+  // P95 processing time in milliseconds
+  uint64 p95_processing_time_ms = 7;
+  
+  // Cache hit rate (0.0 to 1.0)
+  double cache_hit_rate = 8;
+  
+  // Backpressure activations
+  uint64 backpressure_activations = 9;
+}
+
+// Time series point
+message TimeSeriesPoint {
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 1;
+  
+  // Value
+  double value = 2;
+  
+  // Metric name
+  string metric = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Detector performance statistics
+message DetectorPerformanceStats {
+  // Detector name
+  string detector_name = 1;
+  
+  // Total runs
+  uint64 total_runs = 2;
+  
+  // Average execution time in milliseconds
+  uint64 avg_execution_time_ms = 3;
+  
+  // Early exit triggers
+  uint64 early_exit_triggers = 4;
+  
+  // False positive rate (0.0 to 1.0)
+  double false_positive_rate = 5;
+  
+  // Detection accuracy (0.0 to 1.0)
+  double detection_accuracy = 6;
+}
+
+// Health check request
+message HealthCheckRequest {
+  // Service identifier
+  string service = 1;
+  
+  // Health check level
+  HealthCheckLevel level = 2;
+}
+
+// Health check level
+enum HealthCheckLevel {
+  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
+  HEALTH_CHECK_LEVEL_BASIC = 1;
+  HEALTH_CHECK_LEVEL_DETAILED = 2;
+  HEALTH_CHECK_LEVEL_CRITICAL = 3;
+}
+
+// Health check response
+message HealthCheckResponse {
+  // Service status
+  ServiceStatus status = 1;
+  
+  // Service version
+  string version = 2;
+  
+  // Uptime in seconds
+  uint64 uptime_seconds = 3;
+  
+  // Service metadata
+  map<string, string> metadata = 4;
+  
+  // Health check details
+  repeated HealthCheckDetail details = 5;
+  
+  // Last health check timestamp
+  google.protobuf.Timestamp last_check = 6;
+}
+
+// Service status
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_HEALTHY = 1;
+  SERVICE_STATUS_DEGRADED = 2;
+  SERVICE_STATUS_UNHEALTHY = 3;
+  SERVICE_STATUS_UNKNOWN = 4;
+}
+
+// Health check detail
+message HealthCheckDetail {
+  // Component name
+  string component = 1;
+  
+  // Component status
+  ComponentStatus status = 2;
+  
+  // Component message
+  string message = 3;
+  
+  // Component metrics
+  map<string, string> metrics = 4;
+  
+  // Last check timestamp
+  google.protobuf.Timestamp last_check = 5;
+}
+
+// Component status
+enum ComponentStatus {
+  COMPONENT_STATUS_UNSPECIFIED = 0;
+  COMPONENT_STATUS_HEALTHY = 1;
+  COMPONENT_STATUS_DEGRADED = 2;
+  COMPONENT_STATUS_UNHEALTHY = 3;
+  COMPONENT_STATUS_UNKNOWN = 4;
+}
