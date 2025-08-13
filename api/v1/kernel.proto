@@ -1,0 +1,771 @@
+syntax = "proto3";
+
+package provability_fabric.api.v1;
+
+option go_package = "github.com/provability-fabric/api/v1;v1";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.api.v1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "plan.proto";
+
+// Policy Kernel Service for plan validation and enforcement
+service PolicyKernelService {
+  // Validate a plan with comprehensive policy checks
+  rpc ValidatePlan(ValidatePlanRequest) returns (ValidatePlanResponse);
+  
+  // Validate a plan with fast-path caching
+  rpc ValidatePlanWithCache(ValidatePlanWithCacheRequest) returns (ValidatePlanWithCacheResponse);
+  
+  // Verify access receipts
+  rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+  
+  // Batch validate multiple plans
+  rpc BatchValidatePlans(BatchValidatePlansRequest) returns (BatchValidatePlansResponse);
+  
+  // Get kernel configuration
+  rpc GetKernelConfig(GetKernelConfigRequest) returns (GetKernelConfigResponse);
+  
+  // Update kernel configuration
+  rpc UpdateKernelConfig(UpdateKernelConfigRequest) returns (UpdateKernelConfigResponse);
+  
+  // Get cache statistics
+  rpc GetCacheStats(GetCacheStatsRequest) returns (GetCacheStatsResponse);
+  
+  // Invalidate cache by policy
+  rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  
+  // Get kernel metrics
+  rpc GetKernelMetrics(GetKernelMetricsRequest) returns (GetKernelMetricsResponse);
+}
+
+// Plan validation request with cache support
+message ValidatePlanWithCacheRequest {
+  // Plan to validate
+  Plan plan = 1;
+  
+  // Capability token identifier
+  string caps_token_id = 2;
+  
+  // Enable fast-path caching
+  bool enable_cache = 3;
+  
+  // Cache TTL in seconds
+  uint32 cache_ttl_seconds = 4;
+  
+  // Validation context
+  ValidationContext context = 5;
+}
+
+// Plan validation response with cache information
+message ValidatePlanWithCacheResponse {
+  // Validation result
+  ValidationResult result = 1;
+  
+  // Approved steps for execution
+  repeated ApprovedStep approved_steps = 2;
+  
+  // Policy Fast-Path signature
+  string pf_signature = 3;
+  
+  // Signature expiration
+  google.protobuf.Timestamp signature_expires_at = 4;
+  
+  // Cache hit indicator
+  bool cache_hit = 5;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 6;
+  
+  // Validation warnings
+  repeated string warnings = 7;
+}
+
+// Receipt verification request
+message VerifyReceiptRequest {
+  // Receipt identifier
+  string receipt_id = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Subject identifier
+  string subject_id = 3;
+  
+  // Query hash
+  string query_hash = 4;
+  
+  // Result hash
+  string result_hash = 5;
+  
+  // Signature
+  string signature = 6;
+  
+  // Signature algorithm
+  string signature_algorithm = 7;
+  
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 8;
+  
+  // Verification context
+  ReceiptVerificationContext context = 9;
+}
+
+// Receipt verification context
+message ReceiptVerificationContext {
+  // Verification timestamp
+  google.protobuf.Timestamp verification_time = 1;
+  
+  // Client identifier
+  string client_id = 2;
+  
+  // Verification level
+  VerificationLevel level = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Verification level
+enum VerificationLevel {
+  VERIFICATION_LEVEL_UNSPECIFIED = 0;
+  VERIFICATION_LEVEL_BASIC = 1;
+  VERIFICATION_LEVEL_STRICT = 2;
+  VERIFICATION_LEVEL_CRITICAL = 3;
+}
+
+// Receipt verification response
+message VerifyReceiptResponse {
+  // Verification result
+  bool valid = 1;
+  
+  // Verification reason
+  string reason = 2;
+  
+  // Verification errors
+  repeated string errors = 3;
+  
+  // Signature validity
+  bool signature_valid = 4;
+  
+  // Timestamp validity
+  bool timestamp_valid = 5;
+  
+  // Policy compliance
+  bool policy_compliant = 6;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 7;
+  
+  // Verification score (0.0 to 1.0)
+  float score = 8;
+}
+
+// Batch validation request
+message BatchValidatePlansRequest {
+  // Plans to validate
+  repeated Plan plans = 1;
+  
+  // Batch configuration
+  BatchConfig config = 2;
+  
+  // Validation context
+  ValidationContext context = 3;
+}
+
+// Batch configuration
+message BatchConfig {
+  // Maximum batch size
+  uint32 max_batch_size = 1;
+  
+  // Timeout in milliseconds
+  uint32 timeout_ms = 2;
+  
+  // Enable parallel processing
+  bool enable_parallel = 3;
+  
+  // Maximum concurrent validations
+  uint32 max_concurrent = 4;
+}
+
+// Batch validation response
+message BatchValidatePlansResponse {
+  // Validation results for each plan
+  repeated PlanValidationResult plan_results = 1;
+  
+  // Batch statistics
+  BatchStats stats = 2;
+  
+  // Total processing time in milliseconds
+  uint64 total_processing_time_ms = 3;
+  
+  // Successful validations
+  uint32 successful_validations = 4;
+  
+  // Failed validations
+  uint32 failed_validations = 5;
+  
+  // Batch errors
+  repeated string errors = 6;
+}
+
+// Plan validation result
+message PlanValidationResult {
+  // Plan identifier
+  string plan_id = 1;
+  
+  // Validation result
+  ValidationResult result = 2;
+  
+  // Approved steps
+  repeated ApprovedStep approved_steps = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+  
+  // Cache hit indicator
+  bool cache_hit = 5;
+}
+
+// Batch statistics
+message BatchStats {
+  // Total plans processed
+  uint32 total_plans = 1;
+  
+  // Valid plans
+  uint32 valid_plans = 2;
+  
+  // Invalid plans
+  uint32 invalid_plans = 3;
+  
+  // Average processing time in milliseconds
+  uint64 avg_processing_time_ms = 4;
+  
+  // Cache hit rate (0.0 to 1.0)
+  float cache_hit_rate = 5;
+}
+
+// Kernel configuration request
+message GetKernelConfigRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Configuration scope
+  ConfigScope scope = 2;
+}
+
+// Configuration scope
+enum ConfigScope {
+  CONFIG_SCOPE_UNSPECIFIED = 0;
+  CONFIG_SCOPE_TENANT = 1;
+  CONFIG_SCOPE_GLOBAL = 2;
+  CONFIG_SCOPE_ALL = 3;
+}
+
+// Kernel configuration response
+message GetKernelConfigResponse {
+  // Kernel configuration
+  KernelConfig config = 1;
+  
+  // Configuration version
+  string version = 2;
+  
+  // Last updated timestamp
+  google.protobuf.Timestamp last_updated = 3;
+  
+  // Configuration hash
+  string config_hash = 4;
+}
+
+// Kernel configuration
+message KernelConfig {
+  // Maximum budget allowed
+  double max_budget = 1;
+  
+  // Maximum epsilon allowed
+  double max_epsilon = 2;
+  
+  // Maximum latency allowed in milliseconds
+  double max_latency_ms = 3;
+  
+  // Allowed tenants
+  repeated string allowed_tenants = 4;
+  
+  // Strict kernel mode
+  bool strict_kernel = 5;
+  
+  // Cache configuration
+  CacheConfig cache_config = 6;
+  
+  // Policy enforcement rules
+  repeated PolicyRule policy_rules = 7;
+  
+  // Performance thresholds
+  PerformanceThresholds performance_thresholds = 8;
+}
+
+// Cache configuration
+message CacheConfig {
+  // Enable caching
+  bool enabled = 1;
+  
+  // Maximum cache size
+  uint32 max_size = 2;
+  
+  // Cache TTL in seconds
+  uint32 ttl_seconds = 3;
+  
+  // Redis address for distributed caching
+  string redis_addr = 4;
+  
+  // Cache eviction policy
+  EvictionPolicy eviction_policy = 5;
+}
+
+// Eviction policy
+enum EvictionPolicy {
+  EVICTION_POLICY_UNSPECIFIED = 0;
+  EVICTION_POLICY_LRU = 1;
+  EVICTION_POLICY_LFU = 2;
+  EVICTION_POLICY_FIFO = 3;
+  EVICTION_POLICY_RANDOM = 4;
+}
+
+// Policy rule
+message PolicyRule {
+  // Rule identifier
+  string rule_id = 1;
+  
+  // Rule type
+  PolicyRuleType rule_type = 2;
+  
+  // Rule conditions
+  repeated PolicyCondition conditions = 3;
+  
+  // Rule actions
+  repeated PolicyAction actions = 4;
+  
+  // Rule priority
+  uint32 priority = 5;
+  
+  // Rule enabled
+  bool enabled = 6;
+}
+
+// Policy rule type
+enum PolicyRuleType {
+  POLICY_RULE_TYPE_UNSPECIFIED = 0;
+  POLICY_RULE_TYPE_CAPABILITY = 1;
+  POLICY_RULE_TYPE_BUDGET = 2;
+  POLICY_RULE_TYPE_PRIVACY = 3;
+  POLICY_RULE_TYPE_SECURITY = 4;
+  POLICY_RULE_TYPE_COMPLIANCE = 5;
+}
+
+// Policy condition
+message PolicyCondition {
+  // Condition field
+  string field = 1;
+  
+  // Condition operator
+  ConditionOperator operator = 2;
+  
+  // Condition value
+  string value = 3;
+  
+  // Additional parameters
+  map<string, string> parameters = 4;
+}
+
+// Condition operator
+enum ConditionOperator {
+  CONDITION_OPERATOR_UNSPECIFIED = 0;
+  CONDITION_OPERATOR_EQUALS = 1;
+  CONDITION_OPERATOR_NOT_EQUALS = 2;
+  CONDITION_OPERATOR_GREATER_THAN = 3;
+  CONDITION_OPERATOR_LESS_THAN = 4;
+  CONDITION_OPERATOR_CONTAINS = 5;
+  CONDITION_OPERATOR_NOT_CONTAINS = 6;
+  CONDITION_OPERATOR_REGEX = 7;
+}
+
+// Policy action
+message PolicyAction {
+  // Action type
+  ActionType action_type = 1;
+  
+  // Action parameters
+  map<string, string> parameters = 2;
+  
+  // Action severity
+  ActionSeverity severity = 3;
+}
+
+// Action type
+enum ActionType {
+  ACTION_TYPE_UNSPECIFIED = 0;
+  ACTION_TYPE_ALLOW = 1;
+  ACTION_TYPE_DENY = 2;
+  ACTION_TYPE_QUARANTINE = 3;
+  ACTION_TYPE_LOG = 4;
+  ACTION_TYPE_ALERT = 5;
+  ACTION_TYPE_RATE_LIMIT = 6;
+}
+
+// Action severity
+enum ActionSeverity {
+  ACTION_SEVERITY_UNSPECIFIED = 0;
+  ACTION_SEVERITY_LOW = 1;
+  ACTION_SEVERITY_MEDIUM = 2;
+  ACTION_SEVERITY_HIGH = 3;
+  ACTION_SEVERITY_CRITICAL = 4;
+}
+
+// Performance thresholds
+message PerformanceThresholds {
+  // Maximum processing time in milliseconds
+  uint64 max_processing_time_ms = 1;
+  
+  // Maximum memory usage in MB
+  uint64 max_memory_mb = 2;
+  
+  // Maximum CPU usage in cores
+  float max_cpu_cores = 3;
+  
+  // Maximum concurrent validations
+  uint32 max_concurrent_validations = 4;
+  
+  // Cache hit rate threshold (0.0 to 1.0)
+  float min_cache_hit_rate = 5;
+}
+
+// Update kernel configuration request
+message UpdateKernelConfigRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Configuration updates
+  map<string, string> config_updates = 2;
+  
+  // Restart required
+  bool restart_required = 3;
+  
+  // Update reason
+  string update_reason = 4;
+}
+
+// Update kernel configuration response
+message UpdateKernelConfigResponse {
+  // Update success
+  bool success = 1;
+  
+  // Updated configuration keys
+  repeated string updated_keys = 2;
+  
+  // Failed configuration keys
+  repeated string failed_keys = 3;
+  
+  // Update message
+  string message = 4;
+  
+  // Restart required
+  bool restart_required = 5;
+}
+
+// Cache statistics request
+message GetCacheStatsRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Statistics scope
+  StatsScope scope = 2;
+}
+
+// Statistics scope
+enum StatsScope {
+  STATS_SCOPE_UNSPECIFIED = 0;
+  STATS_SCOPE_TENANT = 1;
+  STATS_SCOPE_GLOBAL = 2;
+}
+
+// Cache statistics response
+message GetCacheStatsResponse {
+  // Hit count
+  uint64 hit_count = 1;
+  
+  // Miss count
+  uint64 miss_count = 2;
+  
+  // Hit rate (0.0 to 1.0)
+  double hit_rate = 3;
+  
+  // Total items in cache
+  uint64 total_items = 4;
+  
+  // Evicted items count
+  uint64 evicted_count = 5;
+  
+  // Total requests
+  uint64 total_requests = 6;
+  
+  // Cache size in bytes
+  uint64 cache_size_bytes = 7;
+  
+  // Average item size in bytes
+  uint64 avg_item_size_bytes = 8;
+}
+
+// Cache invalidation request
+message InvalidateCacheRequest {
+  // Policy hash to invalidate
+  string policy_hash = 1;
+  
+  // Tenant identifier
+  string tenant = 2;
+  
+  // Invalidate all caches
+  bool invalidate_all = 3;
+  
+  // Invalidation reason
+  string reason = 4;
+}
+
+// Cache invalidation response
+message InvalidateCacheResponse {
+  // Invalidation success
+  bool success = 1;
+  
+  // Number of invalidated items
+  uint64 invalidated_items = 2;
+  
+  // Invalidation message
+  string message = 3;
+  
+  // Affected cache keys
+  repeated string affected_keys = 4;
+}
+
+// Health check request
+message HealthCheckRequest {
+  // Service identifier
+  string service = 1;
+  
+  // Health check level
+  HealthCheckLevel level = 2;
+}
+
+// Health check level
+enum HealthCheckLevel {
+  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
+  HEALTH_CHECK_LEVEL_BASIC = 1;
+  HEALTH_CHECK_LEVEL_DETAILED = 2;
+  HEALTH_CHECK_LEVEL_CRITICAL = 3;
+}
+
+// Health check response
+message HealthCheckResponse {
+  // Service status
+  ServiceStatus status = 1;
+  
+  // Service version
+  string version = 2;
+  
+  // Uptime in seconds
+  uint64 uptime_seconds = 3;
+  
+  // Service metadata
+  map<string, string> metadata = 4;
+  
+  // Health check details
+  repeated HealthCheckDetail details = 5;
+  
+  // Last health check timestamp
+  google.protobuf.Timestamp last_check = 6;
+}
+
+// Service status
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_HEALTHY = 1;
+  SERVICE_STATUS_DEGRADED = 2;
+  SERVICE_STATUS_UNHEALTHY = 3;
+  SERVICE_STATUS_UNKNOWN = 4;
+}
+
+// Health check detail
+message HealthCheckDetail {
+  // Component name
+  string component = 1;
+  
+  // Component status
+  ComponentStatus status = 2;
+  
+  // Component message
+  string message = 3;
+  
+  // Component metrics
+  map<string, string> metrics = 4;
+  
+  // Last check timestamp
+  google.protobuf.Timestamp last_check = 5;
+}
+
+// Component status
+enum ComponentStatus {
+  COMPONENT_STATUS_UNSPECIFIED = 0;
+  COMPONENT_STATUS_HEALTHY = 1;
+  COMPONENT_STATUS_DEGRADED = 2;
+  COMPONENT_STATUS_UNHEALTHY = 3;
+  COMPONENT_STATUS_UNKNOWN = 4;
+}
+
+// Kernel metrics request
+message GetKernelMetricsRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Metrics scope
+  MetricsScope scope = 2;
+  
+  // Time range
+  TimeRange time_range = 3;
+}
+
+// Metrics scope
+enum MetricsScope {
+  METRICS_SCOPE_UNSPECIFIED = 0;
+  METRICS_SCOPE_TENANT = 1;
+  METRICS_SCOPE_GLOBAL = 2;
+  METRICS_SCOPE_PERFORMANCE = 3;
+  METRICS_SCOPE_SECURITY = 4;
+}
+
+// Time range
+message TimeRange {
+  // Start timestamp
+  google.protobuf.Timestamp start_time = 1;
+  
+  // End timestamp
+  google.protobuf.Timestamp end_time = 2;
+  
+  // Time granularity in seconds
+  uint32 granularity_seconds = 3;
+}
+
+// Kernel metrics response
+message GetKernelMetricsResponse {
+  // Service metrics
+  ServiceMetrics service_metrics = 1;
+  
+  // Performance metrics
+  PerformanceMetrics performance_metrics = 2;
+  
+  // Security metrics
+  SecurityMetrics security_metrics = 3;
+  
+  // Cache metrics
+  CacheMetrics cache_metrics = 4;
+  
+  // Policy metrics
+  PolicyMetrics policy_metrics = 5;
+  
+  // Metrics timestamp
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// Service metrics
+message ServiceMetrics {
+  // Total requests
+  uint64 total_requests = 1;
+  
+  // Successful requests
+  uint64 successful_requests = 2;
+  
+  // Failed requests
+  uint64 failed_requests = 3;
+  
+  // Average response time in milliseconds
+  double avg_response_time_ms = 4;
+  
+  // P95 response time in milliseconds
+  double p95_response_time_ms = 5;
+  
+  // P99 response time in milliseconds
+  double p99_response_time_ms = 6;
+}
+
+// Performance metrics
+message PerformanceMetrics {
+  // CPU usage percentage
+  double cpu_usage_percent = 1;
+  
+  // Memory usage in MB
+  uint64 memory_usage_mb = 2;
+  
+  // Network I/O in MB/s
+  double network_io_mbps = 3;
+  
+  // Disk I/O in MB/s
+  double disk_io_mbps = 4;
+  
+  // Concurrent connections
+  uint32 concurrent_connections = 5;
+}
+
+// Security metrics
+message SecurityMetrics {
+  // Policy violations
+  uint64 policy_violations = 1;
+  
+  // Authentication failures
+  uint64 auth_failures = 2;
+  
+  // Authorization failures
+  uint64 authz_failures = 3;
+  
+  // Rate limit violations
+  uint64 rate_limit_violations = 4;
+  
+  // Security alerts
+  uint64 security_alerts = 5;
+}
+
+// Cache metrics
+message CacheMetrics {
+  // Cache hits
+  uint64 cache_hits = 1;
+  
+  // Cache misses
+  uint64 cache_misses = 2;
+  
+  // Cache hit rate (0.0 to 1.0)
+  double cache_hit_rate = 3;
+  
+  // Cache size in items
+  uint64 cache_size_items = 4;
+  
+  // Cache evictions
+  uint64 cache_evictions = 5;
+}
+
+// Policy metrics
+message PolicyMetrics {
+  // Total policy evaluations
+  uint64 total_policy_evaluations = 1;
+  
+  // Policy cache hits
+  uint64 policy_cache_hits = 2;
+  
+  // Policy cache misses
+  uint64 policy_cache_misses = 3;
+  
+  // Policy evaluation time in milliseconds
+  double avg_policy_evaluation_time_ms = 4;
+  
+  // Policy rule hits
+  map<string, uint64> policy_rule_hits = 5;
+}

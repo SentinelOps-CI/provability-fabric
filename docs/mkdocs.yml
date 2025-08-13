@@ -74,12 +74,44 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
+  
+  # PF-CORE Implementation
+  - PF-CORE Status: pf-core-status.md
+  
+  # Core Components
   - Spec Bundles: spec-bundles.md
   - Lean Proofs: lean.md
   - Runtime: runtime.md
+  
+  # Security & Attestation
+  - Security Overview: security/overview.md
+  - Decision Path: img/decision_path.svg
+  - Attestation Service: runtime/attestor/README.md
+  
+  # Client SDKs
+  - SDKs Overview: core/sdk/README.md
+  - TypeScript SDK: core/sdk/typescript/README.md
+  - Go SDK: core/sdk/go/README.md
+  - Rust SDK: core/sdk/rust/README.md
+  
+  # Performance & Optimization
+  - Performance Benchmarks: bench/README.md
+  - WASM Worker Pool: runtime/wasm-sandbox/README.md
+  - Batch Crypto: core/crypto/README.md
+  
+  # CI/CD & Testing
+  - Cross-repo Testing: .github/workflows/release.yaml
+  - Release Pipeline: .github/workflows/README.md
+  
+  # Generated Specs
   - Generated Specs: generated/*.md
+  
+  # API Reference
   - API Reference: api.md
+  
+  # Development
   - Contributing: contributing.md
+  - Development Guide: dev/README.md
 
 extra:
   social:

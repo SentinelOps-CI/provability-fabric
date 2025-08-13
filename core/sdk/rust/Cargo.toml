@@ -1,0 +1,38 @@
+[package]
+name = "provability-fabric-core-sdk-rust"
+version = "1.0.0"
+edition = "2021"
+authors = ["Provability Fabric Team"]
+description = "Provability Fabric Core SDK for Rust"
+license = "Apache-2.0"
+repository = "https://github.com/provability-fabric/provability-fabric"
+keywords = ["provability-fabric", "ai-safety", "policy-enforcement", "grpc", "rust"]
+categories = ["api-bindings", "asynchronous", "network-programming"]
+
+[dependencies]
+tonic = "0.10"
+prost = "0.12"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[build-dependencies]
+tonic-build = "0.10"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = "0.5"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[features]
+default = ["full"]
+full = ["tonic/transport", "tonic/compression", "tonic/compression-gzip"]
+minimal = []

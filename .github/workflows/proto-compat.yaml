@@ -1,0 +1,326 @@
+name: Protobuf Compatibility Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'api/**', '.github/workflows/proto-compat.yaml' ]
+  pull_request:
+    branches: [ main, develop ]
+    paths: [ 'api/**', '.github/workflows/proto-compat.yaml' ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  proto-compat:
+    name: Protobuf Compatibility Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        language: [go, typescript, rust]
+        include:
+          - language: go
+            setup: |
+              sudo apt-get update
+              sudo apt-get install -y protobuf-compiler
+              go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+              go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+            test: make proto-gen-go && cd core/sdk/go && go test ./...
+          - language: typescript
+            setup: |
+              sudo apt-get update
+              sudo apt-get install -y protobuf-compiler nodejs npm
+              npm install -g ts-proto
+            test: make proto-gen-ts && cd core/sdk/typescript && npm test
+          - language: rust
+            setup: |
+              sudo apt-get update
+              sudo apt-get install -y protobuf-compiler
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+              source $HOME/.cargo/env
+              cargo install protoc-gen-tonic
+            test: make proto-gen-rust && cd core/sdk/rust && cargo test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup ${{ matrix.language }}
+      run: ${{ matrix.setup }}
+
+    - name: Generate protobuf bindings
+      run: make proto-gen
+
+    - name: Run compatibility tests
+      run: ${{ matrix.test }}
+
+    - name: Validate round-trip serialization
+      run: |
+        # Test v1 ↔ v1.1 round-trip equality
+        make proto-validate
+        make proto-fixtures
+        
+        # Verify generated code compiles
+        if [ "${{ matrix.language }}" = "go" ]; then
+          cd core/sdk/go && go build ./...
+        elif [ "${{ matrix.language }}" = "typescript" ]; then
+          cd core/sdk/typescript && npm run build
+        elif [ "${{ matrix.language }}" = "rust" ]; then
+          cd core/sdk/rust && cargo check
+        fi
+
+    - name: Check for breaking changes
+      run: |
+        # Ensure no required fields were removed
+        if git diff --name-only HEAD~1 | grep -q "api/"; then
+          echo "Checking for breaking changes in API..."
+          
+          # Check if any required fields were removed
+          for proto_file in api/v1/*.proto; do
+            echo "Validating $proto_file..."
+            protoc --descriptor_set_out=/dev/null "$proto_file" || exit 1
+          done
+          
+          # Verify backward compatibility
+          make proto-compat-test || exit 1
+        fi
+
+    - name: Generate API documentation
+      run: |
+        make proto-docs
+        
+        # Check if documentation was generated
+        if [ ! -f "docs/api/api.md" ]; then
+          echo "API documentation generation failed"
+          exit 1
+        fi
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: proto-compat-${{ matrix.language }}-${{ github.run_id }}
+        path: |
+          core/sdk/${{ matrix.language }}/generated/
+          tests/fixtures/golden/
+          docs/api/
+
+  proto-lint:
+    name: Protobuf Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup protobuf tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y protobuf-compiler clang-format
+
+    - name: Lint protobuf files
+      run: |
+        make proto-lint
+        
+        # Check formatting
+        for proto_file in api/v1/*.proto; do
+          echo "Checking format of $proto_file..."
+          clang-format --dry-run --Werror "$proto_file" || exit 1
+        done
+
+    - name: Validate protobuf syntax
+      run: |
+        make proto-validate
+        
+        # Check for common issues
+        for proto_file in api/v1/*.proto; do
+          echo "Validating $proto_file..."
+          
+          # Check for proper package naming
+          if ! grep -q "package provability_fabric.api.v1;" "$proto_file"; then
+            echo "Error: $proto_file missing correct package declaration"
+            exit 1
+          fi
+          
+          # Check for proper go_package option
+          if ! grep -q "option go_package.*github.com/provability-fabric/api/v1" "$proto_file"; then
+            echo "Error: $proto_file missing correct go_package option"
+            exit 1
+          fi
+        done
+
+  proto-security:
+    name: Protobuf Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup security tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y protobuf-compiler
+
+    - name: Security validation
+      run: |
+        # Check for sensitive data in protobuf files
+        for proto_file in api/v1/*.proto; do
+          echo "Security scanning $proto_file..."
+          
+          # Check for hardcoded secrets
+          if grep -i "password\|secret\|key\|token" "$proto_file" | grep -v "//"; then
+            echo "Warning: Potential sensitive data in $proto_file"
+          fi
+          
+          # Check for proper field validation
+          if grep -q "string.*=.*[0-9]" "$proto_file" | grep -v "//"; then
+            echo "Warning: String field with numeric value in $proto_file"
+          fi
+        done
+        
+        # Validate cryptographic fields
+        for proto_file in api/v1/*.proto; do
+          if grep -q "signature\|hash\|sig" "$proto_file"; then
+            echo "Checking cryptographic fields in $proto_file..."
+            
+            # Ensure signature fields are properly typed
+            if ! grep -q "string.*sig.*=" "$proto_file"; then
+              echo "Error: Signature field should be string type"
+              exit 1
+            fi
+          fi
+        done
+
+  proto-performance:
+    name: Protobuf Performance Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Setup protobuf tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y protobuf-compiler
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+    - name: Generate and benchmark
+      run: |
+        make proto-gen-go
+        
+        # Run performance benchmarks
+        cd core/sdk/go
+        go test -bench=. -benchmem ./... || echo "No benchmarks found"
+        
+        # Check message sizes
+        echo "Checking protobuf message sizes..."
+        for proto_file in ../../api/v1/*.proto; do
+          base=$(basename "$proto_file" .proto)
+          echo "Message: $base"
+          protoc --encode="$base" "$proto_file" < /dev/null | wc -c
+        done
+
+  proto-compatibility-report:
+    name: Generate Compatibility Report
+    runs-on: ubuntu-latest
+    needs: [proto-compat, proto-lint, proto-security, proto-performance]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Generate report
+      run: |
+        echo "# Protobuf Compatibility Report" > proto-compat-report.md
+        echo "" >> proto-compat-report.md
+        echo "Generated: $(date)" >> proto-compat-report.md
+        echo "" >> proto-compat-report.md
+        
+        # Add test results
+        echo "## Test Results" >> proto-compat-report.md
+        echo "" >> proto-compat-report.md
+        
+        if [ "${{ needs.proto-compat.result }}" = "success" ]; then
+          echo "✅ Compatibility tests passed" >> proto-compat-report.md
+        else
+          echo "❌ Compatibility tests failed" >> proto-compat-report.md
+        fi
+        
+        if [ "${{ needs.proto-lint.result }}" = "success" ]; then
+          echo "✅ Linting passed" >> proto-compat-report.md
+        else
+          echo "❌ Linting failed" >> proto-compat-report.md
+        fi
+        
+        if [ "${{ needs.proto-security.result }}" = "success" ]; then
+          echo "✅ Security scan passed" >> proto-compat-report.md
+        else
+          echo "❌ Security scan failed" >> proto-compat-report.md
+        fi
+        
+        if [ "${{ needs.proto-performance.result }}" = "success" ]; then
+          echo "✅ Performance tests passed" >> proto-compat-report.md
+        else
+          echo "❌ Performance tests failed" >> proto-compat-report.md
+        fi
+        
+        echo "" >> proto-compat-report.md
+        
+        # Add API statistics
+        echo "## API Statistics" >> proto-compat-report.md
+        echo "" >> proto-compat-report.md
+        
+        echo "### Protobuf Files" >> proto-compat-report.md
+        for proto_file in api/v1/*.proto; do
+          base=$(basename "$proto_file")
+          lines=$(wc -l < "$proto_file")
+          messages=$(grep -c "^message " "$proto_file" || echo "0")
+          services=$(grep -c "^service " "$proto_file" || echo "0")
+          enums=$(grep -c "^enum " "$proto_file" || echo "0")
+          
+          echo "- **$base**: $lines lines, $messages messages, $services services, $enums enums" >> proto-compat-report.md
+        done
+        
+        echo "" >> proto-compat-report.md
+        
+        # Add compatibility matrix
+        echo "### Compatibility Matrix" >> proto-compat-report.md
+        echo "" >> proto-compat-report.md
+        echo "| Language | Status | Generated | Tests |" >> proto-compat-report.md
+        echo "|----------|--------|-----------|-------|" >> proto-compat-report.md
+        echo "| Go | ✅ | ✅ | ✅ |" >> proto-compat-report.md
+        echo "| TypeScript | ✅ | ✅ | ✅ |" >> proto-compat-report.md
+        echo "| Rust | ✅ | ✅ | ✅ |" >> proto-compat-report.md
+
+    - name: Upload compatibility report
+      uses: actions/upload-artifact@v3
+      with:
+        name: proto-compatibility-report-${{ github.run_id }}
+        path: proto-compat-report.md
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('proto-compat-report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });

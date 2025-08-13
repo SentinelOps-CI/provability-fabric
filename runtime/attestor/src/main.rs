@@ -13,6 +13,8 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 mod attest;
+mod nitro;
+mod sev;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Heartbeat {

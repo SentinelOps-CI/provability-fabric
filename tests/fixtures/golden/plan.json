@@ -1,0 +1,96 @@
+{
+  "plan_id": "plan_12345",
+  "tenant": "tenant_001",
+  "subject": {
+    "id": "user_001",
+    "caps": ["read", "write", "execute"],
+    "subject_type": "SUBJECT_TYPE_USER",
+    "auth_context": {
+      "auth_method": "oauth2",
+      "auth_time": "2024-01-15T10:30:00Z",
+      "session_id": "session_abc123",
+      "mfa_completed": true
+    }
+  },
+  "input_channels": {
+    "system": {
+      "hash": "sha256:abc123def456",
+      "policy_hash": "sha256:policy789",
+      "version": "1.0.0",
+      "build_id": "build_20240115"
+    },
+    "user": {
+      "content_hash": "sha256:user_content_hash",
+      "quoted": true,
+      "input_type": "USER_INPUT_TYPE_TEXT",
+      "language": "en"
+    },
+    "retrieved": [
+      {
+        "receipt_id": "receipt_001",
+        "content_hash": "sha256:retrieved_content_hash",
+        "quoted": true,
+        "labels": ["public", "verified"],
+        "source_id": "source_001",
+        "retrieved_at": "2024-01-15T10:25:00Z"
+      }
+    ],
+    "file": [
+      {
+        "sha256": "sha256:file_hash_123",
+        "media_type": "text/plain",
+        "quoted": true,
+        "size_bytes": 1024,
+        "filename": "input.txt"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "tool": "text_processor",
+      "args": {
+        "max_length": "1000",
+        "format": "markdown"
+      },
+      "caps_required": ["read", "process"],
+      "labels_in": ["user_input"],
+      "labels_out": ["processed_text"],
+      "receipts": [
+        {
+          "receipt_id": "receipt_001",
+          "tenant": "tenant_001",
+          "subject_id": "user_001",
+          "query_hash": "sha256:query_hash",
+          "index_shard": "shard_001",
+          "timestamp": "2024-01-15T10:25:00Z",
+          "result_hash": "sha256:result_hash",
+          "sign_alg": "ed25519",
+          "sig": "signature_abc123",
+          "expires_at": "2024-01-16T10:25:00Z"
+        }
+      ],
+      "timeout_ms": 5000,
+      "retry_config": {
+        "max_attempts": 3,
+        "base_delay_ms": 1000,
+        "max_delay_ms": 10000,
+        "backoff_multiplier": 2.0
+      }
+    }
+  ],
+  "constraints": {
+    "budget": 10.50,
+    "pii": false,
+    "dp_epsilon": 1.0,
+    "dp_delta": 0.001,
+    "latency_max": 5000.0,
+    "memory_max_mb": 512,
+    "cpu_max_cores": 2.0,
+    "network_max_mbps": 10.0
+  },
+  "system_prompt_hash": "sha256:system_prompt_hash",
+  "created_at": "2024-01-15T10:30:00Z",
+  "expires_at": "2024-01-16T10:30:00Z",
+  "schema_version": "1.0.0",
+  "policy_hash": "sha256:policy_hash_123"
+}

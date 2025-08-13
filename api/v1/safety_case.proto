@@ -1,0 +1,1189 @@
+syntax = "proto3";
+
+package provability_fabric.api.v1;
+
+option go_package = "github.com/provability-fabric/api/v1;v1";
+option java_multiple_files = true;
+option java_package = "com.provability.fabric.api.v1";
+
+import "google/protobuf/timestamp.proto";
+
+// Safety Case Service for managing and validating safety cases
+service SafetyCaseService {
+  // Create a new safety case
+  rpc CreateSafetyCase(CreateSafetyCaseRequest) returns (CreateSafetyCaseResponse);
+  
+  // Validate a safety case
+  rpc ValidateSafetyCase(ValidateSafetyCaseRequest) returns (ValidateSafetyCaseResponse);
+  
+  // Update a safety case
+  rpc UpdateSafetyCase(UpdateSafetyCaseRequest) returns (UpdateSafetyCaseResponse);
+  
+  // Get safety case details
+  rpc GetSafetyCase(GetSafetyCaseRequest) returns (GetSafetyCaseResponse);
+  
+  // List safety cases
+  rpc ListSafetyCases(ListSafetyCasesRequest) returns (ListSafetyCasesResponse);
+  
+  // Revoke a safety case
+  rpc RevokeSafetyCase(RevokeSafetyCaseRequest) returns (RevokeSafetyCaseResponse);
+  
+  // Get safety case statistics
+  rpc GetSafetyCaseStats(GetSafetyCaseStatsRequest) returns (GetSafetyCaseStatsResponse);
+  
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Safety case for AI system deployment
+message SafetyCase {
+  // Unique safety case identifier
+  string case_id = 1;
+  
+  // Plan identifier
+  string plan_id = 2;
+  
+  // Tenant identifier
+  string tenant = 3;
+  
+  // Safety case title
+  string title = 4;
+  
+  // Safety case description
+  string description = 5;
+  
+  // Safety case status
+  SafetyCaseStatus status = 6;
+  
+  // Safety case type
+  SafetyCaseType case_type = 7;
+  
+  // Risk assessment
+  RiskAssessment risk_assessment = 8;
+  
+  // Safety requirements
+  repeated SafetyRequirement safety_requirements = 9;
+  
+  // Safety evidence
+  repeated SafetyEvidence safety_evidence = 10;
+  
+  // Safety arguments
+  repeated SafetyArgument safety_arguments = 11;
+  
+  // Compliance information
+  ComplianceInfo compliance_info = 12;
+  
+  // Review information
+  ReviewInfo review_info = 13;
+  
+  // Creation timestamp
+  google.protobuf.Timestamp created_at = 14;
+  
+  // Last updated timestamp
+  google.protobuf.Timestamp updated_at = 15;
+  
+  // Expiration timestamp
+  google.protobuf.Timestamp expires_at = 16;
+  
+  // Safety case signature
+  string signature = 17;
+  
+  // Signature algorithm
+  string signature_algorithm = 18;
+  
+  // Safety case hash
+  string case_hash = 19;
+  
+  // Version information
+  string version = 20;
+  
+  // Metadata
+  map<string, string> metadata = 21;
+}
+
+// Safety case status
+enum SafetyCaseStatus {
+  SAFETY_CASE_STATUS_UNSPECIFIED = 0;
+  SAFETY_CASE_STATUS_DRAFT = 1;
+  SAFETY_CASE_STATUS_SUBMITTED = 2;
+  SAFETY_CASE_STATUS_UNDER_REVIEW = 3;
+  SAFETY_CASE_STATUS_APPROVED = 4;
+  SAFETY_CASE_STATUS_REJECTED = 5;
+  SAFETY_CASE_STATUS_REVOKED = 6;
+  SAFETY_CASE_STATUS_EXPIRED = 7;
+}
+
+// Safety case type
+enum SafetyCaseType {
+  SAFETY_CASE_TYPE_UNSPECIFIED = 0;
+  SAFETY_CASE_TYPE_AI_SYSTEM = 1;
+  SAFETY_CASE_TYPE_ALGORITHM = 2;
+  SAFETY_CASE_TYPE_MODEL = 3;
+  SAFETY_CASE_TYPE_PIPELINE = 4;
+  SAFETY_CASE_TYPE_INTEGRATION = 5;
+  SAFETY_CASE_TYPE_DEPLOYMENT = 6;
+}
+
+// Risk assessment
+message RiskAssessment {
+  // Overall risk level
+  RiskLevel overall_risk_level = 1;
+  
+  // Risk score (0.0 to 1.0)
+  double risk_score = 2;
+  
+  // Risk factors
+  repeated RiskFactor risk_factors = 3;
+  
+  // Mitigation strategies
+  repeated MitigationStrategy mitigation_strategies = 4;
+  
+  // Residual risk
+  RiskLevel residual_risk_level = 5;
+  
+  // Risk assessment timestamp
+  google.protobuf.Timestamp assessed_at = 6;
+  
+  // Risk assessor
+  string assessor = 7;
+  
+  // Assessment methodology
+  string methodology = 8;
+}
+
+// Risk level
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_NEGLIGIBLE = 1;
+  RISK_LEVEL_LOW = 2;
+  RISK_LEVEL_MEDIUM = 3;
+  RISK_LEVEL_HIGH = 4;
+  RISK_LEVEL_CRITICAL = 5;
+}
+
+// Risk factor
+message RiskFactor {
+  // Risk factor identifier
+  string factor_id = 1;
+  
+  // Risk factor name
+  string name = 2;
+  
+  // Risk factor description
+  string description = 3;
+  
+  // Risk level
+  RiskLevel risk_level = 4;
+  
+  // Probability (0.0 to 1.0)
+  double probability = 5;
+  
+  // Impact severity (0.0 to 1.0)
+  double impact_severity = 6;
+  
+  // Risk score (0.0 to 1.0)
+  double risk_score = 7;
+  
+  // Mitigation status
+  MitigationStatus mitigation_status = 8;
+  
+  // Additional context
+  map<string, string> context = 9;
+}
+
+// Mitigation status
+enum MitigationStatus {
+  MITIGATION_STATUS_UNSPECIFIED = 0;
+  MITIGATION_STATUS_NOT_MITIGATED = 1;
+  MITIGATION_STATUS_PARTIALLY_MITIGATED = 2;
+  MITIGATION_STATUS_FULLY_MITIGATED = 3;
+  MITIGATION_STATUS_ACCEPTED = 4;
+}
+
+// Mitigation strategy
+message MitigationStrategy {
+  // Strategy identifier
+  string strategy_id = 1;
+  
+  // Strategy name
+  string name = 2;
+  
+  // Strategy description
+  string description = 3;
+  
+  // Strategy type
+  MitigationStrategyType strategy_type = 4;
+  
+  // Implementation status
+  ImplementationStatus implementation_status = 5;
+  
+  // Effectiveness (0.0 to 1.0)
+  double effectiveness = 6;
+  
+  // Implementation cost
+  string implementation_cost = 7;
+  
+  // Implementation timeline
+  string implementation_timeline = 8;
+  
+  // Responsible party
+  string responsible_party = 9;
+}
+
+// Mitigation strategy type
+enum MitigationStrategyType {
+  MITIGATION_STRATEGY_TYPE_UNSPECIFIED = 0;
+  MITIGATION_STRATEGY_TYPE_PREVENTION = 1;
+  MITIGATION_STRATEGY_TYPE_DETECTION = 2;
+  MITIGATION_STRATEGY_TYPE_RESPONSE = 3;
+  MITIGATION_STRATEGY_TYPE_RECOVERY = 4;
+  MITIGATION_STRATEGY_TYPE_ACCEPTANCE = 5;
+}
+
+// Implementation status
+enum ImplementationStatus {
+  IMPLEMENTATION_STATUS_UNSPECIFIED = 0;
+  IMPLEMENTATION_STATUS_NOT_STARTED = 1;
+  IMPLEMENTATION_STATUS_IN_PROGRESS = 2;
+  IMPLEMENTATION_STATUS_COMPLETED = 3;
+  IMPLEMENTATION_STATUS_VERIFIED = 4;
+  IMPLEMENTATION_STATUS_MAINTENANCE = 5;
+}
+
+// Safety requirement
+message SafetyRequirement {
+  // Requirement identifier
+  string requirement_id = 1;
+  
+  // Requirement type
+  SafetyRequirementType requirement_type = 2;
+  
+  // Requirement description
+  string description = 3;
+  
+  // Requirement priority
+  RequirementPriority priority = 4;
+  
+  // Requirement status
+  RequirementStatus status = 5;
+  
+  // Verification method
+  string verification_method = 6;
+  
+  // Acceptance criteria
+  string acceptance_criteria = 7;
+  
+  // Related risks
+  repeated string related_risk_factors = 8;
+  
+  // Dependencies
+  repeated string dependencies = 9;
+  
+  // Verification evidence
+  repeated string verification_evidence = 10;
+}
+
+// Safety requirement type
+enum SafetyRequirementType {
+  SAFETY_REQUIREMENT_TYPE_UNSPECIFIED = 0;
+  SAFETY_REQUIREMENT_TYPE_FUNCTIONAL = 1;
+  SAFETY_REQUIREMENT_TYPE_PERFORMANCE = 2;
+  SAFETY_REQUIREMENT_TYPE_RELIABILITY = 3;
+  SAFETY_REQUIREMENT_TYPE_SECURITY = 4;
+  SAFETY_REQUIREMENT_TYPE_PRIVACY = 5;
+  SAFETY_REQUIREMENT_TYPE_ETHICAL = 6;
+  SAFETY_REQUIREMENT_TYPE_COMPLIANCE = 7;
+}
+
+// Requirement priority
+enum RequirementPriority {
+  REQUIREMENT_PRIORITY_UNSPECIFIED = 0;
+  REQUIREMENT_PRIORITY_LOW = 1;
+  REQUIREMENT_PRIORITY_MEDIUM = 2;
+  REQUIREMENT_PRIORITY_HIGH = 3;
+  REQUIREMENT_PRIORITY_CRITICAL = 4;
+}
+
+// Requirement status
+enum RequirementStatus {
+  REQUIREMENT_STATUS_UNSPECIFIED = 0;
+  REQUIREMENT_STATUS_PROPOSED = 1;
+  REQUIREMENT_STATUS_APPROVED = 2;
+  REQUIREMENT_STATUS_IMPLEMENTED = 3;
+  REQUIREMENT_STATUS_VERIFIED = 4;
+  REQUIREMENT_STATUS_MAINTENANCE = 5;
+  REQUIREMENT_STATUS_RETIRED = 6;
+}
+
+// Safety evidence
+message SafetyEvidence {
+  // Evidence identifier
+  string evidence_id = 1;
+  
+  // Evidence type
+  EvidenceType evidence_type = 2;
+  
+  // Evidence description
+  string description = 3;
+  
+  // Evidence source
+  string source = 4;
+  
+  // Evidence timestamp
+  google.protobuf.Timestamp timestamp = 5;
+  
+  // Evidence quality (0.0 to 1.0)
+  double quality_score = 6;
+  
+  // Evidence reliability (0.0 to 1.0)
+  double reliability_score = 7;
+  
+  // Evidence relevance (0.0 to 1.0)
+  double relevance_score = 8;
+  
+  // Evidence format
+  string format = 9;
+  
+  // Evidence location
+  string location = 10;
+  
+  // Evidence hash
+  string hash = 11;
+  
+  // Evidence signature
+  string signature = 12;
+  
+  // Related requirements
+  repeated string related_requirements = 13;
+  
+  // Additional metadata
+  map<string, string> metadata = 14;
+}
+
+// Evidence type
+enum EvidenceType {
+  EVIDENCE_TYPE_UNSPECIFIED = 0;
+  EVIDENCE_TYPE_TEST_RESULT = 1;
+  EVIDENCE_TYPE_ANALYSIS = 2;
+  EVIDENCE_TYPE_EXPERT_OPINION = 3;
+  EVIDENCE_TYPE_CASE_STUDY = 4;
+  EVIDENCE_TYPE_SIMULATION = 5;
+  EVIDENCE_TYPE_FORMAL_PROOF = 6;
+  EVIDENCE_TYPE_DOCUMENTATION = 7;
+  EVIDENCE_TYPE_AUDIT_REPORT = 8;
+  EVIDENCE_TYPE_CERTIFICATION = 9;
+}
+
+// Safety argument
+message SafetyArgument {
+  // Argument identifier
+  string argument_id = 1;
+  
+  // Argument type
+  ArgumentType argument_type = 2;
+  
+  // Argument description
+  string description = 3;
+  
+  // Argument structure
+  string structure = 4;
+  
+  // Argument strength (0.0 to 1.0)
+  double strength = 5;
+  
+  // Argument validity
+  bool valid = 6;
+  
+  // Argument assumptions
+  repeated string assumptions = 7;
+  
+  // Argument limitations
+  repeated string limitations = 8;
+  
+  // Supporting evidence
+  repeated string supporting_evidence = 9;
+  
+  // Counter-arguments
+  repeated string counter_arguments = 10;
+  
+  // Argument timestamp
+  google.protobuf.Timestamp timestamp = 11;
+  
+  // Argument author
+  string author = 12;
+}
+
+// Argument type
+enum ArgumentType {
+  ARGUMENT_TYPE_UNSPECIFIED = 0;
+  ARGUMENT_TYPE_CLAIM = 1;
+  ARGUMENT_TYPE_WARRANT = 2;
+  ARGUMENT_TYPE_BACKING = 3;
+  ARGUMENT_TYPE_QUALIFIER = 4;
+  ARGUMENT_TYPE_REBUTTAL = 5;
+}
+
+// Compliance information
+message ComplianceInfo {
+  // Compliance framework
+  string framework = 1;
+  
+  // Compliance version
+  string version = 2;
+  
+  // Compliance status
+  ComplianceStatus status = 3;
+  
+  // Compliance score (0.0 to 1.0)
+  double compliance_score = 4;
+  
+  // Compliance gaps
+  repeated ComplianceGap gaps = 5;
+  
+  // Compliance evidence
+  repeated string compliance_evidence = 6;
+  
+  // Compliance audit date
+  google.protobuf.Timestamp audit_date = 7;
+  
+  // Compliance auditor
+  string auditor = 8;
+  
+  // Next audit date
+  google.protobuf.Timestamp next_audit_date = 9;
+}
+
+// Compliance status
+enum ComplianceStatus {
+  COMPLIANCE_STATUS_UNSPECIFIED = 0;
+  COMPLIANCE_STATUS_NON_COMPLIANT = 1;
+  COMPLIANCE_STATUS_PARTIALLY_COMPLIANT = 2;
+  COMPLIANCE_STATUS_COMPLIANT = 3;
+  COMPLIANCE_STATUS_CERTIFIED = 4;
+}
+
+// Compliance gap
+message ComplianceGap {
+  // Gap identifier
+  string gap_id = 1;
+  
+  // Gap description
+  string description = 2;
+  
+  // Gap severity
+  GapSeverity severity = 3;
+  
+  // Gap status
+  GapStatus status = 4;
+  
+  // Remediation plan
+  string remediation_plan = 5;
+  
+  // Target resolution date
+  google.protobuf.Timestamp target_date = 6;
+  
+  // Responsible party
+  string responsible_party = 7;
+}
+
+// Gap severity
+enum GapSeverity {
+  GAP_SEVERITY_UNSPECIFIED = 0;
+  GAP_SEVERITY_LOW = 1;
+  GAP_SEVERITY_MEDIUM = 2;
+  GAP_SEVERITY_HIGH = 3;
+  GAP_SEVERITY_CRITICAL = 4;
+}
+
+// Gap status
+enum GapStatus {
+  GAP_STATUS_UNSPECIFIED = 0;
+  GAP_STATUS_OPEN = 1;
+  GAP_STATUS_IN_PROGRESS = 2;
+  GAP_STATUS_RESOLVED = 3;
+  GAP_STATUS_VERIFIED = 4;
+  GAP_STATUS_ACCEPTED = 5;
+}
+
+// Review information
+message ReviewInfo {
+  // Review status
+  ReviewStatus status = 1;
+  
+  // Review type
+  ReviewType review_type = 2;
+  
+  // Reviewers
+  repeated string reviewers = 3;
+  
+  // Review comments
+  repeated ReviewComment comments = 4;
+  
+  // Review decision
+  ReviewDecision decision = 5;
+  
+  // Review timestamp
+  google.protobuf.Timestamp review_timestamp = 6;
+  
+  // Review deadline
+  google.protobuf.Timestamp review_deadline = 7;
+  
+  // Review criteria
+  repeated string review_criteria = 8;
+  
+  // Review methodology
+  string methodology = 9;
+}
+
+// Review status
+enum ReviewStatus {
+  REVIEW_STATUS_UNSPECIFIED = 0;
+  REVIEW_STATUS_PENDING = 1;
+  REVIEW_STATUS_IN_PROGRESS = 2;
+  REVIEW_STATUS_COMPLETED = 3;
+  REVIEW_STATUS_OVERDUE = 4;
+  REVIEW_STATUS_CANCELLED = 5;
+}
+
+// Review type
+enum ReviewType {
+  REVIEW_TYPE_UNSPECIFIED = 0;
+  REVIEW_TYPE_TECHNICAL = 1;
+  REVIEW_TYPE_SAFETY = 2;
+  REVIEW_TYPE_SECURITY = 3;
+  REVIEW_TYPE_ETHICAL = 4;
+  REVIEW_TYPE_LEGAL = 5;
+  REVIEW_TYPE_MANAGEMENT = 6;
+  REVIEW_TYPE_PEER = 7;
+  REVIEW_TYPE_EXTERNAL = 8;
+}
+
+// Review comment
+message ReviewComment {
+  // Comment identifier
+  string comment_id = 1;
+  
+  // Commenter
+  string commenter = 2;
+  
+  // Comment text
+  string text = 3;
+  
+  // Comment timestamp
+  google.protobuf.Timestamp timestamp = 4;
+  
+  // Comment type
+  CommentType comment_type = 5;
+  
+  // Comment severity
+  CommentSeverity severity = 6;
+  
+  // Related requirement
+  string related_requirement = 7;
+  
+  // Action required
+  string action_required = 8;
+  
+  // Resolution status
+  ResolutionStatus resolution_status = 9;
+}
+
+// Comment type
+enum CommentType {
+  COMMENT_TYPE_UNSPECIFIED = 0;
+  COMMENT_TYPE_QUESTION = 1;
+  COMMENT_TYPE_SUGGESTION = 2;
+  COMMENT_TYPE_ISSUE = 3;
+  COMMENT_TYPE_APPROVAL = 4;
+  COMMENT_TYPE_REJECTION = 5;
+  COMMENT_TYPE_CLARIFICATION = 6;
+}
+
+// Comment severity
+enum CommentSeverity {
+  COMMENT_SEVERITY_UNSPECIFIED = 0;
+  COMMENT_SEVERITY_LOW = 1;
+  COMMENT_SEVERITY_MEDIUM = 2;
+  COMMENT_SEVERITY_HIGH = 3;
+  COMMENT_SEVERITY_CRITICAL = 4;
+}
+
+// Resolution status
+enum ResolutionStatus {
+  RESOLUTION_STATUS_UNSPECIFIED = 0;
+  RESOLUTION_STATUS_OPEN = 1;
+  RESOLUTION_STATUS_IN_PROGRESS = 2;
+  RESOLUTION_STATUS_RESOLVED = 3;
+  RESOLUTION_STATUS_VERIFIED = 4;
+  RESOLUTION_STATUS_CLOSED = 5;
+}
+
+// Review decision
+enum ReviewDecision {
+  REVIEW_DECISION_UNSPECIFIED = 0;
+  REVIEW_DECISION_APPROVED = 1;
+  REVIEW_DECISION_APPROVED_WITH_CONDITIONS = 2;
+  REVIEW_DECISION_REJECTED = 3;
+  REVIEW_DECISION_NEEDS_REVISION = 4;
+  REVIEW_DECISION_UNDER_REVIEW = 5;
+}
+
+// Create safety case request
+message CreateSafetyCaseRequest {
+  // Safety case data
+  SafetyCase safety_case = 1;
+  
+  // Signing key identifier
+  string signing_key_id = 2;
+  
+  // Creation context
+  SafetyCaseContext context = 3;
+}
+
+// Safety case context
+message SafetyCaseContext {
+  // Request timestamp
+  google.protobuf.Timestamp request_time = 1;
+  
+  // Client identifier
+  string client_id = 2;
+  
+  // Session identifier
+  string session_id = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Create safety case response
+message CreateSafetyCaseResponse {
+  // Created safety case
+  SafetyCase safety_case = 1;
+  
+  // Creation success
+  bool success = 2;
+  
+  // Creation message
+  string message = 3;
+  
+  // Safety case signature
+  string signature = 4;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 5;
+}
+
+// Validate safety case request
+message ValidateSafetyCaseRequest {
+  // Safety case to validate
+  SafetyCase safety_case = 1;
+  
+  // Validation context
+  ValidationContext context = 2;
+  
+  // Validation level
+  ValidationLevel level = 3;
+}
+
+// Validation context
+message ValidationContext {
+  // Validation timestamp
+  google.protobuf.Timestamp validation_time = 1;
+  
+  // Validator identifier
+  string validator_id = 2;
+  
+  // Validation purpose
+  string purpose = 3;
+  
+  // Additional context
+  map<string, string> metadata = 4;
+}
+
+// Validation level
+enum ValidationLevel {
+  VALIDATION_LEVEL_UNSPECIFIED = 0;
+  VALIDATION_LEVEL_BASIC = 1;
+  VALIDATION_LEVEL_STRICT = 2;
+  VALIDATION_LEVEL_CRITICAL = 3;
+}
+
+// Validate safety case response
+message ValidateSafetyCaseResponse {
+  // Validation result
+  bool valid = 1;
+  
+  // Validation reason
+  string reason = 2;
+  
+  // Validation errors
+  repeated string errors = 3;
+  
+  // Validation warnings
+  repeated string warnings = 4;
+  
+  // Validation score (0.0 to 1.0)
+  double score = 5;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 6;
+  
+  // Validation details
+  ValidationDetails details = 7;
+}
+
+// Validation details
+message ValidationDetails {
+  // Requirements validation
+  RequirementsValidation requirements_validation = 1;
+  
+  // Evidence validation
+  EvidenceValidation evidence_validation = 2;
+  
+  // Arguments validation
+  ArgumentsValidation arguments_validation = 3;
+  
+  // Compliance validation
+  ComplianceValidation compliance_validation = 4;
+  
+  // Risk assessment validation
+  RiskAssessmentValidation risk_validation = 5;
+}
+
+// Requirements validation
+message RequirementsValidation {
+  // Total requirements
+  uint32 total_requirements = 1;
+  
+  // Valid requirements
+  uint32 valid_requirements = 2;
+  
+  // Invalid requirements
+  uint32 invalid_requirements = 3;
+  
+  // Coverage score (0.0 to 1.0)
+  double coverage_score = 4;
+  
+  // Validation errors
+  repeated string errors = 5;
+}
+
+// Evidence validation
+message EvidenceValidation {
+  // Total evidence
+  uint32 total_evidence = 1;
+  
+  // Valid evidence
+  uint32 valid_evidence = 2;
+  
+  // Invalid evidence
+  uint32 invalid_evidence = 3;
+  
+  // Quality score (0.0 to 1.0)
+  double quality_score = 4;
+  
+  // Validation errors
+  repeated string errors = 5;
+}
+
+// Arguments validation
+message ArgumentsValidation {
+  // Total arguments
+  uint32 total_arguments = 1;
+  
+  // Valid arguments
+  uint32 valid_arguments = 2;
+  
+  // Invalid arguments
+  uint32 invalid_arguments = 3;
+  
+  // Strength score (0.0 to 1.0)
+  double strength_score = 4;
+  
+  // Validation errors
+  repeated string errors = 5;
+}
+
+// Compliance validation
+message ComplianceValidation {
+  // Compliance status
+  ComplianceStatus status = 1;
+  
+  // Compliance score (0.0 to 1.0)
+  double compliance_score = 2;
+  
+  // Compliance gaps
+  repeated ComplianceGap gaps = 3;
+  
+  // Validation errors
+  repeated string errors = 4;
+}
+
+// Risk assessment validation
+message RiskAssessmentValidation {
+  // Risk assessment valid
+  bool risk_assessment_valid = 1;
+  
+  // Risk level acceptable
+  bool risk_level_acceptable = 2;
+  
+  // Mitigation adequate
+  bool mitigation_adequate = 3;
+  
+  // Validation errors
+  repeated string errors = 4;
+}
+
+// Update safety case request
+message UpdateSafetyCaseRequest {
+  // Safety case identifier
+  string case_id = 1;
+  
+  // Updated safety case
+  SafetyCase safety_case = 2;
+  
+  // Update reason
+  string update_reason = 3;
+  
+  // Update context
+  SafetyCaseContext context = 4;
+}
+
+// Update safety case response
+message UpdateSafetyCaseResponse {
+  // Updated safety case
+  SafetyCase safety_case = 1;
+  
+  // Update success
+  bool success = 2;
+  
+  // Update message
+  string message = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+}
+
+// Get safety case request
+message GetSafetyCaseRequest {
+  // Safety case identifier
+  string case_id = 1;
+  
+  // Include revoked cases
+  bool include_revoked = 2;
+  
+  // Include expired cases
+  bool include_expired = 3;
+}
+
+// Get safety case response
+message GetSafetyCaseResponse {
+  // Safety case details
+  SafetyCase safety_case = 1;
+  
+  // Case found
+  bool found = 2;
+  
+  // Error message if not found
+  string error_message = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+}
+
+// List safety cases request
+message ListSafetyCasesRequest {
+  // Tenant identifier filter
+  string tenant = 1;
+  
+  // Status filter
+  SafetyCaseStatus status = 2;
+  
+  // Type filter
+  SafetyCaseType case_type = 3;
+  
+  // Time range filter
+  TimeRange time_range = 4;
+  
+  // Pagination
+  Pagination pagination = 5;
+  
+  // Sort order
+  SortOrder sort_order = 6;
+}
+
+// Time range
+message TimeRange {
+  // Start timestamp
+  google.protobuf.Timestamp start_time = 1;
+  
+  // End timestamp
+  google.protobuf.Timestamp end_time = 2;
+}
+
+// Pagination
+message Pagination {
+  // Page number (1-based)
+  uint32 page = 1;
+  
+  // Page size
+  uint32 page_size = 2;
+  
+  // Maximum page size
+  uint32 max_page_size = 3;
+}
+
+// Sort order
+message SortOrder {
+  // Sort field
+  string field = 1;
+  
+  // Sort direction
+  SortDirection direction = 2;
+}
+
+// Sort direction
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_DIRECTION_ASC = 1;
+  SORT_DIRECTION_DESC = 2;
+}
+
+// List safety cases response
+message ListSafetyCasesResponse {
+  // Safety cases list
+  repeated SafetyCase safety_cases = 1;
+  
+  // Pagination info
+  PaginationInfo pagination_info = 2;
+  
+  // Total count
+  uint64 total_count = 3;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 4;
+}
+
+// Pagination info
+message PaginationInfo {
+  // Current page
+  uint32 current_page = 1;
+  
+  // Page size
+  uint32 page_size = 2;
+  
+  // Total pages
+  uint32 total_pages = 3;
+  
+  // Has next page
+  bool has_next = 4;
+  
+  // Has previous page
+  bool has_previous = 5;
+}
+
+// Revoke safety case request
+message RevokeSafetyCaseRequest {
+  // Safety case identifier
+  string case_id = 1;
+  
+  // Revocation reason
+  string reason = 2;
+  
+  // Revocation timestamp
+  google.protobuf.Timestamp revoked_at = 3;
+  
+  // Revoker identifier
+  string revoker_id = 4;
+  
+  // Force revocation (bypass checks)
+  bool force = 5;
+}
+
+// Revoke safety case response
+message RevokeSafetyCaseResponse {
+  // Revocation success
+  bool success = 1;
+  
+  // Revocation message
+  string message = 2;
+  
+  // Revoked safety case
+  SafetyCase safety_case = 3;
+  
+  // Revocation timestamp
+  google.protobuf.Timestamp revoked_at = 4;
+  
+  // Processing time in milliseconds
+  uint64 processing_time_ms = 5;
+}
+
+// Get safety case statistics request
+message GetSafetyCaseStatsRequest {
+  // Tenant identifier
+  string tenant = 1;
+  
+  // Statistics scope
+  StatsScope scope = 2;
+  
+  // Time range
+  TimeRange time_range = 3;
+  
+  // Group by field
+  string group_by = 4;
+}
+
+// Statistics scope
+enum StatsScope {
+  STATS_SCOPE_UNSPECIFIED = 0;
+  STATS_SCOPE_TENANT = 1;
+  STATS_SCOPE_GLOBAL = 2;
+  STATS_SCOPE_TYPE = 3;
+  STATS_SCOPE_STATUS = 4;
+}
+
+// Get safety case statistics response
+message GetSafetyCaseStatsResponse {
+  // Safety case statistics
+  SafetyCaseStatistics statistics = 1;
+  
+  // Time series data
+  repeated TimeSeriesPoint time_series = 2;
+  
+  // Grouped statistics
+  repeated GroupedStatistics grouped_stats = 3;
+  
+  // Statistics timestamp
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Safety case statistics
+message SafetyCaseStatistics {
+  // Total safety cases
+  uint64 total_cases = 1;
+  
+  // Active cases
+  uint64 active_cases = 2;
+  
+  // Approved cases
+  uint64 approved_cases = 3;
+  
+  // Rejected cases
+  uint64 rejected_cases = 4;
+  
+  // Revoked cases
+  uint64 revoked_cases = 5;
+  
+  // Expired cases
+  uint64 expired_cases = 6;
+  
+  // Average approval time in seconds
+  uint64 avg_approval_time_seconds = 7;
+  
+  // Average risk score
+  double avg_risk_score = 8;
+  
+  // Average compliance score
+  double avg_compliance_score = 9;
+}
+
+// Time series point
+message TimeSeriesPoint {
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 1;
+  
+  // Value
+  double value = 2;
+  
+  // Metric name
+  string metric = 3;
+  
+  // Additional metadata
+  map<string, string> metadata = 4;
+}
+
+// Grouped statistics
+message GroupedStatistics {
+  // Group key
+  string group_key = 1;
+  
+  // Group value
+  string group_value = 2;
+  
+  // Statistics for this group
+  SafetyCaseStatistics statistics = 3;
+}
+
+// Health check request
+message HealthCheckRequest {
+  // Service identifier
+  string service = 1;
+  
+  // Health check level
+  HealthCheckLevel level = 2;
+}
+
+// Health check level
+enum HealthCheckLevel {
+  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
+  HEALTH_CHECK_LEVEL_BASIC = 1;
+  HEALTH_CHECK_LEVEL_DETAILED = 2;
+  HEALTH_CHECK_LEVEL_CRITICAL = 3;
+}
+
+// Health check response
+message HealthCheckResponse {
+  // Service status
+  ServiceStatus status = 1;
+  
+  // Service version
+  string version = 2;
+  
+  // Uptime in seconds
+  uint64 uptime_seconds = 3;
+  
+  // Service metadata
+  map<string, string> metadata = 4;
+  
+  // Health check details
+  repeated HealthCheckDetail details = 5;
+  
+  // Last health check timestamp
+  google.protobuf.Timestamp last_check = 6;
+}
+
+// Service status
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_HEALTHY = 1;
+  SERVICE_STATUS_DEGRADED = 2;
+  SERVICE_STATUS_UNHEALTHY = 3;
+  SERVICE_STATUS_UNKNOWN = 4;
+}
+
+// Health check detail
+message HealthCheckDetail {
+  // Component name
+  string component = 1;
+  
+  // Component status
+  ComponentStatus status = 2;
+  
+  // Component message
+  string message = 3;
+  
+  // Component metrics
+  map<string, string> metrics = 4;
+  
+  // Last check timestamp
+  google.protobuf.Timestamp last_check = 5;
+}
+
+// Component status
+enum ComponentStatus {
+  COMPONENT_STATUS_UNSPECIFIED = 0;
+  COMPONENT_STATUS_HEALTHY = 1;
+  COMPONENT_STATUS_DEGRADED = 2;
+  COMPONENT_STATUS_UNHEALTHY = 3;
+  COMPONENT_STATUS_UNKNOWN = 4;
+}

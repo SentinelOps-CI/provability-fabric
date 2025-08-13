@@ -10,6 +10,17 @@ use metrics::{counter, histogram, gauge};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
+mod ratelimit;
+mod approvals;
+
+#[cfg(test)]
+mod ratelimit_test;
+#[cfg(test)]
+mod integration_test;
+
+use ratelimit::{RateLimiter, RateLimitConfig, RateLimitDecision, RateLimitUsage};
+use approvals::ApprovalManager;
+
 #[derive(Debug, Deserialize, Serialize)]
 struct KernelDecision {
     approved_steps: Vec<ApprovedStep>,
@@ -69,6 +80,8 @@ struct ToolBroker {
     http_client: reqwest::Client,
     approved_steps: Arc<RwLock<HashMap<String, Vec<ApprovedStep>>>>,
     violation_log: Arc<RwLock<Vec<Violation>>>,
+    rate_limiter: RateLimiter,
+    approval_manager: ApprovalManager,
 }
 
 impl ToolBroker {
@@ -76,7 +89,7 @@ impl ToolBroker {
         // Create optimized HTTP client with connection pooling
         let http_client = reqwest::Client::builder()
             .pool_max_idle_per_host(10) // Optimize for typical load
-            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
+            .pool_idle_timeout(Duration::from_secs(30)) // Keep connections alive
             .http2_prior_knowledge() // Force HTTP/2 for better performance
             .timeout(Duration::from_secs(30)) // Request timeout
             .connect_timeout(Duration::from_secs(10)) // Connection timeout
@@ -84,11 +97,19 @@ impl ToolBroker {
             .build()
             .expect("Failed to create HTTP client");
 
+        // Initialize rate limiter with default configuration
+        let rate_limiter = RateLimiter::new(RateLimitConfig::default());
+        
+        // Initialize approval manager with default configuration
+        let approval_manager = ApprovalManager::new(approvals::ApprovalConfig::default());
+
         Self {
             kernel_url,
             http_client,
             approved_steps: Arc::new(RwLock::new(HashMap::new())),
             violation_log: Arc::new(RwLock::new(Vec::new())),
+            rate_limiter,
+            approval_manager,
         }
     }
 
@@ -208,6 +229,77 @@ impl ToolBroker {
         let execution_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now();
 
+        // Extract tenant from plan (simplified - in real implementation would come from context)
+        let tenant_id = "default_tenant"; // TODO: Extract from plan or context
+        
+        // Check rate limits before execution
+        let rate_limit_decision = self.rate_limiter.check_rate_limit(
+            tenant_id,
+            &step.tool,
+            &execution_id
+        ).await?;
+
+        match rate_limit_decision {
+            RateLimitDecision::Allow => {
+                // Continue with execution
+            }
+            RateLimitDecision::Deny(reason) => {
+                // Log violation and return error
+                let usage = self.rate_limiter.get_current_usage(tenant_id, &step.tool).await?;
+                self.rate_limiter.log_violation(
+                    tenant_id,
+                    &step.tool,
+                    "RATE_LIMIT_EXCEEDED",
+                    &reason,
+                    &usage
+                ).await?;
+                
+                // Record metrics
+                counter!("pf_broker_denies_total", 1, "reason" => "rate_limit");
+                
+                return Ok(ToolResult {
+                    success: false,
+                    result: None,
+                    error: Some(format!("Rate limit exceeded: {}", reason)),
+                    execution_id,
+                    timestamp,
+                });
+            }
+            RateLimitDecision::RequireApproval(reason) => {
+                // Create approval request
+                let approval_request = approvals::ToolCall {
+                    call_id: execution_id.clone(),
+                    session_id: "default_session".to_string(),
+                    tool_name: step.tool.clone(),
+                    parameters: step.args.clone(),
+                    risk_score: 0.7, // TODO: Calculate based on tool and context
+                    kernel_decision: None,
+                    timestamp: Utc::now().to_rfc3339(),
+                };
+                
+                let approval_id = self.approval_manager.create_approval_request(
+                    approval_request,
+                    0.7,
+                    reason.clone()
+                ).await?;
+                
+                // Record metrics
+                counter!("pf_broker_approvals_required_total", 1, "tool" => step.tool.clone());
+                
+                return Ok(ToolResult {
+                    success: false,
+                    result: None,
+                    error: Some(format!("Approval required: {} (ID: {})", reason, approval_id)),
+                    execution_id,
+                    timestamp,
+                });
+            }
+            RateLimitDecision::Throttle(delay_ms) => {
+                // TODO: Implement throttling with delay
+                info!("Tool execution throttled for {}ms", delay_ms);
+            }
+        }
+
         // Simulate tool execution based on tool type
         match step.tool.as_str() {
             "retrieval" => {
@@ -298,6 +390,16 @@ impl ToolBroker {
         let violations = self.violation_log.read().await;
         violations.clone()
     }
+
+    /// Get rate limit violation statistics
+    pub async fn get_rate_limit_stats(&self) -> Result<HashMap<String, u32>> {
+        self.rate_limiter.get_violation_stats().await
+    }
+
+    /// Update rate limit configuration
+    pub async fn update_rate_limit_config(&mut self, new_config: RateLimitConfig) -> Result<()> {
+        self.rate_limiter.update_config(new_config).await
+    }
 }
 
 #[tokio::main]
@@ -361,6 +463,32 @@ async fn main() -> Result<()> {
     // Get violations
     let violations = broker.get_violations().await;
     println!("Violations: {:?}", violations);
+
+    // Test rate limiting
+    println!("Testing rate limiting...");
+    
+    // Get rate limit stats
+    let rate_limit_stats = broker.get_rate_limit_stats().await?;
+    println!("Rate limit violations: {:?}", rate_limit_stats);
+
+    // Test multiple rapid calls to trigger rate limiting
+    for i in 0..150 {
+        let test_call = ToolCall {
+            tool: "data_query".to_string(),
+            args: HashMap::new(),
+            step_index: Some(0),
+        };
+        
+        let result = broker.execute_tool(&test_call, "test-plan-1").await?;
+        if !result.success {
+            println!("Rate limit triggered at call {}: {:?}", i, result.error);
+            break;
+        }
+    }
+
+    // Get final rate limit stats
+    let final_stats = broker.get_rate_limit_stats().await?;
+    println!("Final rate limit violations: {:?}", final_stats);
 
     Ok(())
 } 

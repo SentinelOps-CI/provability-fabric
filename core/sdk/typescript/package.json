@@ -1,0 +1,54 @@
+{
+  "name": "@provability-fabric/core-sdk-typescript",
+  "version": "1.0.0",
+  "description": "Provability Fabric Core SDK for TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "proto-gen": "protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=generated --ts_proto_opt=esModuleInterop=true --ts_proto_opt=forceLong=string --ts_proto_opt=useOptionals=messages ../api/v1/*.proto"
+  },
+  "keywords": [
+    "provability-fabric",
+    "ai-safety",
+    "policy-enforcement",
+    "grpc",
+    "typescript"
+  ],
+  "author": "Provability Fabric Team",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.51.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.3",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/proto-loader": "^0.7.8",
+    "google-protobuf": "^3.21.2"
+  },
+  "files": [
+    "dist/**/*",
+    "generated/**/*",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/provability-fabric/provability-fabric.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

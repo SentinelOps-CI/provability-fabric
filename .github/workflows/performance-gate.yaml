@@ -1,0 +1,260 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Performance Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      baseline_commit:
+        description: "Baseline commit for comparison"
+        required: false
+        default: "HEAD~1"
+
+jobs:
+  performance-benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust-version: [stable, nightly]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for baseline comparison
+
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-version }}
+          profile: minimal
+          override: true
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
+          cargo install criterion
+
+      - name: Run baseline benchmarks
+        id: baseline
+        run: |
+          echo "Running baseline benchmarks..."
+          cd bench
+          cargo bench --message-format=json > baseline_results.json
+          
+          # Extract key metrics
+          echo "baseline_ed25519=$(grep -o '"ed25519_batch_verification".*"mean":{[^}]*"estimate":[0-9.]*' baseline_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+          echo "baseline_policy=$(grep -o '"policy_evaluation".*"mean":{[^}]*"estimate":[0-9.]*' baseline_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+          echo "baseline_scanning=$(grep -o '"content_scanning".*"mean":{[^}]*"estimate":[0-9.]*' baseline_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+
+      - name: Run current benchmarks
+        id: current
+        run: |
+          echo "Running current benchmarks..."
+          cd bench
+          cargo bench --message-format=json > current_results.json
+          
+          # Extract key metrics
+          echo "current_ed25519=$(grep -o '"ed25519_batch_verification".*"mean":{[^}]*"estimate":[0-9.]*' current_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+          echo "current_policy=$(grep -o '"policy_evaluation".*"mean":{[^}]*"estimate":[0-9.]*' current_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+          echo "current_scanning=$(grep -o '"content_scanning".*"mean":{[^}]*"estimate":[0-9.]*' current_results.json | grep -o '"estimate":[0-9.]*' | cut -d: -f2)" >> $GITHUB_OUTPUT
+
+      - name: Analyze performance changes
+        id: analysis
+        run: |
+          echo "Analyzing performance changes..."
+          
+          # Calculate percentage changes
+          baseline_ed25519=${{ steps.baseline.outputs.baseline_ed25519 }}
+          current_ed25519=${{ steps.current.outputs.current_ed25519 }}
+          
+          if [ -n "$baseline_ed25519" ] && [ -n "$current_ed25519" ]; then
+            ed25519_change=$(echo "scale=2; (($current_ed25519 - $baseline_ed25519) / $baseline_ed25519) * 100" | bc -l)
+            echo "ed25519_change=$ed25519_change" >> $GITHUB_OUTPUT
+            echo "Ed25519 batch verification: $ed25519_change% change"
+          fi
+          
+          baseline_policy=${{ steps.baseline.outputs.baseline_policy }}
+          current_policy=${{ steps.current.outputs.current_policy }}
+          
+          if [ -n "$baseline_policy" ] && [ -n "$current_policy" ]; then
+            policy_change=$(echo "scale=2; (($current_policy - $baseline_policy) / $baseline_policy) * 100" | bc -l)
+            echo "policy_change=$policy_change" >> $GITHUB_OUTPUT
+            echo "Policy evaluation: $policy_change% change"
+          fi
+          
+          baseline_scanning=${{ steps.baseline.outputs.baseline_scanning }}
+          current_scanning=${{ steps.current.outputs.current_scanning }}
+          
+          if [ -n "$baseline_scanning" ] && [ -n "$current_scanning" ]; then
+            scanning_change=$(echo "scale=2; (($current_scanning - $baseline_scanning) / $baseline_scanning) * 100" | bc -l)
+            echo "scanning_change=$ed25519_change" >> $GITHUB_OUTPUT
+            echo "Content scanning: $scanning_change% change"
+          fi
+
+      - name: Check performance gates
+        id: gates
+        run: |
+          echo "Checking performance gates..."
+          
+          # Performance regression threshold: 10%
+          threshold=10.0
+          failed=false
+          
+          ed25519_change=${{ steps.analysis.outputs.ed25519_change }}
+          if [ -n "$ed25519_change" ]; then
+            if (( $(echo "$ed25519_change > $threshold" | bc -l) )); then
+              echo "❌ Ed25519 performance regression: $ed25519_change% (threshold: $threshold%)"
+              failed=true
+            else
+              echo "✅ Ed25519 performance: $ed25519_change% (threshold: $threshold%)"
+            fi
+          fi
+          
+          policy_change=${{ steps.analysis.outputs.policy_change }}
+          if [ -n "$policy_change" ]; then
+            if (( $(echo "$policy_change > $threshold" | bc -l) )); then
+              echo "❌ Policy evaluation performance regression: $policy_change% (threshold: $threshold%)"
+              failed=true
+            else
+              echo "✅ Policy evaluation performance: $policy_change% (threshold: $threshold%)"
+            fi
+          fi
+          
+          scanning_change=${{ steps.analysis.outputs.scanning_change }}
+          if [ -n "$scanning_change" ]; then
+            if (( $(echo "$scanning_change > $threshold" | bc -l) )); then
+              echo "❌ Content scanning performance regression: $scanning_change% (threshold: $threshold%)"
+              failed=true
+            else
+              echo "✅ Content scanning performance: $scanning_change% (threshold: $threshold%)"
+            fi
+          fi
+          
+          if [ "$failed" = true ]; then
+            echo "performance_gate=failed" >> $GITHUB_OUTPUT
+            echo "::error::Performance regression detected! Changes exceed $threshold% threshold."
+            exit 1
+          else
+            echo "performance_gate=passed" >> $GITHUB_OUTPUT
+            echo "✅ All performance gates passed"
+          fi
+
+      - name: Generate performance report
+        if: always()
+        run: |
+          echo "Generating performance report..."
+          
+          cat << EOF > performance_report.md
+          # Performance Benchmark Report
+          
+          ## Summary
+          - **Status**: ${{ steps.gates.outputs.performance_gate }}
+          - **Baseline Commit**: ${{ github.sha }}
+          - **Current Commit**: ${{ github.sha }}
+          
+          ## Performance Changes
+          
+          ### Ed25519 Batch Verification
+          - Baseline: ${{ steps.baseline.outputs.baseline_ed25519 }} ns
+          - Current: ${{ steps.current.outputs.current_ed25519 }} ns
+          - Change: ${{ steps.analysis.outputs.ed25519_change }}%
+          
+          ### Policy Evaluation
+          - Baseline: ${{ steps.baseline.outputs.baseline_policy }} ns
+          - Current: ${{ steps.current.outputs.current_policy }} ns
+          - Change: ${{ steps.analysis.outputs.policy_change }}%
+          
+          ### Content Scanning
+          - Baseline: ${{ steps.baseline.outputs.baseline_scanning }} ns
+          - Current: ${{ steps.current.outputs.current_scanning }} ns
+          - Change: ${{ steps.analysis.outputs.scanning_change }}%
+          
+          ## Thresholds
+          - **Performance Regression Threshold**: 10%
+          - **Action**: Block release if regression > 10%
+          
+          ## Recommendations
+          ${{ steps.gates.outputs.performance_gate == 'failed' && '🚨 **PERFORMANCE REGRESSION DETECTED** - Review changes and optimize before release.' || '✅ Performance within acceptable limits.' }}
+          EOF
+          
+          # Upload report as artifact
+          echo "performance_report.md" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.gates.outputs.performance_gate == 'failed'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('performance_report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚨 Performance Gate Failed\n\n${report}\n\n**Action Required**: Performance regression detected. Please review and optimize before merging.`
+            });
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-${{ matrix.rust-version }}
+          path: |
+            bench/baseline_results.json
+            bench/current_results.json
+            performance_report.md
+
+  performance-summary:
+    runs-on: ubuntu-latest
+    needs: performance-benchmark
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v3
+        with:
+          name: benchmark-results-stable
+
+      - name: Generate summary
+        run: |
+          echo "## Performance Gate Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "performance_report.md" ]; then
+            cat performance_report.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Performance report not found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: Performance regressions > 10% will block releases." >> $GITHUB_STEP_SUMMARY
+
+      - name: Set conclusion
+        run: |
+          if [ "${{ needs.performance-benchmark.result }}" = "success" ]; then
+            echo "✅ Performance gate completed successfully"
+          else
+            echo "❌ Performance gate failed"
+            exit 1
+          fi

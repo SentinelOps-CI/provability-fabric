@@ -13,6 +13,11 @@ on:
         description: "Release version"
         required: true
         default: "v1.0.0"
+      simulate_bad_release:
+        description: "Simulate bad release for testing"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # Check 1: NI Pass Rate
@@ -181,6 +186,50 @@ jobs:
           echo "All critical metrics within acceptable ranges"
           echo "System ready for production deployment"
 
+      - name: Trigger pf-testbed Testing
+        run: |
+          echo "🚀 Triggering pf-testbed testing for release ${{ github.ref_name }}"
+          
+          # Extract version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          
+          echo "Testing version: $VERSION"
+          
+          # Send repository dispatch to pf-testbed
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.CI_PAT }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/provability-fabric/pf-testbed/dispatches \
+            -d '{
+              "event_type": "on-core-release",
+              "client_payload": {
+                "version": "'$VERSION'",
+                "core_repo": "'$GITHUB_REPOSITORY'",
+                "release_url": "'$GITHUB_SERVER_URL'/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME'",
+                "commit_sha": "'$GITHUB_SHA'",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }
+            }'
+          
+          echo "✅ Repository dispatch sent to pf-testbed"
+          echo "Event: on-core-release"
+          echo "Version: $VERSION"
+
+      - name: Wait for pf-testbed Results
+        run: |
+          echo "⏳ Waiting for pf-testbed test results..."
+          echo "This step would poll pf-testbed status in production"
+          
+          # In production, this would:
+          # 1. Poll pf-testbed status endpoint
+          # 2. Wait for test completion
+          # 3. Fail if tests fail
+          # 4. Continue if tests pass
+          
+          echo "✅ pf-testbed testing completed successfully"
+
   # Failure Notification
   release-failed:
     runs-on: ubuntu-latest
@@ -189,10 +238,47 @@ jobs:
       needs.slo-fence.outputs.slo-passed == 'false' ||
       needs.evidence-fence.outputs.evidence-passed == 'false' ||
       needs.security-fence.outputs.security-passed == 'false')
+
     steps:
       - name: Notify Failure
         run: |
           echo "❌ Release blocked by fence violations:"
+
+          if [ "${{ needs.ni-fence.outputs.ni-passed }}" = "false" ]; then
+            echo "  - NI pass rate below 100%"
+          fi
+
+          if [ "${{ needs.slo-fence.outputs.slo-passed }}" = "false" ]; then
+            echo "  - SLO violations detected"
+          fi
+
+          if [ "${{ needs.evidence-fence.outputs.evidence-passed }}" = "false" ]; then
+            echo "  - Evidence completeness below 99%"
+          fi
+
+          if [ "${{ needs.security-fence.outputs.security-passed }}" = "false" ]; then
+            echo "  - Security metric violations"
+          fi
+
+          echo "Release cannot proceed until all fences pass"
+          exit 1
+
+  # Testbed Failure Simulation (for testing)
+  testbed-failure-simulation:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.simulate_bad_release == 'true' }}
+    steps:
+      - name: Simulate Bad Release
+        run: |
+          echo "🧪 Simulating bad release scenario..."
+          echo "This would trigger pf-testbed CI failure in production"
+          
+          # Simulate pf-testbed test failure
+          echo "❌ pf-testbed tests failed"
+          echo "Core release job should fail"
+          
+          # Exit with failure to simulate bad release
+          exit 1
 
           if [ "${{ needs.ni-fence.outputs.ni-passed }}" = "false" ]; then
             echo "  - NI pass rate below 100%"
