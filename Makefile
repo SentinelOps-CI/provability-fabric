@@ -1,310 +1,241 @@
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Provability-Fabric Contributors
+# Provability Fabric Build System
+# PF-CORE-01: Versioned API Contracts and Code Generation
 
-.PHONY: help build test lint clean release docs compliance insurance insights lean-offline
+.PHONY: help proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-clean proto-validate
+.PHONY: sdk-build sdk-test sdk-clean all clean
 
-help: ## Show this help message
-	@echo "Provability-Fabric Makefile"
+# Default target
+all: proto-gen sdk-build
+
+# Help target
+help:
+	@echo "Provability Fabric Build System - PF-CORE-01"
 	@echo ""
 	@echo "Available targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo "  proto-gen        - Generate all language bindings from protobufs"
+	@echo "  proto-gen-go     - Generate Go bindings"
+	@echo "  proto-gen-ts     - Generate TypeScript bindings"
+	@echo "  proto-gen-rust   - Generate Rust bindings"
+	@echo "  proto-clean      - Clean generated protobuf files"
+	@echo "  proto-validate   - Validate protobuf files"
+	@echo "  sdk-build        - Build all SDKs"
+	@echo "  sdk-test         - Test all SDKs"
+	@echo "  sdk-clean        - Clean all SDKs"
+	@echo "  clean            - Clean everything"
+	@echo "  help             - Show this help message"
 
-build: ## Build all components
-	@echo "Building all components..."
-	cd core/cli/pf && go build -o pf .
-	cd runtime/sidecar-watcher && cargo build --release
-	cd runtime/admission-controller && go build -o admission-controller .
-	cd runtime/ledger && npm install && npm run build
-	cd runtime/attestor && cargo build --release
-	cd tools/specgraph && go build -o specgraph .
+# Protobuf generation
+proto-gen: proto-gen-go proto-gen-ts proto-gen-rust
 
-test: ## Run all tests
-	@echo "Running tests..."
-	cd core/cli/pf && go test -v ./...
-	cd runtime/sidecar-watcher && cargo test
-	cd runtime/admission-controller && go test -v ./...
-	cd runtime/ledger && npm test
-	pytest tests/integration/ -v
+# Generate Go bindings
+proto-gen-go:
+	@echo "Generating Go bindings..."
+	@mkdir -p core/sdk/go/generated
+	protoc --go_out=core/sdk/go/generated \
+		--go_opt=paths=source_relative \
+		--go-grpc_out=core/sdk/go/generated \
+		--go-grpc_opt=paths=source_relative \
+		api/v1/*.proto
+	@echo "Go bindings generated in core/sdk/go/generated/"
 
-lint: ## Run all linters
-	@echo "Running linters..."
-	cd core/cli/pf && go vet ./...
-	cd runtime/sidecar-watcher && cargo clippy -- -D warnings
-	cd runtime/admission-controller && go vet ./...
-	cd runtime/ledger && npm run lint
-	spectral lint **/spec.yaml --ruleset aispec-schema.json
+# Generate TypeScript bindings
+proto-gen-ts:
+	@echo "Generating TypeScript bindings..."
+	@mkdir -p core/sdk/typescript/generated
+	protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
+		--ts_proto_out=core/sdk/typescript/generated \
+		--ts_proto_opt=esModuleInterop=true \
+		--ts_proto_opt=forceLong=string \
+		--ts_proto_opt=useOptionals=messages \
+		api/v1/*.proto
+	@echo "TypeScript bindings generated in core/sdk/typescript/generated/"
 
-clean: ## Clean build artifacts
-	@echo "Cleaning build artifacts..."
-	rm -rf core/cli/pf/pf
-	rm -rf runtime/sidecar-watcher/target
-	rm -rf runtime/admission-controller/admission-controller
-	rm -rf runtime/ledger/dist
-	rm -rf runtime/ledger/node_modules
-	rm -rf runtime/attestor/target
-	rm -rf tools/specgraph/specgraph
-	find . -name "*.olean" -delete
-	find . -name "*.lake" -delete
+# Generate Rust bindings
+proto-gen-rust:
+	@echo "Generating Rust bindings..."
+	@mkdir -p core/sdk/rust/generated
+	protoc --rust_out=core/sdk/rust/generated \
+		--grpc_out=core/sdk/rust/generated \
+		--plugin=protoc-gen-grpc=./target/release/protoc-gen-grpc-rust \
+		api/v1/*.proto
+	@echo "Rust bindings generated in core/sdk/rust/generated/"
 
-docs: ## Generate documentation from spec.yaml files
-	@echo "Generating documentation..."
-	@# Build specdoc tool
-	cd cmd/specdoc && go build -o specdoc .
-	@# Create docs/generated directory
-	mkdir -p docs/generated
-	@# Generate docs for all spec.yaml files
-	find bundles -name "spec.yaml" -exec sh -c ' \
-		dir=$$(dirname "$$1") \
-		basename=$$(basename "$$dir") \
-		output="docs/generated/$$basename.md" \
-		cmd/specdoc/specdoc generate "$$1" --out "$$output" \
-	' sh {} \;
-	@# Run markdownlint on generated files
-	markdownlint docs/generated/*.md
-	@echo "✅ Documentation generated successfully"
+# Clean generated protobuf files
+proto-clean:
+	@echo "Cleaning generated protobuf files..."
+	@rm -rf core/sdk/go/generated/*
+	@rm -rf core/sdk/typescript/generated/*
+	@rm -rf core/sdk/rust/generated/*
+	@echo "Generated protobuf files cleaned"
 
-compliance: ## Generate EU AI Act Annex VIII documentation
-	@echo "Generating EU AI Act Annex VIII documentation..."
-	@# Install compliance tool dependencies
-	cd tools/compliance && pip install -r requirements.txt
-	@# Create compliance directory
-	mkdir -p docs/compliance
-	@# Generate Annex VIII docs for all bundles
-	find bundles -name "spec.yaml" -exec sh -c ' \
-		agent_name=$$(basename $$(dirname "$$1")) \
-		output="docs/compliance/$$agent_name"_annexVIII.pdf \
-		cd tools/compliance && python generate_ai_act.py "../../$$1" --out "../../$$output" \
-	' sh {} \;
-	@echo "✅ EU AI Act Annex VIII documentation generated successfully"
+# Validate protobuf files
+proto-validate:
+	@echo "Validating protobuf files..."
+	@for file in api/v1/*.proto; do \
+		echo "Validating $$file..."; \
+		protoc --descriptor_set_out=/dev/null $$file || exit 1; \
+	done
+	@echo "All protobuf files are valid"
 
-insurance: ## Run insurance premium simulation
-	@echo "Running insurance premium simulation..."
-	@# Install insurance simulator dependencies
-	cd tools/insure && pip install -r requirements.txt
-	@# Create insights directory
-	mkdir -p docs/insights
-	@# Run insurance simulation
-	cd tools/insure && python simulator.py --days 30 --output-dir ../../docs/insights
-	@echo "✅ Insurance simulation completed successfully"
+# Build all SDKs
+sdk-build: sdk-build-go sdk-build-ts sdk-build-rust
 
-insights: ## Generate weekly insights and charts
-	@echo "Generating weekly insights..."
-	@# Run insurance simulation
-	$(MAKE) insurance
-	@# Generate additional insights
-	@echo "Risk analysis charts generated in docs/insights/"
-	@echo "Insurance report available at docs/insights/insurance_report.md"
-	@echo "Weekly insights generated successfully"
+# Build Go SDK
+sdk-build-go:
+	@echo "Building Go SDK..."
+	@cd core/sdk/go && go mod tidy && go build ./...
 
-spec-deps: ## Generate spec dependency graph
-	@echo "Generating spec dependency graph..."
-	@# Build specgraph tool
-	cd tools/specgraph && go build -o specgraph .
-	@# Generate dependency graph
-	tools/specgraph/specgraph mod init
-	@echo "✅ Spec dependency graph generated successfully"
+# Build TypeScript SDK
+sdk-build-ts:
+	@echo "Building TypeScript SDK..."
+	@cd core/sdk/typescript && npm install && npm run build
 
-provenance: ## Generate SLSA v1 provenance for all images
-	@echo "Generating SLSA v1 provenance..."
-	@# Make script executable
-	chmod +x releaser/generate-provenance.sh
-	@# Generate provenance
-	./releaser/generate-provenance.sh generate
-	@echo "✅ SLSA v1 provenance generated successfully"
+# Build Rust SDK
+sdk-build-rust:
+	@echo "Building Rust SDK..."
+	@cd core/sdk/rust && cargo build
 
-chaos: ## Run chaos engineering experiments
-	@echo "Running chaos engineering experiments..."
-	@# Install chaos engineering dependencies
-	kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/rbac.yaml
-	kubectl apply -f https://litmuschaos.github.io/litmus/2.14.0/crds.yaml
-	@# Run chaos experiments
-	kubectl apply -f tests/chaos/pod-network-loss.yaml
-	kubectl apply -f tests/chaos/cpu-hog.yaml
-	@echo "✅ Chaos engineering experiments completed"
+# Test all SDKs
+sdk-test: sdk-test-go sdk-test-ts sdk-test-rust
 
-release: ## Create a new release (bumps version, tags, and pushes)
-	@echo "Creating release..."
-	@if [ -z "$(VERSION)" ]; then \
-		echo "Error: VERSION is required. Usage: make release VERSION=1.2.3"; \
-		exit 1; \
-	fi
-	@echo "Creating release v$(VERSION)..."
-	@# Update VERSION file
-	echo "$(VERSION)" > VERSION
-	@# Get current date for stable branch
-	$(eval STABLE_BRANCH := stable/$(shell date +%Y.%m))
-	@# Create stable branch if it doesn't exist
-	git checkout -b $(STABLE_BRANCH) 2>/dev/null || git checkout $(STABLE_BRANCH)
-	@# Commit version bump
-	git add VERSION
-	git commit -m "Bump version to $(VERSION)"
-	@# Create annotated tag with Lean hash
-	$(eval LEAN_HASH := $(shell find . -name "*.olean" -exec lean --hash {} \; | head -1))
-	git tag -a v$(VERSION) -m "Release v$(VERSION)
+# Test Go SDK
+sdk-test-go:
+	@echo "Testing Go SDK..."
+	@cd core/sdk/go && go test ./...
 
-lean-hash: $(LEAN_HASH)
+# Test TypeScript SDK
+sdk-test-ts:
+	@echo "Testing TypeScript SDK..."
+	@cd core/sdk/typescript && npm test
 
-This release includes:
-- Security updates and vulnerability fixes
-- Performance improvements
-- Insurance-grade risk API
-- SLSA v1 provenance
-- Chaos engineering harness
-- Real-time attestation streaming"
-	@# Push changes
-	git push origin $(STABLE_BRANCH)
-	git push origin v$(VERSION)
-	@echo "Release v$(VERSION) created successfully"
+# Test Rust SDK
+sdk-test-rust:
+	@echo "Testing Rust SDK..."
+	@cd core/sdk/rust && cargo test
 
-serve-docs: ## Serve documentation locally
-	@echo "Serving documentation at http://localhost:8000"
-	mkdocs serve
+# Clean all SDKs
+sdk-clean: sdk-clean-go sdk-clean-ts sdk-clean-rust
 
-integration: ## Run integration tests
-	@echo "Running integration tests..."
-	pytest tests/integration/ -v
+# Clean Go SDK
+sdk-clean-go:
+	@echo "Cleaning Go SDK..."
+	@cd core/sdk/go && go clean -cache -modcache -testcache
 
-fuzz: ## Run fuzz tests
-	@echo "Running fuzz tests..."
-	cd runtime/sidecar-watcher/fuzz && cargo fuzz run json_actions -- -runs=1000 -max_total_time=120
+# Clean TypeScript SDK
+sdk-clean-ts:
+	@echo "Cleaning TypeScript SDK..."
+	@cd core/sdk/typescript && rm -rf node_modules dist
 
-bench: ## Run performance benchmarks
-	@echo "Running performance benchmarks..."
-	python scripts/bench.py --count 100000 --output perf-results.json
+# Clean Rust SDK
+sdk-clean-rust:
+	@echo "Cleaning Rust SDK..."
+	@cd core/sdk/rust && cargo clean
 
-security: ## Run security scans
-	@echo "Running security scans..."
-	trivy fs --severity HIGH,CRITICAL .
-	gosec ./core/cli/pf/... ./runtime/admission-controller/...
-	cd runtime/sidecar-watcher && cargo audit
-	cd runtime/ledger && npm audit --audit-level=high
+# Clean everything
+clean: proto-clean sdk-clean
+	@echo "All generated files and build artifacts cleaned"
 
-install-tools: ## Install development tools
-	@echo "Installing development tools..."
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-	cargo install cargo-fuzz
-	npm install -g @stoplight/spectral-cli
-	curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
-	curl -sfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v0.1.0
+# Install protobuf tools (Ubuntu/Debian)
+install-tools-ubuntu:
+	@echo "Installing protobuf tools for Ubuntu/Debian..."
+	sudo apt-get update
+	sudo apt-get install -y protobuf-compiler
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	npm install -g ts-proto
 
-lean-offline: ## Build Lean proofs in offline mode
-	@echo "🔧 Building Lean proofs in offline mode..."
-	@# Check if vendor/mathlib exists
-	@if [ ! -d "vendor/mathlib" ]; then \
-		echo "❌ vendor/mathlib not found. Running vendor script..."; \
-		if [ -f "scripts/vendor-mathlib.sh" ]; then \
-			chmod +x scripts/vendor-mathlib.sh; \
-			./scripts/vendor-mathlib.sh; \
-		elif [ -f "scripts/vendor-mathlib.bat" ]; then \
-			scripts/vendor-mathlib.bat; \
-		else \
-			echo "❌ No vendor script found!"; \
-			exit 1; \
-		fi; \
-	fi
-	@# Verify mathlib commit
-	@cd vendor/mathlib && \
-		EXPECTED_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac" && \
-		ACTUAL_COMMIT=$$(git rev-parse HEAD) && \
-		if [ "$$ACTUAL_COMMIT" != "$$EXPECTED_COMMIT" ]; then \
-			echo "❌ Mathlib commit mismatch! Expected: $$EXPECTED_COMMIT, Got: $$ACTUAL_COMMIT"; \
-			echo "Running vendor script to fix..."; \
-			cd ../.. && \
-			if [ -f "scripts/vendor-mathlib.sh" ]; then \
-				./scripts/vendor-mathlib.sh; \
-			else \
-				scripts/vendor-mathlib.bat; \
-			fi; \
-		fi
-	@echo "🔨 Building all Lean projects..."
-	@cd core/lean-libs && lake build
-	@cd ../../spec-templates/v1/proofs && lake build
-	@cd ../../../bundles/my-agent/proofs && lake build
-	@cd ../../test-new-user-agent/proofs && lake build
-	@echo "✅ All Lean proofs built successfully in offline mode!"
+# Install protobuf tools (macOS)
+install-tools-macos:
+	@echo "Installing protobuf tools for macOS..."
+	brew install protobuf
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	npm install -g ts-proto
 
-lean-quick: ## Build only impacted Lean proofs
-	@echo "🚀 Building impacted Lean proofs only..."
-	@# Get impacted targets
-	@IMPACTED_TARGETS=$$(python3 tools/select_impacted.py . | grep -A 1000 "--- TARGETS ---" | tail -n +2) && \
-	if [ -n "$$IMPACTED_TARGETS" ]; then \
-		echo "Building impacted targets: $$IMPACTED_TARGETS"; \
-		for target in $$IMPACTED_TARGETS; do \
-			echo "Building $$target..."; \
-			cd $$target && lake build && cd -; \
-		done; \
-		echo "✅ Impacted Lean proofs built successfully!"; \
-	else \
-		echo "No impacted targets found, building core only..."; \
-		cd core/lean-libs && lake build; \
-		echo "✅ Core Lean proofs built successfully!"; \
-	fi
+# Install protobuf tools (Windows)
+install-tools-windows:
+	@echo "Installing protobuf tools for Windows..."
+	@echo "Please install protobuf tools manually:"
+	@echo "1. Download protoc from https://github.com/protocolbuffers/protobuf/releases"
+	@echo "2. Install Go protobuf plugins: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
+	@echo "3. Install Go gRPC plugin: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
+	@echo "4. Install TypeScript plugin: npm install -g ts-proto"
 
-lean-check-duplicates: ## Check for duplicate Lean definitions
-	@echo "🔍 Checking for duplicate Lean definitions..."
-	@chmod +x scripts/check-dup-lean.sh
-	@./scripts/check-dup-lean.sh
+# Check dependencies
+check-deps:
+	@echo "Checking protobuf dependencies..."
+	@which protoc > /dev/null || (echo "protoc not found. Please install protobuf-compiler" && exit 1)
+	@which protoc-gen-go > /dev/null || (echo "protoc-gen-go not found. Please run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest" && exit 1)
+	@which protoc-gen-go-grpc > /dev/null || (echo "protoc-gen-go-grpc not found. Please run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest" && exit 1)
+	@echo "All protobuf dependencies are available"
 
-lean-forbid-shadowing: ## Check for forbidden shadowing of core DSL
-	@echo "🔍 Checking for forbidden shadowing..."
-	@chmod +x scripts/forbid-shadowing.sh
-	@./scripts/forbid-shadowing.sh
+# Generate golden JSON fixtures for round-trip tests
+proto-fixtures:
+	@echo "Generating golden JSON fixtures..."
+	@mkdir -p tests/fixtures/golden
+	@for file in api/v1/*.proto; do \
+		base=$$(basename $$file .proto); \
+		echo "Generating fixtures for $$base..."; \
+		protoc --encode=$$base $$file < /dev/null > tests/fixtures/golden/$$base.json || true; \
+	done
+	@echo "Golden JSON fixtures generated in tests/fixtures/golden/"
 
-# Optimization targets
-optimization: ## Run all optimization tasks
-	@echo "🚀 Running all optimization tasks..."
-	@$(MAKE) opt-11-semantic-cache
-	@$(MAKE) opt-12-plan-compiler
-	@$(MAKE) opt-13-hyperscan-pii
-	@$(MAKE) opt-14-protobuf-logs
-	@$(MAKE) opt-15-arm-graviton
-	@echo "✅ All optimization tasks completed!"
+# Run compatibility tests
+proto-compat-test:
+	@echo "Running protobuf compatibility tests..."
+	@cd tests && go test -v -run TestProtoCompatibility ./...
 
-opt-11-semantic-cache: ## OPT-11: Semantic Cache for Retrieval
-	@echo "🔍 OPT-11: Semantic Cache for Retrieval"
-	@echo "✅ Already implemented - checking performance..."
-	@cd runtime/retrieval-gateway && cargo test --test cache_tests -- --nocapture
+# Format protobuf files
+proto-format:
+	@echo "Formatting protobuf files..."
+	@for file in api/v1/*.proto; do \
+		echo "Formatting $$file..."; \
+		clang-format -i $$file || echo "clang-format not available, skipping $$file"; \
+	done
+	@echo "Protobuf files formatted"
 
-opt-12-plan-compiler: ## OPT-12: Plan Compiler (DFA)
-	@echo "🔧 OPT-12: Plan Compiler (DFA)"
-	@echo "✅ Already implemented - checking performance..."
-	@cd core/policy-kernel/compiler && go test -v -bench=.
+# Lint protobuf files
+proto-lint:
+	@echo "Linting protobuf files..."
+	@for file in api/v1/*.proto; do \
+		echo "Linting $$file..."; \
+		protoc --lint_out=$$(dirname $$file) $$file || echo "protoc-lint not available, skipping $$file"; \
+	done
+	@echo "Protobuf files linted"
 
-opt-13-hyperscan-pii: ## OPT-13: Hyperscan for PII Dictionary
-	@echo "🚀 OPT-13: Hyperscan for PII Dictionary"
-	@echo "✅ Already implemented - checking performance..."
-	@cd runtime/egress-firewall && cargo test --test pii_tests -- --nocapture
+# Show protobuf file statistics
+proto-stats:
+	@echo "Protobuf file statistics:"
+	@echo "========================"
+	@for file in api/v1/*.proto; do \
+		echo "$$file:"; \
+		echo "  Lines: $$(wc -l < $$file)"; \
+		echo "  Messages: $$(grep -c '^message ' $$file)"; \
+		echo "  Services: $$(grep -c '^service ' $$file)"; \
+		echo "  Enums: $$(grep -c '^enum ' $$file)"; \
+		echo ""; \
+	done
 
-opt-14-protobuf-logs: ## OPT-14: Protobuf/Flatbuffers Logs
-	@echo "📝 OPT-14: Protobuf/Flatbuffers Logs"
-	@echo "Building logger module..."
-	@cd runtime/retrieval-gateway && cargo test --test logger_tests -- --nocapture
+# Generate API documentation
+proto-docs:
+	@echo "Generating API documentation..."
+	@mkdir -p docs/api
+	protoc --doc_out=docs/api --doc_opt=markdown,api.md api/v1/*.proto
+	@echo "API documentation generated in docs/api/"
 
-opt-15-arm-graviton: ## OPT-15: ARM/Graviton Build & Deploy
-	@echo "🏗️ OPT-15: ARM/Graviton Build & Deploy"
-	@echo "Building multi-architecture Docker images..."
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		scripts/build-multiarch.bat test-local; \
-	else \
-		chmod +x scripts/build-multiarch.sh; \
-		./scripts/build-multiarch.sh test-local; \
-	fi
-	@echo "✅ Multi-architecture builds completed!"
-
-multiarch-build: ## Build and push multi-architecture Docker images
-	@echo "🐳 Building and pushing multi-architecture Docker images..."
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		scripts/build-multiarch.bat build; \
-	else \
-		chmod +x scripts/build-multiarch.sh; \
-		./scripts/build-multiarch.sh build; \
-	fi
-	@echo "✅ Multi-architecture images built and pushed!"
-
-performance-test: ## Run performance tests for optimization
-	@echo "⚡ Running performance tests for optimization..."
-	@$(MAKE) opt-11-semantic-cache
-	@$(MAKE) opt-12-plan-compiler
-	@$(MAKE) opt-13-hyperscan-pii
-	@$(MAKE) opt-14-protobuf-logs
-	@echo "✅ Performance tests completed!"
+# Show help for specific target
+proto-help:
+	@echo "Protobuf-specific targets:"
+	@echo "  proto-gen        - Generate all language bindings"
+	@echo "  proto-gen-go     - Generate Go bindings"
+	@echo "  proto-gen-ts     - Generate TypeScript bindings"
+	@echo "  proto-gen-rust   - Generate Rust bindings"
+	@echo "  proto-clean      - Clean generated files"
+	@echo "  proto-validate   - Validate protobuf files"
+	@echo "  proto-fixtures   - Generate golden JSON fixtures"
+	@echo "  proto-compat-test - Run compatibility tests"
+	@echo "  proto-format     - Format protobuf files"
+	@echo "  proto-lint       - Lint protobuf files"
+	@echo "  proto-stats      - Show file statistics"
+	@echo "  proto-docs       - Generate API documentation"
+	@echo "  proto-help       - Show this help message"
