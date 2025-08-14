@@ -1,0 +1,50 @@
+{
+  "authorization_test": {
+    "status": "PASS",
+    "total_cases": 4,
+    "passed_cases": 4,
+    "failed_cases": 0,
+    "test_cases": [
+      {
+        "name": "approved_tool_execution",
+        "status": "PASS",
+        "description": "Approved tools execute successfully"
+      },
+      {
+        "name": "unapproved_tool_rejection",
+        "status": "PASS",
+        "description": "Unapproved tools are rejected with E_UNAUTHORIZED_TOOL"
+      },
+      {
+        "name": "no_plan_approval_rejection",
+        "status": "PASS",
+        "description": "Tools without plan approval are rejected"
+      },
+      {
+        "name": "enforcement_mode_toggle",
+        "status": "PASS",
+        "description": "Enforcement mode can be toggled"
+      }
+    ],
+    "denial_example": {
+      "violation_type": "UNAPPROVED_TOOL",
+      "reason": "Tool 'unauthorized_tool' not in approved steps",
+      "error": "Tool 'unauthorized_tool' not in approved steps",
+      "decision": "deny"
+    }
+  },
+  "wiretransfer_matrix": {
+    "TreasuryOperator": {
+      "WireTransfer_le_limit": "✓",
+      "WireTransfer_gt_limit": "✗"
+    },
+    "CFO": {
+      "WireTransfer_le_limit": "✓",
+      "WireTransfer_gt_limit": "✗"
+    },
+    "Unauthenticated": {
+      "WireTransfer_le_limit": "✗",
+      "WireTransfer_gt_limit": "✗"
+    }
+  }
+}
