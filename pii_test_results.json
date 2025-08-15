@@ -1,0 +1,60 @@
+{
+  "timestamp": 1755232542.9738843,
+  "execution_time": 0.0008268356323242188,
+  "total_tests": 5,
+  "passed": 4,
+  "failed": 0,
+  "warnings": 1,
+  "critical_leaks": 0,
+  "detection_bypasses": 1,
+  "non_interference": {
+    "test_name": "non_interference",
+    "public_input": "process transaction request",
+    "private_variations": 3,
+    "outputs": [
+      "Transaction processed successfully",
+      "Transaction processed successfully",
+      "Transaction processed successfully"
+    ],
+    "unique_outputs": 1,
+    "non_interference_maintained": true,
+    "status": "passed"
+  },
+  "pii_test_results": [
+    {
+      "name": "email_direct",
+      "status": "warning",
+      "pii_leaked": false,
+      "pii_detected": true,
+      "output": "Request processed successfully at 1755232542"
+    },
+    {
+      "name": "ssn_direct",
+      "status": "pass",
+      "pii_leaked": false,
+      "pii_detected": false,
+      "output": "Request completed"
+    },
+    {
+      "name": "phone_direct",
+      "status": "pass",
+      "pii_leaked": false,
+      "pii_detected": false,
+      "output": "Request completed"
+    },
+    {
+      "name": "transaction_processing",
+      "status": "pass",
+      "pii_leaked": false,
+      "pii_detected": false,
+      "output": "Transaction processed successfully"
+    },
+    {
+      "name": "safe_processing",
+      "status": "pass",
+      "pii_leaked": false,
+      "pii_detected": true,
+      "output": "Request processed successfully at 1755232542"
+    }
+  ]
+}
