@@ -13,7 +13,6 @@ An open-source framework that enforces provable behavioral guarantees through fo
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
 </p>
 
-
 ## Quick Start
 
 ### Option 1: Automated Installation (Recommended)
@@ -142,6 +141,7 @@ Before running the installation, ensure you have:
 - **Rust** - For runtime components (optional)
 
 **For Data Retention Manager:**
+
 - **PostgreSQL** - For hot storage (7-day retention)
 - **AWS S3** - For warm storage (compressed Parquet)
 - **Google BigQuery** - For cold storage analytics
@@ -226,65 +226,6 @@ flowchart TD
     style MM fill:#e8f5e8
 ```
 
-## Components
-
-### Core CLI (`pf`)
-
-- Initialize agent specifications
-- Lint and validate proofs
-- Sign specification bundles
-- Check traceability mappings
-
-### Runtime Components
-
-- **Sidecar Watcher** - Rust-based runtime monitor with plan validation and multi-channel input enforcement
-- **Admission Controller** - Kubernetes webhook for validation
-- **Transparency Ledger** - GraphQL service for audit trail
-- **Incident Bot** - Automated incident response and rollback
-- **WASM Sandbox** - Secure WebAssembly execution environment
-- **Privacy Engine** - Epsilon-differential privacy enforcement
-- **Marketplace API** - RESTful API for package management
-- **Egress Firewall** - PII/secret detection with non-interference certificates
-
-### Security Mechanisms
-
-- **Plan-DSL & Policy Kernel** - Typed plans with capability validation
-- **Capability Tokens** - DSSE-signed authorization tokens
-- **Retrieval Gateway** - Tenant-isolated data access with receipts
-- **Egress Firewall** - PII/secret detection and certificate generation with non-interference verdicts
-- **System Invariants** - Formal Lean proofs of security properties
-- **Evidence Artifacts** - DSSE-signed audit bundles
-- **Test & SLO Harness** - Red-team testing and performance gates
-- **Console Additions** - Security monitoring UI components
-- **Zero-Retention** - TTL deletion and compliance attestation
-- **Allow-list Generation** - Lean-to-JSON with CI drift detection
-- **Documentation** - Guarantees, thresholds, and runbooks
-- **Release Fences** - Mechanism validation gates
-- **Multi-Channel Input Contract** - Trusted vs untrusted channel enforcement
-- **Explicit SLO Thresholds** - Performance gates with per-component budgets
-- **Accuracy Posture Evidence** - Evidence-linked responses with confidence tracking
-
-### Recently Completed Advanced Features
-
-- **Multi-Channel Input Contract (MC-1)** - Injection hardening with trusted/untrusted channel enforcement
-- **Explicit SLO Thresholds (SLO-1)** - p95 < 2.0s, p99 < 4.0s with per-component budgets
-- **Non-Interference Verdict (NI-1)** - Egress certificates with influencing labels and policy hash
-- **Accuracy Posture Evidence (AP-1)** - Evidence-linked responses with fallback confidence tracking
-- **Data Retention Manager (DR-1)** - OPT-20 compliant retention policies with automated storage optimization
-
-### Verification Adapters
-
-- **Marabou Adapter** - Neural network verification
-- **DryVR Adapter** - Hybrid system reachability analysis
-
-### Lean Libraries
-
-- **ActionDSL** - Reusable action definitions
-- **RG** - Rely-Guarantee combinators
-- **Plan** - Plan-DSL formal specification
-- **Capability** - Capability token soundness proofs
-- **Invariants** - System security invariant theorems
-
 ### Running Tests
 
 ```bash
@@ -357,8 +298,9 @@ python ops/retention/retention_manager.py --config config.yaml --action all --dr
 ### Configuration
 
 The retention manager requires a YAML configuration file with:
+
 - PostgreSQL connection details for hot storage
-- S3 bucket configuration for warm storage  
+- S3 bucket configuration for warm storage
 - BigQuery project settings for cold storage
 - Table-specific retention policies
 - Compression settings
@@ -368,53 +310,6 @@ The retention manager requires a YAML configuration file with:
 - **Hot to Warm Migration**: Save ~$0.0875/GB/month
 - **Compression**: Additional 60-80% cost reduction
 - **Automated Lifecycle**: S3 lifecycle policies for further optimization
-
-## Production Features
-
-### Security & Compliance
-
-- **SLSA Level 3** - Supply chain security
-- **SOC 2 Type II** - Compliance framework
-- **Cross-Region DR** - Disaster recovery
-- **RBAC** - Role-based access control
-- **Network Policies** - Zero-trust networking
-- **Formal Verification** - Lean proofs of security properties
-- **Runtime Enforcement** - Sidecar-based security monitoring
-- **Audit Trails** - Complete evidence generation and storage
-- **Multi-Channel Security** - Trusted vs untrusted input enforcement
-- **Non-Interference** - Formal guarantees in egress certificates
-
-### Monitoring & Observability
-
-- **Grafana Dashboards** - Real-time metrics with SLO panels
-- **Prometheus** - Time-series monitoring
-- **Jaeger** - Distributed tracing
-- **Alertmanager** - Incident management
-- **Security Console** - Plan validation, receipt viewing, certificate monitoring
-- **Performance Gates** - SLO thresholds with per-component budgets
-
-### CI/CD Pipeline
-
-- **GitHub Actions** - Automated testing and deployment
-- **Cross-Region Deployment** - Multi-region availability
-- **Automated Rollbacks** - Incident response
-- **Evidence Collection** - Compliance automation
-- **Security Gates** - Mechanism validation in release pipeline
-- **SLO Gates** - Performance validation in release pipeline
-
-## Documentation
-
-- [Architecture Overview](docs/index.md)
-- [Multi-Tenant Design](docs/multi-tenant.md)
-- [Cross-Region DR](docs/cross-region-dr.md)
-- [Compliance Framework](docs/compliance/)
-- [Security Policies](docs/security/)
-- [Operational Excellence](docs/playbooks/)
-- [Plan-DSL Specification](docs/spec/plan-dsl.md)
-- [Runtime Attestation](docs/runtime/attestation.md)
-- [Security Guarantees](docs/guarantees.md)
-- [SLO Documentation](docs/runtime/slo.md)
-- [Multi-Channel Input Contract](docs/spec/plan-dsl.md#multi-channel-input-contract)
 
 ## Contributing
 
@@ -476,26 +371,29 @@ python tests/trust_fire_orchestrator.py
 If you encounter path-related errors in Git Bash on Windows:
 
 1. **Use forward slashes**: Always use `/` instead of `\` in paths
+
    ```bash
    # Correct
    bash scripts/install.sh
    cd core/cli/pf
-   
+
    # Incorrect
    bash scripts\install.sh
    cd core\cli\pf
    ```
 
 2. **File removal issues**: If you get "Device or resource busy" errors:
+
    - Close any file explorers or text editors accessing the files
    - Use the updated scripts which handle Windows file removal properly
    - Try running the script again after closing applications
 
 3. **Command interpretation**: Git Bash interprets backslashes as escape characters:
+
    ```bash
    # Correct
    export PATH=$PATH:$(pwd)/core/cli/pf
-   
+
    # Incorrect
    export PATH=$PATH:$(pwd)\core\cli\pf
    ```
