@@ -13,7 +13,6 @@ An open-source framework that enforces provable behavioral guarantees through fo
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
 </p>
 
-
 ## Quick Start
 
 ### Option 1: Automated Installation (Recommended)
@@ -142,6 +141,7 @@ Before running the installation, ensure you have:
 - **Rust** - For runtime components (optional)
 
 **For Data Retention Manager:**
+
 - **PostgreSQL** - For hot storage (7-day retention)
 - **AWS S3** - For warm storage (compressed Parquet)
 - **Google BigQuery** - For cold storage analytics
@@ -357,8 +357,9 @@ python ops/retention/retention_manager.py --config config.yaml --action all --dr
 ### Configuration
 
 The retention manager requires a YAML configuration file with:
+
 - PostgreSQL connection details for hot storage
-- S3 bucket configuration for warm storage  
+- S3 bucket configuration for warm storage
 - BigQuery project settings for cold storage
 - Table-specific retention policies
 - Compression settings
@@ -476,26 +477,29 @@ python tests/trust_fire_orchestrator.py
 If you encounter path-related errors in Git Bash on Windows:
 
 1. **Use forward slashes**: Always use `/` instead of `\` in paths
+
    ```bash
    # Correct
    bash scripts/install.sh
    cd core/cli/pf
-   
+
    # Incorrect
    bash scripts\install.sh
    cd core\cli\pf
    ```
 
 2. **File removal issues**: If you get "Device or resource busy" errors:
+
    - Close any file explorers or text editors accessing the files
    - Use the updated scripts which handle Windows file removal properly
    - Try running the script again after closing applications
 
 3. **Command interpretation**: Git Bash interprets backslashes as escape characters:
+
    ```bash
    # Correct
    export PATH=$PATH:$(pwd)/core/cli/pf
-   
+
    # Incorrect
    export PATH=$PATH:$(pwd)\core\cli\pf
    ```
