@@ -1,0 +1,90 @@
+{
+  "timestamp": 1755232490.738156,
+  "tests": [
+    {
+      "name": "bundle_integrity",
+      "status": "passed",
+      "details": {
+        "spec_exists": true,
+        "spec_size": 2831,
+        "bundle_hash": "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463"
+      },
+      "timestamp": 1755232490.7461555
+    },
+    {
+      "name": "replay_determinism",
+      "status": "passed",
+      "details": {
+        "runs": [
+          {
+            "run_id": 1,
+            "bundle_hash": "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463",
+            "execution_time": 0.00012230873107910156,
+            "timestamp": 1755232490.746487
+          },
+          {
+            "run_id": 2,
+            "bundle_hash": "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463",
+            "execution_time": 9.751319885253906e-05,
+            "timestamp": 1755232490.7466168
+          },
+          {
+            "run_id": 3,
+            "bundle_hash": "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463",
+            "execution_time": 8.869171142578125e-05,
+            "timestamp": 1755232490.7467182
+          }
+        ],
+        "hashes": [
+          "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463",
+          "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463",
+          "fe11c451c0d961d344426215b3c120aac753f2ec65882f12e7a962fba5169463"
+        ],
+        "drift_detected": false
+      },
+      "timestamp": 1755232490.746473
+    },
+    {
+      "name": "non_interference_demo",
+      "status": "passed",
+      "details": {
+        "public_outputs": [
+          {
+            "transaction_id": "tx_2aaf54e3",
+            "status": "processed",
+            "public_metadata": {
+              "type": "transfer",
+              "timestamp": 1755232490
+            }
+          },
+          {
+            "transaction_id": "tx_2aaf54e3",
+            "status": "processed",
+            "public_metadata": {
+              "type": "transfer",
+              "timestamp": 1755232490
+            }
+          },
+          {
+            "transaction_id": "tx_2aaf54e3",
+            "status": "processed",
+            "public_metadata": {
+              "type": "transfer",
+              "timestamp": 1755232490
+            }
+          }
+        ],
+        "high_secret_variations": 3,
+        "low_observations_consistent": true
+      },
+      "timestamp": 1755232490.7468157
+    }
+  ],
+  "summary": {
+    "total_tests": 3,
+    "passed": 3,
+    "failed": 0,
+    "errors": 0,
+    "success_rate": 1.0
+  }
+}
