@@ -9,21 +9,23 @@ out = {
     "bundle_id": None,
     "proof": None,
     "signature": None,
-    "replay_drift": None
+    "replay_drift": None,
 }
 
 # commit
 try:
-    out["commit"] = sp.check_output(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=root
-    ).decode().strip()
+    out["commit"] = (
+        sp.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=root)
+        .decode()
+        .strip()
+    )
 except Exception:
     out["commit"] = "unknown"
 
 # proof - check if Spec.olean was built
-spec_olean = (root / "spec-templates" / "v1" / "proofs" / 
-              ".lake" / "build" / "lib" / "Spec.olean")
+spec_olean = (
+    root / "spec-templates" / "v1" / "proofs" / ".lake" / "build" / "lib" / "Spec.olean"
+)
 if spec_olean.exists():
     out["proof"] = "verified"
 else:

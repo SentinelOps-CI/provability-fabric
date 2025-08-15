@@ -1,0 +1,22 @@
+{
+  "execution_id": "exec_42",
+  "seed": 42,
+  "timestamp": "2025-08-14T17:41:09.9011054-07:00",
+  "duration": 0,
+  "memory_usage_mb": 0,
+  "tools_executed": 0,
+  "budget_used": {
+    "max_tokens": 0,
+    "max_cost": 0,
+    "max_time": "",
+    "max_memory_mb": 0
+  },
+  "logs": null,
+  "bundle_hash": "placeholder-hash",
+  "environment": {
+    "go_version": "go1.24.0",
+    "os": "windows",
+    "architecture": "amd64",
+    "cpu_count": 16
+  }
+}
