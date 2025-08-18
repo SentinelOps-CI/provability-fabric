@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "dfa_type": "ActionDSL_Safety",
+  "states": [
+    {
+      "id": 0,
+      "accepting": true
+    },
+    {
+      "id": 1,
+      "accepting": true
+    },
+    {
+      "id": 2,
+      "accepting": false
+    }
+  ],
+  "transitions": [
+    {
+      "from": 0,
+      "event": "call(http_get,hash1)",
+      "to": 1
+    },
+    {
+      "from": 1,
+      "event": "log(hash2)",
+      "to": 2
+    },
+    {
+      "from": 2,
+      "event": "emit(plan1)",
+      "to": 0
+    }
+  ],
+  "rate_limiters": [
+    {
+      "key": "http_get",
+      "window": 1000,
+      "bound": 10,
+      "tolerance": 50
+    },
+    {
+      "key": "egress",
+      "window": 5000,
+      "bound": 1024,
+      "tolerance": 100
+    }
+  ],
+  "initial_state": 0,
+  "metadata": {
+    "exported_at": "2025-01-18T13:30:00Z",
+    "canonical": true,
+    "compilation_time_ms": 45,
+    "state_count": 3,
+    "transition_count": 3,
+    "rate_limiter_count": 2
+  }
+}
