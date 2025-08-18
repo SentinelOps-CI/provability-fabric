@@ -2,10 +2,10 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
-[![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/fraware/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
-[![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
-[![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/fraware/provability-fabric)
-[![Implementation Status](https://img.shields.io/badge/Implementation-ALL%20PROMPTS%20COMPLETE-brightgreen.svg)](https://github.com/fraware/provability-fabric)
+[![TRUST-FIRE](https://img.shields.io/badge/TRUST--FIRE-GA%20Ready-green.svg)](https://github.com/SentinelOps-Remote-CI/provability-fabric/actions/workflows/trust-fire-ga-test.yaml)
+[![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/SentinelOps-Remote-CI/provability-fabric)
+[![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/SentinelOps-Remote-CI/provability-fabric)
+[![Implementation Status](https://img.shields.io/badge/Implementation-ALL%20PROMPTS%20COMPLETE-brightgreen.svg)](https://github.com/SentinelOps-Remote-CI/provability-fabric)
 
 An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
 
@@ -19,7 +19,7 @@ An open-source framework that enforces provable behavioral guarantees through fo
 
 ```bash
 # Clone the repository
-git clone https://github.com/fraware/provability-fabric.git
+git clone https://github.com/provability-fabric.git
 cd provability-fabric
 
 # Run the installation script
@@ -56,7 +56,7 @@ npm start
 
 ```bash
 # Clone the repository
-git clone https://github.com/fraware/provability-fabric.git
+git clone https://github.com/provability-fabric.git
 cd provability-fabric
 
 # Build the CLI from source
@@ -319,7 +319,7 @@ We welcome contributions! Please see our [Contributing Guide](docs/community/gov
 
 ```bash
 # Clone the repository
-git clone https://github.com/fraware/provability-fabric.git
+git clone https://github.com/provability-fabric.git
 cd provability-fabric
 
 # Build CLI tools from source
