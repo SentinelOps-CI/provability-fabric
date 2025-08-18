@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-08-18T15:53:22.983537",
+  "test_summary": {
+    "total_tests": 6,
+    "passed": 2,
+    "failed": 4
+  },
+  "test_results": {
+    "cli_commands": true,
+    "bundle_operations": false,
+    "execution_replay": false,
+    "audit_functionality": false,
+    "performance_measurement": false,
+    "privacy_tests": true
+  },
+  "recommendations": [
+    "Some tests failed - check infrastructure setup"
+  ]
+}

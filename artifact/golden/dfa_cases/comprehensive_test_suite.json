@@ -1,0 +1,101 @@
+{
+  "test_suite_id": "comprehensive_test_suite",
+  "description": "Comprehensive DFA test suite with 5k seeded traces for equivalence testing",
+  "version": "v1",
+  "bundle_id": "test-agent",
+  "metadata": {
+    "created_at": "2025-01-01T00:00:00Z",
+    "total_traces": 5000,
+    "seed_range": [1, 5000],
+    "event_types": ["call", "log", "declassify", "emit", "retrieve"],
+    "rate_limit_windows": [1000, 5000, 60000, 300000, 3600000]
+  },
+  "dfa_table": {
+    "states": [0, 1, 2, 3, 4],
+    "start": 0,
+    "accepting": [0, 2, 4],
+    "transitions": [
+      {"from_state": 0, "event": "call(tool1,hash1)", "to_state": 1},
+      {"from_state": 1, "event": "log(hash2)", "to_state": 2},
+      {"from_state": 2, "event": "declassify(high,low,item1)", "to_state": 3},
+      {"from_state": 3, "event": "emit(plan1)", "to_state": 4},
+      {"from_state": 4, "event": "retrieve(source1,receipt1)", "to_state": 0},
+      {"from_state": 0, "event": "call(tool2,hash3)", "to_state": 2},
+      {"from_state": 2, "event": "call(tool3,hash4)", "to_state": 4}
+    ],
+    "rate_limits": [
+      {"tool": "tool1", "window_ms": 1000, "bound": 5},
+      {"tool": "tool2", "window_ms": 5000, "bound": 20},
+      {"tool": "egress", "window_ms": 60000, "bound": 100},
+      {"tool": "declassify", "window_ms": 300000, "bound": 10},
+      {"tool": "retrieve", "window_ms": 3600000, "bound": 50}
+    ]
+  },
+  "test_traces": [
+    {
+      "trace_id": "trace_1",
+      "seed": 1,
+      "events": [
+        {"timestamp": 1000, "event": "call(tool1,hash1)", "args_hash": "abc123"},
+        {"timestamp": 1500, "event": "log(hash2)", "args_hash": "def456"},
+        {"timestamp": 2000, "event": "declassify(high,low,item1)", "args_hash": "ghi789"}
+      ],
+      "expected_final_state": 3,
+      "expected_accept": false,
+      "expected_rate_limit_violations": []
+    },
+    {
+      "trace_id": "trace_2", 
+      "seed": 2,
+      "events": [
+        {"timestamp": 1000, "event": "call(tool1,hash1)", "args_hash": "abc123"},
+        {"timestamp": 1100, "event": "call(tool1,hash2)", "args_hash": "def456"},
+        {"timestamp": 1200, "event": "call(tool1,hash3)", "args_hash": "ghi789"},
+        {"timestamp": 1300, "event": "call(tool1,hash4)", "args_hash": "jkl012"},
+        {"timestamp": 1400, "event": "call(tool1,hash5)", "args_hash": "mno345"},
+        {"timestamp": 1500, "event": "call(tool1,hash6)", "args_hash": "pqr678"}
+      ],
+      "expected_final_state": 0,
+      "expected_accept": true,
+      "expected_rate_limit_violations": ["Rate limit exceeded for event: call(tool1,hash6)"]
+    },
+    {
+      "trace_id": "trace_3",
+      "seed": 3,
+      "events": [
+        {"timestamp": 1000, "event": "call(tool2,hash3)", "args_hash": "abc123"},
+        {"timestamp": 2000, "event": "call(tool3,hash4)", "args_hash": "def456"}
+      ],
+      "expected_final_state": 4,
+      "expected_accept": true,
+      "expected_rate_limit_violations": []
+    }
+  ],
+  "edge_cases": [
+    {
+      "case_id": "empty_trace",
+      "description": "Empty trace should remain in start state",
+      "events": [],
+      "expected_final_state": 0,
+      "expected_accept": true
+    },
+    {
+      "case_id": "invalid_transition",
+      "description": "Invalid event should cause transition error",
+      "events": [
+        {"timestamp": 1000, "event": "invalid_event", "args_hash": "abc123"}
+      ],
+      "expected_error": "No transition for state 0 with event invalid_event"
+    },
+    {
+      "case_id": "clock_wraparound",
+      "description": "Clock wraparound should be handled safely",
+      "events": [
+        {"timestamp": 0, "event": "call(tool1,hash1)", "args_hash": "abc123"},
+        {"timestamp": 1, "event": "log(hash2)", "args_hash": "def456"}
+      ],
+      "expected_final_state": 2,
+      "expected_accept": true
+    }
+  ]
+}

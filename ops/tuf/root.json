@@ -1,0 +1,92 @@
+{
+  "signed": {
+    "_type": "root",
+    "version": 1,
+    "expires": "2026-01-01T00:00:00Z",
+    "keys": {
+      "root": {
+        "keytype": "ed25519",
+        "scheme": "ed25519",
+        "keyval": {
+          "public": "base64:root_public_key_here"
+        }
+      },
+      "targets": {
+        "keytype": "ed25519",
+        "scheme": "ed25519",
+        "keyval": {
+          "public": "base64:targets_public_key_here"
+        }
+      },
+      "snapshot": {
+        "keytype": "ed25519",
+        "scheme": "ed25519",
+        "keyval": {
+          "public": "base64:snapshot_public_key_here"
+        }
+      },
+      "timestamp": {
+        "keytype": "ed25519",
+        "scheme": "ed25519",
+        "keyval": {
+          "public": "base64:timestamp_public_key_here"
+        }
+      }
+    },
+    "roles": {
+      "root": {
+        "keyids": ["root"],
+        "threshold": 1
+      },
+      "targets": {
+        "keyids": ["targets"],
+        "threshold": 1
+      },
+      "snapshot": {
+        "keyids": ["snapshot"],
+        "threshold": 1
+      },
+      "timestamp": {
+        "keyids": ["timestamp"],
+        "threshold": 1
+      }
+    },
+    "consistent_snapshot": true,
+    "pinned_sth": {
+      "log_id": "provability-fabric-log",
+      "tree_size": 1000000,
+      "timestamp": "2025-01-01T00:00:00Z",
+      "sha256_root_hash": "sha256:abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567",
+      "tree_head_signature": "base64:tree_head_signature_here"
+    },
+    "rekor_inclusion": {
+      "enabled": true,
+      "required": true,
+      "log_public_key": "base64:rekor_public_key_here",
+      "log_id": "rekor-log-id-here"
+    },
+    "break_glass": {
+      "enabled": true,
+      "m_of_n": {
+        "m": 3,
+        "n": 5,
+        "signers": [
+          "admin1@provability-fabric.org",
+          "admin2@provability-fabric.org",
+          "admin3@provability-fabric.org",
+          "admin4@provability-fabric.org",
+          "admin5@provability-fabric.org"
+        ]
+      },
+      "ttl_hours": 24,
+      "auto_page": true,
+      "post_mortem_required": true
+    }
+  },
+  "signatures": [
+    {
+      "keyid": "root",
+      "sig": "base64:root_signature_here"
+    }
+  ]
+}

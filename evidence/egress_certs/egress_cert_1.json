@@ -1,0 +1,80 @@
+{
+  "egress_certificate": {
+    "version": "v1",
+    "certificate_id": "egress_cert_001",
+    "bundle_id": "test-agent",
+    "session_id": "session_123",
+    "timestamp": "2025-01-01T00:00:00Z",
+    "policy_hash": "sha256:abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567",
+    "non_interference_verdict": "PASS",
+    "unwinding_proof": {
+      "proof_type": "unwinding",
+      "proof_hash": "sha256:def456ghi789jkl012mno345pqr678stu901vwx234yz567abc123",
+      "verification_status": "verified"
+    },
+    "label_witnesses": [
+      {
+        "path": "$.user_input",
+        "label": "untrusted",
+        "witness_hash": "sha256:ghi789jkl012mno345pqr678stu901vwx234yz567abc123def456",
+        "witness_type": "merkle"
+      },
+      {
+        "path": "$.system_config",
+        "label": "trusted",
+        "witness_hash": "sha256:jkl012mno345pqr678stu901vwx234yz567abc123def456ghi789",
+        "witness_type": "merkle"
+      }
+    ],
+    "declassification_rules": [
+      {
+        "from_label": "untrusted",
+        "to_label": "derived",
+        "rule_hash": "sha256:mno345pqr678stu901vwx234yz567abc123def456ghi789jkl012",
+        "justification": "AI processing transforms untrusted input"
+      }
+    ],
+    "rate_limiting_status": {
+      "http_get": {
+        "window_ms": 60000,
+        "current_count": 5,
+        "max_allowed": 10,
+        "status": "within_limits"
+      }
+    },
+    "budget_status": {
+      "current_cost_usd": 2.50,
+      "max_budget_usd": 10.00,
+      "status": "within_budget"
+    },
+    "privacy_compliance": {
+      "differential_privacy": {
+        "epsilon": 1.0,
+        "delta": 1e-5,
+        "status": "compliant"
+      },
+      "pii_handling": "anonymized",
+      "data_retention_days": 30
+    },
+    "effects_signature": {
+      "declared_effects": ["read", "process", "write"],
+      "effect_hash": "sha256:pqr678stu901vwx234yz567abc123def456ghi789jkl012mno345"
+    },
+    "attestation": {
+      "attestation_quote": "base64:attestation_quote_here",
+      "quote_hash": "sha256:stu901vwx234yz567abc123def456ghi789jkl012mno345pqr678",
+      "attestation_status": "verified"
+    },
+    "signature": {
+      "algorithm": "ed25519",
+      "public_key": "base64:public_key_here",
+      "signature": "base64:signature_here"
+    }
+  },
+  "metadata": {
+    "created_at": "2025-01-01T00:00:00Z",
+    "expires_at": "2025-01-02T00:00:00Z",
+    "issuer": "provability-fabric-runtime",
+    "version": "v1"
+  }
+}

@@ -1,268 +1,181 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Plan DSL Schema - Strict Injection Protection",
-  "description": "Enhanced schema for typed plans with strict capability matching, receipt validation, and injection hardening",
+  "title": "Provability Fabric Plan DSL Schema",
+  "description": "Schema for defining execution plans with runtime mediation points",
   "type": "object",
-  "required": ["plan_id", "tenant", "subject", "steps", "constraints", "system_prompt_hash", "input_channels", "allowed_operations"],
   "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["v1"],
+      "description": "Schema version"
+    },
     "plan_id": {
       "type": "string",
-      "pattern": "^[a-zA-Z0-9_-]+$",
       "description": "Unique identifier for the plan"
     },
-    "tenant": {
+    "bundle_id": {
       "type": "string",
-      "pattern": "^[a-zA-Z0-9_-]+$",
-      "description": "Tenant identifier for multi-tenancy"
+      "description": "Associated bundle identifier"
     },
-    "subject": {
-      "type": "object",
-      "required": ["id", "caps"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Subject identifier"
-        },
-        "caps": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Capabilities possessed by the subject"
-        }
-      }
-    },
-    "allowed_operations": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "data_query", "retrieve", "search", "fetch", "get",
-          "compute", "analyze", "transform", "aggregate",
-          "notify", "alert", "report", "export",
-          "validate", "verify", "audit", "compliance_check"
-        ]
-      },
-      "description": "Whitelist of allowed operations - any step not in this list will be rejected"
-    },
-    "input_channels": {
-      "type": "object",
-      "required": ["system", "user"],
-      "properties": {
-        "system": {
-          "type": "object",
-          "required": ["hash", "policy_hash"],
-          "properties": {
-            "hash": {
-              "type": "string",
-              "pattern": "^[a-fA-F0-9]{64}$",
-              "description": "SHA-256 hash of system prompt"
-            },
-            "policy_hash": {
-              "type": "string",
-              "pattern": "^[a-fA-F0-9]{64}$",
-              "description": "SHA-256 hash of policy configuration"
-            }
-          },
-          "description": "Trusted system channel - cannot be modified by untrusted inputs"
-        },
-        "user": {
-          "type": "object",
-          "required": ["content_hash", "quoted"],
-          "properties": {
-            "content_hash": {
-              "type": "string",
-              "pattern": "^[a-fA-F0-9]{64}$",
-              "description": "SHA-256 hash of user content"
-            },
-            "quoted": {
-              "type": "boolean",
-              "const": true,
-              "description": "MUST be true for untrusted user input - enforced by strict kernel"
-            }
-          },
-          "description": "Untrusted user channel - MUST be quoted=true and cannot alter instructions"
-        },
-        "retrieved": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["receipt_id", "content_hash", "quoted", "labels"],
-            "properties": {
-              "receipt_id": {
-                "type": "string",
-                "description": "Access receipt identifier"
-              },
-              "content_hash": {
-                "type": "string",
-                "pattern": "^[a-fA-F0-9]{64}$",
-                "description": "SHA-256 hash of retrieved content"
-              },
-              "quoted": {
-                "type": "boolean",
-                "const": true,
-                "description": "MUST be true for untrusted retrieved content - enforced by strict kernel"
-              },
-              "labels": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Labels associated with retrieved content"
-              }
-            }
-          },
-          "description": "Untrusted retrieved content - MUST be quoted=true and labeled"
-        },
-        "file": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["sha256", "media_type", "quoted"],
-            "properties": {
-              "sha256": {
-                "type": "string",
-                "pattern": "^[a-fA-F0-9]{64}$",
-                "description": "SHA-256 hash of file content"
-              },
-              "media_type": {
-                "type": "string",
-                "description": "MIME type of the file"
-              },
-              "quoted": {
-                "type": "boolean",
-                "const": true,
-                "description": "MUST be true for untrusted file content - enforced by strict kernel"
-              }
-            }
-          },
-          "description": "Untrusted file content - MUST be quoted=true and typed"
-        }
-      },
-      "description": "Input channel classification for injection hardening - strict kernel enforces quoted=true on all untrusted channels"
-    },
-    "steps": {
+    "capabilities": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["tool", "args", "caps_required", "labels_in", "labels_out"],
         "properties": {
-          "tool": {
+          "capability_id": {
             "type": "string",
-            "description": "Tool identifier to be called - must be in allowed_operations list"
+            "description": "Unique capability identifier"
           },
-          "args": {
+          "type": {
+            "type": "string",
+            "enum": ["call", "log", "declassify", "emit", "retrieve"],
+            "description": "Type of mediated operation"
+          },
+          "field_commit": {
+            "type": "string",
+            "description": "Cryptographic commitment to the field values"
+          },
+          "args_hash": {
+            "type": "string",
+            "description": "Hash of the operation arguments"
+          },
+          "conditions": {
             "type": "object",
-            "description": "Arguments for the tool call"
+            "properties": {
+              "rate_limit": {
+                "type": "object",
+                "properties": {
+                  "window_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "max_operations": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "tolerance_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["window_ms", "max_operations"]
+              },
+              "budget": {
+                "type": "object",
+                "properties": {
+                  "max_cost": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "currency": {
+                    "type": "string",
+                    "default": "USD"
+                  }
+                },
+                "required": ["max_cost"]
+              },
+              "privacy": {
+                "type": "object",
+                "properties": {
+                  "differential_privacy": {
+                    "type": "object",
+                    "properties": {
+                      "epsilon": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "delta": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["epsilon", "delta"]
+                  }
+                }
+              }
+            }
           },
-          "caps_required": {
+          "effects": {
             "type": "array",
             "items": {
-              "type": "string"
-            },
-            "description": "Capabilities required for this step - strict kernel validates against subject.caps"
+              "type": "string",
+              "enum": ["read", "write", "network", "file_system", "database"]
+            }
           },
-          "labels_in": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Input labels for this step - strict kernel validates label flow"
-          },
-          "labels_out": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Output labels for this step"
-          },
-          "receipts": {
+          "declassification_rules": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "receipt_id": {"type": "string"},
-                "tenant": {"type": "string"},
-                "subject_id": {"type": "string"},
-                "query_hash": {"type": "string"},
-                "index_shard": {"type": "string"},
-                "timestamp": {"type": "integer"},
-                "result_hash": {"type": "string"},
-                "sign_alg": {"type": "string"},
-                "sig": {"type": "string"}
-              }
-            },
-            "description": "Access receipts for retrieval steps - strict kernel validates presence and signature"
+                "from_label": {
+                  "type": "string"
+                },
+                "to_label": {
+                  "type": "string"
+                },
+                "condition": {
+                  "type": "string"
+                },
+                "justification": {
+                  "type": "string"
+                }
+              },
+              "required": ["from_label", "to_label", "condition", "justification"]
+            }
+          }
+        },
+        "required": ["capability_id", "type", "field_commit", "args_hash"]
+      }
+    },
+    "execution_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Ordered list of capability IDs defining execution sequence"
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          }
+        },
+        "required": ["name", "condition", "severity"]
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }
-    },
-    "constraints": {
-      "type": "object",
-      "required": ["budget", "pii", "dp_epsilon"],
-      "properties": {
-        "budget": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10000,
-          "description": "Budget limit in USD - strict kernel enforces maximum"
-        },
-        "pii": {
-          "type": "boolean",
-          "description": "Whether PII is allowed"
-        },
-        "dp_epsilon": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10,
-          "description": "Differential privacy epsilon parameter - strict kernel enforces maximum"
-        },
-        "dp_delta": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1e-5,
-          "description": "Differential privacy delta parameter - strict kernel enforces maximum"
-        },
-        "latency_max": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 300,
-          "description": "Maximum allowed latency in seconds - strict kernel enforces maximum"
-        },
-        "max_tokens": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 100000,
-          "description": "Maximum tokens allowed - strict kernel enforces maximum"
-        },
-        "max_retrieval_results": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000,
-          "description": "Maximum retrieval results allowed - strict kernel enforces maximum"
-        }
-      }
-    },
-    "system_prompt_hash": {
-      "type": "string",
-      "pattern": "^[a-fA-F0-9]{64}$",
-      "description": "SHA-256 hash of the system prompt"
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Plan creation timestamp"
-    },
-    "expires_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Plan expiration timestamp"
-    },
-    "security_level": {
-      "type": "string",
-      "enum": ["strict", "permissive"],
-      "default": "strict",
-      "description": "Security level - strict enforces all injection protections"
     }
-  }
+  },
+  "required": ["version", "plan_id", "bundle_id", "capabilities"],
+  "additionalProperties": false
 } 
