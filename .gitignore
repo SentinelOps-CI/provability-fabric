@@ -185,4 +185,22 @@ privacy_burn_down.log
 test_broken_phases.log
 trust-fire-report.json
 dsar_export.zip
-invalid-rate-card.json 
+invalid-rate-card.json
+
+# Large archive files (should be in releases, not repo)
+*.tar
+my-agent.tar
+pf.tar
+
+# Test output files (regenerated during testing)
+*_test_results.json
+*_test_report_*.json
+*_performance_report_*.json
+*_replay_test_results.json
+*_comprehensive_test_report_*.json
+*_privacy_test_report_*.json
+*_trust-fire-report.json
+
+# Log files (regenerated during testing)
+*_burn_down.log
+*_adapter_test.log 

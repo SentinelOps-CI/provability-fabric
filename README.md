@@ -13,6 +13,38 @@ An open-source framework that enforces provable behavioral guarantees through fo
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
 </p>
 
+## Repository Structure
+
+The repository has been reorganized for better clarity and maintainability:
+
+```
+provability-fabric/
+├── README.md                 # Project documentation
+├── LICENSE                   # Apache 2.0 license
+├── VERSION                   # Current version
+├── Makefile                  # Build system
+├── lakefile.lean            # Lean build configuration
+├── lean-toolchain           # Lean version specification
+├── .gitignore               # Version control exclusions
+├── config/                  # Configuration files
+│   ├── schemas/            # JSON schemas (e.g., aispec-schema.json)
+│   └── specifications/     # Specification documents
+├── scripts/                 # Utility scripts
+│   └── setup/              # Infrastructure setup scripts
+├── tests/                   # Test suites
+│   ├── integration/        # Integration tests
+│   ├── unit/               # Unit tests
+│   ├── privacy/            # Privacy tests
+│   ├── replay/             # Replay tests
+│   └── debugging/          # Debugging tests
+├── core/                    # Core framework
+├── runtime/                 # Runtime components
+├── bundles/                 # Agent bundles
+├── tools/                   # Development tools
+├── docs/                    # Documentation
+└── [other directories...]
+```
+
 ## Quick Start
 
 ### Option 1: Automated Installation (Recommended)
