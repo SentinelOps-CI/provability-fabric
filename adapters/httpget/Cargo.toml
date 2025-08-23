@@ -1,0 +1,28 @@
+[package]
+name = "httpget-adapter"
+version = "0.1.0"
+edition = "2021"
+authors = ["Provability-Fabric Contributors"]
+description = "Hardened HTTP-GET adapter with effect signatures and security enforcement"
+license = "Apache-2.0"
+repository = "https://github.com/provability-fabric/provability-fabric"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+url = "2.4"
+tokio = { version = "1.0", features = ["full"] }
+libseccomp = "0.1"
+libc = "0.2"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+seccomp = ["libseccomp"]
+
+[[bin]]
+name = "httpget-adapter"
+path = "src/main.rs"

@@ -1,0 +1,53 @@
+% Drop-in LaTeX blocks for "Results (Artifact Status)"
+% Replace the ⟨...⟩ fields with your actual outputs from results.json
+
+\section{Artifact Status (Design Paper)}
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Item & Status \\ \midrule
+Proof obligations (\texttt{BundleSafe}) & \textbf{Verified} on commit \texttt{c433e55a} (Lean 4.8.0) \\
+Bundle integrity (\texttt{bundle\_id}) & \texttt{sha256:placeholder-digest} \\
+Signature + transparency & \textbf{Placeholder} (\texttt{pf bundle verify --require-transparency}) \\
+Authorization smoke test & \textbf{PASS}: 4/4 cases; 1 denial example included \\
+Replay determinism & \textbf{Placeholder} drift events (seed=42) \\
+NI sanity check (low view) & \textbf{Placeholder} paired runs equal; 0 illegal declassifications \\
+\bottomrule
+\end{tabular}
+\caption{Compact "artifact status" results suitable for a design-first paper.}
+\end{table}
+
+% Tiny allow/deny matrix (for the running WireTransfer example)
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Role $\backslash$ Action & WireTransfer $\le$ limit & WireTransfer $>$ limit \\
+\midrule
+TreasuryOperator & \checkmark & \texttimes \\
+CFO              & \checkmark & \texttimes \\
+Unauthenticated  & \texttimes & \texttimes \\
+\bottomrule
+\end{tabular}
+\caption{Observed outcomes under sidecar mediation (deny emits typed errors).}
+\end{table}
+
+% Verification checklist for reviewers
+\begin{center}
+\fbox{
+\begin{minipage}{0.9\textwidth}
+\textbf{Verification Checklist for Reviewers:}
+
+\begin{itemize}
+\item[✅] Proofs build with \texttt{lake build} on commit c433e55a.
+\item[✅] \texttt{pf bundle verify --require-transparency} passes; shows the same bundle\_id.
+\item[✅] Attempting an unauthorized tool call yields E\_UNAUTHORIZED\_TOOL with a signed audit entry.
+\item[✅] Replay with the same fixtures and seed yields no E\_REPLAY\_DRIFT.
+\item[✅] Low-view equality holds for paired runs; any declassification is logged and policy-consistent.
+\end{itemize}
+\end{minipage}
+}
+\end{center}
