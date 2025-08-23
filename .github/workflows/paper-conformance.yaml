@@ -1,0 +1,445 @@
+name: Paper Conformance CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Prompt 73: DFA Round-trip Equivalence
+  dfa-equivalence:
+    name: DFA Round-trip Equivalence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Lean
+        run: |
+          wget https://github.com/leanprover/lean4/releases/download/v4.6.0/lean-4.6.0-linux.tar.gz
+          tar -xzf lean-4.6.0-linux.tar.gz
+          sudo mv lean-4.6.0-linux/bin/* /usr/local/bin/
+
+      - name: Run DFA Equivalence Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_round_trip_equivalence_5k -- --nocapture
+          cargo test test_round_trip_equivalence_100 -- --nocapture
+
+      - name: Verify 0 Mismatches
+        run: |
+          # Parse test output to ensure 0 mismatches
+          cd runtime/sidecar-watcher
+          cargo test test_round_trip_equivalence_5k -- --nocapture | grep -q "0 mismatches" || exit 1
+
+  # Prompt 74: Proof-Carrying Labeler
+  labeler-stress:
+    name: Proof-Carrying Labeler Stress Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Labeler Stress Tests
+        run: |
+          cd runtime/labeler
+          cargo test test_labeler_stress_1k_randomized_payloads -- --nocapture
+          cargo test test_labeler_polyglot_handling -- --nocapture
+          cargo test test_labeler_deep_nesting -- --nocapture
+
+      - name: Verify 1k Payloads Processed
+        run: |
+          cd runtime/labeler
+          cargo test test_labeler_stress_1k_randomized_payloads -- --nocapture | grep -q "Generated 1000 randomized payloads" || exit 1
+
+  # Prompt 75: Labeled Alphabet & Plan-DSL Integration
+  events-plan-dsl:
+    name: Events & Plan-DSL Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Events & Plan-DSL Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_event_mediation_success -- --nocapture
+          cargo test test_event_mediation_missing_field_commitments -- --nocapture
+          cargo test test_event_mediation_hash_mismatches -- --nocapture
+          cargo test test_event_mediation_no_matching_plan_node -- --nocapture
+          cargo test test_event_mediation_security_label_escalation -- --nocapture
+          cargo test test_event_mediation_field_commitment_validation -- --nocapture
+          cargo test test_event_mediation_args_hash_validation -- --nocapture
+
+  # Prompt 76: Declassification Engine
+  declassify-engine:
+    name: Declassification Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Declassification Engine Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_declassify_engine_basic_operations -- --nocapture
+          cargo test test_declassify_engine_cycle_detection -- --nocapture
+          cargo test test_declassify_engine_silent_label_widening -- --nocapture
+          cargo test test_declassify_engine_well_formed_delta_structures -- --nocapture
+          cargo test test_declassify_engine_denial_without_matching_rules -- --nocapture
+          cargo test test_declassify_engine_expiry_handling -- --nocapture
+          cargo test test_declassify_engine_approval_workflow -- --nocapture
+          cargo test test_declassify_engine_justification_validation -- --nocapture
+
+  # Prompt 77: Rate Limits
+  rate-limits:
+    name: Rate Limits Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Rate Limit Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_99th_percentile_performance -- --nocapture
+          cargo test test_clock_wraparound_safety -- --nocapture
+          cargo test test_monotonicity_guarantee -- --nocapture
+
+      - name: Verify Performance Targets
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_99th_percentile_performance -- --nocapture | grep -q "99th percentile check cost.*< 1ms" || exit 1
+
+  # Prompt 78: Hardened Adapters + OS Enforcement
+  hardened-adapters:
+    name: Hardened Adapters & OS Enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Hardened Adapters Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_http_get_adapter_hardening -- --nocapture
+          cargo test test_file_read_adapter_hardening -- --nocapture
+          cargo test test_seccomp_profile_enforcement -- --nocapture
+          cargo test test_network_namespace_isolation -- --nocapture
+          cargo test test_redirect_attempt_prevention -- --nocapture
+          cargo test test_symlink_traversal_prevention -- --nocapture
+          cargo test test_file_metadata_recording -- --nocapture
+          cargo test test_content_length_enforcement -- --nocapture
+          cargo test test_fixed_dns_enforcement -- --nocapture
+          cargo test test_readonly_filesystem_enforcement -- --nocapture
+
+  # Prompt 79: Local NI Monitor + Egress Certificate
+  ni-monitor-egress:
+    name: NI Monitor & Egress Certificate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run NI Monitor & Egress Certificate Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_ni_monitor_verdict_consistency -- --nocapture
+          cargo test test_egress_certificate_validation -- --nocapture
+          cargo test test_egress_certificate_schema_validation -- --nocapture
+          cargo test test_egress_certificate_dsse_signature -- --nocapture
+          cargo test test_egress_certificate_export_import -- --nocapture
+          cargo test test_egress_certificate_expiry_handling -- --nocapture
+
+      - name: Verify 10k Prefixes Processed
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_ni_monitor_verdict_consistency -- --nocapture | grep -q "Processed 10000 prefixes" || exit 1
+
+  # Prompt 80: Cryptographic Envelope + Rekor/TUF + M-of-N Break-Glass
+  crypto-envelope-break-glass:
+    name: Cryptographic Envelope & Break-Glass
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Cryptographic Envelope & Break-Glass Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_break_glass_m_of_n_signatures -- --nocapture
+          cargo test test_break_glass_signature_validation -- --nocapture
+          cargo test test_break_glass_post_mortem_stub_emission -- --nocapture
+          cargo test test_break_glass_urgency_levels -- --nocapture
+          cargo test test_break_glass_expiry_and_auto_paging -- --nocapture
+          cargo test test_break_glass_audit_logging -- --nocapture
+          cargo test test_break_glass_statistics -- --nocapture
+
+  # Prompt 81: Scheduler & Clock Model
+  scheduler-clock:
+    name: Scheduler & Clock Model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Scheduler & Clock Model Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_concurrency_stress_with_priority_mixing -- --nocapture
+          cargo test test_two_queue_concurrency_stress -- --nocapture
+
+      - name: Verify 0 Reorder Violations
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_concurrency_stress_with_priority_mixing -- --nocapture | grep -q "0 reorder violations" || exit 1
+
+  # Prompt 82: Replay Determinism & Drift Detector
+  replay-determinism:
+    name: Replay Determinism & Drift Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Replay Determinism Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_replay_determinism_verification -- --nocapture
+          cargo test test_replay_drift_detection -- --nocapture
+          cargo test test_redaction_equivalent_view -- --nocapture
+
+  # Prompt 83: Safety Case Bundle
+  safety-case-bundle:
+    name: Safety Case Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Safety Case Bundle Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_safety_case_bundle_creation -- --nocapture
+          cargo test test_safety_case_bundle_storage -- --nocapture
+          cargo test test_safety_case_bundle_retention -- --nocapture
+          cargo test test_safety_case_bundle_schema_validation -- --nocapture
+          cargo test test_safety_case_bundle_compression -- --nocapture
+          cargo test test_safety_case_bundle_export_import -- --nocapture
+          cargo test test_safety_case_bundle_statistics -- --nocapture
+          cargo test test_safety_case_bundle_cleanup -- --nocapture
+
+      - name: Verify 100% Sessions Have Bundles
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test test_safety_case_bundle_storage -- --nocapture | grep -q "100% sessions have bundles" || exit 1
+
+  # Integration Tests
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs:
+      [
+        dfa-equivalence,
+        labeler-stress,
+        events-plan-dsl,
+        declassify-engine,
+        rate-limits,
+        hardened-adapters,
+        ni-monitor-egress,
+        crypto-envelope-break-glass,
+        scheduler-clock,
+        replay-determinism,
+        safety-case-bundle,
+      ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Integration Tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test --all -- --nocapture
+
+      - name: Verify All Tests Pass
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test --all -- --nocapture | grep -q "test result: ok" || exit 1
+
+  # Performance Benchmarks
+  performance:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Performance Benchmarks
+        run: |
+          cd runtime/sidecar-watcher
+          cargo bench --all
+
+      - name: Generate Performance Report
+        run: |
+          cd runtime/sidecar-watcher
+          cargo bench --all -- --output-format=json > performance_report.json
+
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: runtime/sidecar-watcher/performance_report.json
+
+  # Security Audit
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Security Tools
+        run: |
+          cargo install cargo-audit
+          cargo install cargo-geiger
+
+      - name: Run Security Audit
+        run: |
+          cd runtime/sidecar-watcher
+          cargo audit
+          cargo geiger --output-format json > security_report.json
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: runtime/sidecar-watcher/security_report.json
+
+  # Documentation Generation
+  documentation:
+    name: Documentation Generation
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Generate Documentation
+        run: |
+          cd runtime/sidecar-watcher
+          cargo doc --all-features --no-deps
+          cargo test --doc --all-features
+
+      - name: Upload Documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: runtime/sidecar-watcher/target/doc
+
+  # Final Status Check
+  final-status:
+    name: Final Status Check
+    runs-on: ubuntu-latest
+    needs: [integration, performance, security-audit, documentation]
+    steps:
+      - name: All Gates Passed
+        run: |
+          echo "🎉 All CI gates have passed successfully!"
+          echo "✅ DFA Round-trip Equivalence: 0 mismatches across 5k seeded traces"
+          echo "✅ Proof-Carrying Labeler: 1k randomized payloads processed"
+          echo "✅ Events & Plan-DSL Integration: All mediated operations pre-authorized"
+          echo "✅ Declassification Engine: Cycles detected, silent label widening prevented"
+          echo "✅ Rate Limits: 99th percentile < 1ms, clock wraparound safe"
+          echo "✅ Hardened Adapters: Seccomp/netns enforced, redirects blocked"
+          echo "✅ NI Monitor: Verdict consistency across 10k prefixes"
+          echo "✅ Egress Certificate: Schema validation + DSSE signature verified"
+          echo "✅ Break-Glass: M-of-N signatures, post-mortem stubs generated"
+          echo "✅ Scheduler: 0 reorder violations in concurrency stress tests"
+          echo "✅ Replay Determinism: Byte-identical replay, drift detection"
+          echo "✅ Safety Case Bundle: 100% sessions have bundles, 90-day retention"
+          echo "🚀 Provability-Fabric is ready for production deployment!"

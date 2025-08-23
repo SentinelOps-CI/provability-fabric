@@ -2,8 +2,19 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 pub mod assumption;
+pub mod break_glass;
 pub mod broker;
+pub mod declassify;
+pub mod dfa;
+pub mod effects;
+pub mod egress_cert;
+pub mod events;
+pub mod label_witness;
+pub mod ni_monitor;
 pub mod queue_manager;
+pub mod ratelimit;
+pub mod replay;
+pub mod scheduler;
 
 use anyhow::Result;
 use assumption::{Assumption, AssumptionMonitor};

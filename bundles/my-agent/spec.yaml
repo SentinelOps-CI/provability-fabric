@@ -76,4 +76,28 @@ trace:
   REQ-0002: ["AC-0002"]
   REQ-0003: ["AC-0003"]
   NFR-0001: ["AC-0003", "AC-0004"]
-  NFR-0002: ["AC-0002"] 
+  NFR-0002: ["AC-0002"]
+
+# Declassification block Δ - defines allowed label transitions
+declassification:
+  rules:
+    - from_label: "secret"
+      to_label: "confidential"
+      conditions: ["aggregated_data", "anonymized"]
+      derivation: "data_aggregation_policy"
+      
+    - from_label: "confidential"
+      to_label: "public"
+      conditions: ["consent_given", "legitimate_interest"]
+      derivation: "user_consent_policy"
+      
+    - from_label: "secret"
+      to_label: "public"
+      conditions: ["aggregated_data", "anonymized", "consent_given"]
+      derivation: "combined_policy"
+      
+  validation:
+    strict_mode: true
+    require_conditions: true
+    audit_trail: true
+    max_conditions: 5 

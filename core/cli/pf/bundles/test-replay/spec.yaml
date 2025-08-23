@@ -1,0 +1,34 @@
+meta:
+  version: "0.1.0"
+  created: "2025-08-14T17:32:00Z"
+  status: "test"
+  title: "Test Replay Bundle"
+  description: "Simple test bundle for replay determinism testing"
+
+requirements:
+  REQ-0001:
+    statement: "The bundle SHALL produce deterministic output given the same seed"
+    rationale: "Enable reproducible testing and debugging"
+    metric: "100% deterministic replay"
+    owner: "Test Engineer"
+    priority: "high"
+    category: "testing"
+
+nonFunctional:
+  NFR-0001:
+    statement: "Bundle execution shall be reproducible across multiple runs"
+    rationale: "Ensure consistent test results"
+    metric: "Zero variance in output"
+    owner: "Test Engineer"
+    priority: "high"
+    category: "reliability"
+
+acceptanceCriteria:
+  AC-0001:
+    description: "Bundle produces identical output with same seed across multiple runs"
+    testProcedure: "Execute bundle multiple times with seed 42 and verify output consistency"
+    successCriteria: "Identical output across all runs"
+
+trace:
+  REQ-0001: ["AC-0001"]
+  NFR-0001: ["AC-0001"]

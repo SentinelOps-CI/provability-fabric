@@ -1,0 +1,49 @@
+{
+  "test_case_id": "test_case_1",
+  "description": "Simple HTTP GET request sequence",
+  "dfa_table": {
+    "states": [
+      {"id": 0, "accepting": false, "initial": true},
+      {"id": 1, "accepting": false, "initial": false},
+      {"id": 2, "accepting": true, "initial": false}
+    ],
+    "transitions": [
+      {"from": 0, "event": "http_get", "to": 1},
+      {"from": 1, "event": "rate_limit_ok", "to": 2},
+      {"from": 0, "event": "rate_limit_exceeded", "to": 0}
+    ],
+    "rate_limiters": [
+      {
+        "key": "http_get",
+        "window_ms": 60000,
+        "max_operations": 10,
+        "tolerance_ms": 1000
+      }
+    ]
+  },
+  "test_traces": [
+    {
+      "trace_id": "trace_1_1",
+      "events": [
+        {"timestamp": 1000, "event": "http_get", "args": {"url": "https://example.com"}},
+        {"timestamp": 1001, "event": "rate_limit_ok", "args": {"tool": "http_get", "window": 60000, "bound": 10}}
+      ],
+      "expected_accept": true,
+      "expected_final_state": 2
+    },
+    {
+      "trace_id": "trace_1_2",
+      "events": [
+        {"timestamp": 1000, "event": "http_get", "args": {"url": "https://example.com"}},
+        {"timestamp": 1001, "event": "rate_limit_exceeded", "args": {"tool": "http_get", "window": 60000, "bound": 10}}
+      ],
+      "expected_accept": false,
+      "expected_final_state": 0
+    }
+  ],
+  "metadata": {
+    "created_at": "2025-01-01T00:00:00Z",
+    "version": "v1",
+    "bundle_id": "test-agent"
+  }
+}

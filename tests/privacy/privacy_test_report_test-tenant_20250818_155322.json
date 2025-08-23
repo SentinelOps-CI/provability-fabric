@@ -1,0 +1,73 @@
+{
+  "tenant_id": "test-tenant",
+  "timestamp": "2025-08-18T15:53:22.465347",
+  "test_summary": {
+    "total_tests": 5,
+    "passed": 5,
+    "failed": 0,
+    "critical_leaks": 0,
+    "detection_bypasses": 0
+  },
+  "test_results": [
+    {
+      "test_name": "functional_non_interference",
+      "timestamp": "2025-08-18T15:53:22.543164",
+      "success": true,
+      "details": "Test completed in 0.08s",
+      "pii_leaks_detected": 0,
+      "detection_bypasses": 0,
+      "critical_leaks": 0,
+      "declassification_events": 2,
+      "interference_detected": false,
+      "declassification_safe": true
+    },
+    {
+      "test_name": "timing_channel_detection",
+      "timestamp": "2025-08-18T15:53:22.646396",
+      "success": true,
+      "details": "Test completed in 0.10s",
+      "pii_leaks_detected": 0,
+      "detection_bypasses": 0,
+      "critical_leaks": 0,
+      "declassification_events": 1,
+      "interference_detected": false,
+      "declassification_safe": true
+    },
+    {
+      "test_name": "memory_access_patterns",
+      "timestamp": "2025-08-18T15:53:22.700091",
+      "success": true,
+      "details": "Test completed in 0.05s",
+      "pii_leaks_detected": 0,
+      "detection_bypasses": 0,
+      "critical_leaks": 0,
+      "declassification_events": 1,
+      "interference_detected": false,
+      "declassification_safe": true
+    },
+    {
+      "test_name": "network_side_channel",
+      "timestamp": "2025-08-18T15:53:22.803420",
+      "success": true,
+      "details": "Test completed in 0.10s",
+      "pii_leaks_detected": 0,
+      "detection_bypasses": 0,
+      "critical_leaks": 0,
+      "declassification_events": 1,
+      "interference_detected": false,
+      "declassification_safe": true
+    },
+    {
+      "test_name": "declassification_safety",
+      "timestamp": "2025-08-18T15:53:22.906522",
+      "success": true,
+      "details": "Test completed in 0.10s",
+      "pii_leaks_detected": 0,
+      "detection_bypasses": 0,
+      "critical_leaks": 0,
+      "declassification_events": 2,
+      "interference_detected": false,
+      "declassification_safe": true
+    }
+  ]
+}

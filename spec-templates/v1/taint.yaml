@@ -1,0 +1,196 @@
+# Taint Rules for Proof-Carrying Labeler
+# This file defines taint rules for labeling data with security classifications
+# and generating Merkle/Bloom witnesses for runtime verification
+
+version: "v1"
+description: "Comprehensive taint rules for data labeling and witness generation"
+
+# Default labeling behavior
+defaults:
+  unknown_fields_mode: true  # Reject any unseen paths
+  default_label: "untrusted"
+  strict_mode: true
+
+# Taint rules for different data types and paths
+taint_rules:
+  # High-security data paths
+  - path: "$.user.credentials.password"
+    label: "secret"
+    condition: "always"
+    justification: "Password fields are always secret"
+    
+  - path: "$.user.credentials.api_key"
+    label: "secret"
+    condition: "always"
+    justification: "API keys are sensitive credentials"
+    
+  - path: "$.user.personal.email"
+    label: "confidential"
+    condition: "always"
+    justification: "Email addresses are personal information"
+    
+  - path: "$.user.personal.phone"
+    label: "confidential"
+    condition: "always"
+    justification: "Phone numbers are personal information"
+    
+  - path: "$.user.personal.ssn"
+    label: "secret"
+    condition: "always"
+    justification: "Social security numbers are highly sensitive"
+    
+  # Financial data paths
+  - path: "$.financial.credit_card.number"
+    label: "secret"
+    condition: "always"
+    justification: "Credit card numbers are sensitive financial data"
+    
+  - path: "$.financial.credit_card.cvv"
+    label: "secret"
+    condition: "always"
+    justification: "CVV codes are sensitive security data"
+    
+  - path: "$.financial.bank_account.routing"
+    label: "confidential"
+    condition: "always"
+    justification: "Bank routing numbers are confidential"
+    
+  - path: "$.financial.bank_account.account"
+    label: "secret"
+    condition: "always"
+    justification: "Bank account numbers are highly sensitive"
+    
+  # Healthcare data paths
+  - path: "$.healthcare.diagnosis"
+    label: "secret"
+    condition: "always"
+    justification: "Medical diagnoses are protected health information"
+    
+  - path: "$.healthcare.treatment"
+    label: "secret"
+    condition: "always"
+    justification: "Treatment plans are protected health information"
+    
+  - path: "$.healthcare.medications"
+    label: "confidential"
+    condition: "always"
+    justification: "Medication lists are protected health information"
+    
+  # Business data paths
+  - path: "$.business.strategy"
+    label: "confidential"
+    condition: "always"
+    justification: "Business strategy is confidential information"
+    
+  - path: "$.business.financials.revenue"
+    label: "confidential"
+    condition: "always"
+    justification: "Revenue data is confidential business information"
+    
+  - path: "$.business.financials.profit"
+    label: "confidential"
+    condition: "always"
+    justification: "Profit data is confidential business information"
+    
+  # System and infrastructure paths
+  - path: "$.system.internal_ip"
+    label: "confidential"
+    condition: "always"
+    justification: "Internal IP addresses are infrastructure details"
+    
+  - path: "$.system.admin_credentials"
+    label: "secret"
+    condition: "always"
+    justification: "Admin credentials are highly sensitive"
+    
+  - path: "$.system.security_keys"
+    label: "secret"
+    condition: "always"
+    justification: "Security keys are critical infrastructure secrets"
+
+# Declassification rules
+declassification_rules:
+  - from_label: "secret"
+    to_label: "confidential"
+    condition: "authorized_medical_staff"
+    justification: "Medical staff may access for treatment purposes"
+    
+  - from_label: "secret"
+    to_label: "confidential"
+    condition: "legal_compliance"
+    justification: "Required for legal or regulatory compliance"
+    
+  - from_label: "confidential"
+    to_label: "internal"
+    condition: "business_need"
+    justification: "Required for legitimate business operations"
+    
+  - from_label: "internal"
+    to_label: "public"
+    condition: "public_disclosure"
+    justification: "Authorized for public disclosure"
+
+# Witness generation configuration
+witness_config:
+  merkle:
+    hash_algorithm: "sha256"
+    tree_depth: 32
+    include_paths: true
+    include_values: false  # Don't include actual values in witnesses
+    
+  bloom:
+    false_positive_rate: 0.001
+    expected_elements: 10000
+    hash_functions: 10
+    
+  verification:
+    require_merkle: true
+    require_bloom: false  # Bloom filter is optional
+    strict_path_validation: true
+
+# Special handling for JSON-in-string scenarios
+json_in_string_handling:
+  - pattern: "\\{[^}]*\\}"
+    label: "data"
+    condition: "contains_json_like"
+    justification: "JSON-like strings are treated as data, not instructions"
+    
+  - pattern: "\\[[^\\]]*\\]"
+    label: "data"
+    condition: "contains_array_like"
+    justification: "Array-like strings are treated as data"
+
+# Rate limiting for taint operations
+rate_limits:
+  - operation: "label_generation"
+    window_ms: 60000
+    max_operations: 1000
+    description: "Limit label generation rate"
+    
+  - operation: "witness_verification"
+    window_ms: 1000
+    max_operations: 100
+    description: "Limit witness verification rate"
+
+# Validation rules
+validation:
+  - rule: "no_unknown_paths"
+    description: "Reject any paths not explicitly defined in taint rules"
+    severity: "error"
+    
+  - rule: "label_consistency"
+    description: "Ensure consistent labeling across similar data types"
+    severity: "warning"
+    
+  - rule: "declassification_audit"
+    description: "Log all declassification operations for audit"
+    severity: "info"
+
+# Metadata
+metadata:
+  created_at: "2025-01-01T00:00:00Z"
+  created_by: "security-team"
+  version: "1.0.0"
+  last_updated: "2025-01-01T00:00:00Z"
+  contact: "security@provability-fabric.org"
+  documentation: "https://docs.provability-fabric.org/taint-rules"
