@@ -15,8 +15,7 @@ limitations under the License.
 -/
 
 import Mathlib.Data.List.Basic
-import Mathlib.Data.Float.Basic
-import Mathlib.Algebra.Order.Ring
+import Mathlib.Data.FP.Basic
 import Fabric.Budget
 
 namespace Fabric

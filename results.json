@@ -1,0 +1,72 @@
+{
+  "commit": "c433e55a",
+  "proof": "verified",
+  "bundle_id": "placeholder-sha256-digest",
+  "signature": "placeholder",
+  "replay_drift": "placeholder",
+  "verification_results": {
+    "A_proof_backed_policies": {
+      "status": "Verified",
+      "lean_version": "4.8.0",
+      "commit_hash": "c433e55a",
+      "obligations_discharged": "All obligations discharged for BundleSafe",
+      "invariants_count": "1",
+      "auth_lemmas_count": "1",
+      "non_interference_theorem": "present"
+    },
+    "B_cryptographic_provenance": {
+      "status": "Placeholder - requires full pf CLI",
+      "bundle_id": "sha256:placeholder-digest",
+      "signature_verification": "placeholder",
+      "transparency_inclusion": "placeholder"
+    },
+    "C_authorization_enforcement": {
+      "status": "PASS",
+      "total_cases": 4,
+      "passed_cases": 4,
+      "failed_cases": 0,
+      "denial_example": {
+        "violation_type": "UNAUTHORIZED_TOOL",
+        "error_code": "E_UNAUTHORIZED_TOOL",
+        "decision": "deny",
+        "reason": "Tool 'unauthorized_tool' not in approved steps"
+      }
+    },
+    "D_non_interference": {
+      "status": "Placeholder - requires Python tests",
+      "low_equivalence_preserved": "placeholder",
+      "violations_count": "placeholder",
+      "declassifications_policy_consistent": "placeholder"
+    },
+    "E_replay_determinism": {
+      "status": "Placeholder - requires pf CLI",
+      "drift_events": "placeholder",
+      "event_hash_equality": "placeholder"
+    },
+    "F_auditability": {
+      "status": "Placeholder - requires ledger setup",
+      "hash_chain_integrity": "placeholder",
+      "inclusion_proof": "placeholder"
+    },
+    "G_runtime_overhead": {
+      "status": "Placeholder - requires k6 tests",
+      "median_overhead_ms": "placeholder",
+      "p95_overhead_ms": "placeholder",
+      "qps": "placeholder"
+    }
+  },
+  "wiretransfer_matrix": {
+    "TreasuryOperator": {
+      "WireTransfer_le_limit": "✓",
+      "WireTransfer_gt_limit": "✗"
+    },
+    "CFO": {
+      "WireTransfer_le_limit": "✓",
+      "WireTransfer_gt_limit": "✗"
+    },
+    "Unauthenticated": {
+      "WireTransfer_le_limit": "✗",
+      "WireTransfer_gt_limit": "✗"
+    }
+  }
+}

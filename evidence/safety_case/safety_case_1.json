@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "session_id": "session_20250101_001",
+    "bundle_id": "bundle_medical_analysis_001",
+    "created_at": 1735689600,
+    "expires_at": 1738368000,
+    "version": "1.0.0",
+    "components": [
+      "capability_receipts",
+      "plan_executions",
+      "kernel_decisions",
+      "egress_certificates",
+      "attestation_quotes"
+    ],
+    "total_size_bytes": 2048,
+    "checksum": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678"
+  },
+  "capability_receipts": [
+    {
+      "capability_id": "cap_medical_data_access",
+      "granted_at": 1735689600,
+      "expires_at": 1735776000,
+      "granted_by": "medical_director_001",
+      "scope": "patient_records:read:limited",
+      "conditions": {
+        "purpose": "medical_treatment",
+        "patient_consent": "granted",
+        "data_minimization": "enabled",
+        "audit_logging": "required"
+      },
+      "signature": "sig_medical_director_001_20250101_001"
+    },
+    {
+      "capability_id": "cap_ai_analysis_tool",
+      "granted_at": 1735689600,
+      "expires_at": 1735776000,
+      "granted_by": "ai_safety_officer_001",
+      "scope": "ai_tools:execute:supervised",
+      "conditions": {
+        "model_type": "medical_analysis",
+        "input_validation": "required",
+        "output_review": "human_required",
+        "rate_limit": "100_requests_per_hour"
+      },
+      "signature": "sig_ai_safety_officer_001_20250101_001"
+    }
+  ],
+  "plan_executions": [
+    {
+      "plan_id": "plan_medical_analysis_001",
+      "execution_id": "exec_20250101_001",
+      "start_time": 1735689600,
+      "end_time": 1735693200,
+      "status": "completed_successfully",
+      "capabilities_used": [
+        "cap_medical_data_access",
+        "cap_ai_analysis_tool"
+      ],
+      "events_processed": 150,
+      "plan_hash": "hash_plan_medical_analysis_001_v1_0_0"
+    }
+  ],
+  "kernel_decisions": [
+    {
+      "timestamp": 1735689600,
+      "decision_type": "capability_grant",
+      "resource": "patient_records",
+      "action": "read",
+      "result": "allowed",
+      "justification": "Valid medical treatment purpose with patient consent",
+      "metadata": {
+        "patient_id": "patient_12345",
+        "treatment_id": "treatment_67890",
+        "data_classification": "confidential"
+      }
+    },
+    {
+      "timestamp": 1735689600,
+      "decision_type": "ai_tool_execution",
+      "resource": "medical_analysis_model",
+      "action": "execute",
+      "result": "allowed",
+      "justification": "Supervised execution with valid capability",
+      "metadata": {
+        "model_version": "v2.1.0",
+        "input_size": "1024",
+        "supervisor_id": "dr_smith_001"
+      }
+    },
+    {
+      "timestamp": 1735693200,
+      "decision_type": "data_egress",
+      "resource": "analysis_results",
+      "action": "transmit",
+      "result": "allowed",
+      "justification": "Results transmitted to authorized medical staff",
+      "metadata": {
+        "recipient": "dr_jones_001",
+        "transmission_method": "secure_channel",
+        "encryption": "aes_256"
+      }
+    }
+  ],
+  "egress_certificates": [
+    {
+      "certificate_id": "egress_cert_20250101_001",
+      "issued_at": 1735693200,
+      "expires_at": 1735776000,
+      "subject": "medical_analysis_results",
+      "issuer": "provability_fabric_kernel",
+      "public_key": "pubkey_medical_analysis_001",
+      "signature": "sig_egress_kernel_20250101_001",
+      "extensions": {
+        "data_classification": "confidential",
+        "recipient_authorization": "medical_staff_only",
+        "audit_required": "true"
+      }
+    }
+  ],
+  "attestation_quotes": [
+    {
+      "quote_id": "attestation_20250101_001",
+      "timestamp": 1735689600,
+      "platform": "intel_sgx_enclave",
+      "measurement": "measurement_medical_analysis_enclave_v2_1_0",
+      "signature": "sig_intel_sgx_20250101_001",
+      "public_key": "pubkey_intel_sgx_001",
+      "nonce": "nonce_medical_analysis_001"
+    }
+  ],
+  "artifacts": {}
+}
