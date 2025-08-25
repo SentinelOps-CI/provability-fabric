@@ -7,7 +7,6 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
-[![Security Mechanisms](https://img.shields.io/badge/Security%20Mechanisms-12%2F12%20Complete-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
 
 An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
