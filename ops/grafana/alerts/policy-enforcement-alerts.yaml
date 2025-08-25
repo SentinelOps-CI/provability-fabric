@@ -1,0 +1,178 @@
+groups:
+  - name: policy-enforcement
+    rules:
+      # Certificate verification alert
+      - alert: CertificateVerificationLow
+        expr: rate(certs_verified_total[5m]) / rate(certs_total[5m]) * 100 < 99.9
+        for: 2m
+        labels:
+          severity: critical
+          component: policy
+        annotations:
+          summary: "Certificate verification rate below 99.9%"
+          description: "Certificate verification rate is {{ $value }}%, which is below the required 99.9% threshold. This may indicate policy enforcement issues."
+
+      # NI Monitor reject rate spike
+      - alert: NIMonitorRejectRateSpike
+        expr: rate(ni_monitor_rejects_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+          component: ni-monitor
+        annotations:
+          summary: "NI Monitor reject rate spike detected"
+          description: "NI Monitor reject rate is {{ $value }} rejects/sec, which is above the normal threshold. This may indicate policy violations or configuration issues."
+
+      # Permission reject rate spike
+      - alert: PermissionRejectRateSpike
+        expr: rate(permit_rejects_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+          component: policy-adapter
+        annotations:
+          summary: "Permission reject rate spike detected"
+          description: "Permission reject rate is {{ $value }} rejects/sec, which is above the normal threshold. This may indicate policy changes or user access issues."
+
+      # Monitor performance degradation
+      - alert: MonitorPerformanceDegraded
+        expr: histogram_quantile(0.95, rate(monitor_duration_seconds_bucket[5m])) * 1000 > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: policy-enforcement
+        annotations:
+          summary: "Monitor performance degraded"
+          description: "P95 monitor latency is {{ $value }}ms, which is above the 100ms threshold. This may indicate performance issues."
+
+      # Replay determinism alert
+      - alert: ReplayDeterminismLow
+        expr: rate(replay_deterministic_total[5m]) / rate(replay_total[5m]) * 100 < 99.9
+        for: 2m
+        labels:
+          severity: critical
+          component: replay
+        annotations:
+          summary: "Replay determinism below 99.9%"
+          description: "Replay determinism rate is {{ $value }}%, which is below the required 99.9% threshold. This may indicate non-deterministic behavior."
+
+      # Egress labeling failure
+      - alert: EgressLabelingFailure
+        expr: rate(egress_bytes_labeled_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: labeler
+        annotations:
+          summary: "Egress labeling has stopped"
+          description: "No egress bytes are being labeled. This may indicate a complete failure of the labeling system."
+
+      # Enforcement mode change
+      - alert: EnforcementModeChanged
+        expr: changes(enforcement_mode_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          component: policy-adapter
+        annotations:
+          summary: "Enforcement mode changed"
+          description: "Policy enforcement mode has changed. This may indicate a configuration update or manual intervention."
+
+      # Revocation rate spike
+      - alert: RevocationRateSpike
+        expr: rate(revocation_total[5m]) > 0.01
+        for: 1m
+        labels:
+          severity: warning
+          component: revocation
+        annotations:
+          summary: "Revocation rate spike detected"
+          description: "Revocation rate is {{ $value }} revocations/sec, which is above the normal threshold. This may indicate a security incident or bulk cleanup."
+
+      # Bridge guarantee failure
+      - alert: BridgeGuaranteeFailure
+        expr: bridge_guarantee_local_checks_ok == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: ni-monitor
+        annotations:
+          summary: "Bridge guarantee conditions failed"
+          description: "Local checks for the bridge guarantee have failed. This may indicate a violation of the non-interference property."
+
+      # Epoch validation failure
+      - alert: EpochValidationFailure
+        expr: rate(epoch_validation_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: policy-adapter
+        annotations:
+          summary: "Epoch validation failures detected"
+          description: "Epoch validation is failing at a rate of {{ $value }} failures/sec. This may indicate clock drift or revocation issues."
+
+      # Witness validation failure
+      - alert: WitnessValidationFailure
+        expr: rate(witness_validation_failures_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: policy-adapter
+        annotations:
+          summary: "Witness validation failures detected"
+          description: "Witness validation is failing at a rate of {{ $value }} failures/sec. This may indicate tampering or corruption."
+
+      # High assurance mode violations
+      - alert: HighAssuranceViolations
+        expr: rate(high_assurance_violations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: policy-adapter
+        annotations:
+          summary: "High assurance mode violations detected"
+          description: "Violations detected in high assurance mode at a rate of {{ $value }} violations/sec. This indicates a critical security issue."
+
+      # Policy adapter errors
+      - alert: PolicyAdapterErrors
+        expr: rate(policy_adapter_errors_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          component: policy-adapter
+        annotations:
+          summary: "Policy adapter errors detected"
+          description: "Policy adapter is experiencing errors at a rate of {{ $value }} errors/sec. This may indicate configuration or integration issues."
+
+      # Sidecar health check
+      - alert: SidecarUnhealthy
+        expr: up{job="sidecar-watcher"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: sidecar
+        annotations:
+          summary: "Sidecar watcher is down"
+          description: "The sidecar watcher service is not responding to health checks. Policy enforcement may be disabled."
+
+      # Memory usage alert
+      - alert: SidecarHighMemoryUsage
+        expr: (process_resident_memory_bytes{job="sidecar-watcher"} / process_heap_size_bytes{job="sidecar-watcher"}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: sidecar
+        annotations:
+          summary: "Sidecar memory usage high"
+          description: "Sidecar memory usage is {{ $value }}% of heap size. This may indicate memory leaks or high load."
+
+      # CPU usage alert
+      - alert: SidecarHighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="sidecar-watcher"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: sidecar
+        annotations:
+          summary: "Sidecar CPU usage high"
+          description: "Sidecar CPU usage is {{ $value }}%. This may indicate performance issues or high load."

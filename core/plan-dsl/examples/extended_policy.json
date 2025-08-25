@@ -1,0 +1,196 @@
+{
+  "version": "v1",
+  "plan_id": "extended-policy-example",
+  "bundle_id": "test-bundle",
+  "description": "Extended ActionDSL policy with read/write operations and ABAC primitives",
+  "capabilities": [
+    {
+      "capability_id": "email-send",
+      "type": "call",
+      "resource": {
+        "tool": "SendEmail"
+      },
+      "conditions": {
+        "rate_limit": {
+          "window_ms": 60000,
+          "max_operations": 10,
+          "tolerance_ms": 1000
+        },
+        "abac": {
+          "allow": {
+            "role": "email_user",
+            "action": "call",
+            "guard": {
+              "type": "and",
+              "left": {
+                "type": "attr",
+                "key": "project",
+                "value": "marketing"
+              },
+              "right": {
+                "type": "epoch_in",
+                "start": 1000,
+                "end": 2000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "capability_id": "document-read",
+      "type": "read",
+      "resource": {
+        "doc_id": "user-profiles",
+        "path": ["personal", "email"]
+      },
+      "conditions": {
+        "abac": {
+          "allow": {
+            "role": "reader",
+            "action": "read",
+            "guard": {
+              "type": "and",
+              "left": {
+                "type": "scope",
+                "tenant": "tenant-a"
+              },
+              "right": {
+                "type": "session",
+                "key": "auth_level",
+                "value": "verified"
+              }
+            }
+          },
+          "forbid": {
+            "role": "reader",
+            "action": "read",
+            "guard": {
+              "type": "attr",
+                "key": "clearance",
+                "value": "low"
+            }
+          }
+        }
+      }
+    },
+    {
+      "capability_id": "document-write",
+      "type": "write",
+      "resource": {
+        "doc_id": "user-profiles",
+        "path": ["preferences", "notifications"]
+      },
+      "conditions": {
+        "abac": {
+          "allow": {
+            "role": "writer",
+            "action": "write",
+            "guard": {
+              "type": "and",
+              "left": {
+                "type": "scope",
+                "tenant": "tenant-a"
+              },
+              "right": {
+                "type": "epoch_in",
+                "start": 1000,
+                "end": 3000
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "capability_id": "log-action",
+      "type": "log",
+      "resource": {
+        "tool": "LogAction"
+      },
+      "conditions": {
+        "rate_limit": {
+          "window_ms": 1000,
+          "max_operations": 100,
+          "tolerance_ms": 100
+        },
+        "abac": {
+          "allow": {
+            "role": "logger",
+            "action": "log",
+            "guard": {
+              "type": "attr",
+              "key": "environment",
+              "value": "production"
+            }
+          }
+        }
+      }
+    },
+    {
+      "capability_id": "declassify-data",
+      "type": "declassify",
+      "resource": {
+        "source_label": "confidential",
+        "target_label": "internal"
+      },
+      "conditions": {
+        "abac": {
+          "allow": {
+            "role": "admin",
+            "action": "declassify",
+            "guard": {
+              "type": "and",
+              "left": {
+                "type": "attr",
+                "key": "clearance",
+                "value": "high"
+              },
+              "right": {
+                "type": "session",
+                "key": "approval",
+                "value": "granted"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "capability_id": "emit-event",
+      "type": "emit",
+      "resource": {
+        "event": "user_action"
+      },
+      "conditions": {
+        "rate_limit": {
+          "window_ms": 5000,
+          "max_operations": 50,
+          "tolerance_ms": 500
+        },
+        "abac": {
+          "allow": {
+            "role": "monitor",
+            "action": "emit",
+            "guard": {
+              "type": "scope",
+              "tenant": "tenant-a"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "created_by": "policy-admin",
+    "created_at": "2025-01-15T00:00:00Z",
+    "version": "1.0.0",
+    "enforcement_mode": "enforce",
+    "feature_flags": {
+      "witness_validation": true,
+      "label_derivation": true,
+      "epoch_validation": true,
+      "abac_evaluation": true
+    }
+  }
+}
