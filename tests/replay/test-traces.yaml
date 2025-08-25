@@ -1,0 +1,459 @@
+# Policy Enforcement Test Traces
+# This file contains good traces (allowed behaviors) and bad traces (policy violations)
+# for comprehensive testing of the policy enforcement system
+
+test_suites:
+  # Good Traces - Allowed Behaviors
+  good_traces:
+    description: "Traces that should be allowed by policy"
+    traces:
+      # Basic tool access
+      - name: "basic_email_access"
+        description: "User with email_user role sending email"
+        events:
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "allow"
+            metadata:
+              recipient: "user@example.com"
+              subject: "Test email"
+              timestamp: 1640995200
+
+      - name: "admin_network_access"
+        description: "Admin user making network call"
+        events:
+          - type: "call"
+            tool: "NetworkCall"
+            principal: "admin1"
+            roles: ["admin"]
+            expected: "allow"
+            metadata:
+              endpoint: "https://api.example.com"
+              method: "GET"
+              timestamp: 1640995200
+
+      # Document operations
+      - name: "owner_read_access"
+        description: "Document owner reading their document"
+        events:
+          - type: "read"
+            doc_id: "doc://user1/private"
+            path: ["data", "personal"]
+            principal: "user1"
+            roles: ["owner"]
+            org: "owner_org"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+
+      - name: "reader_field_access"
+        description: "Reader accessing allowed field"
+        events:
+          - type: "read"
+            doc_id: "doc://public/shared"
+            path: ["data", "public"]
+            principal: "reader1"
+            roles: ["reader"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+
+      # IFC operations
+      - name: "label_flow_allowed"
+        description: "Information flow from lower to higher label"
+        events:
+          - type: "read"
+            doc_id: "doc://internal/confidential"
+            path: ["data", "internal"]
+            principal: "admin1"
+            roles: ["admin"]
+            doc_label: "Internal"
+            user_label: "Public"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+
+      - name: "declassification_allowed"
+        description: "Declassification according to rules"
+        events:
+          - type: "declassify"
+            doc_id: "doc://secret/classified"
+            path: ["data", "secret"]
+            principal: "declassifier1"
+            roles: ["declassifier"]
+            source_label: "Secret"
+            target_label: "Internal"
+            rule: "emergency_access"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+
+      # Grant operations
+      - name: "admin_grant_permission"
+        description: "Admin granting permission to user"
+        events:
+          - type: "grant"
+            principal: "admin1"
+            roles: ["admin"]
+            target: "user1"
+            action: "read"
+            resource: "doc://shared/team"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+
+  # Bad Traces - Policy Violations
+  bad_traces:
+    description: "Traces that should be denied by policy"
+    traces:
+      # Unauthorized tool access
+      - name: "unauthorized_email_access"
+        description: "User without email role trying to send email"
+        events:
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user2"
+            roles: ["reader"]
+            expected: "deny"
+            metadata:
+              recipient: "user@example.com"
+              subject: "Unauthorized email"
+              timestamp: 1640995200
+
+      - name: "unauthorized_network_access"
+        description: "Non-admin user trying to make network call"
+        events:
+          - type: "call"
+            tool: "NetworkCall"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "deny"
+            metadata:
+              endpoint: "https://api.example.com"
+              method: "POST"
+              timestamp: 1640995200
+
+      # Document access violations
+      - name: "unauthorized_document_read"
+        description: "User trying to read document they don't own"
+        events:
+          - type: "read"
+            doc_id: "doc://user1/private"
+            path: ["data", "personal"]
+            principal: "user2"
+            roles: ["reader"]
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      - name: "unauthorized_field_write"
+        description: "User trying to write to field they can't access"
+        events:
+          - type: "write"
+            doc_id: "doc://admin/system"
+            path: ["config", "security"]
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      # IFC violations
+      - name: "label_flow_violation"
+        description: "Information flow from higher to lower label"
+        events:
+          - type: "read"
+            doc_id: "doc://secret/classified"
+            path: ["data", "secret"]
+            principal: "user1"
+            roles: ["reader"]
+            doc_label: "Secret"
+            user_label: "Internal"
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      - name: "unauthorized_declassification"
+        description: "Declassification without proper rule"
+        events:
+          - type: "declassify"
+            doc_id: "doc://secret/classified"
+            path: ["data", "secret"]
+            principal: "user1"
+            roles: ["reader"]
+            source_label: "Secret"
+            target_label: "Public"
+            rule: "none"
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      # Grant violations
+      - name: "unauthorized_grant"
+        description: "Non-admin user trying to grant permission"
+        events:
+          - type: "grant"
+            principal: "user1"
+            roles: ["email_user"]
+            target: "user2"
+            action: "read"
+            resource: "doc://shared/team"
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      # Epoch violations
+      - name: "expired_epoch_access"
+        description: "User trying to access with expired epoch"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            epoch: 1
+            current_epoch: 5
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      # Witness validation failures
+      - name: "invalid_witness"
+        description: "User trying to access document with invalid witness"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            witness_valid: false
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+      - name: "missing_field_commit"
+        description: "User trying to access field without commitment"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            field_commit: null
+            expected: "deny"
+            metadata:
+              timestamp: 1640995200
+
+  # Adversarial Traces - Edge Cases and Attack Patterns
+  adversarial_traces:
+    description: "Traces designed to test edge cases and attack patterns"
+    traces:
+      # Rate limiting attacks
+      - name: "rate_limit_bypass_attempt"
+        description: "Attempt to bypass rate limiting through rapid requests"
+        events:
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995201
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "deny"
+            metadata:
+              timestamp: 1640995202
+
+      # Session manipulation
+      - name: "session_manipulation_attempt"
+        description: "Attempt to manipulate session attributes"
+        events:
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            session_id: "session1"
+            session_attributes:
+              user_id: "user1"
+              org: "org1"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            session_id: "session1"
+            session_attributes:
+              user_id: "user2"
+              org: "org2"
+            expected: "deny"
+            metadata:
+              timestamp: 1640995201
+
+      # Attribute manipulation
+      - name: "attribute_manipulation_attempt"
+        description: "Attempt to manipulate ABAC attributes"
+        events:
+          - type: "read"
+            doc_id: "doc://org1/internal"
+            path: ["data", "internal"]
+            principal: "user1"
+            roles: ["reader"]
+            attributes:
+              org: "org1"
+              project: "project1"
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+          - type: "read"
+            doc_id: "doc://org1/internal"
+            path: ["data", "internal"]
+            principal: "user1"
+            roles: ["reader"]
+            attributes:
+              org: "org2"
+              project: "project1"
+            expected: "deny"
+            metadata:
+              timestamp: 1640995201
+
+      # Path traversal attempts
+      - name: "path_traversal_attempt"
+        description: "Attempt to access unauthorized paths through traversal"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "..", "admin", "config"]
+            principal: "user1"
+            roles: ["reader"]
+            expected: "deny"
+            metadata:
+              timestamp: 1640995201
+
+      # Epoch manipulation
+      - name: "epoch_manipulation_attempt"
+        description: "Attempt to manipulate epoch for access"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            epoch: 5
+            current_epoch: 5
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            epoch: 999999
+            current_epoch: 5
+            expected: "deny"
+            metadata:
+              timestamp: 1640995201
+
+  # Performance Traces - High Load Testing
+  performance_traces:
+    description: "Traces for testing system performance under load"
+    traces:
+      - name: "high_throughput_requests"
+        description: "High volume of legitimate requests"
+        events:
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user1"
+            roles: ["email_user"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+              load_test: true
+              request_id: "load_001"
+          - type: "call"
+            tool: "SendEmail"
+            principal: "user2"
+            roles: ["email_user"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995201
+              load_test: true
+              request_id: "load_002"
+          # ... more events for load testing
+
+      - name: "concurrent_access_patterns"
+        description: "Concurrent access to same resources"
+        events:
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user1"
+            roles: ["reader"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+              concurrent: true
+              thread_id: "thread_1"
+          - type: "read"
+            doc_id: "doc://shared/team"
+            path: ["data", "team"]
+            principal: "user2"
+            roles: ["reader"]
+            expected: "allow"
+            metadata:
+              timestamp: 1640995200
+              concurrent: true
+              thread_id: "thread_2"
+
+# Test Configuration
+test_config:
+  # Deterministic seed for reproducible tests
+  seed: 42
+  
+  # Test execution parameters
+  execution:
+    timeout_seconds: 300
+    max_concurrent: 10
+    retry_attempts: 3
+    
+  # Coverage requirements
+  coverage:
+    min_good_traces: 100
+    min_bad_traces: 50
+    min_adversarial_traces: 25
+    min_performance_traces: 10
+    
+  # Assertion requirements
+  assertions:
+    require_deterministic: true
+    require_counterexamples: true
+    require_performance_baselines: true
+    
+  # Output configuration
+  output:
+    format: "json"
+    include_metadata: true
+    include_timing: true
+    include_resource_usage: true

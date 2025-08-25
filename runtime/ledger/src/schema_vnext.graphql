@@ -1,0 +1,385 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+# Certificate Schema vNext with Permission Evidence
+# This schema extends the existing schema with enhanced security features
+
+type Tenant {
+  id: ID!
+  name: String!
+  auth0Id: String!
+  domain: String
+  securityLevel: String!
+  complianceFramework: [String!]!
+  createdAt: String!
+  updatedAt: String!
+
+  # Security metadata
+  lastSecurityReview: String
+  securityScore: Float!
+  riskProfile: String!
+
+  # Relations
+  capsules: [Capsule!]!
+  premiumQuotes: [PremiumQuote!]!
+  usageEvents: [UsageEvent!]!
+  invoices: [TenantInvoice!]!
+  certificates: [Certificate!]!
+  permissionEvidence: [PermissionEvidence!]!
+  auditLogs: [AuditLog!]!
+}
+
+type Capsule {
+  id: ID!
+  hash: String!
+  specSig: String!
+  riskScore: Float!
+  reason: String
+  tenantId: String!
+  createdAt: String!
+  updatedAt: String!
+
+  # Security metadata
+  securityLevel: String!
+  threatModel: String
+  vulnerabilityScore: Float
+  lastSecurityScan: String
+
+  # Relations
+  tenant: Tenant!
+  premiumQuotes: [PremiumQuote!]!
+  certificates: [Certificate!]!
+  permissionEvidence: [PermissionEvidence!]!
+}
+
+type Certificate {
+  id: ID!
+  certificateId: String!
+  type: String!
+  status: String!
+
+  # Certificate details
+  subject: String!
+  issuer: String!
+  validFrom: String!
+  validUntil: String!
+  serialNumber: String!
+
+  # Security features
+  keyStrength: Int!
+  signatureAlgorithm: String!
+  extendedKeyUsage: [String!]!
+
+  # Relations
+  tenantId: String!
+  tenant: Tenant!
+  capsuleId: String
+  capsule: Capsule
+
+  # Metadata
+  createdAt: String!
+  updatedAt: String!
+  revokedAt: String
+  revocationReason: String
+}
+
+type PermissionEvidence {
+  id: ID!
+
+  # Permission details
+  permission: String!
+  scope: String!
+  grantedAt: String!
+  expiresAt: String
+
+  # Evidence chain
+  evidenceType: String!
+  evidenceSource: String!
+  evidenceHash: String!
+
+  # Security context
+  riskLevel: String!
+  justification: String
+  approver: String
+
+  # Relations
+  tenantId: String!
+  tenant: Tenant!
+  capsuleId: String
+  capsule: Capsule
+
+  # Audit trail
+  createdAt: String!
+  updatedAt: String!
+  lastUsed: String
+  usageCount: Int!
+}
+
+type PremiumQuote {
+  id: ID!
+  capsuleHash: String!
+  riskScore: Float!
+  annualUsd: Float!
+  tenantId: String!
+  createdAt: String!
+
+  # Enhanced pricing factors
+  securityMultiplier: Float!
+  complianceMultiplier: Float!
+  threatModelMultiplier: Float!
+
+  # Relations
+  capsule: Capsule!
+  tenant: Tenant!
+}
+
+type UsageEvent {
+  id: ID!
+  tenantId: String!
+  eventType: String!
+  resource: String
+  timestamp: String!
+
+  # Security context
+  riskScore: Float!
+  threatIndicators: [String!]!
+  anomalyScore: Float
+
+  # Relations
+  tenant: Tenant!
+}
+
+type TenantInvoice {
+  id: ID!
+  tenantId: String!
+  invoiceNumber: String!
+  amount: Float!
+  currency: String!
+  status: String!
+  dueDate: String!
+  issuedAt: String!
+  paidAt: String
+
+  # Relations
+  tenant: Tenant!
+}
+
+type AuditLog {
+  id: ID!
+
+  # Event details
+  eventType: String!
+  severity: String!
+  description: String!
+
+  # Actor information
+  actorId: String
+  actorType: String
+  actorTenant: String
+
+  # Resource information
+  resourceType: String
+  resourceId: String
+
+  # Context
+  ipAddress: String
+  userAgent: String
+  sessionId: String
+
+  # Relations
+  tenantId: String!
+  tenant: Tenant!
+
+  # Timestamps
+  createdAt: String!
+}
+
+type SecurityPolicy {
+  id: ID!
+
+  # Policy details
+  name: String!
+  description: String!
+  version: String!
+  status: String!
+
+  # Policy content
+  rules: JSON!
+  conditions: JSON
+  exceptions: JSON
+
+  # Scope
+  applicableTenants: [String!]!
+  applicableResources: [String!]!
+
+  # Metadata
+  createdBy: String!
+  createdAt: String!
+  updatedAt: String!
+  effectiveFrom: String
+  effectiveUntil: String
+}
+
+type ThreatIntelligence {
+  id: ID!
+
+  # Threat details
+  threatType: String!
+  severity: String!
+  confidence: Float!
+
+  # Indicators
+  indicators: [String!]!
+  iocHash: String
+  source: String!
+
+  # Context
+  affectedTenants: [String!]!
+  affectedResources: [String!]!
+
+  # Metadata
+  firstSeen: String!
+  lastSeen: String!
+  updatedAt: String!
+}
+
+# Input types for mutations
+input CreateCertificateInput {
+  certificateId: String!
+  type: String!
+  subject: String!
+  issuer: String!
+  validFrom: String!
+  validUntil: String!
+  serialNumber: String!
+  keyStrength: Int!
+  signatureAlgorithm: String!
+  extendedKeyUsage: [String!]!
+  capsuleId: String
+}
+
+input CreatePermissionEvidenceInput {
+  permission: String!
+  scope: String!
+  expiresAt: String
+  evidenceType: String!
+  evidenceSource: String!
+  evidenceHash: String!
+  riskLevel: String!
+  justification: String
+  approver: String
+  capsuleId: String
+}
+
+input UpdateTenantSecurityInput {
+  securityLevel: String
+  complianceFramework: [String!]
+  riskProfile: String
+}
+
+# Queries
+type Query {
+  # Tenant queries
+  tenant: Tenant!
+  tenants: [Tenant!]!
+
+  # Capsule queries
+  capsules: [Capsule!]!
+  capsule(hash: String!): Capsule
+
+  # Certificate queries
+  certificates: [Certificate!]!
+  certificate(id: String!): Certificate
+  certificateBySerial(serialNumber: String!): Certificate
+
+  # Permission evidence queries
+  permissionEvidence: [PermissionEvidence!]!
+  permissionEvidenceByTenant(tenantId: String!): [PermissionEvidence!]!
+  permissionEvidenceByCapsule(capsuleId: String!): [PermissionEvidence!]!
+
+  # Premium quote queries
+  premiumQuotes: [PremiumQuote!]!
+  premiumQuote(capsuleHash: String!): PremiumQuote
+
+  # Usage event queries
+  usageEvents: [UsageEvent!]!
+  usageEventsByTenant(tenantId: String!): [UsageEvent!]!
+
+  # Audit log queries
+  auditLogs: [AuditLog!]!
+  auditLogsByTenant(tenantId: String!): [AuditLog!]!
+  auditLogsByEventType(eventType: String!): [AuditLog!]!
+
+  # Security policy queries
+  securityPolicies: [SecurityPolicy!]!
+  securityPolicy(name: String!): SecurityPolicy
+
+  # Threat intelligence queries
+  threatIntelligence: [ThreatIntelligence!]!
+  threatIntelligenceByType(threatType: String!): [ThreatIntelligence!]!
+
+  # Security analysis queries
+  tenantSecurityScore(tenantId: String!): Float!
+  capsuleThreatModel(capsuleId: String!): String
+  permissionRiskAnalysis(permission: String!, scope: String!): String!
+}
+
+# Mutations
+type Mutation {
+  # Certificate mutations
+  createCertificate(input: CreateCertificateInput!): Certificate!
+  updateCertificate(id: String!, input: CreateCertificateInput!): Certificate!
+  revokeCertificate(id: String!, reason: String!): Certificate!
+
+  # Permission evidence mutations
+  createPermissionEvidence(
+    input: CreatePermissionEvidenceInput!
+  ): PermissionEvidence!
+  updatePermissionEvidence(
+    id: String!
+    input: CreatePermissionEvidenceInput!
+  ): PermissionEvidence!
+  revokePermissionEvidence(id: String!, reason: String!): PermissionEvidence!
+
+  # Tenant security mutations
+  updateTenantSecurity(input: UpdateTenantSecurityInput!): Tenant!
+
+  # Capsule mutations
+  createCapsule(
+    hash: String!
+    specSig: String!
+    riskScore: Float!
+    reason: String
+  ): Capsule!
+  updateCapsule(hash: String!, riskScore: Float!, reason: String): Capsule!
+
+  # Premium quote mutations
+  createPremiumQuote(
+    capsuleHash: String!
+    riskScore: Float!
+    annualUsd: Float!
+  ): PremiumQuote!
+
+  # Usage event mutations
+  createUsageEvent(
+    eventType: String!
+    resource: String
+    riskScore: Float
+  ): UsageEvent!
+
+  # Audit log mutations
+  createAuditLog(
+    eventType: String!
+    severity: String!
+    description: String!
+    actorId: String
+    resourceType: String
+    resourceId: String
+  ): AuditLog!
+}
+
+# Custom scalar for JSON data
+scalar JSON
+
+# Custom scalar for DateTime
+scalar DateTime

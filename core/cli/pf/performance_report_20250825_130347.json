@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-08-25T13:03:47.6314061-07:00",
+  "environment": {
+    "go_version": "go1.24.0",
+    "os": "windows",
+    "architecture": "amd64",
+    "cpu_count": 16
+  },
+  "baseline_metrics": {
+    "duration": 5116505100,
+    "concurrency": 5,
+    "total_requests": 250,
+    "successful_requests": 250,
+    "failed_requests": 0,
+    "average_latency": 57137800,
+    "p95_latency": 94286900,
+    "p99_latency": 99131800,
+    "requests_per_second": 48.86147773017953,
+    "memory_usage_mb": 2,
+    "cpu_usage_percent": 10.34424903019923,
+    "error_rate": 0
+  },
+  "sidecar_metrics": {
+    "duration": 5116281800,
+    "concurrency": 5,
+    "total_requests": 250,
+    "successful_requests": 250,
+    "failed_requests": 0,
+    "average_latency": 65436100,
+    "p95_latency": 109212500,
+    "p99_latency": 113272300,
+    "requests_per_second": 46.4204297738252,
+    "memory_usage_mb": 14,
+    "cpu_usage_percent": 20.472234373511263,
+    "error_rate": 0
+  },
+  "overhead_analysis": {
+    "latency_overhead_percent": 14.523310312962698,
+    "throughput_overhead_percent": 4.995853727212607,
+    "memory_overhead_percent": 600,
+    "cpu_overhead_percent": 97.90933410191663,
+    "overall_overhead_percent": 179.35712453552298
+  },
+  "recommendations": [
+    "⚠️  High overhead detected - consider optimizing sidecar configuration",
+    "💾 High memory overhead - optimize memory usage in sidecar"
+  ]
+}

@@ -28,7 +28,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["call", "log", "declassify", "emit", "retrieve"],
+            "enum": ["call", "log", "declassify", "emit", "retrieve", "read", "write"],
             "description": "Type of mediated operation"
           },
           "field_commit": {
@@ -38,6 +38,27 @@
           "args_hash": {
             "type": "string",
             "description": "Hash of the operation arguments"
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "doc_id": {
+                "type": "string",
+                "description": "Document identifier for read/write operations"
+              },
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Field path for document operations"
+              },
+              "tool": {
+                "type": "string",
+                "description": "Tool identifier for call operations"
+              }
+            },
+            "description": "Resource specification for the operation"
           },
           "conditions": {
             "type": "object",
@@ -92,6 +113,58 @@
                     "required": ["epsilon", "delta"]
                   }
                 }
+              },
+              "abac": {
+                "type": "object",
+                "properties": {
+                  "attributes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "description": "Attribute key"
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "Attribute value"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "enum": ["eq", "ne", "gt", "lt", "gte", "lte", "in", "not_in"],
+                          "description": "Comparison operator"
+                        }
+                      },
+                      "required": ["key", "value", "operator"]
+                    }
+                  },
+                  "session_attrs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "Session attribute keys to check"
+                    }
+                  },
+                  "epoch_range": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "description": "Start epoch (inclusive)"
+                      },
+                      "end": {
+                        "type": "integer",
+                        "description": "End epoch (inclusive)"
+                      }
+                    },
+                    "required": ["start", "end"]
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Tenant or organizational scope"
+                  }
+                }
               }
             }
           },
@@ -125,6 +198,151 @@
           }
         },
         "required": ["capability_id", "type", "field_commit", "args_hash"]
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "description": "Unique rule identifier"
+          },
+          "effect": {
+            "type": "string",
+            "enum": ["allow", "deny", "forbid"],
+            "description": "Permission effect"
+          },
+          "subject": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string",
+                "description": "Role-based access control"
+              },
+              "principal": {
+                "type": "string",
+                "description": "Specific principal identifier"
+              },
+              "organization": {
+                "type": "string",
+                "description": "Organizational scope"
+              }
+            },
+            "description": "Subject specification"
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["call", "read", "write", "grant"],
+                "description": "Action type"
+              },
+              "resource": {
+                "type": "string",
+                "description": "Resource identifier (tool name, document URI, etc.)"
+              },
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Field path for document operations"
+              }
+            },
+            "required": ["type", "resource"]
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "abac": {
+                "type": "object",
+                "properties": {
+                  "attributes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "enum": ["eq", "ne", "gt", "lt", "gte", "lte", "in", "not_in"]
+                        }
+                      },
+                      "required": ["key", "value", "operator"]
+                    }
+                  },
+                  "session_attrs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "epoch_range": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer"
+                      },
+                      "end": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": ["start", "end"]
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                }
+              },
+              "time_constraints": {
+                "type": "object",
+                "properties": {
+                  "valid_from": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "valid_until": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "time_window": {
+                    "type": "object",
+                    "properties": {
+                      "start_hour": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 23
+                      },
+                      "end_hour": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 23
+                      },
+                      "timezone": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Rule priority (higher numbers take precedence)"
+          }
+        },
+        "required": ["rule_id", "effect", "subject", "action"]
       }
     },
     "execution_order": {
