@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-08-25T13:08:30.942618-07:00",
+  "environment": {
+    "go_version": "go1.24.0",
+    "os": "windows",
+    "architecture": "amd64",
+    "cpu_count": 16
+  },
+  "baseline_metrics": {
+    "duration": 5114294400,
+    "concurrency": 5,
+    "total_requests": 250,
+    "successful_requests": 250,
+    "failed_requests": 0,
+    "average_latency": 54238800,
+    "p95_latency": 93445600,
+    "p99_latency": 97508400,
+    "requests_per_second": 48.88259854575442,
+    "memory_usage_mb": 2,
+    "cpu_usage_percent": 8.976936158075588,
+    "error_rate": 0
+  },
+  "recommendations": []
+}

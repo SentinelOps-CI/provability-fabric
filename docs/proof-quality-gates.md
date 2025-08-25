@@ -65,21 +65,21 @@ scripts\lean_time_budget.bat
 
 **Output:**
 ```
-🔧 Lean Time Budget Checker
+Lean Time Budget Checker
 📋 Total budget: 360s
 📋 Per-file budget: 90s
 📋 Warning threshold: 60s
 
-🔨 Building core/lean-libs... ✅ 45s
-🔨 Building spec-templates/v1/proofs... ⚠️ 75s
+Building core/lean-libs... PASSED 45s
+Building spec-templates/v1/proofs... WARNING 75s
 
 ============================================================
-📊 LEAN BUILD TIME RESULTS
+LEAN BUILD TIME RESULTS
 ============================================================
-⏱️  Total build time: 120s / 360s
-✅ Total time within budget
+Total build time: 120s / 360s
+PASSED Total time within budget
 
-⚠️  Slow files (1):
+WARNING Slow files (1):
    spec-templates/v1/proofs:75s
 ```
 
@@ -119,23 +119,23 @@ The quality gates are integrated into the CI workflow (`.github/workflows/ci.yam
 ```yaml
 - name: Lean proof quality gate
   run: |
-    echo "🔍 Running Lean proof quality gate..."
+    echo "Running Lean proof quality gate..."
     python tools/lean_gate.py --root . --config tools/lean_gate_config.yaml
 
 - name: Lean build time budget check
   run: |
-    echo "⏱️  Running Lean build time budget check..."
+    echo "Running Lean build time budget check..."
     chmod +x scripts/lean_time_budget.sh
     ./scripts/lean_time_budget.sh
 
 - name: Time-to-fail check
   run: |
-    echo "⚡ Checking time-to-fail for first failing lemma..."
+    echo "Checking time-to-fail for first failing lemma..."
     # ... timeout checks ...
 
 - name: Run proofbench
   run: |
-    echo "🧪 Running property-based testing with proofbench..."
+    echo "Running property-based testing with proofbench..."
     cd core/lean-libs
     lake build
     cd ../..
@@ -170,7 +170,7 @@ The quality gates are integrated into the CI workflow (`.github/workflows/ci.yam
 
 1. **Stale sorry/admit detected**
    ```
-   ❌ Found admits/sorry in files older than 48 hours:
+   FAILED Found admits/sorry in files older than 48 hours:
    core/lean-libs/Example.lean
    ```
    **Fix**: Replace `sorry` with actual proof or add file to exceptions
@@ -183,7 +183,7 @@ The quality gates are integrated into the CI workflow (`.github/workflows/ci.yam
 
 3. **Slow file warning**
    ```
-   ⚠️  Slow files (1):
+   WARNING Slow files (1):
       spec-templates/v1/proofs:75s
    ```
    **Fix**: Optimize proofs or increase budget if legitimate

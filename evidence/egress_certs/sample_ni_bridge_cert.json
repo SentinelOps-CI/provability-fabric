@@ -1,0 +1,109 @@
+{
+  "certificate_id": "cert_ni_bridge_001",
+  "timestamp": "2025-01-27T10:30:00Z",
+  "epoch": 42,
+  "tenant_id": "tenant-a",
+  "session_id": "session_abc123",
+  "user_id": "user_001",
+  "operation": "read",
+  "resource": {
+    "doc_id": "doc://sensitive-data",
+    "path": ["$.personal_info", "$.email"]
+  },
+  "permit_decision": "accept",
+  "path_witness_ok": true,
+  "label_derivation_ok": true,
+  "permission_evidence": {
+    "principal": {
+      "id": "user_001",
+      "roles": ["reader", "data_analyst"],
+      "org": "research_team"
+    },
+    "action": "read",
+    "context": {
+      "session": "session_abc123",
+      "epoch": 42,
+      "attributes": ["project:alpha", "clearance:internal"],
+      "tenant": "tenant-a",
+      "timestamp": 1706355000
+    },
+    "permit_result": true,
+    "reason": "User has reader role and document is accessible at internal clearance level"
+  },
+  "proof_hashes": {
+    "policy_proof_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678",
+    "automata_hash": "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab",
+    "labeler_hash": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd",
+    "ni_bridge_hash": "d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcde"
+  },
+  "ni_monitor": {
+    "prefixes": ["prefix_session_abc123"],
+    "active_sessions": ["session_abc123"],
+    "violation_count": 0,
+    "last_audit": 1706355000,
+    "bridge_guarantee": {
+      "theorem_reference": "ni-bridge",
+      "local_checks_ok": true,
+      "global_ni_claim": "global_non_interference",
+      "proof_verification": true,
+      "bridge_conditions": [
+        "All prefixes respect label ordering",
+        "No non-interference violations",
+        "Monitor state is consistent",
+        "Proof hashes match expected values",
+        "Automata hashes verified",
+        "Labeler hashes verified",
+        "NI bridge theorem hash verified"
+      ],
+      "proof_hashes": {
+        "policy_proof_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678",
+        "automata_hash": "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab",
+        "labeler_hash": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd",
+        "ni_bridge_hash": "d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcde"
+      }
+    }
+  },
+  "metadata": {
+    "version": "vNext",
+    "schema": "ni_bridge_cert_v1",
+    "generated_by": "sidecar-watcher",
+    "break_glass": false,
+    "audit_trail": [
+      {
+        "timestamp": "2025-01-27T10:29:55Z",
+        "event": "permission_check",
+        "result": "allowed",
+        "details": "User has required roles and clearance"
+      },
+      {
+        "timestamp": "2025-01-27T10:29:56Z",
+        "event": "witness_validation",
+        "result": "valid",
+        "details": "Merkle path verification successful"
+      },
+      {
+        "timestamp": "2025-01-27T10:29:57Z",
+        "event": "label_derivation",
+        "result": "success",
+        "details": "Label flow from internal to public allowed"
+      },
+      {
+        "timestamp": "2025-01-27T10:29:58Z",
+        "event": "ni_monitor_update",
+        "result": "accepted",
+        "details": "Prefix added without violations"
+      },
+      {
+        "timestamp": "2025-01-27T10:29:59Z",
+        "event": "bridge_guarantee_generated",
+        "result": "success",
+        "details": "All bridge conditions satisfied"
+      }
+    ]
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "signature": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  }
+}

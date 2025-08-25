@@ -8,6 +8,7 @@ package provability_fabric {
 @[default_target]
 lean_lib Fabric {
   -- add library configuration options here
+  roots := #[`Fabric, `Policy]
 }
 
 -- Use vendored mathlib instead of fetching from git

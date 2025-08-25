@@ -11,9 +11,12 @@ pub mod egress_cert;
 pub mod events;
 pub mod label_witness;
 pub mod ni_monitor;
+pub mod permit_enforcement;
+pub mod policy_adapter;
 pub mod queue_manager;
 pub mod ratelimit;
 pub mod replay;
+pub mod revocation;
 pub mod scheduler;
 
 use anyhow::Result;

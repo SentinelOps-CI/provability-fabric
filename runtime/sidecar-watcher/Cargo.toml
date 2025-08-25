@@ -29,6 +29,7 @@ ed25519-dalek = { version = "2.0", features = ["batch"] }
 rand = "0.8"
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
+md5 = "0.7"
 
 [dev-dependencies]
 tokio-test = "0.4" 

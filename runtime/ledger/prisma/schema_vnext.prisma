@@ -1,0 +1,283 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Provability-Fabric Contributors
+
+// Certificate Schema vNext with Permission Evidence
+// This schema extends the existing schema with enhanced security features
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enhanced Tenant model with additional security features
+model Tenant {
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  auth0Id               String   @unique
+  domain                String?  // Associated domain
+  securityLevel         String   @default("standard") // standard, enhanced, critical
+  complianceFramework   String[] // SOC2, GDPR, HIPAA, FedRAMP
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  capsules              Capsule[]
+  premiumQuotes         PremiumQuote[]
+  usageEvents           UsageEvent[]
+  invoices              TenantInvoice[]
+  certificates          Certificate[]
+  permissionEvidence    PermissionEvidence[]
+  auditLogs             AuditLog[]
+  
+  // Security metadata
+  lastSecurityReview    DateTime?
+  securityScore         Float    @default(0.0)
+  riskProfile           String   @default("low") // low, medium, high, critical
+  
+  @@map("tenants")
+}
+
+// Enhanced Capsule model with security metadata
+model Capsule {
+  id                    String   @id @default(cuid())
+  hash                  String   @unique
+  specSig               String
+  riskScore             Float    @default(0.0)
+  reason                String?
+  tenantId              String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Security metadata
+  securityLevel         String   @default("standard")
+  threatModel           String?  // JSON string of threat model
+  vulnerabilityScore    Float?   // CVSS score if applicable
+  lastSecurityScan      DateTime?
+  
+  // Relations
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  premiumQuotes         PremiumQuote[]
+  certificates          Certificate[]
+  permissionEvidence    PermissionEvidence[]
+  
+  @@map("capsules")
+}
+
+// New Certificate model for vNext
+model Certificate {
+  id                    String   @id @default(cuid())
+  certificateId         String   @unique // External certificate ID
+  type                  String   // SSL, Code Signing, Identity, etc.
+  status                String   @default("active") // active, revoked, expired, suspended
+  
+  // Certificate details
+  subject               String   // Subject name
+  issuer                String   // Certificate authority
+  validFrom             DateTime
+  validUntil            DateTime
+  serialNumber          String   @unique
+  
+  // Security features
+  keyStrength           Int      // Key size in bits
+  signatureAlgorithm    String   // SHA256, SHA384, etc.
+  extendedKeyUsage      String[] // Array of extended key usage
+  
+  // Relations
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  capsuleId             String?
+  capsule               Capsule? @relation(fields: [capsuleId], references: [id])
+  
+  // Metadata
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  revokedAt             DateTime?
+  revocationReason      String?
+  
+  @@map("certificates")
+}
+
+// New Permission Evidence model
+model PermissionEvidence {
+  id                    String   @id @default(cuid())
+  
+  // Permission details
+  permission            String   // Specific permission (e.g., "read:data", "write:logs")
+  scope                 String   // Resource scope
+  grantedAt             DateTime @default(now())
+  expiresAt             DateTime?
+  
+  // Evidence chain
+  evidenceType          String   // "policy", "role", "delegation", "emergency"
+  evidenceSource        String   // Source of the permission grant
+  evidenceHash          String   // Hash of the evidence document
+  
+  // Security context
+  riskLevel             String   @default("low") // low, medium, high, critical
+  justification         String?  // Business justification
+  approver              String?  // Who approved this permission
+  
+  // Relations
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  capsuleId             String?
+  capsule               Capsule? @relation(fields: [capsuleId], references: [id])
+  
+  // Audit trail
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  lastUsed              DateTime?
+  usageCount            Int      @default(0)
+  
+  @@map("permission_evidence")
+}
+
+// Enhanced PremiumQuote model
+model PremiumQuote {
+  id                    String   @id @default(cuid())
+  capsuleHash           String
+  riskScore             Float
+  annualUsd             Float
+  tenantId              String
+  createdAt             DateTime @default(now())
+  
+  // Enhanced pricing factors
+  securityMultiplier    Float    @default(1.0)
+  complianceMultiplier  Float    @default(1.0)
+  threatModelMultiplier Float    @default(1.0)
+  
+  // Relations
+  capsule               Capsule @relation(fields: [capsuleHash], references: [hash])
+  tenant                Tenant  @relation(fields: [tenantId], references: [id])
+  
+  @@map("premium_quotes")
+}
+
+// Enhanced UsageEvent model
+model UsageEvent {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  eventType             String   // "api_call", "resource_access", "policy_check"
+  resource              String?  // Resource being accessed
+  timestamp             DateTime @default(now())
+  
+  // Security context
+  riskScore             Float    @default(0.0)
+  threatIndicators      String[] // Array of threat indicators
+  anomalyScore          Float?   // ML-based anomaly detection score
+  
+  // Relations
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@map("usage_events")
+}
+
+// Enhanced TenantInvoice model
+model TenantInvoice {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  invoiceNumber         String   @unique
+  amount                Float
+  currency              String   @default("USD")
+  status                String   @default("pending") // pending, paid, overdue, cancelled
+  dueDate               DateTime
+  issuedAt              DateTime @default(now())
+  paidAt                DateTime?
+  
+  // Relations
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@map("tenant_invoices")
+}
+
+// New Audit Log model for comprehensive logging
+model AuditLog {
+  id                    String   @id @default(cuid())
+  
+  // Event details
+  eventType             String   // "permission_granted", "access_denied", "policy_violation"
+  severity              String   @default("info") // info, warning, error, critical
+  description           String
+  
+  // Actor information
+  actorId               String?  // User or system that performed the action
+  actorType             String?  // "user", "system", "service"
+  actorTenant           String?  // Tenant context of the actor
+  
+  // Resource information
+  resourceType          String?  // Type of resource affected
+  resourceId            String?  // ID of the resource affected
+  
+  // Context
+  ipAddress             String?  // IP address of the request
+  userAgent             String?  // User agent string
+  sessionId             String?  // Session identifier
+  
+  // Relations
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  
+  @@map("audit_logs")
+}
+
+// New Security Policy model
+model SecurityPolicy {
+  id                    String   @id @default(cuid())
+  
+  // Policy details
+  name                  String   @unique
+  description           String
+  version               String   @default("1.0.0")
+  status                String   @default("draft") // draft, active, deprecated
+  
+  // Policy content
+  rules                 Json     // JSON array of policy rules
+  conditions            Json?    // JSON object of policy conditions
+  exceptions            Json?    // JSON array of policy exceptions
+  
+  // Scope
+  applicableTenants     String[] // Array of tenant IDs this policy applies to
+  applicableResources   String[] // Array of resource types this policy applies to
+  
+  // Metadata
+  createdBy             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  effectiveFrom         DateTime?
+  effectiveUntil        DateTime?
+  
+  @@map("security_policies")
+}
+
+// New Threat Intelligence model
+model ThreatIntelligence {
+  id                    String   @id @default(cuid())
+  
+  // Threat details
+  threatType            String   // "malware", "phishing", "insider_threat", "zero_day"
+  severity              String   @default("low") // low, medium, high, critical
+  confidence            Float    @default(0.0) // 0.0 to 1.0
+  
+  // Indicators
+  indicators            String[] // Array of threat indicators
+  iocHash               String?  // Hash of IOCs
+  source                String   // Source of threat intelligence
+  
+  // Context
+  affectedTenants       String[] // Array of affected tenant IDs
+  affectedResources     String[] // Array of affected resource types
+  
+  // Metadata
+  firstSeen             DateTime @default(now())
+  lastSeen              DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("threat_intelligence")
+}

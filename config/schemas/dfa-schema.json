@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActionDSL DFA Schema",
+  "description": "Schema for ActionDSL-generated Deterministic Finite Automata",
+  "type": "object",
+  "required": ["version", "dfa_type", "states", "transitions", "initial_state"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "dfa_type": {
+      "type": "string",
+      "description": "Type of DFA",
+      "enum": ["ActionDSL_Safety", "ActionDSL_IFC", "ActionDSL_ABAC"]
+    },
+    "states": {
+      "type": "array",
+      "description": "List of DFA states",
+      "items": {
+        "type": "object",
+        "required": ["id", "accepting"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unique state identifier"
+          },
+          "accepting": {
+            "type": "boolean",
+            "description": "Whether this state accepts input"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional state metadata"
+          }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "description": "List of state transitions",
+      "items": {
+        "type": "object",
+        "required": ["from", "event", "to"],
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "Source state ID"
+          },
+          "event": {
+            "type": "string",
+            "description": "Event that triggers transition"
+          },
+          "to": {
+            "type": "integer",
+            "description": "Target state ID"
+          },
+          "guard": {
+            "type": "object",
+            "description": "Optional guard condition"
+          }
+        }
+      }
+    },
+    "rate_limiters": {
+      "type": "array",
+      "description": "Rate limiting rules",
+      "items": {
+        "type": "object",
+        "required": ["key", "window", "bound"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Rate limiter identifier"
+          },
+          "window": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Time window in milliseconds"
+          },
+          "bound": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum events per window"
+          },
+          "tolerance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tolerance in milliseconds"
+          }
+        }
+      }
+    },
+    "initial_state": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Initial state ID"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional DFA metadata",
+      "properties": {
+        "exported_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Export timestamp"
+        },
+        "canonical": {
+          "type": "boolean",
+          "description": "Whether this is the canonical version"
+        },
+        "compilation_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Compilation time in milliseconds"
+        },
+        "state_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of states"
+        },
+        "transition_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of transitions"
+        },
+        "rate_limiter_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of rate limiters"
+        }
+      }
+    }
+  }
+}

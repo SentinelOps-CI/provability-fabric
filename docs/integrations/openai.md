@@ -185,9 +185,9 @@ print(f"Confidence: {certificate.confidence}")
 
 # Check if NI passed
 if certificate.non_interference == "passed":
-    print("✅ Non-interference check passed")
+    print("PASSED Non-interference check passed")
 else:
-    print("❌ Non-interference violation detected")
+    print("FAILED Non-interference violation detected")
     # Handle violation appropriately
 ```
 
@@ -197,10 +197,10 @@ else:
 def display_confidence(certificate):
     if certificate.non_interference == "passed":
         badge_color = "green"
-        icon = "✅"
+        icon = "PASSED"
     else:
         badge_color = "red"
-        icon = "❌"
+        icon = "FAILED"
     
     print(f"{icon} NI {certificate.non_interference.upper()}")
     print(f"Confidence: {certificate.confidence:.1%}")
@@ -217,13 +217,13 @@ try:
     if not validation.valid:
         for error in validation.errors:
             if "CAP_MISS" in error:
-                print("❌ Missing required capabilities")
+                print("FAILED Missing required capabilities")
             elif "RECEIPT_MISSING" in error:
-                print("❌ Missing access receipt")
+                print("FAILED Missing access receipt")
             elif "LABEL_FLOW" in error:
-                print("❌ Label flow violation")
+                print("FAILED Label flow violation")
             elif "BUDGET" in error:
-                print("❌ Budget exceeded")
+                print("FAILED Budget exceeded")
 except Exception as e:
     print(f"Validation error: {e}")
 ```
@@ -325,13 +325,13 @@ print(f"Metrics: {metrics}")
 ### 1. Always Quote User Input
 
 ```python
-# ✅ Correct - quoted user input
+# PASSED Correct - quoted user input
 user_input = {
     "content": "{{user_message}}",
     "quoted": True
 }
 
-# ❌ Incorrect - unquoted user input
+# FAILED Incorrect - unquoted user input
 user_input = {
     "content": user_message,
     "quoted": False  # This will be rejected

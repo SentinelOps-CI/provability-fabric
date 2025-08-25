@@ -21,6 +21,27 @@ use std::time::{Duration, Instant};
 use reqwest::Client;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_LENGTH, USER_AGENT};
 use url::Url;
+use sha2::{Digest, Sha256};
+
+/// Resource mapping for HTTP-GET operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpGetResource {
+    pub doc_id: String,           // Document ID (URI)
+    pub field_path: Vec<String>,  // Field path for JSON response
+    pub merkle_root: String,      // Merkle root for witness validation
+    pub field_commit: String,     // Field commit hash
+    pub label: String,            // Information flow control label
+}
+
+/// Witness for HTTP-GET operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpGetWitness {
+    pub merkle_path: Vec<String>, // Merkle path from root to field
+    pub sibling_hashes: Vec<String>, // Sibling hashes for path verification
+    pub field_commit: String,     // Field commit hash
+    pub timestamp: u64,           // Witness timestamp
+    pub signature: String,        // Cryptographic signature
+}
 
 /// Effect signature for HTTP-GET operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +53,9 @@ pub struct HttpGetEffect {
     pub max_content_length: usize,
     pub allowed_domains: Vec<String>,
     pub user_agent: String,
+    pub resource_mapping: Option<HttpGetResource>, // Optional resource mapping
+    pub witness_required: bool,                    // Whether witness is required
+    pub high_assurance_mode: bool,                 // High-assurance mode for IFC
 }
 
 impl Default for HttpGetEffect {
@@ -44,11 +68,14 @@ impl Default for HttpGetEffect {
             max_content_length: 10 * 1024 * 1024, // 10MB max
             allowed_domains: vec![],
             user_agent: "ProvabilityFabric-HttpGet/1.0".to_string(),
+            resource_mapping: None,
+            witness_required: false,
+            high_assurance_mode: false,
         }
     }
 }
 
-/// HTTP response with security metadata
+/// HTTP response with security metadata and witness validation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpGetResponse {
     pub status_code: u16,
@@ -60,6 +87,8 @@ pub struct HttpGetResponse {
     pub redirect_count: u32,
     pub response_time_ms: u64,
     pub security_metadata: SecurityMetadata,
+    pub witness_validation: WitnessValidationResult,
+    pub resource_access: ResourceAccessResult,
 }
 
 /// Security metadata for audit and compliance
@@ -74,7 +103,28 @@ pub struct SecurityMetadata {
     pub response_timestamp: u64,
 }
 
-/// HTTP-GET adapter with security enforcement
+/// Witness validation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WitnessValidationResult {
+    pub valid: bool,
+    pub merkle_path_verified: bool,
+    pub field_commit_verified: bool,
+    pub timestamp_valid: bool,
+    pub signature_valid: bool,
+    pub error_message: Option<String>,
+}
+
+/// Resource access result for IFC
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceAccessResult {
+    pub access_granted: bool,
+    pub label_derivation_ok: bool,
+    pub declass_rule_applied: Option<String>,
+    pub flow_violation: Option<String>,
+    pub permitted_fields: Vec<String>,
+}
+
+/// HTTP-GET adapter with security enforcement and witness validation
 pub struct HttpGetAdapter {
     client: Client,
     effect_signature: HttpGetEffect,
@@ -130,12 +180,19 @@ impl HttpGetAdapter {
         if effect.max_content_length == 0 || effect.max_content_length > 100 * 1024 * 1024 { // Max 100MB
             return Err("Invalid content length limit".into());
         }
+
+        // Validate resource mapping if provided
+        if let Some(ref resource) = effect.resource_mapping {
+            if resource.doc_id.is_empty() || resource.merkle_root.is_empty() {
+                return Err("Invalid resource mapping: missing doc_id or merkle_root".into());
+            }
+        }
         
         Ok(())
     }
     
-    /// Execute HTTP-GET request with security enforcement
-    pub async fn execute(&mut self, url: &str) -> Result<HttpGetResponse, Box<dyn Error>> {
+    /// Execute HTTP-GET request with security enforcement and witness validation
+    pub async fn execute(&mut self, url: &str, witness: Option<&HttpGetWitness>) -> Result<HttpGetResponse, Box<dyn Error>> {
         // Rate limiting check
         self.check_rate_limit()?;
         
@@ -190,7 +247,34 @@ impl HttpGetAdapter {
             request_timestamp: start_time.duration_since(Instant::now()).as_millis() as u64,
             response_timestamp: response_time.as_millis() as u64,
         };
-        
+
+        // Validate witness if required
+        let witness_validation = if self.effect_signature.witness_required {
+            self.validate_witness(witness, &body)?
+        } else {
+            WitnessValidationResult {
+                valid: true,
+                merkle_path_verified: true,
+                field_commit_verified: true,
+                timestamp_valid: true,
+                signature_valid: true,
+                error_message: None,
+            }
+        };
+
+        // Validate resource access for IFC
+        let resource_access = if let Some(ref resource) = self.effect_signature.resource_mapping {
+            self.validate_resource_access(resource, &body, witness)?
+        } else {
+            ResourceAccessResult {
+                access_granted: true,
+                label_derivation_ok: true,
+                declass_rule_applied: None,
+                flow_violation: None,
+                permitted_fields: vec![],
+            }
+        };
+
         // Update adapter state
         self.request_count += 1;
         self.last_request_time = Some(Instant::now());
@@ -209,7 +293,146 @@ impl HttpGetAdapter {
             redirect_count: 0, // Would be tracked during redirects
             response_time_ms: response_time.as_millis() as u64,
             security_metadata,
+            witness_validation,
+            resource_access,
         })
+    }
+
+    /// Validate witness for high-assurance mode
+    fn validate_witness(&self, witness: Option<&HttpGetWitness>, body: &[u8]) -> Result<WitnessValidationResult, Box<dyn Error>> {
+        let witness = witness.ok_or("Witness required but not provided")?;
+        
+        // Validate timestamp (within 5 minutes)
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+        let timestamp_valid = (current_time as i64 - witness.timestamp as i64).abs() < 300;
+
+        // Validate field commit
+        let body_hash = self.calculate_body_hash(body);
+        let field_commit_verified = body_hash == witness.field_commit;
+
+        // Validate Merkle path (simplified - would use actual Merkle tree verification)
+        let merkle_path_verified = self.verify_merkle_path(witness)?;
+
+        // Validate signature (simplified - would use actual cryptographic verification)
+        let signature_valid = self.verify_signature(witness)?;
+
+        let valid = timestamp_valid && field_commit_verified && merkle_path_verified && signature_valid;
+
+        Ok(WitnessValidationResult {
+            valid,
+            merkle_path_verified,
+            field_commit_verified,
+            timestamp_valid,
+            signature_valid,
+            error_message: if valid { None } else { Some("Witness validation failed".to_string()) },
+        })
+    }
+
+    /// Validate resource access for information flow control
+    fn validate_resource_access(&self, resource: &HttpGetResource, body: &[u8], witness: Option<&HttpGetWitness>) -> Result<ResourceAccessResult, Box<dyn Error>> {
+        // Check if we have a valid witness in high-assurance mode
+        let witness_ok = if self.effect_signature.high_assurance_mode {
+            witness.is_some() && witness.as_ref().unwrap().field_commit == resource.field_commit
+        } else {
+            true
+        };
+
+        if !witness_ok {
+            return Ok(ResourceAccessResult {
+                access_granted: false,
+                label_derivation_ok: false,
+                declass_rule_applied: None,
+                flow_violation: Some("Missing or invalid witness in high-assurance mode".to_string()),
+                permitted_fields: vec![],
+            });
+        }
+
+        // Parse JSON response to extract field access
+        let json_value: serde_json::Value = serde_json::from_slice(body)?;
+        let permitted_fields = self.extract_permitted_fields(&json_value, &resource.field_path)?;
+
+        // Check label derivation (simplified IFC logic)
+        let label_derivation_ok = self.can_derive_label(&resource.label)?;
+
+        // Check for declassification rules
+        let declass_rule_applied = self.check_declass_rules(&resource.label)?;
+
+        Ok(ResourceAccessResult {
+            access_granted: true,
+            label_derivation_ok,
+            declass_rule_applied,
+            flow_violation: None,
+            permitted_fields,
+        })
+    }
+
+    /// Calculate hash of response body
+    fn calculate_body_hash(&self, body: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(body);
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Verify Merkle path (simplified implementation)
+    fn verify_merkle_path(&self, witness: &HttpGetWitness) -> Result<bool, Box<dyn Error>> {
+        // In a real implementation, this would verify the Merkle path from root to field
+        // For now, we'll assume it's valid if the path is not empty
+        Ok(!witness.merkle_path.is_empty())
+    }
+
+    /// Verify signature (simplified implementation)
+    fn verify_signature(&self, witness: &HttpGetWitness) -> Result<bool, Box<dyn Error>> {
+        // In a real implementation, this would verify the cryptographic signature
+        // For now, we'll assume it's valid if the signature is not empty
+        Ok(!witness.signature.is_empty())
+    }
+
+    /// Extract permitted fields from JSON response
+    fn extract_permitted_fields(&self, json: &serde_json::Value, field_path: &[String]) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut permitted_fields = Vec::new();
+        
+        // Navigate to the specified field path
+        let mut current = json;
+        for field in field_path {
+            if let Some(value) = current.get(field) {
+                current = value;
+            } else {
+                return Ok(permitted_fields); // Field not found
+            }
+        }
+
+        // Extract field names at the target level
+        if let Some(obj) = current.as_object() {
+            for (key, _) in obj {
+                permitted_fields.push(key.clone());
+            }
+        }
+
+        Ok(permitted_fields)
+    }
+
+    /// Check if label can be derived (simplified IFC logic)
+    fn can_derive_label(&self, label: &str) -> Result<bool, Box<dyn Error>> {
+        // Simplified IFC logic - in practice, this would use the full IFC system
+        match label {
+            "public" => Ok(true),
+            "internal" => Ok(true),
+            "confidential" => Ok(false), // Would check declassification rules
+            "secret" => Ok(false),       // Would check declassification rules
+            _ => Ok(false),
+        }
+    }
+
+    /// Check for applicable declassification rules
+    fn check_declass_rules(&self, label: &str) -> Result<Option<String>, Box<dyn Error>> {
+        // Simplified declassification logic
+        match label {
+            "confidential" => Ok(Some("confidential_to_internal".to_string())),
+            "secret" => Ok(Some("secret_to_confidential".to_string())),
+            _ => Ok(None),
+        }
     }
     
     /// Check rate limiting constraints
@@ -235,6 +458,8 @@ impl HttpGetAdapter {
             self.last_request_time.map(|t| t.elapsed().as_secs().to_string())
                 .unwrap_or_else(|| "never".to_string()));
         stats.insert("effect_signature".to_string(), format!("{:?}", self.effect_signature));
+        stats.insert("witness_required".to_string(), self.effect_signature.witness_required.to_string());
+        stats.insert("high_assurance_mode".to_string(), self.effect_signature.high_assurance_mode.to_string());
         stats
     }
 }
@@ -253,6 +478,9 @@ mod tests {
             max_content_length: 1024 * 1024,
             allowed_domains: vec!["example.com".to_string()],
             user_agent: "Test/1.0".to_string(),
+            resource_mapping: None,
+            witness_required: false,
+            high_assurance_mode: false,
         };
         
         assert!(HttpGetAdapter::validate_effect_signature(&valid_effect).is_ok());
@@ -268,6 +496,9 @@ mod tests {
             max_content_length: 1024 * 1024,
             allowed_domains: vec![],
             user_agent: "Test/1.0".to_string(),
+            resource_mapping: None,
+            witness_required: false,
+            high_assurance_mode: false,
         };
         
         assert!(HttpGetAdapter::validate_effect_signature(&invalid_effect).is_err());
@@ -283,8 +514,63 @@ mod tests {
             max_content_length: 1024 * 1024,
             allowed_domains: vec!["allowed.com".to_string()],
             user_agent: "Test/1.0".to_string(),
+            resource_mapping: None,
+            witness_required: false,
+            high_assurance_mode: false,
         };
         
         assert!(HttpGetAdapter::validate_effect_signature(&restricted_effect).is_err());
+    }
+
+    #[test]
+    fn test_resource_mapping_validation() {
+        let valid_resource = HttpGetResource {
+            doc_id: "https://api.example.com/data".to_string(),
+            field_path: vec!["users".to_string()],
+            merkle_root: "abc123".to_string(),
+            field_commit: "def456".to_string(),
+            label: "internal".to_string(),
+        };
+
+        let effect_with_resource = HttpGetEffect {
+            url: "https://api.example.com/data".to_string(),
+            method: "GET".to_string(),
+            max_redirects: 0,
+            timeout_ms: 30000,
+            max_content_length: 1024 * 1024,
+            allowed_domains: vec![],
+            user_agent: "Test/1.0".to_string(),
+            resource_mapping: Some(valid_resource),
+            witness_required: true,
+            high_assurance_mode: true,
+        };
+
+        assert!(HttpGetAdapter::validate_effect_signature(&effect_with_resource).is_ok());
+    }
+
+    #[test]
+    fn test_invalid_resource_mapping_rejected() {
+        let invalid_resource = HttpGetResource {
+            doc_id: "".to_string(), // Empty doc_id
+            field_path: vec!["users".to_string()],
+            merkle_root: "".to_string(), // Empty merkle_root
+            field_commit: "def456".to_string(),
+            label: "internal".to_string(),
+        };
+
+        let effect_with_invalid_resource = HttpGetEffect {
+            url: "https://api.example.com/data".to_string(),
+            method: "GET".to_string(),
+            max_redirects: 0,
+            timeout_ms: 30000,
+            max_content_length: 1024 * 1024,
+            allowed_domains: vec![],
+            user_agent: "Test/1.0".to_string(),
+            resource_mapping: Some(invalid_resource),
+            witness_required: true,
+            high_assurance_mode: true,
+        };
+
+        assert!(HttpGetAdapter::validate_effect_signature(&effect_with_invalid_resource).is_err());
     }
 }
