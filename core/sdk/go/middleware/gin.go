@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/provability-fabric/core/sdk/go/sdk"
+	sdk "github.com/provability-fabric/core/sdk/go"
 )
 
 // PFMiddlewareOptions holds configuration for the PF middleware

@@ -49,9 +49,6 @@ panic = "abort"
 # Additional performance optimizations
 strip = true
 overflow-checks = false
-# Profile-guided optimization hints
-codegen-units = 1
-panic = "abort"
 
 [profile.dev]
 opt-level = 0

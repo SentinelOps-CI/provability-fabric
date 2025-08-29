@@ -13,11 +13,13 @@ export class RAGGuard {
   private secretDetector: SecretDetector;
   private ledgerClient: LedgerClient;
   private config: GuardConfig;
+  private ledgerUrlValid: boolean;
 
   constructor(config: GuardConfig) {
     this.config = config;
     this.piiDetector = new PIIDetector(config.customPatterns?.pii);
     this.secretDetector = new SecretDetector(config.customPatterns?.secrets);
+    this.ledgerUrlValid = /^https?:\/\//i.test(config.ledgerUrl);
     this.ledgerClient = new LedgerClient(
       config.ledgerUrl,
       config.tenantId,
@@ -30,6 +32,10 @@ export class RAGGuard {
     try {
       const detections = this.detectViolations(content);
       
+      if (!this.ledgerUrlValid) {
+        throw new Error('invalid_ledger_url');
+      }
+
       if (detections.length === 0) {
         return {
           allowed: true,
@@ -45,6 +51,8 @@ export class RAGGuard {
         content
       );
 
+      // If ledger could not record the incident, continue with redaction (fail-open on reporting)
+
       // Generate safe content by redacting detected patterns
       const safeContent = this.generateSafeContent(content, detections);
 
@@ -52,7 +60,7 @@ export class RAGGuard {
         allowed: false,
         safeContent,
         blockedDetections: detections,
-        incidentId: ledgerResponse.incidentId
+        incidentId: ledgerResponse.success ? ledgerResponse.incidentId : undefined
       };
     } catch (error: any) {
       console.error('Error in RAG guard filter:', error.message);
