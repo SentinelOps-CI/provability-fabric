@@ -1,0 +1,160 @@
+groups:
+  - name: system_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+          runbook_url: "https://runbooks.example.com/high-error-rate"
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Service is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute"
+          runbook_url: "https://runbooks.example.com/service-down"
+
+      - alert: HighMemoryUsage
+        expr: process_memory_usage_bytes / 1024 / 1024 > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB for service {{ $labels.service }}"
+          runbook_url: "https://runbooks.example.com/high-memory"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% for service {{ $labels.service }}"
+          runbook_url: "https://runbooks.example.com/high-cpu"
+
+      - alert: SlowRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow request latency"
+          description: "95th percentile latency is {{ $value }}s for service {{ $labels.service }}"
+          runbook_url: "https://runbooks.example.com/slow-latency"
+
+  - name: security_alerts
+    rules:
+      - alert: PolicyViolationSpike
+        expr: rate(policy_violations_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Policy violation spike detected"
+          description: "Policy violations rate is {{ $value }}/sec"
+          runbook_url: "https://runbooks.example.com/policy-violations"
+
+      - alert: AuthenticationFailureSpike
+        expr: rate(auth_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Authentication failure spike"
+          description: "Authentication failures rate is {{ $value }}/sec"
+          runbook_url: "https://runbooks.example.com/auth-failures"
+
+      - alert: PIIDetectionAlert
+        expr: rate(pii_detected_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "PII detection event"
+          description: "PII detected at rate {{ $value }}/sec in tenant {{ $labels.tenant_id }}"
+          runbook_url: "https://runbooks.example.com/pii-detection"
+
+      - alert: CertificateChainInvalid
+        expr: rate(certificate_chain_invalid_total[5m]) > 0.01
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Invalid certificate chain detected"
+          description: "Invalid certificate chains at rate {{ $value }}/sec"
+          runbook_url: "https://runbooks.example.com/invalid-certs"
+
+      - alert: ComplianceScoreLow
+        expr: compliance_score < 80
+        for: 15m
+        labels:
+          severity: warning
+          team: compliance
+        annotations:
+          summary: "Compliance score below threshold"
+          description: "Compliance score is {{ $value }}%"
+          runbook_url: "https://runbooks.example.com/compliance-score"
+
+  - name: performance_alerts
+    rules:
+      - alert: PrivacyBudgetExhaustion
+        expr: privacy_budget_remaining < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: privacy
+        annotations:
+          summary: "Privacy budget near exhaustion"
+          description: "Privacy budget remaining: {{ $value }} for tenant {{ $labels.tenant_id }}"
+          runbook_url: "https://runbooks.example.com/privacy-budget"
+
+      - alert: CertificateProcessingBacklog
+        expr: certificate_processing_queue_size > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Certificate processing backlog"
+          description: "Certificate queue size: {{ $value }} certificates"
+          runbook_url: "https://runbooks.example.com/cert-backlog"
+
+      - alert: StorageSpaceHigh
+        expr: disk_usage_bytes / disk_total_bytes > 0.85
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High storage usage"
+          description: "Storage usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://runbooks.example.com/storage-usage"
+
+      - alert: ReplayDeterminismLow
+        expr: rate(replay_deterministic_total[5m]) / rate(replay_total[5m]) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          team: reliability
+        annotations:
+          summary: "Replay determinism below threshold"
+          description: "Replay determinism is {{ $value | humanizePercentage }}"
+          runbook_url: "https://runbooks.example.com/replay-determinism"
