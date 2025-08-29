@@ -1,0 +1,28 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pf-enforce-mutating
+  labels:
+    app.kubernetes.io/name: pf-enforce
+webhooks:
+  - name: sidecar-injector.pf.local
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: { { .Values.webhooks.failurePolicy | default "Fail" } }
+    timeoutSeconds: { { .Values.webhooks.timeouts.mutating | default 10 } }
+    namespaceSelector:
+      { { toYaml .Values.webhooks.namespaceSelector | nindent 6 } }
+    objectSelector: { { toYaml .Values.webhooks.objectSelector | nindent 6 } }
+    clientConfig:
+      service:
+        name: pf-enforce-admission
+        namespace: { { .Release.Namespace } }
+        path: /mutate
+        port: 443
+      caBundle: { { .Values.caBundle | quote } }
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+    reinvocationPolicy: IfNeeded

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pf-enforce
+description: Provability-Fabric enforcement webhooks (mutating + validating) and admission-controller scaffold
+version: 0.1.0
+appVersion: "0.1.0"
+type: application

@@ -1,0 +1,15 @@
+name: PF Reusable CI Caller
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  call-pf-ci:
+    uses: ./.github/workflows/pf-ci.yaml
+    with:
+      pr_number: ${{ github.event.pull_request.number || '' }}
+      run_phases: "2,3,6"
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
