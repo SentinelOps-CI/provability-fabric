@@ -1,0 +1,326 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Trace Replay & Determinism",
+    "tags": ["replay", "determinism", "traces"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Replay Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(replay_success_total[5m]) / rate(replay_total[5m]) * 100",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99.9}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Determinism Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(replay_deterministic_total[5m]) / rate(replay_total[5m]) * 100",
+            "legendFormat": "Determinism Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 99},
+                {"color": "green", "value": 99.9999}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Trace Processing Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(traces_processed_total[5m])",
+            "legendFormat": "Traces/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "tps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Replay Latency Distribution",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(replay_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(replay_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(replay_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "s"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Non-Deterministic Events",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(replay_non_deterministic_total[5m])",
+            "legendFormat": "{{event_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Certificate Validation During Replay",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(replay_cert_valid_total[5m])",
+            "legendFormat": "Valid Certs",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(replay_cert_invalid_total[5m])",
+            "legendFormat": "Invalid Certs",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "cps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Egress Determinism Checks",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(egress_deterministic_total[5m]) / rate(egress_total[5m]) * 100",
+            "legendFormat": "Egress Determinism",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 99},
+                {"color": "green", "value": 99.9}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Bundle Verification",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(bundle_verified_total[5m]) / rate(bundle_total[5m]) * 100",
+            "legendFormat": "Bundle Verification Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99.9}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Low-View Equality Check",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(low_view_equal_total[5m]) / rate(low_view_checks_total[5m]) * 100",
+            "legendFormat": "Low-View Equality %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 99.9},
+                {"color": "green", "value": 99.9999}
+              ]
+            },
+            "custom": {
+              "lineWidth": 3,
+              "fillOpacity": 20
+            },
+            "unit": "percent",
+            "min": 99,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Trace Size Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(trace_size_bytes_bucket[5m])",
+            "legendFormat": "Trace Size",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "spectrum"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-2h",
+      "to": "now"
+    },
+    "refresh": "1m",
+    "schemaVersion": 30,
+    "version": 1,
+    "links": [
+      {
+        "title": "System Overview",
+        "url": "/d/system-overview/system-overview",
+        "type": "dashboards"
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Replay Failures",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "increase(replay_failures_total[5m])",
+          "iconColor": "red",
+          "textFormat": "Replay Failure: {{error_type}}"
+        }
+      ]
+    }
+  }
+}
