@@ -14,12 +14,12 @@ describe('SecretDetector', () => {
 
   describe('AWS Key Detection', () => {
     it('should detect AWS access keys', () => {
-      const content = 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE';
+      const content = 'AWS_ACCESS_KEY_ID=AKIA_FAKE_EXAMPLE_KEY';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('aws_access_key');
-      expect(results[0].match).toBe('AKIAIOSFODNN7EXAMPLE');
+      expect(results[0].match).toBe('AKIA_FAKE_EXAMPLE_KEY');
       expect(results[0].severity).toBe('critical');
     });
 
@@ -44,7 +44,7 @@ describe('SecretDetector', () => {
 
   describe('GitHub Token Detection', () => {
     it('should detect GitHub personal access tokens', () => {
-      const content = 'GITHUB_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+      const content = 'GITHUB_TOKEN=ghp_fake_token_example_not_real';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('SecretDetector', () => {
 
   describe('Stripe Key Detection', () => {
     it('should detect Stripe live secret keys', () => {
-      const content = 'STRIPE_SECRET_KEY=sk_live_1234567890abcdefghijklmn';
+      const content = 'STRIPE_SECRET_KEY=sk_fake_example_key_not_real';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);

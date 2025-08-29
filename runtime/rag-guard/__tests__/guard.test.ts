@@ -79,7 +79,7 @@ describe('RAGGuard', () => {
 
   describe('Secret Content Blocking', () => {
     it('should block content with AWS keys', async () => {
-      const content = 'Use AWS key: AKIAIOSFODNN7EXAMPLE';
+      const content = 'Use AWS key: AKIA_FAKE_EXAMPLE_KEY';
       const result = await guard.filter(content);
       
       expect(result.allowed).toBe(false);
@@ -88,7 +88,7 @@ describe('RAGGuard', () => {
     });
 
     it('should block content with GitHub tokens', async () => {
-      const content = 'Deploy with: ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+      const content = 'Deploy with: ghp_fake_token_example_not_real';
       const result = await guard.filter(content);
       
       expect(result.allowed).toBe(false);
@@ -108,7 +108,7 @@ describe('RAGGuard', () => {
 
   describe('Mixed Content', () => {
     it('should handle multiple detections correctly', async () => {
-      const content = 'User email: admin@company.com has SSN 123-45-6789 and API key: sk_live_1234567890abcdefghijklmn';
+      const content = 'User email: admin@company.com has SSN 123-45-6789 and API key: sk_fake_example_key_not_real';
       const result = await guard.filter(content);
       
       expect(result.allowed).toBe(false);
@@ -154,7 +154,7 @@ describe('RAGGuard', () => {
       };
       const guardNoSecrets = new RAGGuard(configNoSecrets);
       
-      const content = 'API key: AKIAIOSFODNN7EXAMPLE';
+      const content = 'API key: AKIA_FAKE_EXAMPLE_KEY';
       const result = await guardNoSecrets.filter(content);
       
       expect(result.allowed).toBe(true);
