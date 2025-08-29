@@ -1,0 +1,8 @@
+{
+  "name": "egress",
+  "steps": [
+    { "op": "call", "tool": "HTTPGet", "args": {"url": "https://example.com"} },
+    { "op": "emit", "args": {"payload": "response"} }
+  ]
+}
+

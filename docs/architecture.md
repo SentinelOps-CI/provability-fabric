@@ -174,3 +174,17 @@ The attestation service provides hardware-level security:
 ## Conclusion
 
 Provability-Fabric's architecture provides a robust foundation for deploying AI agents with mathematical guarantees. The layered design ensures separation of concerns while maintaining strong security and performance characteristics. The framework is designed to scale with your needs while maintaining the core principles of formal verification and runtime enforcement.
+
+## Where Standards Plug In
+
+End-to-end evidence loop with external standards:
+
+1. Policy → DFAs (ActionDSL / Lean): proof artifacts and automata are generated from specs
+2. Runtime → CERT (CERT-V1): sidecar emits per-emission CERTs validated against the public schema
+3. Replay (TRACE-REPLAY-KIT): canonical runner + low-view oracles assert deterministic replays
+
+References:
+- CERT-V1: https://github.com/verifiable-ai-ci/CERT-V1
+- TRACE-REPLAY-KIT: https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT
+- Morph Lean CI: https://github.com/SentinelOps-CI/morph-lean-ci
+- Morph Replay Runner: https://github.com/SentinelOps-CI/morph-replay-runner

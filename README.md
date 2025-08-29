@@ -8,6 +8,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
+[![Lean on Morph](https://img.shields.io/badge/Lean%20on%20Morph-Sharded%20CI-blue)](.github/workflows/lean-morph.yml)
 
 An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
 
@@ -44,6 +45,17 @@ provability-fabric/
 ```
 
 ## Quick Start
+## Standards & Replays
+
+Adopt the ecosystem standards and end-to-end evidence loop:
+
+- CERT-V1 (schema + verifiers): https://github.com/verifiable-ai-ci/CERT-V1
+- TRACE-REPLAY-KIT (runner + oracles): https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT
+- morph-lean-ci (sharded Lean): https://github.com/SentinelOps-CI/morph-lean-ci
+- morph-replay-runner (branch-N replays): https://github.com/SentinelOps-CI/morph-replay-runner
+- mcp-sidecar-demo (permissions/epochs/IFC): https://github.com/SentinelOps-CI/mcp-sidecar-demo
+
+See `docs/standards.md`, `docs/Evidence.md`, and `docs/Replay.md` for usage.
 
 ### Option 1: Automated Installation (Recommended)
 

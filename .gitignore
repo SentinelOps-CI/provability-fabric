@@ -204,3 +204,9 @@ pf.tar
 # Log files (regenerated during testing)
 *_burn_down.log
 *_adapter_test.log 
+
+# Todo2 - AI-powered task management directories
+.cursor/rules/todo2-overview.mdc
+.cursor/rules/todo2.mdc
+.cursor/mcp.json
+.todo2/

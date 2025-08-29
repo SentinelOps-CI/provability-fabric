@@ -1,0 +1,45 @@
+name: Egress Determinism (EGRESS-DET-P1)
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "scripts/check-egress.sh"
+      - ".github/workflows/egress.yml"
+      - "external/**"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "scripts/check-egress.sh"
+      - ".github/workflows/egress.yml"
+      - "external/**"
+  workflow_dispatch:
+
+jobs:
+  egress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update submodules
+        run: make submodules
+
+      - name: Generate replay outputs for egress analysis
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=1
+          bash tests/replay/run_replays.sh
+
+      - name: Run EGRESS-DET-P1 harness
+        run: |
+          bash scripts/check-egress.sh
+
+      - name: Upload egress report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: egress-report
+          path: evidence/egress/

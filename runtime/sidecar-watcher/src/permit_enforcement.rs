@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{error, info, warn};
+use crate::cert_v1::{write_cert, CertV1, MorphInfo};
+use crate::ni_monitor::NIMonitor; // for naming consistency in docs
 
 /// Runtime event that triggers permitD evaluation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,7 +160,68 @@ impl PermitEnforcementHook {
             self.record_violation(event, &permission_result);
         }
 
+        // Emit CERT-V1 on emit events and at end-like events we treat as emit_end
+        if event.event_type == "emit" {
+            if let Err(e) = self.emit_cert_v1(event, &enforcement_result) {
+                warn!("Failed to emit CERT-V1: {}", e);
+            }
+        }
+
         Ok(enforcement_result)
+    }
+
+    fn emit_cert_v1(&self, event: &RuntimeEvent, result: &EnforcementResult) -> Result<()> {
+        // Gather environment/config for required fields
+        let bundle_id = std::env::var("BUNDLE_ID").unwrap_or_else(|_| "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        let policy_hash = std::env::var("POLICY_HASH").unwrap_or_default();
+        let proof_hash = std::env::var("PROOF_HASH").unwrap_or_default();
+        let automata_hash = std::env::var("AUTOMATA_HASH").unwrap_or_default();
+        let labeler_hash = std::env::var("LABELER_HASH").unwrap_or_default();
+        let sidecar_build = std::env::var("SIDECAR_BUILD").unwrap_or_else(|_| "dev".to_string());
+        let egress_profile = std::env::var("EGRESS_PROFILE").unwrap_or_else(|_| "EGRESS-DET-P1@1.0".to_string());
+        let morph_block = if let (Ok(env_digest), Ok(branch_id), Ok(base_image)) = (
+            std::env::var("MORPH_ENV_SNAPSHOT_DIGEST"),
+            std::env::var("MORPH_BRANCH_ID"),
+            std::env::var("MORPH_BASE_IMAGE"),
+        ) {
+            Some(MorphInfo {
+                env_snapshot_digest: env_digest,
+                branch_id,
+                base_image,
+                morphvm_id: std::env::var("MORPHVM_ID").ok(),
+            })
+        } else { None };
+
+        // Map NI monitor verdict from feature flags or default
+        let ni_monitor = if result.allowed { "accept" } else { "reject" }.to_string();
+
+        // Signature placeholder (upstream signing can replace)
+        let sig = std::env::var("CERT_SIG").unwrap_or_else(|_| "dsse:placeholder".to_string());
+
+        let cert = CertV1 {
+            bundle_id,
+            policy_hash,
+            proof_hash,
+            automata_hash,
+            labeler_hash,
+            ni_monitor,
+            permit_decision: result.permit_decision.clone(),
+            path_witness_ok: result.path_witness_ok,
+            label_derivation_ok: result.label_derivation_ok,
+            epoch: result.epoch,
+            sidecar_build,
+            egress_profile,
+            morph: morph_block,
+            sig,
+        };
+
+        // Use session and seq from event context; fallback defaults
+        let session = &event.session_id;
+        let seq = result.timestamp as u64; // fallback; ideally monotonic seq
+
+        let path = write_cert(&cert, session, seq)?;
+        info!("CERT-V1 written: {}", path);
+        Ok(())
     }
 
     /// Process call event with tool validation

@@ -1,0 +1,70 @@
+name: CERT-V1 Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "evidence/**"
+      - "tests/replay/**"
+      - "external/**"
+      - "tools/cert-validate/**"
+      - "Makefile"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "evidence/**"
+      - "tests/replay/**"
+      - "external/**"
+      - "tools/cert-validate/**"
+      - "Makefile"
+  workflow_dispatch:
+
+jobs:
+  validate-certs:
+    name: Validate CERT-V1 JSON Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Update submodules
+        run: make submodules
+
+      - name: Install validation dependencies
+        run: |
+          cd tools/cert-validate
+          pip install -r requirements.txt
+
+      - name: Validate CERT files
+        run: make validate-certs
+
+      - name: Upload validation artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: cert-validation-failures
+          path: |
+            evidence/**/*.cert.json
+            tests/replay/out/**/*.cert.json
+          retention-days: 7
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ CERT-V1 validation failed. Check the workflow logs for details and ensure all JSON files conform to the schema.'
+            })

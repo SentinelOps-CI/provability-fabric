@@ -1,0 +1,40 @@
+apiVersion: perm.unify.r1
+kind: Policy
+metadata:
+  name: mcp-epoch-demo
+spec:
+  roles:
+    - name: admin
+      can:
+        - grant
+        - call: [HTTPGet, FileRead]
+    - name: user
+      can:
+        - call: [HTTPGet]
+
+  epochs:
+    - id: 1
+      name: bootstrap
+      witness_mode: strict
+      allowed_tools: [HTTPGet]
+    - id: 2
+      name: elevated
+      witness_mode: strict
+      allowed_tools: [HTTPGet, FileRead]
+
+  epoch_control:
+    mode: http
+    endpoint: http://localhost:8787/epoch
+
+  ifc:
+    witness:
+      enabled: true
+      merkle_path_required: true
+    declassify:
+      rules: []
+
+  explain:
+    enabled: true
+    include: [decision, witness, labels]
+
+

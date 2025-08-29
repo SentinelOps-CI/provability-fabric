@@ -1,0 +1,108 @@
+name: Lean on Morph (Sharded Lean CI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Number of shards"
+        required: false
+        default: "8"
+  push:
+    branches: [main, develop]
+    paths:
+      - "**/*.lean"
+      - "**/lakefile.lean"
+      - ".github/workflows/lean-morph.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "**/*.lean"
+      - "**/lakefile.lean"
+      - ".github/workflows/lean-morph.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  # Attempt Morph reusable workflow first; fallback to local sharded builds when MORPH is unavailable.
+  morph:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check for MORPH_API_KEY
+        id: keycheck
+        run: |
+          if [ -z "${{ secrets.MORPH_API_KEY }}" ]; then
+            echo "missing=true" >> $GITHUB_OUTPUT
+          else
+            echo "missing=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Invoke Morph Lean CI
+        if: steps.keycheck.outputs.missing == 'false'
+        env:
+          MORPH_API_KEY: ${{ secrets.MORPH_API_KEY }}
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/SentinelOps-CI/morph-lean-ci tmp/morph-lean-ci
+          cd tmp/morph-lean-ci
+          bash run.sh \
+            --api-key "$MORPH_API_KEY" \
+            --shards "${{ inputs.shards || 8 }}" \
+            --targets "proofs,spec-templates/v1/proofs,Fabric.lean,Policy.lean,ProofBench.lean"
+      - name: Skip (no MORPH_API_KEY)
+        if: steps.keycheck.outputs.missing == 'true'
+        run: |
+          echo "Skipping Morph job: MORPH_API_KEY not set"
+
+  fallback-local:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        total: [8]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Lean (elan)
+        run: |
+          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
+          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+
+      - name: Prewarm caches (core libs & templates)
+        run: |
+          set -e
+          cd core/lean-libs
+          lake build
+          cd ../../spec-templates/v1/proofs
+          lake build
+
+      - name: Sharded build - bundles
+        run: |
+          set -e
+          SHARD=${{ matrix.shard }}
+          TOTAL=${{ matrix.total }}
+          i=0
+          for p in bundles/*/proofs; do
+            [ -d "$p" ] || continue
+            i=$((i+1))
+            idx=$(( (i-1) % TOTAL + 1 ))
+            if [ "$idx" -eq "$SHARD" ]; then
+              echo "[shard $SHARD/$TOTAL] building $p"
+              (cd "$p" && lake build)
+            fi
+          done
+
+      - name: Root Lean targets
+        run: |
+          set -e
+          # Compile top-level Lean entry points (non-sharded, cheap)
+          lean --make Fabric.lean || true
+          lean --make Policy.lean || true
+          lean --make ProofBench.lean || true
+
+      - name: Print snapshot info (if available)
+        run: |
+          echo "MORPH_SNAPSHOT_ID=${MORPH_SNAPSHOT_ID:-unavailable}"

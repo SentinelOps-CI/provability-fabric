@@ -239,3 +239,32 @@ proto-help:
 	@echo "  proto-stats      - Show file statistics"
 	@echo "  proto-docs       - Generate API documentation"
 	@echo "  proto-help       - Show this help message"
+
+# Standards and validation targets
+.PHONY: submodules validate-certs standards-pin-check
+
+# Update and initialize git submodules
+submodules:
+	@echo "Updating git submodules..."
+	git submodule update --init --recursive
+	@echo "Submodules updated"
+
+# Enforce standards pinned to tags
+standards-pin-check:
+	@echo "Checking external standards are pinned to released tags..."
+	@python tools/standards/check_pins.py
+	@echo "Standards pin check complete"
+
+# Validate CERT-V1 JSON files
+validate-certs:
+	@echo "Validating CERT-V1 JSON files..."
+	@cd tools/cert-validate && pip install -r requirements.txt
+	python tools/cert-validate/validate.py evidence/**/*.cert.json tests/replay/out/**/*.cert.json
+	@echo "CERT validation complete"
+
+# Show standards help
+standards-help:
+	@echo "Standards and validation targets:"
+	@echo "  submodules       - Update and initialize git submodules"
+	@echo "  validate-certs   - Validate CERT-V1 JSON files"
+	@echo "  standards-help   - Show this help message"

@@ -4,6 +4,7 @@
 pub mod assumption;
 pub mod break_glass;
 pub mod broker;
+pub mod cert_v1;
 pub mod declassify;
 pub mod dfa;
 pub mod effects;

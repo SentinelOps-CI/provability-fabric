@@ -1,0 +1,88 @@
+name: Replay Determinism
+
+on:
+  pull_request:
+    paths:
+      - "tests/replay/**"
+      - "external/TRACE-REPLAY-KIT/**"
+      - ".github/workflows/replay.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "tests/replay/**"
+      - "external/TRACE-REPLAY-KIT/**"
+      - ".github/workflows/replay.yml"
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runs: [3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Update submodules
+        run: make submodules
+
+      - name: Run replays
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=${{ matrix.runs }}
+          bash tests/replay/run_replays.sh
+
+      - name: Sanity check bundles and zipped artifacts
+        run: |
+          set -e
+          test -d tests/replay/bundles || (echo "Missing tests/replay/bundles" >&2; exit 1)
+          count=$(find tests/replay/bundles -mindepth 1 -maxdepth 1 -type d | wc -l)
+          if [ "$count" -lt 2 ]; then
+            echo "Need at least 2 replay bundles (found $count)" >&2
+            exit 1
+          fi
+          mkdir -p artifact/replay_zips
+          for b in tests/replay/bundles/*; do
+            [ -d "$b" ] || continue
+            name=$(basename "$b")
+            (cd tests/replay/bundles && zip -r "../../artifact/replay_zips/${name}.zip" "$name")
+          done
+          ls -l artifact/replay_zips
+
+      - name: Enforce negative CERT tests fail
+        run: |
+          set +e
+          # Expect validation to fail when including invalid samples
+          if python tools/cert-validate/validate.py tests/replay/invalid_*.cert.json tests/privacy/invalid_*.cert.json; then
+            echo "Unexpected pass: invalid CERTs validated" >&2
+            exit 1
+          else
+            echo "Negative CERT tests correctly failed validation"
+          fi
+
+      - name: Validate CERTs
+        run: make validate-certs
+
+      - name: Upload replay outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-outputs
+          path: tests/replay/out/
+
+      - name: Upload zipped bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-bundles-zipped
+          path: artifact/replay_zips/
