@@ -1,0 +1,16 @@
+{
+  "bundle_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "policy_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "proof_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "automata_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "labeler_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "ni_monitor": "accept",
+  "permit_decision": "accept",
+  "path_witness_ok": true,
+  "label_derivation_ok": true,
+  "epoch": 1,
+  "sidecar_build": "dev",
+  "egress_profile": "EGRESS-DET-P1@1.0"
+  /* missing required field: sig */
+}
+
