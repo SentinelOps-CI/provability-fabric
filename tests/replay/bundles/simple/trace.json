@@ -1,0 +1,8 @@
+{
+  "name": "simple",
+  "steps": [
+    { "op": "call", "tool": "Echo", "args": {"msg": "hello"} },
+    { "op": "emit", "args": {"payload": "world"} }
+  ]
+}
+

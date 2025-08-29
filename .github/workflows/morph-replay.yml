@@ -1,0 +1,60 @@
+name: Morph Replay Runner (Branch-N)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branches:
+        description: "Number of branches (N)"
+        required: false
+        default: "8"
+  push:
+    branches: [main, develop]
+    paths:
+      - "tests/replay/**"
+      - ".github/workflows/morph-replay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  morph-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package replay bundles
+        run: |
+          set -e
+          mkdir -p artifact/replay_zips
+          for b in tests/replay/bundles/*; do
+            [ -d "$b" ] || continue
+            name=$(basename "$b")
+            (cd tests/replay/bundles && zip -r "../../artifact/replay_zips/${name}.zip" "$name")
+          done
+
+      - name: Run Morph replay runner
+        env:
+          MORPH_API_KEY: ${{ secrets.MORPH_API_KEY }}
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/SentinelOps-CI/morph-replay-runner tmp/morph-replay-runner
+          cd tmp/morph-replay-runner
+          bash run.sh \
+            --api-key "$MORPH_API_KEY" \
+            --input-glob "${GITHUB_WORKSPACE}/artifact/replay_zips/*.zip" \
+            --branches "${{ inputs.branches || 8 }}" \
+            --output "${GITHUB_WORKSPACE}/evidence/morph/evidence-pack"
+
+      - name: Upload evidence pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: morph-evidence-pack
+          path: evidence/morph/evidence-pack/
+
+      - name: Upload morph summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: morph-replay-summary
+          path: evidence/morph/evidence-pack/summary.json
