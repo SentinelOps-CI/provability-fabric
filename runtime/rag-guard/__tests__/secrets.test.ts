@@ -63,7 +63,7 @@ describe('SecretDetector', () => {
 
   describe('Slack Token Detection', () => {
     it('should detect Slack bot tokens', () => {
-      const content = 'SLACK_BOT_TOKEN=xoxb-1234567890-1234567890-abcdefghijklmnopqrstuvwx';
+      const content = 'SLACK_BOT_TOKEN=xoxb_fake_token_example_not_real';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('SecretDetector', () => {
     });
 
     it('should detect Slack user tokens', () => {
-      const content = 'token: xoxp-1234567890-1234567890-1234567890-abcdef';
+      const content = 'token: xoxp_fake_token_example_not_real';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
