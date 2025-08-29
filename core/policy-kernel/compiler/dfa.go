@@ -263,7 +263,7 @@ func (c *DFACompiler) markAcceptingStates(dfa *DFA) {
 	}
 
 	// For each rule, keep only the highest priority accepting state
-	for ruleID, states := range ruleStates {
+	for _, states := range ruleStates {
 		if len(states) > 1 {
 			// Sort by priority (higher first)
 			sort.Slice(states, func(i, j int) bool {

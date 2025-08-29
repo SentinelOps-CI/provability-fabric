@@ -1,14 +1,11 @@
+package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // revokeCmd represents the revoke command
@@ -137,4 +134,3 @@ func getCurrentUser() string {
 	}
 	return "cli-user"
 }
-

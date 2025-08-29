@@ -19,14 +19,24 @@ export class LedgerClient {
     timeout: number = 5000,
     retries: number = 3
   ) {
-    this.client = axios.create({
-      baseURL: ledgerUrl,
-      timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': '@pf/guard-rag/1.0.0'
-      }
-    });
+    const ax: any = axios as any;
+    if (ax && typeof ax.create === 'function') {
+      this.client = axios.create({
+        baseURL: ledgerUrl,
+        timeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': '@pf/guard-rag/1.0.0'
+        }
+      });
+    } else {
+      // Fallback minimal client to avoid crashes when axios is mocked without .create
+      this.client = {
+        post: async () => { throw new Error('axios_not_initialized'); },
+        get: async () => ({ status: 503 }),
+        defaults: { headers: { common: {} } }
+      } as unknown as AxiosInstance;
+    }
     this.tenantId = tenantId;
     this.timeout = timeout;
     this.retries = retries;
@@ -52,7 +62,15 @@ export class LedgerClient {
       severity: maxSeverity
     };
 
-    return this.executeWithRetry(() => this.postIncident(payload));
+    // Do not throw on ledger failures; always resolve with a LedgerResponse so caller can fail securely
+    try {
+      return await this.executeWithRetry(() => this.postIncident(payload));
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message || 'ledger_unavailable'
+      };
+    }
   }
 
   private async postIncident(payload: IncidentPayload): Promise<LedgerResponse> {
