@@ -36,7 +36,7 @@ const config: GuardConfig = {
 const guard = new RAGGuard(config);
 
 // Filter content
-const result = await guard.filter('User email: admin@example.com has API key: sk_fake_example_key_not_real');
+const result = await guard.filter('User email: admin@example.com has API key: sk_live_...');
 
 if (result.allowed) {
   console.log('Content is safe:', result.safeContent);
@@ -147,7 +147,7 @@ const customConfig: GuardConfig = {
 Detected patterns are replaced with descriptive redaction markers:
 
 ```
-Original: "Contact admin@example.com with API key sk_fake_example_key_not_real"
+Original: "Contact admin@example.com with API key sk_live_1234567890abcdef"
 Redacted: "Contact [EMAIL-REDACTED] with API key [STRIPE-KEY-REDACTED]"
 ```
 
