@@ -39,15 +39,15 @@ async function runDemo() {
     },
     {
       name: 'Secrets - AWS Keys',
-      content: 'Use this AWS access key: AKIA_FAKE_EXAMPLE_KEY and secret: fake_secret_key_example_not_real'
+      content: 'Use this AWS access key: AKIAIOSFODNN7EXAMPLE and secret: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
     },
     {
       name: 'Secrets - GitHub Token',
-      content: 'Deploy with token ghp_fake_token_example_not_real'
+      content: 'Deploy with token ghp_1234567890abcdefghijklmnopqrstuvwxyz'
     },
     {
       name: 'Mixed PII and Secrets',
-      content: 'User email: admin@company.com has API key: sk_fake_example_key_not_real for credit card 4000-0000-0000-0000'
+      content: 'User email: admin@company.com has API key: sk_live_1234567890abcdefghijklmn for credit card 4532-1234-5678-9012'
     }
   ];
 

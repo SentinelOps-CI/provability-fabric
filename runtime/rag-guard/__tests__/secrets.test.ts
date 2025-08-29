@@ -14,12 +14,12 @@ describe('SecretDetector', () => {
 
   describe('AWS Key Detection', () => {
     it('should detect AWS access keys', () => {
-      const content = 'AWS_ACCESS_KEY_ID=AKIA_FAKE_EXAMPLE_KEY';
+      const content = 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('aws_access_key');
-      expect(results[0].match).toBe('AKIA_FAKE_EXAMPLE_KEY');
+      expect(results[0].match).toBe('AKIAIOSFODNN7EXAMPLE');
       expect(results[0].severity).toBe('critical');
     });
 
@@ -44,7 +44,7 @@ describe('SecretDetector', () => {
 
   describe('GitHub Token Detection', () => {
     it('should detect GitHub personal access tokens', () => {
-      const content = 'GITHUB_TOKEN=ghp_fake_token_example_not_real';
+      const content = 'GITHUB_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyz';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('SecretDetector', () => {
 
   describe('Slack Token Detection', () => {
     it('should detect Slack bot tokens', () => {
-      const content = 'SLACK_BOT_TOKEN=xoxb_fake_token_example_not_real';
+      const content = 'SLACK_BOT_TOKEN=xoxb-1234567890-1234567890-abcdefghijklmnopqrstuvwx';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('SecretDetector', () => {
     });
 
     it('should detect Slack user tokens', () => {
-      const content = 'token: xoxp_fake_token_example_not_real';
+      const content = 'token: xoxp-1234567890-1234567890-1234567890-abcdef';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('SecretDetector', () => {
 
   describe('Stripe Key Detection', () => {
     it('should detect Stripe live secret keys', () => {
-      const content = 'STRIPE_SECRET_KEY=sk_fake_example_key_not_real';
+      const content = 'STRIPE_SECRET_KEY=sk_live_1234567890abcdefghijklmn';
       const results = detector.detect(content);
       
       expect(results).toHaveLength(1);
