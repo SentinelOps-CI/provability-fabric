@@ -1,0 +1,325 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Security & Compliance Monitoring",
+    "tags": ["security", "compliance", "audit"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Security Events Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(security_events_total[5m])",
+            "legendFormat": "{{event_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "events/sec"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Policy Violations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(policy_violations_total[5m])",
+            "legendFormat": "Violations/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Authentication Failures",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(auth_failures_total[5m])",
+            "legendFormat": "Auth Failures/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.1}
+              ]
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Certificate Trust Chain",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(certificate_chain_valid_total[5m])",
+            "legendFormat": "Valid Chains",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(certificate_chain_invalid_total[5m])",
+            "legendFormat": "Invalid Chains",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "cps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Egress Data Classification",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (classification) (egress_data_bytes_total)",
+            "legendFormat": "{{classification}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "bytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "PII Detection Events",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(pii_detected_total[5m])",
+            "legendFormat": "PII Detections/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.01},
+                {"color": "red", "value": 0.1}
+              ]
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "Audit Log Volume",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(audit_logs_total[5m])",
+            "legendFormat": "{{log_level}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "logs/sec"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Secret Detection Events",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(secrets_detected_total[5m])",
+            "legendFormat": "{{secret_type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Compliance Score",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "compliance_score",
+            "legendFormat": "Overall Score",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Risk Assessment",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, risk_assessment_score_bucket)",
+            "legendFormat": "Risk Score Distribution",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "spectrum"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "Failed Attestations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(attestation_failures_total[5m])",
+            "legendFormat": "Failed Attestations/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.001},
+                {"color": "red", "value": 0.01}
+              ]
+            },
+            "unit": "eps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-4h",
+      "to": "now"
+    },
+    "refresh": "1m",
+    "schemaVersion": 30,
+    "version": 1,
+    "links": [
+      {
+        "title": "System Overview",
+        "url": "/d/system-overview/system-overview",
+        "type": "dashboards"
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Security Incidents",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "increase(security_incidents_total[1h])",
+          "iconColor": "red",
+          "textFormat": "Security Incident: {{type}}"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,345 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Provability Fabric - System Overview",
+    "tags": ["overview", "system", "performance"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall System Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "Service Up",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0.8},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "none",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 6, "w": 4, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m]))",
+            "legendFormat": "Total Requests/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            },
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 10, "x": 4, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+            "legendFormat": "Error Rate %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "custom": {
+              "lineWidth": 3,
+              "fillOpacity": 20
+            },
+            "unit": "percent",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 10, "x": 14, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Certificate Processing",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(certificates_generated_total[5m])",
+            "legendFormat": "Certs/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(certificates_validated_total[5m])",
+            "legendFormat": "Validations/sec",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "cps"
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "process_memory_usage_bytes / 1024 / 1024",
+            "legendFormat": "{{service}} Memory (MB)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "decbytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "CPU Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "{{service}} CPU %",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "Sidecar Watcher Performance",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(sidecar_watcher_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P95 Latency (ms)",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(sidecar_watcher_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P99 Latency (ms)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "ms"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Privacy Budget Utilization",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "privacy_budget_remaining",
+            "legendFormat": "Remaining Budget",
+            "refId": "A"
+          },
+          {
+            "expr": "privacy_budget_utilized",
+            "legendFormat": "Utilized Budget",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "none"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Active Tenants",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (tenant_id) (http_requests_total))",
+            "legendFormat": "Active Tenants",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "none"
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Storage Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "disk_usage_bytes / 1024 / 1024 / 1024",
+            "legendFormat": "Disk Usage (GB)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "decbytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 9, "x": 6, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "Network I/O",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(network_bytes_transmitted_total[5m])",
+            "legendFormat": "Transmitted",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(network_bytes_received_total[5m])",
+            "legendFormat": "Received",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "Bps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 9, "x": 15, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 30,
+    "version": 1,
+    "links": [
+      {
+        "title": "Policy Enforcement Dashboard",
+        "url": "/d/policy-enforcement/policy-enforcement",
+        "type": "dashboards"
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "increase(deployment_events_total[1h])",
+          "iconColor": "blue",
+          "textFormat": "Deployment: {{version}}"
+        }
+      ]
+    }
+  }
+}
