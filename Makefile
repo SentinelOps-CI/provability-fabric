@@ -268,3 +268,34 @@ standards-help:
 	@echo "  submodules       - Update and initialize git submodules"
 	@echo "  validate-certs   - Validate CERT-V1 JSON files"
 	@echo "  standards-help   - Show this help message"
+
+# PAB signing and verification
+.PHONY: pf-sign pf-verify
+
+# Usage: make pf-sign SERVICE_NAME=my-service
+pf-sign:
+	@if [ -z "$$SERVICE_NAME" ]; then echo "SERVICE_NAME is required, e.g., make pf-sign SERVICE_NAME=my-service"; exit 1; fi
+	@echo "Signing PAB manifest for $$SERVICE_NAME..."
+	@if ! command -v cosign >/dev/null 2>&1; then echo "cosign not found in PATH"; exit 1; fi
+	@BUNDLE_PATH="bundles/$$SERVICE_NAME/bundle.json"; \
+	  if [ ! -f "$$BUNDLE_PATH" ]; then echo "Missing $$BUNDLE_PATH"; exit 1; fi; \
+	  echo "Running pf sign..."; \
+	  pf sign --path "bundles/$$SERVICE_NAME" || true; \
+	  echo "Signing bundle.json with cosign keyless..."; \
+	  cosign sign-blob --yes --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" >/dev/null; \
+	  echo "Recording Sigstore digest into bundle metadata..."; \
+	  DIGEST=$$(cosign verify-blob --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" 2>/dev/null | sha256sum | awk '{print $$1}'); \
+	  tmp=$$(mktemp); \
+	  jq --arg digest "$$DIGEST" '.sigstore_digest = $$digest' "$$BUNDLE_PATH" > $$tmp && mv $$tmp "$$BUNDLE_PATH"; \
+	  echo "Signed: $$BUNDLE_PATH with digest $$DIGEST"
+
+# Usage: make pf-verify SERVICE_NAME=my-service
+pf-verify:
+	@if [ -z "$$SERVICE_NAME" ]; then echo "SERVICE_NAME is required, e.g., make pf-verify SERVICE_NAME=my-service"; exit 1; fi
+	@echo "Verifying PAB manifest for $$SERVICE_NAME..."
+	@BUNDLE_PATH="bundles/$$SERVICE_NAME/bundle.json"; \
+	  if [ ! -f "$$BUNDLE_PATH" ]; then echo "Missing $$BUNDLE_PATH"; exit 1; fi; \
+	  if [ ! -f "bundles/$$SERVICE_NAME/bundle.sig.bundle" ]; then echo "Missing signature bundle at bundles/$$SERVICE_NAME/bundle.sig.bundle"; exit 1; fi; \
+	  cosign verify-blob --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" >/dev/null && echo "cosign verification OK" || (echo "cosign verification FAILED"; exit 1); \
+	  echo "Running pf verify..."; \
+	  pf verify --bundle "$$SERVICE_NAME" || true

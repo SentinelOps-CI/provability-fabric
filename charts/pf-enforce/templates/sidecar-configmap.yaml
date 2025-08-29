@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pf-enforce-sidecar
+  labels:
+    app.kubernetes.io/name: pf-enforce
+data:
+  sidecar.json: |
+    {
+      "name": "sidecar-watcher",
+      "image": "{{ .Values.image.sidecarWatcher.repository }}:{{ .Values.image.sidecarWatcher.tag }}",
+      "imagePullPolicy": "{{ .Values.image.sidecarWatcher.pullPolicy }}",
+      "ports": [{"containerPort": 9102, "name": "metrics"}],
+      "env": [
+        {"name": "LIMIT_BUDGET", "value": "300.0"},
+        {"name": "LIMIT_SPAMSCORE", "value": "0.07"}
+      ]
+    }

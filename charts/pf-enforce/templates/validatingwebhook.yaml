@@ -1,0 +1,26 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: pf-enforce-validating
+  labels:
+    app.kubernetes.io/name: pf-enforce
+webhooks:
+  - name: pab-validate.pf.local
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: { { .Values.webhooks.failurePolicy | default "Fail" } }
+    timeoutSeconds: { { .Values.webhooks.timeouts.validating | default 10 } }
+    namespaceSelector:
+      { { toYaml .Values.webhooks.namespaceSelector | nindent 6 } }
+    clientConfig:
+      service:
+        name: pf-enforce-admission
+        namespace: { { .Release.Namespace } }
+        path: /validate
+        port: 443
+      caBundle: { { .Values.caBundle | quote } }
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]

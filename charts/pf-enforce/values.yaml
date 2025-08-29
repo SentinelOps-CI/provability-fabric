@@ -1,0 +1,38 @@
+image:
+  sidecarWatcher:
+    repository: provability-fabric/sidecar-watcher
+    tag: latest
+    pullPolicy: IfNotPresent
+  admissionController:
+    repository: provability-fabric/admission-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+
+webhooks:
+  namespaceSelector: {}
+  objectSelector:
+    matchExpressions:
+      - key: pf/enforce
+        operator: In
+        values: ["true"]
+  timeouts:
+    mutating: 10
+    validating: 10
+  failurePolicy: Fail
+
+caBundle: ""
+
+admission:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 443
+  tls:
+    secretName: pf-enforce-certs
+  extraEnv: []
+
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: ""

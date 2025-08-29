@@ -1,0 +1,20 @@
+# PF Service Configuration
+service: <service-name>
+attestor:
+  endpoint: http://attestor-service:8080
+ledger:
+  endpoint: http://ledger-service:4000
+redis:
+  url: redis://redis-master:6379
+
+tools:
+  http_fetch:
+    allowlist:
+      - https://api.example.com
+      - https://*.trusted.com
+  s3_read:
+    allowlist:
+      - s3://mybucket/public/*
+  sql_query:
+    allowlist:
+      - postgres://db.internal/prod
