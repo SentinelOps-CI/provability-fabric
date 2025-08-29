@@ -31,7 +31,8 @@ export class PIIDetector {
       },
       {
         name: 'email',
-        pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+        // Support IDN/unicode domains and labels (Node >= 12 supports Unicode property escapes)
+        pattern: /\b[\p{L}0-9._%+-]+@[\p{L}0-9.-]+\.[\p{L}A-Za-z]{2,}\b/gu,
         severity: 'medium',
         description: 'Email Address'
       },
@@ -43,6 +44,7 @@ export class PIIDetector {
       },
       {
         name: 'ip_address',
+        // Match IPv4 then validate octets are 0-255 to avoid false positives like 999.999.999.999
         pattern: /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g,
         severity: 'low',
         description: 'IP Address'
@@ -72,9 +74,33 @@ export class PIIDetector {
       
       while ((match = pattern.pattern.exec(content)) !== null) {
         // Extract the actual matched content (group 1 if available, otherwise full match)
-        const matchedText = match[1] || match[0];
+        let matchedText = match[1] || match[0];
         const startPos = match.index + (match[0].indexOf(matchedText));
         
+        // Additional validation for IP addresses
+        if (pattern.name === 'ip_address') {
+          const octets = matchedText.split('.')
+            .map(v => (v || '').trim())
+            .filter(v => v.length > 0);
+          if (octets.length !== 4 || octets.some(v => isNaN(Number(v)) || Number(v) < 0 || Number(v) > 255)) {
+            continue;
+          }
+        }
+
+        // Tighten US phone matching to avoid nine/ten digit random numbers without separators in normal text
+        if (pattern.name === 'phone_us') {
+          if (!/[().\-\s]/.test(matchedText)) {
+            // require some formatting char to reduce false positives like 1234567890 in text
+            continue;
+          }
+        }
+
+        // Unicode/IDN email support: normalize visually similar dot
+        if (pattern.name === 'email') {
+          // Accept unicode domain labels with IDNA-like dots
+          // Already matched by broad regex; no-op here, kept for future extensions
+        }
+
         results.push({
           type: 'pii',
           name: pattern.name,
