@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pf-enforce-admission
+  labels:
+    app.kubernetes.io/name: pf-enforce-admission
+spec:
+  replicas: { { .Values.admission.replicaCount | default 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pf-enforce-admission
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pf-enforce-admission
+    spec:
+      serviceAccountName:
+        {
+          {
+            default (include "pf-enforce.serviceAccountName" .) .Values.rbac.serviceAccount.name | default "pf-enforce-admission",
+          },
+        }
+      containers:
+        - name: admission-controller
+          image: "{{ .Values.image.admissionController.repository }}:{{ .Values.image.admissionController.tag }}"
+          imagePullPolicy: { { .Values.image.admissionController.pullPolicy } }
+          ports:
+            - name: https
+              containerPort: 8443
+          env:
+            - name: PORT
+              value: "8443"
+            - name: CERT_FILE
+              value: "/etc/certs/tls.crt"
+            - name: KEY_FILE
+              value: "/etc/certs/tls.key"
+            - name: LEDGER_URL
+              value: "http://ledger-service:4000"
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/certs
+              readOnly: true
+      volumes:
+        - name: certs
+          secret:
+            secretName: { { .Values.admission.tls.secretName } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pf-enforce-admission
+  labels:
+    app.kubernetes.io/name: pf-enforce-admission
+spec:
+  type: { { .Values.admission.service.type | default "ClusterIP" } }
+  selector:
+    app.kubernetes.io/name: pf-enforce-admission
+  ports:
+    - name: https
+      port: { { .Values.admission.service.port | default 443 } }
+      targetPort: 8443
