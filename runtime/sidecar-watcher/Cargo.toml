@@ -1,38 +1,25 @@
 [package]
 name = "sidecar-watcher"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
-authors = ["Provability-Fabric Contributors"]
 license = "Apache-2.0"
-
-[lib]
-name = "sidecar_watcher"
-path = "src/lib.rs"
-
-[[bin]]
-name = "sidecar-watcher"
-path = "src/main.rs"
+description = "SentinelOps Platform Runtime Sidecar"
 
 [dependencies]
 anyhow = "1.0"
+hyper = { version = "0.14", features = ["full"] }
+tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-hyper = { version = "1.0", features = ["full"] }
-prometheus = { version = "0.13", features = ["process"] }
-# Correct crate name is prometheus-client
-prometheus-client = "0.22"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-chrono = { version = "0.4", features = ["serde"] }
+prometheus-client = "0.22"
 reqwest = { version = "0.11", features = ["json"] }
-ed25519-dalek = { version = "2.0", features = ["batch"] }
-rand = "0.8"
-metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
-md5 = "0.7"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+sha2 = "0.10"
 jsonschema = "0.17"
 once_cell = "1.19"
 
 [dev-dependencies]
-tokio-test = "0.4" 
+tokio-test = "0.4"
