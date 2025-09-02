@@ -3,6 +3,7 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { SentinelOpsClient } from '@sentinelops/platform-sdk';
 import { spawn } from 'child_process';
 
@@ -13,7 +14,7 @@ interface AgentConfig {
   sidecar_url?: string;
 }
 
-class MCPClientAgent {
+export class MCPClientAgent {
   private client: Client;
   private sentinelOps: SentinelOpsClient;
   private config: AgentConfig;
@@ -47,7 +48,6 @@ class MCPClientAgent {
     });
 
     const transport = new StdioClientTransport({
-      stdin: serverProcess.stdin!,
       stdout: serverProcess.stdout!,
     });
 
@@ -207,7 +207,7 @@ class MCPClientAgent {
     try {
       // Download compliance packet
       const packetData = await this.sentinelOps.downloadPacket(this.sessionId);
-      console.log(`✅ Downloaded compliance packet: ${packetData.byteLength} bytes`);
+      console.log(`✅ Downloaded compliance packet: ${packetData.size} bytes`);
       
       // In a real demo, this would save the packet to disk
       console.log('📁 Compliance packet ready for GRC system import');
