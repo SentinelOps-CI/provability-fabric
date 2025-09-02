@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 SentinelOps Platform Contributors
+
+name: Policy Build and Proof
+
+on:
+  push:
+    paths:
+      - 'bundles/*/spec.yaml'
+      - 'bundles/*/proofs/*.lean'
+  pull_request:
+    paths:
+      - 'bundles/*/spec.yaml'
+      - 'bundles/*/proofs/*.lean'
+
+jobs:
+  policy-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Set up Lean 4
+      run: |
+        curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
+        echo "$HOME/.elan/bin" >> $GITHUB_PATH
+    
+    - name: Build CLI
+      run: |
+        cd core/cli/pf
+        go build -o pf .
+        echo "$(pwd)" >> $GITHUB_PATH
+    
+    - name: Start platform services
+      run: |
+        docker-compose up --build -d api-gateway spec-service proof-service build-orchestrator
+        sleep 30
+    
+    - name: Detect changed policies
+      id: changed-policies
+      run: |
+        echo "🔍 Detecting changed policy bundles..."
+        CHANGED_BUNDLES=$(git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep "bundles/" | cut -d'/' -f2 | sort -u)
+        echo "changed_bundles=${CHANGED_BUNDLES}" >> $GITHUB_OUTPUT
+        echo "Changed bundles: ${CHANGED_BUNDLES}"
+    
+    - name: Compile and prove policies
+      if: steps.changed-policies.outputs.changed_bundles != ''
+      run: |
+        echo "🔨 Compiling and proving changed policies..."
+        
+        for bundle in ${{ steps.changed-policies.outputs.changed_bundles }}; do
+          echo "Processing bundle: $bundle"
+          
+          if [ -f "bundles/$bundle/spec.yaml" ]; then
+            # Extract English policy from spec.yaml
+            python tools/extract_english.py bundles/$bundle/spec.yaml > /tmp/policy.md
+            
+            # Compile policy
+            pf policy compile --in /tmp/policy.md --out bundles/$bundle/build/
+            
+            # Run proofs
+            pf policy prove --build bundles/$bundle/build/
+            
+            # Build policy
+            pf policy build --build bundles/$bundle/build/
+            
+            echo "✅ Policy $bundle processed successfully"
+          fi
+        done
+    
+    - name: Attach hashes to PR
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "📎 Attaching proof hashes to PR..."
+        
+        COMMENT="## Policy Build Results\n\n"
+        
+        for bundle in ${{ steps.changed-policies.outputs.changed_bundles }}; do
+          if [ -f "bundles/$bundle/build/metadata.json" ]; then
+            POLICY_HASH=$(jq -r '.policy_hash' bundles/$bundle/build/metadata.json)
+            PROOF_HASH=$(jq -r '.proof_hash' bundles/$bundle/build/metadata.json)
+            AUTOMATA_HASH=$(jq -r '.automata_hash' bundles/$bundle/build/metadata.json)
+            
+            COMMENT="${COMMENT}### Bundle: \`$bundle\`\n"
+            COMMENT="${COMMENT}- Policy Hash: \`$POLICY_HASH\`\n"
+            COMMENT="${COMMENT}- Proof Hash: \`$PROOF_HASH\`\n"
+            COMMENT="${COMMENT}- Automata Hash: \`$AUTOMATA_HASH\`\n\n"
+          fi
+        done
+        
+        # Post comment to PR (would use GitHub API in real implementation)
+        echo "$COMMENT" > pr-comment.md
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: policy-build-artifacts
+        path: |
+          bundles/*/build/
+          pr-comment.md
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down
