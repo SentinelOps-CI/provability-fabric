@@ -4,11 +4,11 @@
 use anyhow::{Context, Result};
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
+    Body, Request, Response, Server, Method, StatusCode,
 };
 use prometheus_client::{
     encoding::text::encode,
-    metrics::{counter::Counter, family::Family, gauge::Gauge},
+    metrics::{counter::Counter, family::Family, gauge::Gauge, histogram::Histogram},
     registry::Registry,
 };
 use serde::{Deserialize, Serialize};
@@ -18,16 +18,25 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     net::SocketAddr,
-    sync::Arc,
-    time::Duration,
+    sync::{Arc, RwLock},
+    time::{Duration, Instant},
 };
 use tokio::time::sleep;
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, debug};
 use reqwest::Client;
+use uuid::Uuid;
 
 mod assumption;
+mod cert_v1;
+mod permit_enforcement;
+mod ifc_labels;
+mod deterministic_egress;
 
 use assumption::{Assumption, AssumptionMonitor};
+use cert_v1::{CertV1, write_cert, validate_cert};
+use permit_enforcement::{PermitEnforcer, PermissionResult, Principal, ActionContext};
+use ifc_labels::{LabelManager, Label, FlowCheck};
+use deterministic_egress::{EgressManager, EgressProfile};
 
 // Import epsilon guard
 mod privacy;

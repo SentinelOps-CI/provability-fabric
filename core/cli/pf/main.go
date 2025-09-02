@@ -61,6 +61,14 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(runCmd())
 	rootCmd.AddCommand(auditCmd())
 	rootCmd.AddCommand(performanceCmd())
+	
+	// New SentinelOps Platform commands
+	rootCmd.AddCommand(policyCmd())
+	rootCmd.AddCommand(certCmd())
+	rootCmd.AddCommand(replayCmd())
+	rootCmd.AddCommand(packetCmd())
+	rootCmd.AddCommand(deployCmd())
+	rootCmd.AddCommand(epochCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

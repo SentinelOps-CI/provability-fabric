@@ -1,0 +1,246 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 SentinelOps Platform Contributors
+
+version: '3.8'
+
+services:
+  # Database services
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: sentinelops
+      POSTGRES_USER: sentinelops
+      POSTGRES_PASSWORD: sentinelops_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinelops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Platform services
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SPEC_SERVICE_URL=http://spec-service:8001
+      - PROOF_SERVICE_URL=http://proof-service:8002
+      - BUILD_SERVICE_URL=http://build-orchestrator:8003
+      - EVIDENCE_SERVICE_URL=http://evidence-service:8004
+      - REPLAY_SERVICE_URL=http://replay-service:8005
+      - RUNTIME_SERVICE_URL=http://runtime-sidecar:8006
+    depends_on:
+      - spec-service
+      - proof-service
+      - build-orchestrator
+      - evidence-service
+      - replay-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  spec-service:
+    build:
+      context: ./services/spec-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  proof-service:
+    build:
+      context: ./services/proof-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - PROOF_CACHE_PATH=/tmp/proof-cache
+      - MORPH_ENABLED=false
+    volumes:
+      - proof_cache:/tmp/proof-cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  build-orchestrator:
+    build:
+      context: ./services/build-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - BUILD_CACHE_PATH=/tmp/build-cache
+    volumes:
+      - build_cache:/tmp/build-cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  evidence-service:
+    build:
+      context: ./services/evidence-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+      - DATABASE_URL=postgres://sentinelops:sentinelops_password@postgres:5432/sentinelops
+      - EVIDENCE_STORAGE_PATH=/tmp/evidence
+    volumes:
+      - evidence_data:/tmp/evidence
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  replay-service:
+    build:
+      context: ./services/replay-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - PORT=8005
+      - REPLAY_WORKING_DIR=/tmp/replay-jobs
+      - REPLAY_KIT_PATH=/app/external/TRACE-REPLAY-KIT/runner.py
+    volumes:
+      - replay_data:/tmp/replay-jobs
+      - ./external/TRACE-REPLAY-KIT:/app/external/TRACE-REPLAY-KIT
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  runtime-sidecar:
+    build:
+      context: ./runtime/sidecar-watcher
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+      - "9090:9090"  # Metrics port
+    environment:
+      - PORT=8006
+      - METRICS_PORT=9090
+      - REDIS_URL=redis://redis:6379
+      - ENFORCEMENT_MODE=enforce
+      - TENANT_ID=demo-tenant
+      - LEDGER_URL=http://evidence-service:8004
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Console Web UI
+  console:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:8000
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Demo application
+  verifiable-mcp-fraud:
+    build:
+      context: ./demos/verifiable-mcp-fraud
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - SENTINELOPS_API_URL=http://api-gateway:8000
+      - TENANT_ID=acme-corp
+      - SIDECAR_URL=http://runtime-sidecar:8006
+    depends_on:
+      - api-gateway
+      - runtime-sidecar
+
+  # Monitoring
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+volumes:
+  postgres_data:
+  redis_data:
+  proof_cache:
+  build_cache:
+  evidence_data:
+  replay_data:
+  grafana_data:
+  prometheus_data:
+
+networks:
+  default:
+    name: sentinelops-platform
