@@ -31,11 +31,30 @@ async function setupDemo() {
   try {
     console.log('1️⃣ Compiling fraud detection policy...');
     
-    // Execute full policy workflow using platform SDK
-    const result = await client.fullPolicyWorkflow(
-      FRAUD_POLICY_ENGLISH,
-      'fraud-detection-v1'
-    );
+    // Execute policy workflow steps using platform SDK
+    const compileResult = await client.compilePolicy({
+      english: FRAUD_POLICY_ENGLISH,
+      policy_id: 'fraud-detection-v1'
+    });
+    
+    const proofResult = await client.runProofs({
+      policy_hash: compileResult.policy_hash,
+      action_dsl: compileResult.actionDsl
+    });
+    
+    const buildResult = await client.buildPolicy({
+      policy_hash: compileResult.policy_hash,
+      action_dsl: compileResult.actionDsl,
+      proof_hash: proofResult.proof_hash
+    });
+    
+    const result = {
+      policy_hash: compileResult.policy_hash,
+      proof_hash: proofResult.proof_hash,
+      automata_hash: buildResult.automata_hash,
+      epoch: 1,
+      status: 'completed'
+    };
     
     console.log('✅ Policy workflow completed:');
     console.log(`   Policy Hash: ${result.policy_hash}`);
@@ -100,5 +119,5 @@ async function setupDemo() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
+  setupDemo().catch(console.error);
 }
