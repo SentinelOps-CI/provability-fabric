@@ -1,6 +1,6 @@
 # SentinelOps Platform
 
-A complete, modular platform that converts natural-language policies into formal specifications, compiles them to provable monitors, enforces them at runtime with deterministic egress, and emits machine-verifiable evidence with deterministic replay.
+A modular platform that converts natural-language policies into formal specifications, compiles them to provable monitors, enforces them at runtime with deterministic egress, and emits machine-verifiable evidence with deterministic replay.
 
 ## Quick Start
 
@@ -179,14 +179,6 @@ err = client.AssertLowView(ctx, replayID, 0.999)
 - **Evidence write**: Amortized < 1ms per emission (batched)
 - **Certificate validation**: 0 failures (deny-wins on any error)
 - **Replay low-view match**: ≥99.9% (alert if below)
-
-## Security & Privacy
-
-- **RLS enforced** for all database reads (multi-tenant isolation)
-- **PII redacted** at source and UI
-- **All certificates signed** with deny-wins on validation errors
-- **TLS everywhere** with JWT auth and RBAC
-- **CERT-V1 schema validation** synchronous on every emission
 
 ## Verifiable MCP Fraud Demo
 
