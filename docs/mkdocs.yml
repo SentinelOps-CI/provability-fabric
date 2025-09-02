@@ -10,6 +10,8 @@ repo_name: provability-fabric/provability-fabric
 repo_url: https://github.com/provability-fabric/provability-fabric
 edit_uri: edit/main/docs/
 
+
+
 theme:
   name: material
   palette:
@@ -43,9 +45,7 @@ markdown_extensions:
       smart_enable: all
   - pymdownx.caret
   - pymdownx.details
-  - pymdownx.emoji:
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.emoji
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -57,61 +57,21 @@ markdown_extensions:
   - pymdownx.smartsymbols
   - pymdownx.snippets:
       check_paths: true
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-      combine_header_slug: true
-      slug_github_compat: true
-      tabs_style: material
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
 
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md
-  
-  # PF-CORE Implementation
-  - PF-CORE Status: pf-core-status.md
-  
-  # Core Components
-  - Spec Bundles: spec-bundles.md
-  - Lean Proofs: lean.md
-  - Runtime: runtime.md
-  
-  # Security & Attestation
-  - Security Overview: security/overview.md
-  - Decision Path: img/decision_path.svg
-  - Attestation Service: runtime/attestor/README.md
-  
-  # Client SDKs
-  - SDKs Overview: core/sdk/README.md
-  - TypeScript SDK: core/sdk/typescript/README.md
-  - Go SDK: core/sdk/go/README.md
-  - Rust SDK: core/sdk/rust/README.md
-  
-  # Performance & Optimization
-  - Performance Benchmarks: bench/README.md
-  - WASM Worker Pool: runtime/wasm-sandbox/README.md
-  - Batch Crypto: core/crypto/README.md
-  
-  # CI/CD & Testing
-  - Cross-repo Testing: .github/workflows/release.yaml
-  - Release Pipeline: .github/workflows/README.md
-  
-  # Generated Specs
-  - Generated Specs: generated/*.md
-  
-  # API Reference
-  - API Reference: api.md
-  
-  # Development
-  - Contributing: contributing.md
-  - Development Guide: dev/README.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Deployment Guide: deployment-guide.md
+  - Developer Guide: developer-guide.md
+  - Examples: examples.md
+  - Security: security/overview.md
 
 extra:
   social:

@@ -2,7 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 import { PrismaClient } from '@prisma/client'
-import express from 'express'
+import express, { Request, Response, NextFunction } from 'express'
 import { ApolloServer } from '@apollo/server'
 import { expressMiddleware } from '@apollo/server/express4'
 import bodyParser from 'body-parser'
@@ -118,7 +118,7 @@ const resolvers = {
         return tenant
       } catch (error) {
         logger.error('Tenant query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           userId: user?.sub,
           tenantId: user?.tid 
         })
@@ -144,7 +144,7 @@ const resolvers = {
         return capsules
       } catch (error) {
         logger.error('Capsules query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           userId: user?.sub,
           tenantId: user?.tid 
         })
@@ -174,7 +174,7 @@ const resolvers = {
         return capsule
       } catch (error) {
         logger.error('Capsule query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           hash,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -201,7 +201,7 @@ const resolvers = {
         return quotes
       } catch (error) {
         logger.error('Premium quotes query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           userId: user?.sub,
           tenantId: user?.tid 
         })
@@ -231,7 +231,7 @@ const resolvers = {
         return quote
       } catch (error) {
         logger.error('Premium quote query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           capsuleHash,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -256,7 +256,7 @@ const resolvers = {
         return events
       } catch (error) {
         logger.error('Usage events query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           userId: user?.sub,
           tenantId: user?.tid 
         })
@@ -280,7 +280,7 @@ const resolvers = {
         }
       } catch (error) {
         logger.error('Invoice query error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           period,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -315,7 +315,7 @@ const resolvers = {
         return capsule
       } catch (error) {
         logger.error('Capsule creation error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           hash,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -346,7 +346,7 @@ const resolvers = {
         return capsule
       } catch (error) {
         logger.error('Capsule update error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           hash,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -378,7 +378,7 @@ const resolvers = {
         return quote
       } catch (error) {
         logger.error('Premium quote creation error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           capsuleHash,
           userId: user?.sub,
           tenantId: user?.tid 
@@ -407,7 +407,7 @@ const resolvers = {
         return event
       } catch (error) {
         logger.error('Usage event recording error', { 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           cpuMs,
           netBytes,
           userId: user?.sub,
@@ -432,21 +432,7 @@ async function startServer() {
     app.use(cors())
     app.use(bodyParser.json())
 
-    // Global error handling middleware
-    app.use((error: any, req: Request, res: Response, next: NextFunction) => {
-      logger.error('Unhandled error', { 
-        error: error.message,
-        stack: error.stack,
-        path: req.path,
-        method: req.method,
-        ip: req.ip
-      })
-      
-      res.status(500).json({ 
-        error: 'Internal server error',
-        code: 'INTERNAL_ERROR' 
-      })
-    })
+
 
     // Root endpoint
     app.get('/', (req, res) => {
@@ -532,8 +518,8 @@ async function startServer() {
           res.json(capsules)
         } catch (error) {
           logger.error('Error fetching capsules', { 
-            error: error.message,
-            stack: error.stack,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
             tenantId: req.user!.tid 
           })
           res.status(500).json({ 
@@ -605,8 +591,8 @@ async function startServer() {
           })
         } catch (error) {
           logger.error('Error generating premium quote', { 
-            error: error.message,
-            stack: error.stack,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
             hash: req.params.hash,
             tenantId: req.user!.tid 
           })
@@ -655,6 +641,22 @@ async function startServer() {
       })
     )
 
+    // Global error handling middleware (must be last)
+    app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+      logger.error('Unhandled error', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        path: req.url,
+        method: req.method,
+        ip: req.ip
+      })
+      
+      res.status(500).json({ 
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR' 
+      })
+    })
+
     app.listen(port, () => {
       logger.info('Provability-Fabric Ledger started successfully', {
         port,
@@ -669,8 +671,8 @@ async function startServer() {
     })
   } catch (error) {
     logger.error('Failed to start server', { 
-      error: error.message,
-      stack: error.stack 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined 
     })
     process.exit(1)
   }

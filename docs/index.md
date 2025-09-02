@@ -6,11 +6,7 @@ An open-source framework that binds every AI agent container image to a machine-
 
 Provability-Fabric provides a comprehensive toolkit for creating AI agents with mathematically verifiable behavior. The framework combines specification-driven development with runtime enforcement to ensure agents operate within defined constraints. By binding container images to formal proofs, Provability-Fabric enables trust in AI systems through cryptographic verification rather than blind faith.
 
-The framework consists of three core components: specification bundles that define agent behavior in YAML and Lean, runtime guards that monitor execution in real-time, and solver adapters that verify neural network properties. This creates a complete pipeline from formal specification to deployed, verified agents.
-
-Key features include automatic sidecar injection for runtime monitoring, admission controllers that validate proofs before deployment, and a transparency ledger that maintains an immutable record of all agent specifications and their verification status. The framework supports multiple verification engines including Marabou for neural networks and DryVR for hybrid systems.
-
-Provability-Fabric is designed for production use with comprehensive CI/CD integration, security policies, and community governance. It enables organizations to deploy AI agents with confidence, knowing their behavior is mathematically guaranteed to remain within specified bounds.
+The framework consists of six core components: specification bundles that define agent behavior in YAML and Lean, runtime guards that monitor execution in real-time, solver adapters that verify neural network properties, a modern web-based marketplace with advanced search capabilities, real-time WebSocket communication for live monitoring, and comprehensive authentication and user management.
 
 ## Architecture
 
@@ -102,17 +98,29 @@ cargo test --package crypto
 
 ## Documentation
 
+### Core Documentation
 - **[Getting Started](getting-started.md)** - Quick start guide and basic concepts
 - **[Architecture Overview](architecture.md)** - System architecture and design principles
 - **[Developer Guide](developer-guide.md)** - Development setup and contribution guidelines
 - **[API Reference](api-reference.md)** - Complete API documentation
 - **[Examples](examples.md)** - Practical examples and use cases
+
+### New Features (2025)
+- **[Model Context Protocol (MCP) Integration](mcp-integration.md)** - Complete MCP implementation guide
+- **[MCP Quick Reference](mcp-quick-reference.md)** - Developer quick reference for MCP APIs
+- **[Real-Time Communication](features/real-time-communication.md)** - WebSocket system for live updates
+- **[Advanced Search](features/advanced-search.md)** - Intelligent package discovery with fuzzy search
+- **[Authentication & User Management](features/authentication.md)** - JWT-based security and RBAC
+
+### Deployment & Operations
+- **[Production Deployment](deployment/production-deployment.md)** - Complete production setup guide
 - **[Testing Guide](testing-guide.md)** - Testing strategies and best practices
-- **[Deployment Guide](deployment-guide.md)** - Production deployment instructions
-- **[CLI Reference](cli-reference.md)** - Command-line interface reference
-- **[Configuration](configuration.md)** - Configuration options and management
 - **[Security](security/README.md)** - Security architecture and best practices
 - **[Runbooks](runbooks/README.md)** - Operational procedures and troubleshooting
+
+### Reference
+- **[CLI Reference](cli-reference.md)** - Command-line interface reference
+- **[Configuration](configuration.md)** - Configuration options and management
 - **[Glossary](glossary.md)** - Terms and definitions
 
 ## License

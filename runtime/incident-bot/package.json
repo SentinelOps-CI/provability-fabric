@@ -52,7 +52,11 @@
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
-    "tsconfig-paths": "^4.2.1",
+<<<<<<< Current (Your changes)
+    "tsconfig-paths": "^4.1.0",
+=======
+    "tsconfig-paths": "^4.2.0",
+>>>>>>> Incoming (Background Agent changes)
     "typescript": "^5.1.3"
   },
   "jest": {

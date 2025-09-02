@@ -4,14 +4,16 @@ interface User {
   id: string;
   name: string;
   email: string;
-  roles: string[];
-  tenantId: string;
+  role: string;
+  token?: string;
+  websocketUrl?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   hasRole: (role: string) => boolean;
 }
@@ -41,7 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const token = localStorage.getItem('authToken');
         if (token) {
           // Validate token and get user info
-          const response = await fetch('/api/auth/me', {
+          const response = await fetch('http://localhost:8080/auth/profile', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -49,7 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (response.ok) {
             const userData = await response.json();
-            setUser(userData);
+            setUser({ ...userData, token });
           } else {
             localStorage.removeItem('authToken');
           }
@@ -67,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('http://localhost:8080/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -76,14 +78,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
       }
 
-      const { token, user: userData } = await response.json();
+      const { token, user: userData, websocketUrl } = await response.json();
       localStorage.setItem('authToken', token);
-      setUser(userData);
+      setUser({ ...userData, token, websocketUrl });
     } catch (error) {
       console.error('Login failed:', error);
+      throw error;
+    }
+  };
+
+  const register = async (email: string, password: string, name: string) => {
+    try {
+      const response = await fetch('http://localhost:8080/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password, name })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Registration failed');
+      }
+
+      const { token, user: userData, websocketUrl } = await response.json();
+      localStorage.setItem('authToken', token);
+      setUser({ ...userData, token, websocketUrl });
+    } catch (error) {
+      console.error('Registration failed:', error);
       throw error;
     }
   };
@@ -94,13 +121,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const hasRole = (role: string) => {
-    return user?.roles.includes(role) || false;
+    return user?.role === role || false;
   };
 
   const value = {
     user,
     loading,
     login,
+    register,
     logout,
     hasRole
   };

@@ -42,10 +42,10 @@ export async function storeEgressCertificate(certificate: EgressCertificate): Pr
         policyHash: certificate.policy_hash,
         textHash: certificate.text_hash,
         timestamp: new Date(certificate.timestamp * 1000),
-        signer: certificate.signer,
+        signer: certificate.signer ?? undefined,
         // Non-interference fields
         nonInterference: certificate.non_interference,
-        influencingLabels: certificate.influencing_labels,
+        influencingLabels: JSON.stringify(certificate.influencing_labels),
         attestationRef: certificate.attestation_ref,
       },
     });
@@ -68,7 +68,7 @@ export async function getEgressCertificate(certId: string): Promise<EgressCertif
 
     return {
       cert_id: certificate.certId,
-      plan_id: certificate.planId,
+      plan_id: certificate.planId ?? undefined,
       tenant: certificate.tenant,
       detector_flags: {
         pii_detected: certificate.piiDetected,
@@ -76,15 +76,15 @@ export async function getEgressCertificate(certId: string): Promise<EgressCertif
         near_dupe_detected: certificate.nearDupeDetected,
         policy_violations: certificate.policyViolations,
       },
-      near_dupe_score: certificate.nearDupeScore,
-      policy_hash: certificate.policyHash,
-      text_hash: certificate.textHash,
+      near_dupe_score: certificate.nearDupeScore ?? 0,
+      policy_hash: certificate.policyHash ?? '',
+      text_hash: certificate.textHash ?? '',
       timestamp: Math.floor(certificate.timestamp.getTime() / 1000),
-      signer: certificate.signer,
+      signer: certificate.signer ?? undefined,
       // Non-interference fields
       non_interference: certificate.nonInterference as 'passed' | 'failed',
-      influencing_labels: certificate.influencingLabels || [],
-      attestation_ref: certificate.attestationRef,
+      influencing_labels: certificate.influencingLabels ? JSON.parse(certificate.influencingLabels) : [],
+      attestation_ref: certificate.attestationRef ?? undefined,
     };
   } catch (error) {
     console.error('Failed to retrieve egress certificate:', error);
@@ -103,7 +103,7 @@ export async function getEgressCertificatesByTenant(tenant: string, limit: numbe
 
     return certificates.map(cert => ({
       cert_id: cert.certId,
-      plan_id: cert.planId,
+      plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
       detector_flags: {
         pii_detected: cert.piiDetected,
@@ -111,15 +111,15 @@ export async function getEgressCertificatesByTenant(tenant: string, limit: numbe
         near_dupe_detected: cert.nearDupeDetected,
         policy_violations: cert.policyViolations,
       },
-      near_dupe_score: cert.nearDupeScore,
-      policy_hash: cert.policyHash,
-      text_hash: cert.textHash,
+      near_dupe_score: cert.nearDupeScore ?? 0,
+      policy_hash: cert.policyHash ?? '',
+      text_hash: cert.textHash ?? '',
       timestamp: Math.floor(cert.timestamp.getTime() / 1000),
-      signer: cert.signer,
+      signer: cert.signer ?? undefined,
       // Non-interference fields
       non_interference: cert.nonInterference as 'passed' | 'failed',
-      influencing_labels: cert.influencingLabels || [],
-      attestation_ref: cert.attestationRef,
+      influencing_labels: cert.influencingLabels ? JSON.parse(cert.influencingLabels) : [],
+      attestation_ref: cert.attestationRef ?? undefined,
     }));
   } catch (error) {
     console.error('Failed to retrieve egress certificates by tenant:', error);
@@ -137,7 +137,7 @@ export async function getEgressCertificatesByPlan(planId: string): Promise<Egres
 
     return certificates.map(cert => ({
       cert_id: cert.certId,
-      plan_id: cert.planId,
+      plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
       detector_flags: {
         pii_detected: cert.piiDetected,
@@ -145,15 +145,15 @@ export async function getEgressCertificatesByPlan(planId: string): Promise<Egres
         near_dupe_detected: cert.nearDupeDetected,
         policy_violations: cert.policyViolations,
       },
-      near_dupe_score: cert.nearDupeScore,
-      policy_hash: cert.policyHash,
-      text_hash: cert.textHash,
+      near_dupe_score: cert.nearDupeScore ?? 0,
+      policy_hash: cert.policyHash ?? '',
+      text_hash: cert.textHash ?? '',
       timestamp: Math.floor(cert.timestamp.getTime() / 1000),
-      signer: cert.signer,
+      signer: cert.signer ?? undefined,
       // Non-interference fields
       non_interference: cert.nonInterference as 'passed' | 'failed',
-      influencing_labels: cert.influencingLabels || [],
-      attestation_ref: cert.attestationRef,
+      influencing_labels: cert.influencingLabels ? JSON.parse(cert.influencingLabels) : [],
+      attestation_ref: cert.attestationRef ?? undefined,
     }));
   } catch (error) {
     console.error('Failed to retrieve egress certificates by plan:', error);
@@ -179,7 +179,7 @@ export async function getCertificatesWithViolations(limit: number = 100): Promis
 
     return certificates.map(cert => ({
       cert_id: cert.certId,
-      plan_id: cert.planId,
+      plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
       detector_flags: {
         pii_detected: cert.piiDetected,
@@ -187,15 +187,15 @@ export async function getCertificatesWithViolations(limit: number = 100): Promis
         near_dupe_detected: cert.nearDupeDetected,
         policy_violations: cert.policyViolations,
       },
-      near_dupe_score: cert.nearDupeScore,
-      policy_hash: cert.policyHash,
-      text_hash: cert.textHash,
+      near_dupe_score: cert.nearDupeScore ?? 0,
+      policy_hash: cert.policyHash ?? '',
+      text_hash: cert.textHash ?? '',
       timestamp: Math.floor(cert.timestamp.getTime() / 1000),
-      signer: cert.signer,
+      signer: cert.signer ?? undefined,
       // Non-interference fields
       non_interference: cert.nonInterference as 'passed' | 'failed',
-      influencing_labels: cert.influencingLabels || [],
-      attestation_ref: cert.attestationRef,
+      influencing_labels: cert.influencingLabels ? JSON.parse(cert.influencingLabels) : [],
+      attestation_ref: cert.attestationRef ?? undefined,
     }));
   } catch (error) {
     console.error('Failed to retrieve certificates with violations:', error);
@@ -216,7 +216,7 @@ export async function getCertificatesWithNIFailures(limit: number = 100): Promis
 
     return certificates.map(cert => ({
       cert_id: cert.certId,
-      plan_id: cert.planId,
+      plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
       detector_flags: {
         pii_detected: cert.piiDetected,
@@ -224,15 +224,15 @@ export async function getCertificatesWithNIFailures(limit: number = 100): Promis
         near_dupe_detected: cert.nearDupeDetected,
         policy_violations: cert.policyViolations,
       },
-      near_dupe_score: cert.nearDupeScore,
-      policy_hash: cert.policyHash,
-      text_hash: cert.textHash,
+      near_dupe_score: cert.nearDupeScore ?? 0,
+      policy_hash: cert.policyHash ?? '',
+      text_hash: cert.textHash ?? '',
       timestamp: Math.floor(cert.timestamp.getTime() / 1000),
-      signer: cert.signer,
+      signer: cert.signer ?? undefined,
       // Non-interference fields
       non_interference: cert.nonInterference as 'passed' | 'failed',
-      influencing_labels: cert.influencingLabels || [],
-      attestation_ref: cert.attestationRef,
+      influencing_labels: cert.influencingLabels ? JSON.parse(cert.influencingLabels) : [],
+      attestation_ref: cert.attestationRef ?? undefined,
     }));
   } catch (error) {
     console.error('Failed to retrieve certificates with NI failures:', error);

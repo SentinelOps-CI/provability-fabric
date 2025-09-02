@@ -1,0 +1,62 @@
+[package]
+name = "mpc-fintech"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "High-Performance Multi-Party Computation for Financial Services"
+authors = ["Provability-Fabric Contributors"]
+repository = "https://github.com/provability-fabric/provability-fabric"
+keywords = ["mpc", "cryptography", "fintech", "threshold-signatures", "compliance"]
+categories = ["cryptography", "finance", "security"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Cryptography
+sha2 = "0.10"
+uuid = { version = "1.0", features = ["v4"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+tracing = "0.1"
+
+# Error handling
+thiserror = "1.0"
+
+# Async traits
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = ["hardware-acceleration"]
+hardware-acceleration = []
+benchmarking = []
+
+[[bin]]
+name = "mpc-fintech-benchmark"
+path = "src/bin/benchmark.rs"
+required-features = ["benchmarking"]
+
+[[bin]]
+name = "mpc-fintech-demo"
+path = "src/bin/demo.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+debug = true

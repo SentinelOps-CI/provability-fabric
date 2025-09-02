@@ -1,0 +1,178 @@
+services:
+  # PostgreSQL with financial data schema
+  postgres-fintech:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: financial_services
+      POSTGRES_USER: fintech_user
+      POSTGRES_PASSWORD: secure_fintech_2025
+    volumes:
+      - postgres_fintech_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - '5433:5432'
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c max_connections=1000
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=64MB
+    networks:
+      - fintech-network
+
+  # Redis for ultra-low latency caching
+  redis-cache:
+    image: redis:7-alpine
+    ports:
+      - '6380:6379'
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    networks:
+      - fintech-network
+
+  # Financial MCP Server
+  financial-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp-server
+    environment:
+      DATABASE_URL: postgresql://fintech_user:secure_fintech_2025@postgres-fintech:5432/financial_services
+      REDIS_URL: redis://redis-cache:6379
+      MCP_SERVER_PORT: 8080
+      LOG_LEVEL: info
+      NODE_ENV: production
+    ports:
+      - '8080:8080'
+    depends_on:
+      - postgres-fintech
+      - redis-cache
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1GB
+        reservations:
+          cpus: '0.5'
+          memory: 512MB
+
+  # Transaction Simulator
+  transaction-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    environment:
+      MCP_SERVER_URL: http://financial-mcp-server:8080
+      TRANSACTIONS_PER_SECOND: 10000
+      FRAUD_RATE: 0.02
+      INSTITUTIONS_COUNT: 5
+    ports:
+      - '8081:8081'
+    depends_on:
+      - financial-mcp-server
+
+  # AI Fraud Detection Agent
+  fraud-detection-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    environment:
+      MCP_SERVER_URL: http://financial-mcp-server:8080
+      MODEL_PATH: /app/models/fraud-detection-v2.json
+      CONFIDENCE_THRESHOLD: 0.85
+      MAX_PROCESSING_TIME_MS: 500
+    ports:
+      - '8082:8082'
+    depends_on:
+      - financial-mcp-server
+    volumes:
+      - ./models:/app/models
+
+  # Performance Monitoring Dashboard
+  monitoring-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      GRAFANA_URL: http://grafana:3000
+      API_SERVER_URL: http://financial-mcp-server:8080
+    ports:
+      - '3001:3001'
+    depends_on:
+      - prometheus
+      - grafana
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - '3000:3000'
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+
+  # NGINX Load Balancer for production simulation
+  nginx-lb:
+    image: nginx:alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - financial-mcp-server
+      - monitoring-dashboard
+
+  # Audit Trail Verifier Service
+  audit-verifier:
+    build:
+      context: .
+      dockerfile: Dockerfile.audit
+    environment:
+      DATABASE_URL: postgresql://fintech_user:secure_fintech_2025@postgres-fintech:5432/financial_services
+      VERIFICATION_INTERVAL_MS: 1000
+      BLOCKCHAIN_ENABLED: true
+    ports:
+      - '8083:8083'
+    depends_on:
+      - postgres-fintech
+
+volumes:
+  postgres_fintech_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  fintech-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
