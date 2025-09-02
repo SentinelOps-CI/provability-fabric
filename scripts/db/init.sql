@@ -36,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_certificates_ni_monitor ON certificates(ni_monito
 ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy for tenant isolation
-CREATE POLICY IF NOT EXISTS tenant_isolation ON certificates
+CREATE POLICY tenant_isolation ON certificates
     FOR ALL TO ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_hash ON audit_logs(hash);
 -- Enable RLS for audit logs
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS audit_tenant_isolation ON audit_logs
+CREATE POLICY audit_tenant_isolation ON audit_logs
     FOR ALL TO ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
@@ -93,7 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_policy_versions_status ON policy_versions(status)
 -- Enable RLS for policy versions
 ALTER TABLE policy_versions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS policy_tenant_isolation ON policy_versions
+CREATE POLICY policy_tenant_isolation ON policy_versions
     FOR ALL TO ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_epochs_created_at ON epochs(created_at);
 -- Enable RLS for epochs
 ALTER TABLE epochs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS epoch_tenant_isolation ON epochs
+CREATE POLICY epoch_tenant_isolation ON epochs
     FOR ALL TO ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
@@ -146,20 +146,20 @@ CREATE INDEX IF NOT EXISTS idx_replay_jobs_started_at ON replay_jobs(started_at)
 -- Enable RLS for replay jobs
 ALTER TABLE replay_jobs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS replay_tenant_isolation ON replay_jobs
+CREATE POLICY replay_tenant_isolation ON replay_jobs
     FOR ALL TO ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Insert sample data for demo
 INSERT INTO policy_versions (policy_id, version, policy_hash, english_text, action_dsl, status, tenant_id, created_by) VALUES
-('fraud-detection-v1', '1.0.0', 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678', 
+('fraud-detection-v1', '1.0.0', 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456', 
  'Only FraudService may call /score endpoint. Rate limit alerts to 5 per 10 seconds per tenant. Block transactions with score >= 0.93.',
  '{"rules": [{"type": "allow", "role": "FraudService", "action": {"type": "call", "tool": "score"}}]}',
  'deployed', 'acme-corp', 'admin@acme-corp.com')
 ON CONFLICT (policy_hash) DO NOTHING;
 
 INSERT INTO epochs (epoch, policy_hash, automata_hash, tenant_id, created_by) VALUES
-(42, 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345678',
- 'b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab',
+(42, 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+ 'b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
  'acme-corp', 'admin@acme-corp.com')
 ON CONFLICT (epoch) DO NOTHING;
