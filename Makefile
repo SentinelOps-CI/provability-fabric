@@ -27,11 +27,11 @@ help:
 # Development environment
 dev:
 	@echo "🚀 Starting SentinelOps Platform development environment..."
-	docker-compose up --build -d postgres redis
+	docker compose up --build -d postgres redis
 	@echo "⏳ Waiting for databases to be ready..."
 	sleep 10
 	@echo "🔧 Starting platform services..."
-	docker-compose up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
+	docker compose up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
 	@echo "✅ Development environment ready!"
 	@echo "🌐 Console UI: http://localhost:3000"
 	@echo "🔗 API Gateway: http://localhost:8000"
@@ -39,7 +39,7 @@ dev:
 # Build all services
 build:
 	@echo "🔨 Building all platform services..."
-	docker-compose build
+	docker compose build
 
 # Run tests
 test:
@@ -53,7 +53,7 @@ test:
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning build artifacts..."
-	docker-compose down -v
+	docker compose down -v
 	docker system prune -f
 	rm -rf build/ dist/ coverage/ .pytest_cache/
 	find . -name "*.pyc" -delete
@@ -63,7 +63,7 @@ clean:
 demo-up:
 	@echo "🎬 Starting SentinelOps Platform Demo..."
 	@echo "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
-	docker-compose up --build -d
+	docker compose up --build -d
 	@echo "⏳ Waiting for services to be ready..."
 	sleep 30
 	@echo "🎯 Setting up demo data..."
@@ -87,7 +87,7 @@ demo-up:
 
 demo-down:
 	@echo "🛑 Stopping demo environment..."
-	docker-compose down
+	docker compose down
 	@echo "✅ Demo environment stopped"
 
 demo-setup:
