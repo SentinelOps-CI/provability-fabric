@@ -1,301 +1,186 @@
-# Provability Fabric Build System
-# PF-CORE-01: Versioned API Contracts and Code Generation
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-clean proto-validate
-.PHONY: sdk-build sdk-test sdk-clean all clean
+.PHONY: help build test clean demo-up demo-down install dev
 
 # Default target
-all: proto-gen sdk-build
-
-# Help target
 help:
-	@echo "Provability Fabric Build System - PF-CORE-01"
+	@echo "SentinelOps Platform - Available Commands:"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  proto-gen        - Generate all language bindings from protobufs"
-	@echo "  proto-gen-go     - Generate Go bindings"
-	@echo "  proto-gen-ts     - Generate TypeScript bindings"
-	@echo "  proto-gen-rust   - Generate Rust bindings"
-	@echo "  proto-clean      - Clean generated protobuf files"
-	@echo "  proto-validate   - Validate protobuf files"
-	@echo "  sdk-build        - Build all SDKs"
-	@echo "  sdk-test         - Test all SDKs"
-	@echo "  sdk-clean        - Clean all SDKs"
-	@echo "  clean            - Clean everything"
-	@echo "  help             - Show this help message"
+	@echo "Development:"
+	@echo "  make dev          - Start development environment"
+	@echo "  make build        - Build all services"
+	@echo "  make test         - Run all tests"
+	@echo "  make clean        - Clean build artifacts"
+	@echo ""
+	@echo "Demo:"
+	@echo "  make demo-up      - Start complete demo environment"
+	@echo "  make demo-down    - Stop demo environment"
+	@echo "  make demo-setup   - Setup demo data and policies"
+	@echo ""
+	@echo "Platform:"
+	@echo "  make install      - Install platform locally"
+	@echo "  make validate-certs - Validate all CERT-V1 certificates"
+	@echo "  make lint         - Run linting on all code"
+	@echo ""
 
-# Protobuf generation
-proto-gen: proto-gen-go proto-gen-ts proto-gen-rust
+# Development environment
+dev:
+	@echo "🚀 Starting SentinelOps Platform development environment..."
+	docker-compose up --build -d postgres redis
+	@echo "⏳ Waiting for databases to be ready..."
+	sleep 10
+	@echo "🔧 Starting platform services..."
+	docker-compose up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
+	@echo "✅ Development environment ready!"
+	@echo "🌐 Console UI: http://localhost:3000"
+	@echo "🔗 API Gateway: http://localhost:8000"
 
-# Generate Go bindings
-proto-gen-go:
-	@echo "Generating Go bindings..."
-	@mkdir -p core/sdk/go/generated
-	protoc --go_out=core/sdk/go/generated \
-		--go_opt=paths=source_relative \
-		--go-grpc_out=core/sdk/go/generated \
-		--go-grpc_opt=paths=source_relative \
-		api/v1/*.proto
-	@echo "Go bindings generated in core/sdk/go/generated/"
+# Build all services
+build:
+	@echo "🔨 Building all platform services..."
+	docker-compose build
 
-# Generate TypeScript bindings
-proto-gen-ts:
-	@echo "Generating TypeScript bindings..."
-	@mkdir -p core/sdk/typescript/generated
-	protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
-		--ts_proto_out=core/sdk/typescript/generated \
-		--ts_proto_opt=esModuleInterop=true \
-		--ts_proto_opt=forceLong=string \
-		--ts_proto_opt=useOptionals=messages \
-		api/v1/*.proto
-	@echo "TypeScript bindings generated in core/sdk/typescript/generated/"
+# Run tests
+test:
+	@echo "🧪 Running platform tests..."
+	python tests/trust_fire_orchestrator.py
+	@echo "🧪 Running integration tests..."
+	python tests/integration/test_platform_integration.py
+	@echo "🧪 Running demo tests..."
+	cd demos/verifiable-mcp-fraud && npm test
 
-# Generate Rust bindings
-proto-gen-rust:
-	@echo "Generating Rust bindings..."
-	@mkdir -p core/sdk/rust/generated
-	protoc --rust_out=core/sdk/rust/generated \
-		--grpc_out=core/sdk/rust/generated \
-		--plugin=protoc-gen-grpc=./target/release/protoc-gen-grpc-rust \
-		api/v1/*.proto
-	@echo "Rust bindings generated in core/sdk/rust/generated/"
+# Clean build artifacts
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	docker-compose down -v
+	docker system prune -f
+	rm -rf build/ dist/ coverage/ .pytest_cache/
+	find . -name "*.pyc" -delete
+	find . -name "__pycache__" -delete
 
-# Clean generated protobuf files
-proto-clean:
-	@echo "Cleaning generated protobuf files..."
-	@rm -rf core/sdk/go/generated/*
-	@rm -rf core/sdk/typescript/generated/*
-	@rm -rf core/sdk/rust/generated/*
-	@echo "Generated protobuf files cleaned"
+# Demo environment
+demo-up:
+	@echo "🎬 Starting SentinelOps Platform Demo..."
+	@echo "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
+	docker-compose up --build -d
+	@echo "⏳ Waiting for services to be ready..."
+	sleep 30
+	@echo "🎯 Setting up demo data..."
+	$(MAKE) demo-setup
+	@echo ""
+	@echo "✅ Demo environment ready!"
+	@echo ""
+	@echo "🌐 Access Points:"
+	@echo "  Console UI:     http://localhost:3000"
+	@echo "  API Gateway:    http://localhost:8000"
+	@echo "  Grafana:        http://localhost:3002 (admin/admin)"
+	@echo "  Demo App:       http://localhost:3001"
+	@echo ""
+	@echo "🎯 Demo Flow:"
+	@echo "  1. Open Console UI and go to Policies tab"
+	@echo "  2. See the fraud detection policy compiled and deployed"
+	@echo "  3. Go to Runtime tab to monitor live metrics"
+	@echo "  4. Go to Evidence tab to see CERT-V1 certificates"
+	@echo "  5. Run replays to verify 99.9%+ low-view equality"
+	@echo "  6. Download compliance packets"
 
-# Validate protobuf files
-proto-validate:
-	@echo "Validating protobuf files..."
-	@for file in api/v1/*.proto; do \
-		echo "Validating $$file..."; \
-		protoc --descriptor_set_out=/dev/null $$file || exit 1; \
-	done
-	@echo "All protobuf files are valid"
+demo-down:
+	@echo "🛑 Stopping demo environment..."
+	docker-compose down
+	@echo "✅ Demo environment stopped"
 
-# Build all SDKs
-sdk-build: sdk-build-go sdk-build-ts sdk-build-rust
+demo-setup:
+	@echo "🎯 Setting up demo data and policies..."
+	cd demos/verifiable-mcp-fraud && npm run demo:setup
+	@echo "✅ Demo setup completed"
 
-# Build Go SDK
-sdk-build-go:
-	@echo "Building Go SDK..."
-	@cd core/sdk/go && go mod tidy && go build ./...
+# Install platform locally
+install:
+	@echo "📦 Installing SentinelOps Platform locally..."
+	./scripts/install.sh
+	@echo "✅ Platform installed successfully"
 
-# Build TypeScript SDK
-sdk-build-ts:
-	@echo "Building TypeScript SDK..."
-	@cd core/sdk/typescript && npm install && npm run build
-
-# Build Rust SDK
-sdk-build-rust:
-	@echo "Building Rust SDK..."
-	@cd core/sdk/rust && cargo build
-
-# Test all SDKs
-sdk-test: sdk-test-go sdk-test-ts sdk-test-rust
-
-# Test Go SDK
-sdk-test-go:
-	@echo "Testing Go SDK..."
-	@cd core/sdk/go && go test ./...
-
-# Test TypeScript SDK
-sdk-test-ts:
-	@echo "Testing TypeScript SDK..."
-	@cd core/sdk/typescript && npm test
-
-# Test Rust SDK
-sdk-test-rust:
-	@echo "Testing Rust SDK..."
-	@cd core/sdk/rust && cargo test
-
-# Clean all SDKs
-sdk-clean: sdk-clean-go sdk-clean-ts sdk-clean-rust
-
-# Clean Go SDK
-sdk-clean-go:
-	@echo "Cleaning Go SDK..."
-	@cd core/sdk/go && go clean -cache -modcache -testcache
-
-# Clean TypeScript SDK
-sdk-clean-ts:
-	@echo "Cleaning TypeScript SDK..."
-	@cd core/sdk/typescript && rm -rf node_modules dist
-
-# Clean Rust SDK
-sdk-clean-rust:
-	@echo "Cleaning Rust SDK..."
-	@cd core/sdk/rust && cargo clean
-
-# Clean everything
-clean: proto-clean sdk-clean
-	@echo "All generated files and build artifacts cleaned"
-
-# Install protobuf tools (Ubuntu/Debian)
-install-tools-ubuntu:
-	@echo "Installing protobuf tools for Ubuntu/Debian..."
-	sudo apt-get update
-	sudo apt-get install -y protobuf-compiler
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	npm install -g ts-proto
-
-# Install protobuf tools (macOS)
-install-tools-macos:
-	@echo "Installing protobuf tools for macOS..."
-	brew install protobuf
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	npm install -g ts-proto
-
-# Install protobuf tools (Windows)
-install-tools-windows:
-	@echo "Installing protobuf tools for Windows..."
-	@echo "Please install protobuf tools manually:"
-	@echo "1. Download protoc from https://github.com/protocolbuffers/protobuf/releases"
-	@echo "2. Install Go protobuf plugins: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
-	@echo "3. Install Go gRPC plugin: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
-	@echo "4. Install TypeScript plugin: npm install -g ts-proto"
-
-# Check dependencies
-check-deps:
-	@echo "Checking protobuf dependencies..."
-	@which protoc > /dev/null || (echo "protoc not found. Please install protobuf-compiler" && exit 1)
-	@which protoc-gen-go > /dev/null || (echo "protoc-gen-go not found. Please run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest" && exit 1)
-	@which protoc-gen-go-grpc > /dev/null || (echo "protoc-gen-go-grpc not found. Please run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest" && exit 1)
-	@echo "All protobuf dependencies are available"
-
-# Generate golden JSON fixtures for round-trip tests
-proto-fixtures:
-	@echo "Generating golden JSON fixtures..."
-	@mkdir -p tests/fixtures/golden
-	@for file in api/v1/*.proto; do \
-		base=$$(basename $$file .proto); \
-		echo "Generating fixtures for $$base..."; \
-		protoc --encode=$$base $$file < /dev/null > tests/fixtures/golden/$$base.json || true; \
-	done
-	@echo "Golden JSON fixtures generated in tests/fixtures/golden/"
-
-# Run compatibility tests
-proto-compat-test:
-	@echo "Running protobuf compatibility tests..."
-	@cd tests && go test -v -run TestProtoCompatibility ./...
-
-# Format protobuf files
-proto-format:
-	@echo "Formatting protobuf files..."
-	@for file in api/v1/*.proto; do \
-		echo "Formatting $$file..."; \
-		clang-format -i $$file || echo "clang-format not available, skipping $$file"; \
-	done
-	@echo "Protobuf files formatted"
-
-# Lint protobuf files
-proto-lint:
-	@echo "Linting protobuf files..."
-	@for file in api/v1/*.proto; do \
-		echo "Linting $$file..."; \
-		protoc --lint_out=$$(dirname $$file) $$file || echo "protoc-lint not available, skipping $$file"; \
-	done
-	@echo "Protobuf files linted"
-
-# Show protobuf file statistics
-proto-stats:
-	@echo "Protobuf file statistics:"
-	@echo "========================"
-	@for file in api/v1/*.proto; do \
-		echo "$$file:"; \
-		echo "  Lines: $$(wc -l < $$file)"; \
-		echo "  Messages: $$(grep -c '^message ' $$file)"; \
-		echo "  Services: $$(grep -c '^service ' $$file)"; \
-		echo "  Enums: $$(grep -c '^enum ' $$file)"; \
-		echo ""; \
-	done
-
-# Generate API documentation
-proto-docs:
-	@echo "Generating API documentation..."
-	@mkdir -p docs/api
-	protoc --doc_out=docs/api --doc_opt=markdown,api.md api/v1/*.proto
-	@echo "API documentation generated in docs/api/"
-
-# Show help for specific target
-proto-help:
-	@echo "Protobuf-specific targets:"
-	@echo "  proto-gen        - Generate all language bindings"
-	@echo "  proto-gen-go     - Generate Go bindings"
-	@echo "  proto-gen-ts     - Generate TypeScript bindings"
-	@echo "  proto-gen-rust   - Generate Rust bindings"
-	@echo "  proto-clean      - Clean generated files"
-	@echo "  proto-validate   - Validate protobuf files"
-	@echo "  proto-fixtures   - Generate golden JSON fixtures"
-	@echo "  proto-compat-test - Run compatibility tests"
-	@echo "  proto-format     - Format protobuf files"
-	@echo "  proto-lint       - Lint protobuf files"
-	@echo "  proto-stats      - Show file statistics"
-	@echo "  proto-docs       - Generate API documentation"
-	@echo "  proto-help       - Show this help message"
-
-# Standards and validation targets
-.PHONY: submodules validate-certs standards-pin-check
-
-# Update and initialize git submodules
-submodules:
-	@echo "Updating git submodules..."
-	git submodule update --init --recursive
-	@echo "Submodules updated"
-
-# Enforce standards pinned to tags
-standards-pin-check:
-	@echo "Checking external standards are pinned to released tags..."
-	@python tools/standards/check_pins.py
-	@echo "Standards pin check complete"
-
-# Validate CERT-V1 JSON files
+# Validate CERT-V1 certificates
 validate-certs:
-	@echo "Validating CERT-V1 JSON files..."
-	@cd tools/cert-validate && pip install -r requirements.txt
-	python tools/cert-validate/validate.py evidence/**/*.cert.json tests/replay/out/**/*.cert.json
-	@echo "CERT validation complete"
+	@echo "🔍 Validating CERT-V1 certificates..."
+	python tools/cert-validate/validate.py evidence/egress_certs/*.json
+	python tools/cert-validate/validate.py evidence/certs/**/*.cert.json
+	@echo "✅ Certificate validation completed"
 
-# Show standards help
-standards-help:
-	@echo "Standards and validation targets:"
-	@echo "  submodules       - Update and initialize git submodules"
-	@echo "  validate-certs   - Validate CERT-V1 JSON files"
-	@echo "  standards-help   - Show this help message"
+# Lint all code
+lint:
+	@echo "🔍 Running linting on all code..."
+	# Go services
+	cd services/spec-service && go fmt ./... && go vet ./...
+	cd services/proof-service && go fmt ./... && go vet ./...
+	cd services/build-orchestrator && go fmt ./... && go vet ./...
+	cd services/evidence-service && go fmt ./... && go vet ./...
+	cd services/replay-service && go fmt ./... && go vet ./...
+	cd services/api-gateway && go fmt ./... && go vet ./...
+	# Rust sidecar
+	cd runtime/sidecar-watcher && cargo fmt && cargo clippy
+	# TypeScript
+	cd console && npm run lint
+	cd demos/verifiable-mcp-fraud && npm run lint
+	cd sdks/typescript && npm run lint
+	# Python
+	python -m flake8 tools/ tests/ --max-line-length=100
+	@echo "✅ Linting completed"
 
-# PAB signing and verification
-.PHONY: pf-sign pf-verify
+# Performance benchmarks
+bench:
+	@echo "⚡ Running performance benchmarks..."
+	cd demos/verifiable-mcp-fraud && npm run benchmark
+	python tests/performance/performance_benchmarks.py
+	@echo "✅ Benchmarks completed"
 
-# Usage: make pf-sign SERVICE_NAME=my-service
-pf-sign:
-	@if [ -z "$$SERVICE_NAME" ]; then echo "SERVICE_NAME is required, e.g., make pf-sign SERVICE_NAME=my-service"; exit 1; fi
-	@echo "Signing PAB manifest for $$SERVICE_NAME..."
-	@if ! command -v cosign >/dev/null 2>&1; then echo "cosign not found in PATH"; exit 1; fi
-	@BUNDLE_PATH="bundles/$$SERVICE_NAME/bundle.json"; \
-	  if [ ! -f "$$BUNDLE_PATH" ]; then echo "Missing $$BUNDLE_PATH"; exit 1; fi; \
-	  echo "Running pf sign..."; \
-	  pf sign --path "bundles/$$SERVICE_NAME" || true; \
-	  echo "Signing bundle.json with cosign keyless..."; \
-	  cosign sign-blob --yes --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" >/dev/null; \
-	  echo "Recording Sigstore digest into bundle metadata..."; \
-	  DIGEST=$$(cosign verify-blob --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" 2>/dev/null | sha256sum | awk '{print $$1}'); \
-	  tmp=$$(mktemp); \
-	  jq --arg digest "$$DIGEST" '.sigstore_digest = $$digest' "$$BUNDLE_PATH" > $$tmp && mv $$tmp "$$BUNDLE_PATH"; \
-	  echo "Signed: $$BUNDLE_PATH with digest $$DIGEST"
+# Security tests
+security:
+	@echo "🔒 Running security tests..."
+	python tests/redteam/abac_fuzz.py --queries 1000
+	python tests/redteam/pii_leak.py --vectors 1000
+	python tests/security/malicious_adapter_test.py
+	@echo "✅ Security tests completed"
 
-# Usage: make pf-verify SERVICE_NAME=my-service
-pf-verify:
-	@if [ -z "$$SERVICE_NAME" ]; then echo "SERVICE_NAME is required, e.g., make pf-verify SERVICE_NAME=my-service"; exit 1; fi
-	@echo "Verifying PAB manifest for $$SERVICE_NAME..."
-	@BUNDLE_PATH="bundles/$$SERVICE_NAME/bundle.json"; \
-	  if [ ! -f "$$BUNDLE_PATH" ]; then echo "Missing $$BUNDLE_PATH"; exit 1; fi; \
-	  if [ ! -f "bundles/$$SERVICE_NAME/bundle.sig.bundle" ]; then echo "Missing signature bundle at bundles/$$SERVICE_NAME/bundle.sig.bundle"; exit 1; fi; \
-	  cosign verify-blob --bundle "bundles/$$SERVICE_NAME/bundle.sig.bundle" "$$BUNDLE_PATH" >/dev/null && echo "cosign verification OK" || (echo "cosign verification FAILED"; exit 1); \
-	  echo "Running pf verify..."; \
-	  pf verify --bundle "$$SERVICE_NAME" || true
+# Full test suite
+test-all: test security bench validate-certs
+	@echo "🎉 All tests completed successfully!"
+
+# Production deployment helpers
+helm-install:
+	@echo "☸️  Installing with Helm..."
+	helm install sentinelops-platform charts/pf-enforce/ \
+		--set global.environment=production \
+		--set global.domain=platform.sentinelops.ai
+	@echo "✅ Helm installation completed"
+
+helm-upgrade:
+	@echo "🔄 Upgrading Helm deployment..."
+	helm upgrade sentinelops-platform charts/pf-enforce/
+	@echo "✅ Helm upgrade completed"
+
+# Documentation
+docs:
+	@echo "📚 Building documentation..."
+	mkdocs build
+	@echo "✅ Documentation built"
+
+docs-serve:
+	@echo "📚 Serving documentation..."
+	mkdocs serve --dev-addr=127.0.0.1:8002
+
+# Quick start for new users
+quick-start: build demo-up
+	@echo ""
+	@echo "🎉 SentinelOps Platform is ready!"
+	@echo ""
+	@echo "👨‍💻 For Developers:"
+	@echo "  Write policy in English → see ActionDSL preview → compile → proof run → deploy"
+	@echo ""
+	@echo "🛡️  For Security/Compliance:"
+	@echo "  Browse certificates → filter by policy/tenant → export compliance packet"
+	@echo ""
+	@echo "⚙️  For SRE/Platform:"
+	@echo "  Monitor SLOs → check cert validation → roll back epochs → fetch artifacts"
+	@echo ""
