@@ -3,13 +3,121 @@
 
 import express from 'express'
 import cors from 'cors'
+import compression from 'compression'
+import jwt from 'jsonwebtoken'
+import bcrypt from 'bcryptjs'
+import { wsServer } from './websocket-server.js'
 
 const app = express()
 const port = process.env.PORT || 8080
+const JWT_SECRET = process.env.JWT_SECRET || 'provability-fabric-dev-secret-2025'
 
-// CORS middleware
-app.use(cors())
-app.use(express.json())
+// Mock user database (in production, use a real database)
+const users = new Map()
+users.set('admin@provability-fabric.org', {
+  id: 'admin-001',
+  email: 'admin@provability-fabric.org',
+  passwordHash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+  role: 'admin',
+  name: 'System Administrator',
+  createdAt: new Date('2025-01-01')
+})
+users.set('developer@provability-fabric.org', {
+  id: 'dev-001',
+  email: 'developer@provability-fabric.org',
+  passwordHash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+  role: 'developer',
+  name: 'Developer User',
+  createdAt: new Date('2025-01-15')
+})
+
+// Security middleware
+app.use((req, res, next) => {
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-XSS-Protection', '1; mode=block')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';")
+  
+  // Rate limiting headers
+  res.setHeader('X-RateLimit-Limit', '1000')
+  res.setHeader('X-RateLimit-Remaining', '999')
+  res.setHeader('X-RateLimit-Reset', Date.now() + 3600000)
+  
+  next()
+})
+
+// Performance middleware
+app.use(compression())
+
+// CORS middleware with security restrictions
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://localhost:3000', 'https://localhost:9000'] 
+    : ['http://localhost:3000', 'http://localhost:9000', 'http://127.0.0.1:8002'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
+
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Simple in-memory cache
+const cache = new Map()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+// Cache middleware for GET requests
+const cacheMiddleware = (req, res, next) => {
+  if (req.method !== 'GET') return next()
+  
+  const key = `${req.method}:${req.url}`
+  const cached = cache.get(key)
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[CACHE HIT] ${key}`)
+    res.setHeader('X-Cache', 'HIT')
+    return res.json(cached.data)
+  }
+  
+  // Override res.json to cache the response
+  const originalJson = res.json
+  res.json = function(data) {
+    cache.set(key, { data, timestamp: Date.now() })
+    res.setHeader('X-Cache', 'MISS')
+    return originalJson.call(this, data)
+  }
+  
+  next()
+}
+
+app.use(cacheMiddleware)
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString()
+  console.log(`[${timestamp}] ${req.method} ${req.url} - ${req.ip}`)
+  next()
+})
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' })
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' })
+    }
+    req.user = user
+    next()
+  })
+}
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -17,13 +125,140 @@ app.get('/', (req, res) => {
     message: 'Welcome to Provability-Fabric Ledger API',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
+    features: ['REST API', 'GraphQL', 'WebSocket Real-time', 'Authentication'],
     endpoints: {
       health: '/health',
       status: '/api/status',
+      auth: {
+        login: 'POST /auth/login',
+        register: 'POST /auth/register',
+        profile: 'GET /auth/profile'
+      },
       graphql: '/graphql',
+      websocket: 'ws://localhost:8081',
       capsules: '/tenant/:tid/capsules',
       quotes: '/tenant/:tid/quote/:hash'
     }
+  })
+})
+
+// Authentication endpoints
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' })
+    }
+
+    const user = users.get(email)
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' })
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash)
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' })
+    }
+
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    )
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      },
+      websocketUrl: `ws://localhost:8081?token=${token}`
+    })
+
+    // Notify WebSocket server of login
+    wsServer.notifySystemAlert('info', `User ${user.name} logged in`)
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Login failed' })
+  }
+})
+
+app.post('/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password, and name required' })
+    }
+
+    if (users.has(email)) {
+      return res.status(409).json({ error: 'User already exists' })
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const userId = `user-${Date.now()}`
+    
+    const newUser = {
+      id: userId,
+      email,
+      passwordHash,
+      name,
+      role: 'user',
+      createdAt: new Date()
+    }
+    
+    users.set(email, newUser)
+
+    const token = jwt.sign(
+      { 
+        userId: newUser.id, 
+        email: newUser.email, 
+        role: newUser.role 
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    )
+
+    res.status(201).json({
+      token,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      },
+      websocketUrl: `ws://localhost:8081?token=${token}`
+    })
+
+    // Notify WebSocket server of new registration
+    wsServer.notifySystemAlert('info', `New user registered: ${newUser.name}`)
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Registration failed' })
+  }
+})
+
+app.get('/auth/profile', authenticateToken, (req, res) => {
+  const userEmail = req.user.email
+  const user = users.get(userEmail)
+  
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' })
+  }
+
+  res.json({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    createdAt: user.createdAt
   })
 })
 
@@ -236,14 +471,29 @@ app.get('/search', (req, res) => {
   });
 });
 
-app.post('/install', (req, res) => {
+app.post('/install', authenticateToken, (req, res) => {
   const { tenantId, packageId, version } = req.body;
   
   // Mock installation response
-  res.json({
-    installId: `install-${Date.now()}`,
+  const installId = `install-${Date.now()}`;
+  const response = {
+    installId,
     status: 'initiated',
     message: `Installation of ${packageId} v${version} initiated for tenant ${tenantId}`,
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(response);
+
+  // Send real-time notification
+  wsServer.broadcastToRoom('marketplace', {
+    type: 'package_installation',
+    installId,
+    packageId,
+    version,
+    tenantId,
+    userId: req.user.userId,
+    status: 'initiated',
     timestamp: new Date().toISOString()
   });
 });
@@ -265,5 +515,10 @@ app.listen(port, () => {
   console.log(`📊 Health check: http://localhost:${port}/health`)
   console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
   console.log(`📡 API Status: http://localhost:${port}/api/status`)
+  console.log(`🔐 Authentication: http://localhost:${port}/auth/login`)
   console.log(`👤 Mock tenant: http://localhost:${port}/tenant/dev-tenant/capsules`)
+  
+  // Initialize WebSocket server
+  wsServer.initialize()
+  console.log(`📡 Real-time features activated`)
 }) 

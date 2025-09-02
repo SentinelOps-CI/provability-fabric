@@ -96,7 +96,7 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
     if (!tenant) {
       logger.error('Tenant not found or access denied', { 
         tenantId: req.user.tid,
-        userId: req.user.sub,
+        userId: req.user?.sub,
         path: req.path 
       })
       throw new AuthorizationError('Tenant not found or access denied')
@@ -116,15 +116,15 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
     next()
   } catch (error) {
     logger.error('Tenant validation error', { 
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
       userId: req.user?.sub,
       path: req.path 
     })
     
     if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
       return res.status(error.statusCode).json({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         code: error.name 
       })
     }
@@ -156,14 +156,14 @@ export const tenantScopeMiddleware = (model: 'capsule' | 'premiumQuote') => {
       logger.debug('Tenant scope middleware applied', { 
         tenantId,
         model,
-        userId: req.user.sub 
+        userId: req.user?.sub 
       })
       
       next()
     } catch (error) {
       logger.error('Tenant scope middleware error', { 
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         userId: req.user?.sub,
         model,
         path: req.path 
@@ -171,7 +171,7 @@ export const tenantScopeMiddleware = (model: 'capsule' | 'premiumQuote') => {
       
       if (error instanceof AuthenticationError) {
         return res.status(error.statusCode).json({ 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           code: error.name 
         })
       }
@@ -191,11 +191,15 @@ export const getTenantScopedPrisma = (tenantId: string) => {
       capsule: {
         async $allOperations({ args, query }) {
           try {
-            args.where = { ...args.where, tenantId }
+            if ('where' in args && args.where !== undefined) {
+              args.where = { ...args.where, tenantId }
+            } else if ('data' in args && args.data !== undefined) {
+              args.data = { ...args.data, tenantId }
+            }
             return await query(args)
           } catch (error) {
             logger.error('Capsule query error', { 
-              error: error.message,
+              error: error instanceof Error ? error.message : String(error),
               tenantId,
               operation: args 
             })
@@ -206,11 +210,15 @@ export const getTenantScopedPrisma = (tenantId: string) => {
       premiumQuote: {
         async $allOperations({ args, query }) {
           try {
-            args.where = { ...args.where, tenantId }
+            if ('where' in args && args.where !== undefined) {
+              args.where = { ...args.where, tenantId }
+            } else if ('data' in args && args.data !== undefined) {
+              args.data = { ...args.data, tenantId }
+            }
             return await query(args)
           } catch (error) {
             logger.error('PremiumQuote query error', { 
-              error: error.message,
+              error: error instanceof Error ? error.message : String(error),
               tenantId,
               operation: args 
             })
@@ -229,8 +237,8 @@ export const clearTenantContext = async () => {
     logger.debug('Tenant context cleared successfully')
   } catch (error) {
     logger.error('Error clearing tenant context', { 
-      error: error.message,
-      stack: error.stack 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined 
     })
   }
 }
@@ -250,7 +258,7 @@ export const requirePermission = (permission: string) => {
       }
       
       logger.debug('Permission granted', { 
-        userId: req.user.sub,
+        userId: req.user?.sub,
         permission,
         path: req.path 
       })
@@ -258,7 +266,7 @@ export const requirePermission = (permission: string) => {
       next()
     } catch (error) {
       logger.error('Permission check error', { 
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         userId: req.user?.sub,
         permission,
         path: req.path 
@@ -266,7 +274,7 @@ export const requirePermission = (permission: string) => {
       
       if (error instanceof AuthorizationError) {
         return res.status(error.statusCode).json({ 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           code: error.name 
         })
       }
@@ -293,7 +301,7 @@ export const rateLimitMiddleware = (windowMs: number = 15 * 60 * 1000, max: numb
     }
     
     const userRequests = requests.get(key)
-    const recentRequests = userRequests.filter(timestamp => timestamp > windowStart)
+    const recentRequests = userRequests.filter((timestamp: number) => timestamp > windowStart)
     
     if (recentRequests.length >= max) {
       logger.warn('Rate limit exceeded', { 

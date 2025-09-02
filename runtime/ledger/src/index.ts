@@ -9,6 +9,8 @@ import { json } from 'body-parser'
 import cors from 'cors'
 import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth'
 import { BillingService, billingMiddleware } from './billing'
+import McpService from './mcp/mcp-service.js'
+import winston from 'winston'
 
 const prisma = new PrismaClient()
 
@@ -155,9 +157,38 @@ async function startServer() {
   const app = express()
   const port = process.env.PORT || 4000
 
+  // Initialize logger
+  const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.json()
+    ),
+    transports: [
+      new winston.transports.Console(),
+      new winston.transports.File({ filename: 'mcp-service.log' })
+    ]
+  })
+
   // Initialize billing service
   const billingService = new BillingService()
   const billing = billingMiddleware(billingService)
+
+  // Initialize MCP service
+  const mcpService = new McpService(
+    {
+      name: 'provability-fabric-mcp',
+      version: '1.0.0',
+      description: 'Model Context Protocol integration for Provability-Fabric',
+      enableWebSocket: true,
+      sidecarUrl: process.env.SIDECAR_URL || 'http://localhost:8081',
+      enableMultiTenant: true
+    },
+    prisma,
+    logger
+  )
+
+  await mcpService.initialize()
 
   // CORS middleware
   app.use(cors())
@@ -167,6 +198,9 @@ async function startServer() {
   app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() })
   })
+
+  // MCP endpoints
+  app.use('/api', mcpService.getRouter())
 
   // Billing endpoints
   app.post('/usage', authMiddleware, tenantMiddleware, billing.recordUsage)
@@ -239,29 +273,44 @@ async function startServer() {
   })
 
   // Apollo Server setup with context
-  const server = new ApolloServer({
+  const apolloServer = new ApolloServer({
     typeDefs,
     resolvers,
   })
 
-  await server.start()
+  await apolloServer.start()
 
   app.use('/graphql', 
     authMiddleware,
     tenantMiddleware,
-    expressMiddleware(server, {
+    expressMiddleware(apolloServer, {
       context: async ({ req }) => {
         return { user: (req as AuthenticatedRequest).user }
       }
     })
   )
 
-  app.listen(port, () => {
+  const httpServer = app.listen(port, () => {
     console.log(`🚀 Ledger service ready at http://localhost:${port}`)
     console.log(`📊 GraphQL endpoint: http://localhost:${port}/graphql`)
+    console.log(`🤖 MCP endpoints: http://localhost:${port}/api/mcp/*`)
+    console.log(`🔌 MCP WebSocket: ws://localhost:${port}/mcp/ws`)
     console.log(`💰 Premium quotes: http://localhost:${port}/tenant/:tid/quote/:hash`)
     console.log(`🏢 Tenant capsules: http://localhost:${port}/tenant/:tid/capsules`)
     console.log(`💳 Billing endpoints: http://localhost:${port}/usage, /tenant/:tid/invoice/*`)
+  })
+
+  // Setup WebSocket support for MCP
+  mcpService.setupWebSocket(httpServer)
+
+  // Graceful shutdown handling
+  process.on('SIGINT', async () => {
+    console.log('🛑 Shutting down gracefully...')
+    await mcpService.shutdown()
+    httpServer.close(() => {
+      console.log('✅ Server closed')
+      process.exit(0)
+    })
   })
 }
 

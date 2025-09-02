@@ -2,7 +2,6 @@
   <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
 </p>
 
-
 # Provability Fabric
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -77,22 +76,32 @@ scripts/test-new-user.bat      # For Windows Command Prompt (RECOMMENDED for Win
 bash scripts/windows-troubleshoot.sh  # For Windows Git Bash troubleshooting
 ```
 
-### Option 2: Launch the UI Dashboard
+### Option 2: Launch the Production Web Interface
 
-The project includes a React-based marketplace UI for managing AI agent packages and monitoring the system:
+The project includes a comprehensive web ecosystem with real-time capabilities, advanced search, and secure authentication:
 
 ```bash
-# Navigate to the UI directory
-cd marketplace/ui
+# Quick launch all services (Recommended)
+./launch-web-interfaces.bat     # Windows
+./launch-web-interfaces.sh      # Linux/macOS
 
-# Install dependencies (if not already done)
-npm install
+# Or launch services individually:
 
-# Start the development server
-npm start
+# 1. Start the Ledger API with WebSocket and Authentication
+cd runtime/ledger && node minimal-server.js
+# Available at: http://localhost:8080
 
-# The UI will be available at http://localhost:3000
-```
+# 2. Start the Admin Dashboard
+cd admin-interface && node server.js
+# Available at: http://localhost:9000
+
+# 3. Start the Marketplace UI with Advanced Features
+cd marketplace/ui && npm install && npm start
+# Available at: http://localhost:3000
+
+# 4. Start the Documentation Site
+mkdocs serve --dev-addr=127.0.0.1:8002
+# Available at: http://127.0.0.1:8002
 
 ### Option 3: Manual Installation
 
@@ -191,12 +200,14 @@ Before running the installation, ensure you have:
 
 ## Architecture
 
-Provability-Fabric consists of four core components with comprehensive security mechanisms:
+Provability-Fabric consists of six core components with comprehensive security and real-time capabilities:
 
 1. **Specification Bundles** - YAML specifications with Lean proofs
 2. **Runtime Guards** - Sidecar containers that monitor execution
 3. **Solver Adapters** - Verification engines for neural networks and hybrid systems
-4. **Marketplace UI** - React-based dashboard for package management and system monitoring
+4. **Marketplace UI** - React-based dashboard with advanced search and real-time updates
+5. **WebSocket Real-Time System** - Live communication for monitoring and notifications
+6. **Authentication & User Management** - JWT-based security with role-based access control
 
 ### Security Architecture
 

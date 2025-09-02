@@ -85,13 +85,21 @@ export const getTenantScopedPrisma = (tenantId: string) => {
     query: {
       capsule: {
         async $allOperations({ args, query }) {
-          args.where = { ...args.where, tenantId }
+          if ('where' in args && args.where !== undefined) {
+            args.where = { ...args.where, tenantId }
+          } else if ('data' in args && args.data !== undefined) {
+            args.data = { ...args.data, tenantId }
+          }
           return query(args)
         }
       },
       premiumQuote: {
         async $allOperations({ args, query }) {
-          args.where = { ...args.where, tenantId }
+          if ('where' in args && args.where !== undefined) {
+            args.where = { ...args.where, tenantId }
+          } else if ('data' in args && args.data !== undefined) {
+            args.data = { ...args.data, tenantId }
+          }
           return query(args)
         }
       }
