@@ -42,13 +42,10 @@ export class MCPClientAgent {
   }
 
   async connect(): Promise<void> {
-    // Start MCP server process
-    const serverProcess = spawn('node', ['dist/fraud-mcp-server.js'], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-    });
-
+    // Configure MCP server transport
     const transport = new StdioClientTransport({
-      stdout: serverProcess.stdout!,
+      command: 'node',
+      args: ['dist/fraud-mcp-server.js'],
     });
 
     await this.client.connect(transport);
@@ -96,7 +93,7 @@ export class MCPClientAgent {
           CallToolRequestSchema
         );
 
-        const scoreData = JSON.parse(scoreResult.content[0].text);
+        const scoreData = JSON.parse(scoreResult.params.content[0].text);
         console.log(`Fraud score for ${txn.id}: ${scoreData.fraud_score} (${scoreData.risk_level})`);
 
         // 3. Handle high-risk transactions

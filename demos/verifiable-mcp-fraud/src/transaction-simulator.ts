@@ -7,6 +7,7 @@ import { MCPClientAgent } from './mcp-client-agent.js';
 interface Transaction {
   id: string;
   amount: number;
+  currency: string;
   merchant: string;
   user_id: string;
   location: string;
@@ -39,6 +40,7 @@ class TransactionSimulator {
     return {
       id: `txn_${uuidv4().substring(0, 8)}`,
       amount,
+      currency: 'USD',
       merchant,
       user_id: user,
       location,
@@ -67,6 +69,7 @@ class TransactionSimulator {
           transactions.push({
             id: `normal_${i}`,
             amount: Math.random() * 500 + 10, // $10-$510
+            currency: 'USD',
             merchant: this.randomChoice(['Coffee Shop', 'Gas Station', 'Grocery Store']),
             user_id: this.randomChoice(this.users),
             location: this.randomChoice(['New York, NY', 'Los Angeles, CA', 'Chicago, IL']),
@@ -82,6 +85,7 @@ class TransactionSimulator {
           transactions.push({
             id: `suspicious_${i}`,
             amount: Math.random() * 15000 + 5000, // $5,000-$20,000
+            currency: 'USD',
             merchant: this.randomChoice(['Casino', 'Unknown Merchant', 'Crypto Exchange']),
             user_id: this.randomChoice(this.users),
             location: this.randomChoice(['Unknown', 'Offshore', 'Foreign']),
@@ -158,23 +162,32 @@ class TransactionSimulator {
       {
         id: 'demo_normal_001',
         amount: 50.00,
+        currency: 'USD',
         merchant: 'Coffee Shop',
         user_id: 'user_alice',
         location: 'New York, NY',
+        timestamp: new Date().toISOString(),
+        tenant_id: 'acme-corp',
       },
       {
         id: 'demo_high_risk_001',
         amount: 15000.00,
+        currency: 'USD',
         merchant: 'Casino',
         user_id: 'user_bob',
         location: 'Unknown',
+        timestamp: new Date().toISOString(),
+        tenant_id: 'acme-corp',
       },
       {
         id: 'demo_block_001',
         amount: 25000.00,
+        currency: 'USD',
         merchant: 'Crypto Exchange',
         user_id: 'user_charlie',
         location: 'Offshore',
+        timestamp: new Date().toISOString(),
+        tenant_id: 'acme-corp',
       },
     ];
 
@@ -198,7 +211,7 @@ async function main() {
 
   try {
     await agent.connect();
-    await agent.runPolicyDemo();
+    await agent.runFullDemo();
   } catch (error) {
     console.error('Agent failed:', error);
     process.exit(1);
