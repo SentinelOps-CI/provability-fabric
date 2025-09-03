@@ -121,6 +121,7 @@ services:
       - EVIDENCE_STORAGE_PATH=/tmp/evidence
     volumes:
       - evidence_data:/tmp/evidence
+      - ./external/CERT-V1:/root/external/CERT-V1
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,60 +150,61 @@ services:
       timeout: 10s
       retries: 3
 
-  runtime-sidecar:
-    build:
-      context: ./runtime/sidecar-watcher
-      dockerfile: Dockerfile
-    ports:
-      - "8006:8006"
-      - "9090:9090"  # Metrics port
-    environment:
-      - PORT=8006
-      - METRICS_PORT=9090
-      - REDIS_URL=redis://redis:6379
-      - ENFORCEMENT_MODE=enforce
-      - TENANT_ID=demo-tenant
-      - LEDGER_URL=http://evidence-service:8004
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # runtime-sidecar: (temporarily disabled due to compilation errors)
+  # runtime-sidecar:
+  #   build:
+  #     context: ./runtime/sidecar-watcher
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8006:8006"
+  #     - "9090:9090"  # Metrics port
+  #   environment:
+  #     - PORT=8006
+  #     - METRICS_PORT=9090
+  #     - REDIS_URL=redis://redis:6379
+  #     - ENFORCEMENT_MODE=enforce
+  #     - TENANT_ID=demo-tenant
+  #     - LEDGER_URL=http://evidence-service:8004
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
-  # Console Web UI
-  console:
-    build:
-      context: ./console
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_BASE_URL=http://localhost:8000
-    depends_on:
-      - api-gateway
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Console Web UI (temporarily disabled due to build issues)
+  # console:
+  #   build:
+  #     context: ./console
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - REACT_APP_API_BASE_URL=http://localhost:8000
+  #   depends_on:
+  #     - api-gateway
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
-  # Demo application
-  verifiable-mcp-fraud:
-    build:
-      context: .
-      dockerfile: demos/verifiable-mcp-fraud/Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - SENTINELOPS_API_URL=http://api-gateway:8000
-      - TENANT_ID=acme-corp
-      - SIDECAR_URL=http://runtime-sidecar:8006
-    depends_on:
-      - api-gateway
-      - runtime-sidecar
+  # Demo application (temporarily disabled due to npm issues)
+  # verifiable-mcp-fraud:
+  #   build:
+  #     context: .
+  #     dockerfile: demos/verifiable-mcp-fraud/Dockerfile
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     - SENTINELOPS_API_URL=http://api-gateway:8000
+  #     - TENANT_ID=acme-corp
+  #     - SIDECAR_URL=http://runtime-sidecar:8006
+  #   depends_on:
+  #     - api-gateway
+  #     - runtime-sidecar
 
   # Monitoring
   grafana:

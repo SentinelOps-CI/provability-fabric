@@ -15,7 +15,6 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
 COPY --from=builder /app/main .
-COPY --from=builder /app/../../external/CERT-V1 /root/external/CERT-V1
 
 EXPOSE 8004
 

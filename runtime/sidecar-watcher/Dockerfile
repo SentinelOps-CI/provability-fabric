@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-FROM rust:1.75 AS builder
+FROM rust:1.82 AS builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./

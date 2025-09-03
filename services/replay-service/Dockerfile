@@ -15,7 +15,6 @@ RUN apk --no-cache add ca-certificates python3 py3-pip
 WORKDIR /root/
 
 COPY --from=builder /app/main .
-COPY --from=builder /app/../../external/TRACE-REPLAY-KIT /root/external/TRACE-REPLAY-KIT
 
 EXPOSE 8005
 
