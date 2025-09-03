@@ -1,0 +1,16 @@
+# Exclude dependencies and OS cruft
+node_modules
+npm-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Exclude build output
+/dist
+
+# Ensure these files are included
+!package.json
+!package-lock.json
+!tsconfig.json
+!Dockerfile
+!src/
+!scripts/

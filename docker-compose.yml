@@ -192,8 +192,8 @@ services:
   # Demo application
   verifiable-mcp-fraud:
     build:
-      context: ./demos/verifiable-mcp-fraud
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: demos/verifiable-mcp-fraud/Dockerfile
     ports:
       - "3001:3001"
     environment:
