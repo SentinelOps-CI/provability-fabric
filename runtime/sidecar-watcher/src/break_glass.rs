@@ -269,7 +269,7 @@ impl BreakGlassManager {
     ) -> Result<(), String> {
         let request = self.active_requests
             .get_mut(request_id)
-            .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
+            .ok_or_else(|| format!("Break glass request {} not found", request_id)?;
 
         // Check if request is still pending
         if request.status != BreakGlassStatus::Pending {
@@ -326,7 +326,7 @@ impl BreakGlassManager {
     pub fn deny_request(&mut self, request_id: &str, reason: String) -> Result<(), String> {
         let request = self.active_requests
             .get_mut(request_id)
-            .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
+            .ok_or_else(|| format!("Break glass request {} not found", request_id)?;
 
         if request.status != BreakGlassStatus::Pending {
             return Err("Request is no longer pending".to_string());
@@ -346,7 +346,7 @@ impl BreakGlassManager {
     pub fn complete_request(&mut self, request_id: &str) -> Result<(), String> {
         let request = self.active_requests
             .get_mut(request_id)
-            .ok_or_else(|| format!("Break glass request {} not found", request_id))?);
+            .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
 
         if request.status != BreakGlassStatus::Approved {
             return Err("Request must be approved before completion".to_string());
