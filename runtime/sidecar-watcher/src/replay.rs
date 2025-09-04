@@ -14,10 +14,39 @@
  * limitations under the License.
  */
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+/// Custom serialization for std::time::Instant
+mod instant_serde {
+    use super::*;
+    use serde::de::Error;
+
+    pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let system_now = SystemTime::now();
+        let instant_now = Instant::now();
+        let duration_since_instant = instant_now.duration_since(*instant).unwrap_or(Duration::ZERO);
+        let approx_system_time = system_now - duration_since_instant;
+        approx_system_time.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Instant, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let system_time = SystemTime::deserialize(deserializer)?;
+        let system_now = SystemTime::now();
+        let instant_now = Instant::now();
+        let duration_since_system_time = system_now.duration_since(system_time).unwrap_or(Duration::ZERO);
+        let approx_instant = instant_now - duration_since_system_time;
+        Ok(approx_instant)
+    }
+}
 
 /// Replay configuration for deterministic execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,9 +81,11 @@ impl Default for ReplayConfig {
 pub struct ReplaySession {
     pub session_id: String,
     pub config: ReplayConfig,
+    #[serde(with = "instant_serde")]
     pub start_time: Instant,
     pub events: Vec<ReplayEvent>,
     pub chunk_buffer: Vec<u8>,
+    #[serde(with = "instant_serde")]
     pub last_flush: Instant,
     pub sequence_number: u64,
     pub drift_detected: bool,

@@ -5,14 +5,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package manifest and lock file for the demo (paths are relative to build context root)
-COPY demos/verifiable-mcp-fraud/package.json demos/verifiable-mcp-fraud/package-lock.json ./
+# Copy package manifest for the demo (paths are relative to build context root)
+COPY demos/verifiable-mcp-fraud/package.json ./
 
 # Copy local SDK so file:../../sdks/typescript resolves from /app to /sdks/typescript
 COPY sdks/typescript /sdks/typescript
-
-# TEMP: Debug contents before install
-RUN ls -la && echo "--- package-lock.json head ---" && (head -n 20 package-lock.json || true) && echo "--- end head ---"
 
 # Install all dependencies (including devDependencies for building)
 RUN npm install --no-audit --no-fund
@@ -31,8 +28,8 @@ WORKDIR /app
 # Install curl for health checks
 RUN apk add --no-cache curl
 
-# Copy package manifest and lock file explicitly (from repo root paths)
-COPY demos/verifiable-mcp-fraud/package.json demos/verifiable-mcp-fraud/package-lock.json ./
+# Copy package manifest explicitly (from repo root paths)
+COPY demos/verifiable-mcp-fraud/package.json ./
 
 # Copy local SDK for runtime install resolution (not strictly needed after build, but ensures parity)
 COPY sdks/typescript /sdks/typescript
@@ -59,6 +56,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/health || exit 1
 
 CMD ["npm", "start"]
-
-
-
