@@ -180,7 +180,7 @@ export const checkServiceHealth = async (service: string) => {
     });
     return { service, status: 'healthy', data: response.data };
   } catch (error) {
-    return { service, status: 'unhealthy', error: error.message };
+    return { service, status: 'unhealthy', error: (error as Error).message };
   }
 };
 

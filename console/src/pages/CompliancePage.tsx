@@ -4,6 +4,7 @@ import {
   DocumentArrowDownIcon,
   ChartBarIcon,
   LockClosedIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 interface ComplianceMetrics {

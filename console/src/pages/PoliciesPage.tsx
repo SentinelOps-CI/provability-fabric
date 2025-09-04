@@ -6,6 +6,7 @@ import {
   DocumentCheckIcon,
   RocketLaunchIcon,
   ClockIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { compilePolicy, buildPolicy, runProofs, deployPolicy } from '../services/api';
 
