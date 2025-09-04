@@ -14,10 +14,39 @@
  * limitations under the License.
  */
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
+
+/// Custom serialization for std::time::Instant
+mod instant_serde {
+    use super::*;
+    use serde::de::Error;
+
+    pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let system_now = SystemTime::now();
+        let instant_now = Instant::now();
+        let duration_since_instant = instant_now.duration_since(*instant).unwrap_or(Duration::ZERO);
+        let approx_system_time = system_now - duration_since_instant;
+        approx_system_time.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Instant, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let system_time = SystemTime::deserialize(deserializer)?;
+        let system_now = SystemTime::now();
+        let instant_now = Instant::now();
+        let duration_since_system_time = system_now.duration_since(system_time).unwrap_or(Duration::ZERO);
+        let approx_instant = instant_now - duration_since_system_time;
+        Ok(approx_instant)
+    }
+}
 
 /// Event priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -33,6 +62,7 @@ pub enum Priority {
 pub struct ScheduledEvent {
     pub id: String,
     pub priority: Priority,
+    #[serde(with = "instant_serde")]
     pub timestamp: Instant,
     pub session_id: String,
     pub event_type: String,

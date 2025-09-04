@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 SentinelOps Platform Contributors
+
+# Exclude node_modules from all locations to prevent symlink issues
+**/node_modules/**
+**/npm-debug.log*
+**/yarn-error.log*
+
+# Exclude build outputs
+**/dist
+**/build
+**/.next
+**/coverage
+**/target
+
+# Exclude development files
+.git
+.gitignore
+**/.env
+**/.env.local
+**/.vscode
+**/.idea
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+
+# Exclude OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Exclude documentation and test files (keep minimal)
+docs/
+**/README.md
+**/*.md
+tests/
+**/*.test.*
+**/*.spec.*
+
+# Exclude temporary files
+**/tmp
+**/temp
+**/.tmp
+
+# Exclude large vendor directories
+vendor/
+**/vendor
+
+# Keep essential files for Docker builds
+!sdks/typescript/
+!demos/verifiable-mcp-fraud/
+!services/*/
+!runtime/*/
+!package.json
+!package-lock.json
+!tsconfig.json
+!Cargo.toml
+!go.mod
+!Dockerfile
