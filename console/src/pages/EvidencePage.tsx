@@ -5,6 +5,7 @@ import {
   DocumentArrowDownIcon,
   PlayIcon,
   FunnelIcon,
+  DocumentMagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { searchCertificates, downloadCompliancePacket, startReplay } from '../services/api';
 
