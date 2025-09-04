@@ -70,7 +70,7 @@ pub enum EventType {
 }
 
 /// Principal information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Principal {
     pub id: String,
     pub roles: Vec<String>,

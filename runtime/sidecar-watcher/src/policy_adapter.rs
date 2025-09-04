@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use tracing::{error, info, warn};
 
 /// Principal represents a user, service, or agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Principal {
     pub id: String,
     pub roles: Vec<String>,
