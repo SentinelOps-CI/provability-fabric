@@ -15,7 +15,7 @@
  */
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -30,7 +30,9 @@ mod instant_serde {
     {
         let system_now = SystemTime::now();
         let instant_now = Instant::now();
-        let duration_since_instant = instant_now.duration_since(*instant).unwrap_or(Duration::ZERO);
+        let duration_since_instant = instant_now
+            .checked_duration_since(*instant)
+            .unwrap_or(Duration::ZERO);
         let approx_system_time = system_now - duration_since_instant;
         approx_system_time.serialize(serializer)
     }
@@ -42,7 +44,9 @@ mod instant_serde {
         let system_time = SystemTime::deserialize(deserializer)?;
         let system_now = SystemTime::now();
         let instant_now = Instant::now();
-        let duration_since_system_time = system_now.duration_since(system_time).unwrap_or(Duration::ZERO);
+        let duration_since_system_time = system_now
+            .duration_since(system_time)
+            .unwrap_or(Duration::ZERO);
         let approx_instant = instant_now - duration_since_system_time;
         Ok(approx_instant)
     }
@@ -158,16 +162,14 @@ impl SGEQScheduler {
 
         // Add to session-specific queue
         let mut session_events = self.session_events.lock().unwrap();
+        let session_id = event.session_id.clone();
         session_events
-            .entry(event.session_id.clone())
+            .entry(session_id.clone())
             .or_insert_with(VecDeque::new)
             .push_back(event);
 
         // Mark session as active
-        self.active_sessions
-            .lock()
-            .unwrap()
-            .insert(event.session_id);
+        self.active_sessions.lock().unwrap().insert(session_id);
 
         Ok(())
     }
@@ -259,16 +261,14 @@ impl TwoQueueScheduler {
 
         // Add to session-specific queue
         let mut session_events = self.session_events.lock().unwrap();
+        let session_id = event.session_id.clone();
         session_events
-            .entry(event.session_id.clone())
+            .entry(session_id.clone())
             .or_insert_with(VecDeque::new)
             .push_back(event);
 
         // Mark session as active
-        self.active_sessions
-            .lock()
-            .unwrap()
-            .insert(event.session_id);
+        self.active_sessions.lock().unwrap().insert(session_id);
 
         // Check if FIFO merge should be triggered
         if !self.merge_triggered && self.fifo_queue.len() >= self.config.fifo_merge_threshold {

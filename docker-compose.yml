@@ -22,8 +22,10 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -119,6 +121,7 @@ services:
       - EVIDENCE_STORAGE_PATH=/tmp/evidence
     volumes:
       - evidence_data:/tmp/evidence
+      - ./external/CERT-V1:/root/external/CERT-V1:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,14 +156,16 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8006:8006"
-      - "9090:9090" # Metrics port
+      # - "9090:9090"
+    expose:
+      - "9090" # Metrics port
     environment:
       - PORT=8006
       - METRICS_PORT=9090
       - REDIS_URL=redis://redis:6379
       - ENFORCEMENT_MODE=enforce
       - TENANT_ID=demo-tenant
-      - LEDGER_URL=http://evidence-service:8004
+      - LEDGER_URL=
     depends_on:
       redis:
         condition: service_healthy
@@ -206,7 +211,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3002:3000"
+      - "3003:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:

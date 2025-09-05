@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
+use crate::cert_v1::{write_cert, CertV1, MorphInfo};
 use crate::policy_adapter::{
-    Action, Ctx, EnforcementMode, PermissionResult, PolicyAdapter, PolicyConfig, Principal,
+    self, EnforcementMode, PermissionResult, PolicyAdapter, PolicyConfig, Tool,
 };
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
-use crate::cert_v1::{write_cert, CertV1, MorphInfo};
-use crate::ni_monitor::NIMonitor; // for naming consistency in docs
+use tracing::{error, info, warn}; // for naming consistency in docs
 
 /// Runtime event that triggers permitD evaluation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,8 +121,11 @@ impl PermitEnforcementHook {
             _ => {}
         }
 
+        // Convert to policy adapter RuntimeEvent format
+        let policy_event = self.convert_to_policy_event(event);
+
         // Evaluate permission using policy adapter
-        let permission_result = self.policy_adapter.process_event(event);
+        let permission_result = self.policy_adapter.process_event(&policy_event);
 
         // Update enforcement statistics
         if permission_result.allowed {
@@ -172,13 +174,16 @@ impl PermitEnforcementHook {
 
     fn emit_cert_v1(&self, event: &RuntimeEvent, result: &EnforcementResult) -> Result<()> {
         // Gather environment/config for required fields
-        let bundle_id = std::env::var("BUNDLE_ID").unwrap_or_else(|_| "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        let bundle_id = std::env::var("BUNDLE_ID").unwrap_or_else(|_| {
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()
+        });
         let policy_hash = std::env::var("POLICY_HASH").unwrap_or_default();
         let proof_hash = std::env::var("PROOF_HASH").unwrap_or_default();
         let automata_hash = std::env::var("AUTOMATA_HASH").unwrap_or_default();
         let labeler_hash = std::env::var("LABELER_HASH").unwrap_or_default();
         let sidecar_build = std::env::var("SIDECAR_BUILD").unwrap_or_else(|_| "dev".to_string());
-        let egress_profile = std::env::var("EGRESS_PROFILE").unwrap_or_else(|_| "EGRESS-DET-P1@1.0".to_string());
+        let egress_profile =
+            std::env::var("EGRESS_PROFILE").unwrap_or_else(|_| "EGRESS-DET-P1@1.0".to_string());
         let morph_block = if let (Ok(env_digest), Ok(branch_id), Ok(base_image)) = (
             std::env::var("MORPH_ENV_SNAPSHOT_DIGEST"),
             std::env::var("MORPH_BRANCH_ID"),
@@ -190,7 +195,9 @@ impl PermitEnforcementHook {
                 base_image,
                 morphvm_id: std::env::var("MORPHVM_ID").ok(),
             })
-        } else { None };
+        } else {
+            None
+        };
 
         // Map NI monitor verdict from feature flags or default
         let ni_monitor = if result.allowed { "accept" } else { "reject" }.to_string();
@@ -249,7 +256,7 @@ impl PermitEnforcementHook {
     /// Process read event with witness validation
     pub fn process_read_event(&mut self, event: &RuntimeEvent) -> Result<EnforcementResult> {
         // Validate Merkle path witness if in high assurance mode
-        if self
+        if *self
             .feature_flags
             .get("witness_validation")
             .unwrap_or(&false)
@@ -289,7 +296,7 @@ impl PermitEnforcementHook {
     /// Process write event with witness and label validation
     pub fn process_write_event(&mut self, event: &RuntimeEvent) -> Result<EnforcementResult> {
         // Validate Merkle path witness
-        if self
+        if *self
             .feature_flags
             .get("witness_validation")
             .unwrap_or(&false)
@@ -324,7 +331,7 @@ impl PermitEnforcementHook {
         }
 
         // Validate label derivation
-        if self.feature_flags.get("label_derivation").unwrap_or(&false) {
+        if *self.feature_flags.get("label_derivation").unwrap_or(&false) {
             if let (Some(ref source), Some(ref target)) = (&event.source_label, &event.target_label)
             {
                 if !self.validate_label_derivation(source, target) {
@@ -403,7 +410,7 @@ impl PermitEnforcementHook {
 
     /// Get enforcement mode as string
     fn get_enforcement_mode_string(&self) -> String {
-        match self.policy_adapter.config.enforcement_mode {
+        match self.policy_adapter.get_enforcement_mode() {
             EnforcementMode::Enforce => "enforce".to_string(),
             EnforcementMode::Shadow => "shadow".to_string(),
             EnforcementMode::Monitor => "monitor".to_string(),
@@ -442,6 +449,31 @@ impl PermitEnforcementHook {
     /// Update feature flags
     pub fn update_feature_flags(&mut self, flags: HashMap<String, bool>) {
         self.feature_flags = flags;
+    }
+
+    /// Convert permit enforcement RuntimeEvent to policy adapter RuntimeEvent
+    fn convert_to_policy_event(&self, event: &RuntimeEvent) -> policy_adapter::RuntimeEvent {
+        policy_adapter::RuntimeEvent {
+            event_type: event.event_type.clone(),
+            user_id: event.user_id.clone(),
+            roles: event.roles.clone(),
+            organization: event.organization.clone(),
+            session_id: event.session_id.clone(),
+            epoch: event.epoch,
+            attributes: event.attributes.clone(),
+            tenant: event.tenant.clone(),
+            timestamp: event.timestamp,
+            tool: event.tool.as_ref().map(|t| match t.as_str() {
+                "SendEmail" => Tool::SendEmail,
+                "FileRead" => Tool::FileRead,
+                "FileWrite" => Tool::FileWrite,
+                "DatabaseQuery" => Tool::DatabaseQuery,
+                _ => Tool::SendEmail, // default fallback
+            }),
+            resource_uri: event.resource_uri.clone().unwrap_or_default(),
+            resource_version: event.resource_version,
+            field_path: event.field_path.clone(),
+        }
     }
 }
 

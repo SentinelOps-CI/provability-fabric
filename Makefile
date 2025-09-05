@@ -1,116 +1,136 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down install dev
+.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild
 
-# Default target
+# ---------- Cross-platform helpers ----------
+# Seconds to wait after starting containers (override with: make demo-up WAIT=10)
+WAIT ?= 30
+
+ifeq ($(OS),Windows_NT)
+SLEEP        = powershell -NoProfile -Command "Start-Sleep -Seconds"
+RM_RF        = powershell -NoProfile -Command "param([string[]]$$p); foreach($$x in $$p){ if (Test-Path $$x){ Remove-Item $$x -Recurse -Force -ErrorAction SilentlyContinue } }" --
+FIND_PYC     = powershell -NoProfile -Command "Get-ChildItem -Recurse -Filter *.pyc -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Get-ChildItem -Recurse -Directory -Filter __pycache__ -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue"
+ECHOOK       = echo
+else
+SLEEP        = sleep
+RM_RF        = rm -rf
+FIND_PYC     = sh -lc 'find . -name "*.pyc" -delete; find . -name "__pycache__" -type d -exec rm -rf {} +'
+ECHOOK       = echo
+endif
+
+# Docker Compose wrapper
+DC := docker compose
+
+# ---------- Default target ----------
 help:
-	@echo "SentinelOps Platform - Available Commands:"
-	@echo ""
-	@echo "Development:"
-	@echo "  make dev          - Start development environment"
-	@echo "  make build        - Build all services"
-	@echo "  make test         - Run all tests"
-	@echo "  make clean        - Clean build artifacts"
-	@echo ""
-	@echo "Demo:"
-	@echo "  make demo-up      - Start complete demo environment"
-	@echo "  make demo-down    - Stop demo environment"
-	@echo "  make demo-setup   - Setup demo data and policies"
-	@echo ""
-	@echo "Platform:"
-	@echo "  make install      - Install platform locally"
-	@echo "  make validate-certs - Validate all CERT-V1 certificates"
-	@echo "  make lint         - Run linting on all code"
-	@echo ""
+	@$(ECHOOK) "SentinelOps Platform - Available Commands:"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "Development:"
+	@$(ECHOOK) "  make dev             - Start development environment"
+	@$(ECHOOK) "  make build           - Build all services"
+	@$(ECHOOK) "  make test            - Run all tests"
+	@$(ECHOOK) "  make clean           - Clean build artifacts"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "Demo:"
+	@$(ECHOOK) "  make demo-up         - Start complete demo environment"
+	@$(ECHOOK) "  make demo-down       - Stop demo environment"
+	@$(ECHOOK) "  make demo-setup      - Setup demo data and policies"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "Platform:"
+	@$(ECHOOK) "  make install         - Install platform locally"
+	@$(ECHOOK) "  make validate-certs  - Validate all CERT-V1 certificates"
+	@$(ECHOOK) "  make lint            - Run linting on all code"
+	@$(ECHOOK) ""
 
-# Development environment
+# ---------- Development ----------
 dev:
-	@echo "🚀 Starting SentinelOps Platform development environment..."
-	docker compose up --build -d postgres redis
-	@echo "⏳ Waiting for databases to be ready..."
-	sleep 10
-	@echo "🔧 Starting platform services..."
-	docker compose up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
-	@echo "✅ Development environment ready!"
-	@echo "🌐 Console UI: http://localhost:3000"
-	@echo "🔗 API Gateway: http://localhost:8000"
+	@$(ECHOOK) "🚀 Starting SentinelOps Platform development environment..."
+	$(DC) up --build -d postgres redis
+	@$(ECHOOK) "⏳ Waiting for databases to be ready..."
+	@$(SLEEP) 10
+	@$(ECHOOK) "🔧 Starting platform services..."
+	$(DC) up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
+	@$(ECHOOK) "✅ Development environment ready!"
+	@$(ECHOOK) "🌐 Console UI: http://localhost:3000"
+	@$(ECHOOK) "🔗 API Gateway: http://localhost:8000"
 
-# Build all services
+# ---------- Build / Test ----------
 build:
-	@echo "🔨 Building all platform services..."
-	docker compose build
+	@$(ECHOOK) "🔨 Building all platform services..."
+	$(DC) build
 
-# Run tests
 test:
-	@echo "🧪 Running platform tests..."
+	@$(ECHOOK) "🧪 Running platform tests..."
 	python tests/trust_fire_orchestrator.py
-	@echo "🧪 Running integration tests..."
+	@$(ECHOOK) "🧪 Running integration tests..."
 	python tests/integration/test_platform_integration.py
-	@echo "🧪 Running demo tests..."
+	@$(ECHOOK) "🧪 Running demo tests..."
 	cd demos/verifiable-mcp-fraud && npm test
 
-# Clean build artifacts
 clean:
-	@echo "🧹 Cleaning build artifacts..."
-	docker compose down -v
+	@$(ECHOOK) "🧹 Cleaning build artifacts..."
+	$(DC) down -v
 	docker system prune -f
-	rm -rf build/ dist/ coverage/ .pytest_cache/
-	find . -name "*.pyc" -delete
-	find . -name "__pycache__" -delete
+	-$(RM_RF) build/ dist/ coverage/ .pytest_cache/
+	-$(FIND_PYC)
 
-# Demo environment
+# ---------- Demo ----------
 demo-up:
-	@echo "🎬 Starting SentinelOps Platform Demo..."
-	@echo "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
-	docker compose up --build -d
-	@echo "⏳ Waiting for services to be ready..."
-	sleep 30
-	@echo "🎯 Setting up demo data..."
+	@$(ECHOOK) "🎬 Starting SentinelOps Platform Demo..."
+	@$(ECHOOK) "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
+	$(DC) up --build -d
+	@$(ECHOOK) "⏳ Waiting for services to be ready ($(WAIT)s)..."
+	@$(SLEEP) $(WAIT)
+	@$(ECHOOK) "🎯 Setting up demo data..."
 	$(MAKE) demo-setup
-	@echo ""
-	@echo "✅ Demo environment ready!"
-	@echo ""
-	@echo "🌐 Access Points:"
-	@echo "  Console UI:     http://localhost:3000"
-	@echo "  API Gateway:    http://localhost:8000"
-	@echo "  Grafana:        http://localhost:3002 (admin/admin)"
-	@echo "  Demo App:       http://localhost:3001"
-	@echo ""
-	@echo "🎯 Demo Flow:"
-	@echo "  1. Open Console UI and go to Policies tab"
-	@echo "  2. See the fraud detection policy compiled and deployed"
-	@echo "  3. Go to Runtime tab to monitor live metrics"
-	@echo "  4. Go to Evidence tab to see CERT-V1 certificates"
-	@echo "  5. Run replays to verify 99.9%+ low-view equality"
-	@echo "  6. Download compliance packets"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "✅ Demo environment ready!"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "🌐 Access Points:"
+	@$(ECHOOK) "  Console UI:     http://localhost:3000"
+	@$(ECHOOK) "  API Gateway:    http://localhost:8000"
+	@$(ECHOOK) "  Grafana:        http://localhost:3002 (admin/admin)"
+	@$(ECHOOK) "  Demo App:       http://localhost:3001"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "🎯 Demo Flow:"
+	@$(ECHOOK) "  1. Open Console UI and go to Policies tab"
+	@$(ECHOOK) "  2. See the fraud detection policy compiled and deployed"
+	@$(ECHOOK) "  3. Go to Runtime tab to monitor live metrics"
+	@$(ECHOOK) "  4. Go to Evidence tab to see CERT-V1 certificates"
+	@$(ECHOOK) "  5. Run replays to verify 99.9%+ low-view equality"
+	@$(ECHOOK) "  6. Download compliance packets"
 
 demo-down:
-	@echo "🛑 Stopping demo environment..."
-	docker compose down
-	@echo "✅ Demo environment stopped"
+	@$(ECHOOK) "🛑 Stopping demo environment..."
+	$(DC) down
+	@$(ECHOOK) "✅ Demo environment stopped"
 
+# Run setup **inside** the verifiable-mcp-fraud container using compiled JS
 demo-setup:
-	@echo "🎯 Setting up demo data and policies..."
-	cd demos/verifiable-mcp-fraud && npm run demo:setup
-	@echo "✅ Demo setup completed"
+	@$(ECHOOK) "🎯 Setting up demo data and policies..."
+	$(DC) run --rm verifiable-mcp-fraud node dist/scripts/setup-demo.js
+	@$(ECHOOK) "✅ Demo setup completed"
 
-# Install platform locally
+# Optional convenience: run the demo script inside the container
+demo-run:
+	@$(ECHOOK) "▶️ Running demo script..."
+	$(DC) run --rm verifiable-mcp-fraud node dist/scripts/run-demo.js
+
+# ---------- Platform ----------
 install:
-	@echo "📦 Installing SentinelOps Platform locally..."
+	@$(ECHOOK) "📦 Installing SentinelOps Platform locally..."
 	./scripts/install.sh
-	@echo "✅ Platform installed successfully"
+	@$(ECHOOK) "✅ Platform installed successfully"
 
-# Validate CERT-V1 certificates
 validate-certs:
-	@echo "🔍 Validating CERT-V1 certificates..."
+	@$(ECHOOK) "🔍 Validating CERT-V1 certificates..."
 	python tools/cert-validate/validate.py evidence/egress_certs/*.json
 	python tools/cert-validate/validate.py evidence/certs/**/*.cert.json
-	@echo "✅ Certificate validation completed"
+	@$(ECHOOK) "✅ Certificate validation completed"
 
-# Lint all code
 lint:
-	@echo "🔍 Running linting on all code..."
+	@$(ECHOOK) "🔍 Running linting on all code..."
 	# Go services
 	cd services/spec-service && go fmt ./... && go vet ./...
 	cd services/proof-service && go fmt ./... && go vet ./...
@@ -126,61 +146,64 @@ lint:
 	cd sdks/typescript && npm run lint
 	# Python
 	python -m flake8 tools/ tests/ --max-line-length=100
-	@echo "✅ Linting completed"
+	@$(ECHOOK) "✅ Linting completed"
 
-# Performance benchmarks
 bench:
-	@echo "⚡ Running performance benchmarks..."
+	@$(ECHOOK) "⚡ Running performance benchmarks..."
 	cd demos/verifiable-mcp-fraud && npm run benchmark
 	python tests/performance/performance_benchmarks.py
-	@echo "✅ Benchmarks completed"
+	@$(ECHOOK) "✅ Benchmarks completed"
 
-# Security tests
 security:
-	@echo "🔒 Running security tests..."
+	@$(ECHOOK) "🔒 Running security tests..."
 	python tests/redteam/abac_fuzz.py --queries 1000
 	python tests/redteam/pii_leak.py --vectors 1000
 	python tests/security/malicious_adapter_test.py
-	@echo "✅ Security tests completed"
+	@$(ECHOOK) "✅ Security tests completed"
 
-# Full test suite
 test-all: test security bench validate-certs
-	@echo "🎉 All tests completed successfully!"
+	@$(ECHOOK) "🎉 All tests completed successfully!"
 
-# Production deployment helpers
+# ---------- Deploy helpers ----------
 helm-install:
-	@echo "☸️  Installing with Helm..."
+	@$(ECHOOK) "☸️  Installing with Helm..."
 	helm install sentinelops-platform charts/pf-enforce/ \
 		--set global.environment=production \
 		--set global.domain=platform.sentinelops.ai
-	@echo "✅ Helm installation completed"
+	@$(ECHOOK) "✅ Helm installation completed"
 
 helm-upgrade:
-	@echo "🔄 Upgrading Helm deployment..."
+	@$(ECHOOK) "🔄 Upgrading Helm deployment..."
 	helm upgrade sentinelops-platform charts/pf-enforce/
-	@echo "✅ Helm upgrade completed"
+	@$(ECHOOK) "✅ Helm upgrade completed"
 
-# Documentation
+# ---------- Docs ----------
 docs:
-	@echo "📚 Building documentation..."
+	@$(ECHOOK) "📚 Building documentation..."
 	mkdocs build
-	@echo "✅ Documentation built"
+	@$(ECHOOK) "✅ Documentation built"
 
 docs-serve:
-	@echo "📚 Serving documentation..."
+	@$(ECHOOK) "📚 Serving documentation..."
 	mkdocs serve --dev-addr=127.0.0.1:8002
 
-# Quick start for new users
+# ---------- Convenience ----------
+logs:
+	$(DC) logs -f
+
+rebuild:
+	$(DC) build --no-cache
+	$(MAKE) demo-up
+
 quick-start: build demo-up
-	@echo ""
-	@echo "🎉 SentinelOps Platform is ready!"
-	@echo ""
-	@echo "👨‍💻 For Developers:"
-	@echo "  Write policy in English → see ActionDSL preview → compile → proof run → deploy"
-	@echo ""
-	@echo "🛡️  For Security/Compliance:"
-	@echo "  Browse certificates → filter by policy/tenant → export compliance packet"
-	@echo ""
-	@echo "⚙️  For SRE/Platform:"
-	@echo "  Monitor SLOs → check cert validation → roll back epochs → fetch artifacts"
-	@echo ""
+	@$(ECHOOK) ""
+	@$(ECHOOK) "🎉 SentinelOps Platform is ready!"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "👨‍💻 For Developers:"
+	@$(ECHOOK) "  Write policy in English → see ActionDSL preview → compile → proof run → deploy"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "🛡️  For Security/Compliance:"
+	@$(ECHOOK) "  Browse certificates → filter by policy/tenant → export compliance packet"
+	@$(ECHOOK) ""
+	@$(ECHOOK) "⚙️  For SRE/Platform:"
+	@$(ECHOOK) "  Monitor SLOs → check cert validation → roll back epochs → fetch artifacts"

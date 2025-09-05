@@ -15,7 +15,9 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
 COPY --from=builder /app/main .
-COPY --from=builder /app/../../external/CERT-V1 /root/external/CERT-V1
+#COPY --from=builder /app/../../external/CERT-V1 /root/external/CERT-V1
+# (CERT-V1 is bind-mounted by docker compose)
+RUN mkdir -p /root/external/CERT-V1
 
 EXPOSE 8004
 

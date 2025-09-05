@@ -158,7 +158,7 @@ impl DFAInterpreter {
 
         // Find transition
         let key = (self.current_state, event.to_string());
-        let next_state = self.transition_map.get(&key).ok_or_else(|| {
+        let next_state = *self.transition_map.get(&key).ok_or_else(|| {
             format!(
                 "No transition for state {} with event {}",
                 self.current_state, event
@@ -169,7 +169,7 @@ impl DFAInterpreter {
         self.update_rate_limits(event, current_time);
 
         // Transition to next state
-        self.current_state = *next_state;
+        self.current_state = next_state;
         Ok(true)
     }
 
