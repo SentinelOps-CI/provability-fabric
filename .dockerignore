@@ -54,5 +54,6 @@ vendor/
 !package-lock.json
 !tsconfig.json
 !Cargo.toml
+!Cargo.lock
 !go.mod
 !Dockerfile

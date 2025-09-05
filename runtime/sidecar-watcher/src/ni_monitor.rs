@@ -353,24 +353,29 @@ impl NIMonitorState {
         let prefix_id = self.generate_prefix_id(&event);
 
         // Get or create prefix
-        let prefix = self.prefixes.entry(prefix_id.clone()).or_insert_with(|| {
-            NIPrefix::new(
-                prefix_id,
-                event
-                    .input_labels
-                    .first()
-                    .unwrap_or(&SecurityLabel::Public)
-                    .clone(),
-                event
-                    .output_labels
-                    .first()
-                    .unwrap_or(&SecurityLabel::Public)
-                    .clone(),
-            )
-        });
+        {
+            let prefix = self.prefixes.entry(prefix_id.clone()).or_insert_with(|| {
+                NIPrefix::new(
+                    prefix_id.clone(),
+                    event
+                        .input_labels
+                        .first()
+                        .unwrap_or(&SecurityLabel::Public)
+                        .clone(),
+                    event
+                        .output_labels
+                        .first()
+                        .unwrap_or(&SecurityLabel::Public)
+                        .clone(),
+                )
+            });
 
-        // Add event to prefix
-        prefix.add_event(event.clone());
+            // Add event to prefix
+            prefix.add_event(event.clone());
+        }
+
+        // Get prefix reference for violation checking and logging
+        let prefix = self.prefixes.get(&prefix_id).unwrap();
 
         // Check for non-interference violations
         if prefix.violates_ni() {
@@ -382,11 +387,13 @@ impl NIMonitorState {
         }
 
         // Track active session
-        self.active_sessions.insert(event.session_id);
+        self.active_sessions.insert(event.session_id.clone());
 
         // Audit logging
         if self.config.enable_audit_logging {
-            self.log_audit_event(&event, prefix);
+            // Clone prefix data to avoid borrowing conflict
+            let prefix_clone = prefix.clone();
+            self.log_audit_event(&event, &prefix_clone);
         }
 
         Ok(true)
@@ -492,7 +499,7 @@ impl NIMonitorState {
         let label_ordering_ok = self
             .prefixes
             .iter()
-            .all(|prefix| prefix.input_label.le(&prefix.output_label));
+            .all(|(_name, prefix)| prefix.input_label.le(&prefix.output_label));
 
         // Condition 2: No violations in strict mode
         let no_violations = self.violation_count == 0 || !self.config.strict_mode;

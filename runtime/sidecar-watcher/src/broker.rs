@@ -37,7 +37,7 @@ pub struct AccessReceipt {
     pub sig: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolCall {
     pub tool: String,
     pub args: HashMap<String, serde_json::Value>,
@@ -54,7 +54,7 @@ pub struct ToolResult {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Violation {
     pub violation_type: String,
     pub reason: String,

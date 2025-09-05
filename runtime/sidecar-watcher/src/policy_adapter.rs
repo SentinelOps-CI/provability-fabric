@@ -31,6 +31,7 @@ pub enum Tool {
     NetworkCall,
     FileRead,
     FileWrite,
+    DatabaseQuery,
     Custom { name: String },
 }
 
@@ -113,7 +114,13 @@ impl LeanInterface {
     }
 
     /// Evaluate permitD for a given principal, action, and context
-    pub fn evaluate_permit(&self, principal: &Principal, action: &Action, ctx: &Ctx) -> bool {
+    pub fn evaluate_permit(
+        &self,
+        principal: &Principal,
+        action: &Action,
+        ctx: &Ctx,
+        config: &PolicyConfig,
+    ) -> bool {
         match action {
             Action::Call { tool } => match tool {
                 Tool::SendEmail => {
@@ -140,6 +147,10 @@ impl LeanInterface {
                     principal.roles.contains(&"file_writer".to_string())
                         || principal.roles.contains(&"admin".to_string())
                 }
+                Tool::DatabaseQuery => {
+                    principal.roles.contains(&"db_user".to_string())
+                        || principal.roles.contains(&"admin".to_string())
+                }
                 Tool::Custom { name: _ } => principal.roles.contains(&"admin".to_string()),
             },
             Action::Read { doc, path } => {
@@ -150,7 +161,7 @@ impl LeanInterface {
                         && principal.org == "owner_org");
 
                 // In high assurance mode, validate witness and label derivation
-                if self.config.high_assurance_mode {
+                if config.high_assurance_mode {
                     has_read_permission && self.validate_read_witness(doc, path, ctx)
                 } else {
                     has_read_permission
@@ -164,7 +175,7 @@ impl LeanInterface {
                         && principal.org == "owner_org");
 
                 // In high assurance mode, validate witness and label derivation
-                if self.config.high_assurance_mode {
+                if config.high_assurance_mode {
                     has_write_permission && self.validate_write_witness(doc, path, ctx)
                 } else {
                     has_write_permission
@@ -295,7 +306,7 @@ impl PolicyAdapter {
 
         // Evaluate permitD
         let permit_allowed = if let Some(ref lean_interface) = self.lean_interface {
-            lean_interface.evaluate_permit(principal, action, ctx)
+            lean_interface.evaluate_permit(principal, action, ctx, &self.config)
         } else {
             false
         };
@@ -433,6 +444,11 @@ impl PolicyAdapter {
     pub fn get_current_epoch(&self) -> u64 {
         self.epoch_manager.get_current_epoch()
     }
+
+    /// Get enforcement mode
+    pub fn get_enforcement_mode(&self) -> &EnforcementMode {
+        &self.config.enforcement_mode
+    }
 }
 
 /// Enforcement statistics for monitoring
@@ -513,53 +529,21 @@ impl WorldState {
     pub fn has_path_witness(&self, doc: &DocId, path: &[String]) -> bool {
         // In a real implementation, this would check Merkle path witnesses
         // For now, we'll simulate this
-        let doc_key = format!("{}:{}", doc.uri, doc.version);
-        self.documents.contains_key(&doc_key)
+        self.documents.contains_key(doc)
     }
 
     pub fn can_derive_labels(&self, doc: &DocId) -> bool {
         // In a real implementation, this would check if we can derive labels
         // For now, we'll simulate this
-        let doc_key = format!("{}:{}", doc.uri, doc.version);
-        self.labels.contains_key(&doc_key)
+        self.labels.contains_key(doc)
     }
 
     pub fn add_document(&mut self, doc: &DocId, state: DocumentState) {
-        let doc_key = format!("{}:{}", doc.uri, doc.version);
-        self.documents.insert(doc_key, state);
+        self.documents.insert(doc.clone(), state);
     }
 
-    pub fn add_labels(&mut self, doc: &DocId, labels: Vec<String>) {
-        let doc_key = format!("{}:{}", doc.uri, doc.version);
-        self.labels.insert(doc_key, labels);
-    }
-}
-
-/// Document state for witness validation
-#[derive(Debug, Clone)]
-pub struct DocumentState {
-    pub owner: String,
-    pub acls: Vec<(String, Vec<String>)>,
-    pub merkle_root: String,
-    pub field_commits: HashMap<String, String>,
-}
-
-impl DocumentState {
-    pub fn new(owner: String, merkle_root: String) -> Self {
-        Self {
-            owner,
-            acls: Vec::new(),
-            merkle_root,
-            field_commits: HashMap::new(),
-        }
-    }
-
-    pub fn add_acl(&mut self, principal: String, permissions: Vec<String>) {
-        self.acls.push((principal, permissions));
-    }
-
-    pub fn add_field_commit(&mut self, path: String, commit: String) {
-        self.field_commits.insert(path, commit);
+    pub fn add_labels(&mut self, doc: &DocId, labels: Label) {
+        self.labels.insert(doc.clone(), labels);
     }
 }
 

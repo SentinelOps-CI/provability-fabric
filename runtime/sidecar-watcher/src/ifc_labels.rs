@@ -57,51 +57,123 @@ pub struct WitnessInfo {
 impl LabelManager {
     pub fn new() -> Result<Self> {
         let mut labels = HashMap::new();
-        
+
         // Initialize default labels
-        labels.insert("public".to_string(), Label {
-            name: "public".to_string(),
-            level: 0,
-            categories: vec!["unclassified".to_string()],
-            tenant: "default".to_string(),
-        });
-        
-        labels.insert("internal".to_string(), Label {
-            name: "internal".to_string(),
-            level: 1,
-            categories: vec!["internal".to_string()],
-            tenant: "default".to_string(),
-        });
-        
-        labels.insert("confidential".to_string(), Label {
-            name: "confidential".to_string(),
-            level: 2,
-            categories: vec!["confidential".to_string()],
-            tenant: "default".to_string(),
-        });
-        
-        labels.insert("secret".to_string(), Label {
-            name: "secret".to_string(),
-            level: 3,
-            categories: vec!["secret".to_string()],
-            tenant: "default".to_string(),
-        });
+        labels.insert(
+            "public".to_string(),
+            Label {
+                name: "public".to_string(),
+                level: 0,
+                categories: vec!["unclassified".to_string()],
+                tenant: "default".to_string(),
+            },
+        );
+
+        labels.insert(
+            "internal".to_string(),
+            Label {
+                name: "internal".to_string(),
+                level: 1,
+                categories: vec!["internal".to_string()],
+                tenant: "default".to_string(),
+            },
+        );
+
+        labels.insert(
+            "confidential".to_string(),
+            Label {
+                name: "confidential".to_string(),
+                level: 2,
+                categories: vec!["confidential".to_string()],
+                tenant: "default".to_string(),
+            },
+        );
+
+        labels.insert(
+            "secret".to_string(),
+            Label {
+                name: "secret".to_string(),
+                level: 3,
+                categories: vec!["secret".to_string()],
+                tenant: "default".to_string(),
+            },
+        );
 
         // Default flow policies (allow upward flow, deny downward)
         let flow_policies = vec![
-            FlowPolicy { from: "public".to_string(), to: "internal".to_string(), allowed: true, condition: None },
-            FlowPolicy { from: "public".to_string(), to: "confidential".to_string(), allowed: true, condition: None },
-            FlowPolicy { from: "public".to_string(), to: "secret".to_string(), allowed: true, condition: None },
-            FlowPolicy { from: "internal".to_string(), to: "confidential".to_string(), allowed: true, condition: None },
-            FlowPolicy { from: "internal".to_string(), to: "secret".to_string(), allowed: true, condition: None },
-            FlowPolicy { from: "confidential".to_string(), to: "secret".to_string(), allowed: true, condition: None },
+            FlowPolicy {
+                from: "public".to_string(),
+                to: "internal".to_string(),
+                allowed: true,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "public".to_string(),
+                to: "confidential".to_string(),
+                allowed: true,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "public".to_string(),
+                to: "secret".to_string(),
+                allowed: true,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "internal".to_string(),
+                to: "confidential".to_string(),
+                allowed: true,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "internal".to_string(),
+                to: "secret".to_string(),
+                allowed: true,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "confidential".to_string(),
+                to: "secret".to_string(),
+                allowed: true,
+                condition: None,
+            },
             // Deny downward flows
-            FlowPolicy { from: "internal".to_string(), to: "public".to_string(), allowed: false, condition: None },
-            FlowPolicy { from: "confidential".to_string(), to: "public".to_string(), allowed: false, condition: None },
-            FlowPolicy { from: "confidential".to_string(), to: "internal".to_string(), allowed: false, condition: None },
-            FlowPolicy { from: "secret".to_string(), to: "public".to_string(), allowed: false, condition: None },
-            FlowPolicy { from: "secret".to_string(), to: "internal".to_string(), allowed: false, condition: None },
-            FlowPolicy { from: "secret".to_string(), to: "confidential".to_string(), allowed: false, condition: None },
+            FlowPolicy {
+                from: "internal".to_string(),
+                to: "public".to_string(),
+                allowed: false,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "confidential".to_string(),
+                to: "public".to_string(),
+                allowed: false,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "confidential".to_string(),
+                to: "internal".to_string(),
+                allowed: false,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "secret".to_string(),
+                to: "public".to_string(),
+                allowed: false,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "secret".to_string(),
+                to: "internal".to_string(),
+                allowed: false,
+                condition: None,
+            },
+            FlowPolicy {
+                from: "secret".to_string(),
+                to: "confidential".to_string(),
+                allowed: false,
+                condition: None,
+            },
         ];
 
         Ok(Self {
@@ -112,8 +184,15 @@ impl LabelManager {
         })
     }
 
-    pub fn attach_label(&mut self, data_id: String, label_name: String, witness_id: String) -> Result<()> {
-        let label = self.labels.get(&label_name)
+    pub fn attach_label(
+        &mut self,
+        data_id: String,
+        label_name: String,
+        witness_id: String,
+    ) -> Result<()> {
+        let label = self
+            .labels
+            .get(&label_name)
             .ok_or_else(|| anyhow::anyhow!("Unknown label: {}", label_name))?
             .clone();
 
@@ -124,9 +203,9 @@ impl LabelManager {
             metadata: HashMap::new(),
         };
 
-        self.labeled_data.insert(data_id, labeled_data);
+        self.labeled_data.insert(data_id.clone(), labeled_data);
         debug!("Attached label {} to data {}", label_name, data_id);
-        
+
         Ok(())
     }
 
@@ -138,7 +217,7 @@ impl LabelManager {
 
         // Validate new witness (simplified - in production would verify Merkle proofs)
         let valid = !path.is_empty() && path.iter().all(|p| !p.is_empty());
-        
+
         let witness_info = WitnessInfo {
             witness_id: witness_id.to_string(),
             path: path.clone(),
@@ -149,8 +228,9 @@ impl LabelManager {
             valid,
         };
 
-        self.witness_cache.insert(witness_id.to_string(), witness_info);
-        
+        self.witness_cache
+            .insert(witness_id.to_string(), witness_info);
+
         debug!("Validated witness {}: {}", witness_id, valid);
         Ok(valid)
     }
@@ -159,21 +239,23 @@ impl LabelManager {
         // Find applicable flow policy
         for policy in &self.flow_policies {
             if policy.from == from_label && policy.to == to_label {
-                let from_label_obj = self.labels.get(from_label).cloned()
-                    .unwrap_or_else(|| Label {
-                        name: from_label.to_string(),
-                        level: 0,
-                        categories: vec![],
-                        tenant: "unknown".to_string(),
-                    });
-                
-                let to_label_obj = self.labels.get(to_label).cloned()
-                    .unwrap_or_else(|| Label {
-                        name: to_label.to_string(),
-                        level: 0,
-                        categories: vec![],
-                        tenant: "unknown".to_string(),
-                    });
+                let from_label_obj =
+                    self.labels
+                        .get(from_label)
+                        .cloned()
+                        .unwrap_or_else(|| Label {
+                            name: from_label.to_string(),
+                            level: 0,
+                            categories: vec![],
+                            tenant: "unknown".to_string(),
+                        });
+
+                let to_label_obj = self.labels.get(to_label).cloned().unwrap_or_else(|| Label {
+                    name: to_label.to_string(),
+                    level: 0,
+                    categories: vec![],
+                    tenant: "unknown".to_string(),
+                });
 
                 return FlowCheck {
                     from_label: from_label_obj,
@@ -190,8 +272,18 @@ impl LabelManager {
 
         // Default deny for unknown flows
         FlowCheck {
-            from_label: Label { name: from_label.to_string(), level: 0, categories: vec![], tenant: "unknown".to_string() },
-            to_label: Label { name: to_label.to_string(), level: 0, categories: vec![], tenant: "unknown".to_string() },
+            from_label: Label {
+                name: from_label.to_string(),
+                level: 0,
+                categories: vec![],
+                tenant: "unknown".to_string(),
+            },
+            to_label: Label {
+                name: to_label.to_string(),
+                level: 0,
+                categories: vec![],
+                tenant: "unknown".to_string(),
+            },
             allowed: false,
             reason: "No flow policy found - default deny".to_string(),
         }
@@ -212,12 +304,12 @@ impl LabelManager {
 
     pub fn get_label_stats(&self) -> HashMap<String, u32> {
         let mut stats = HashMap::new();
-        
+
         for (_, labeled_data) in &self.labeled_data {
             let count = stats.entry(labeled_data.label.name.clone()).or_insert(0);
             *count += 1;
         }
-        
+
         stats
     }
 }

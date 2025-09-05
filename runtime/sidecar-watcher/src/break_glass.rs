@@ -37,7 +37,7 @@ impl Default for BreakGlassConfig {
         Self {
             enable_break_glass: true,
             m_of_n_threshold: (2, 3), // 2 of 3 signatures required
-            ttl_seconds: 3600, // 1 hour
+            ttl_seconds: 3600,        // 1 hour
             auto_page_enabled: true,
             auto_page_threshold: 300, // 5 minutes before auto-page
             require_justification: true,
@@ -240,7 +240,7 @@ impl BreakGlassManager {
 
         // Track user requests
         self.user_requests
-            .entry(user_id)
+            .entry(user_id.clone())
             .or_insert_with(Vec::new)
             .push(request_id.clone());
 
@@ -267,9 +267,10 @@ impl BreakGlassManager {
         signature: String,
         justification: Option<String>,
     ) -> Result<(), String> {
-        let request = self.active_requests
+        let request = self
+            .active_requests
             .get_mut(request_id)
-            .ok_or_else(|| format!("Break glass request {} not found", request_id)?;
+            .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
 
         // Check if request is still pending
         if request.status != BreakGlassStatus::Pending {
@@ -302,12 +303,17 @@ impl BreakGlassManager {
 
         request.signatures.push(new_signature);
 
-        // Check if we have enough signatures
-        if self.check_signature_threshold(request) {
+        // Check if we have enough signatures (after adding the new signature)
+        let (m, _n) = self.config.m_of_n_threshold;
+        let signature_count = request.signatures.len();
+        let has_enough_signatures = signature_count >= m;
+        let user_id = request.user_id.clone();
+        
+        if has_enough_signatures {
             request.status = BreakGlassStatus::Approved;
-            
+
             if self.config.audit_logging {
-                self.log_audit_event("request_approved", request_id, &request.user_id);
+                self.log_audit_event("request_approved", request_id, &user_id);
             }
         }
 
@@ -318,25 +324,27 @@ impl BreakGlassManager {
     fn check_signature_threshold(&self, request: &BreakGlassRequest) -> bool {
         let (m, n) = self.config.m_of_n_threshold;
         let signature_count = request.signatures.len();
-        
+
         signature_count >= m
     }
 
     /// Deny break glass request
     pub fn deny_request(&mut self, request_id: &str, reason: String) -> Result<(), String> {
-        let request = self.active_requests
+        let request = self
+            .active_requests
             .get_mut(request_id)
-            .ok_or_else(|| format!("Break glass request {} not found", request_id)?;
+            .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
 
         if request.status != BreakGlassStatus::Pending {
             return Err("Request is no longer pending".to_string());
         }
 
+        let user_id = request.user_id.clone();
         request.status = BreakGlassStatus::Denied;
         request.metadata.insert("denial_reason".to_string(), reason);
 
         if self.config.audit_logging {
-            self.log_audit_event("request_denied", request_id, &request.user_id);
+            self.log_audit_event("request_denied", request_id, &user_id);
         }
 
         Ok(())
@@ -344,7 +352,8 @@ impl BreakGlassManager {
 
     /// Complete break glass request
     pub fn complete_request(&mut self, request_id: &str) -> Result<(), String> {
-        let request = self.active_requests
+        let request = self
+            .active_requests
             .get_mut(request_id)
             .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
 
@@ -352,10 +361,11 @@ impl BreakGlassManager {
             return Err("Request must be approved before completion".to_string());
         }
 
+        let user_id = request.user_id.clone();
         request.status = BreakGlassStatus::Completed;
 
         if self.config.audit_logging {
-            self.log_audit_event("request_completed", request_id, &request.user_id);
+            self.log_audit_event("request_completed", request_id, &user_id);
         }
 
         Ok(())
@@ -370,6 +380,7 @@ impl BreakGlassManager {
 
         let mut expired_requests = Vec::new();
         let mut auto_paged_requests = Vec::new();
+        let mut auto_paged_users = Vec::new();
 
         for (request_id, request) in &mut self.active_requests {
             // Check for expired requests
@@ -380,15 +391,20 @@ impl BreakGlassManager {
             }
 
             // Check for auto-page threshold
-            if self.config.auto_page_enabled && 
-               request.status == BreakGlassStatus::Approved &&
-               (now - request.created_at) > self.config.auto_page_threshold {
+            if self.config.auto_page_enabled
+                && request.status == BreakGlassStatus::Approved
+                && (now - request.created_at) > self.config.auto_page_threshold
+            {
                 request.status = BreakGlassStatus::AutoPaged;
                 auto_paged_requests.push(request_id.clone());
-                
-                if self.config.audit_logging {
-                    self.log_audit_event("auto_paged", request_id, &request.user_id);
-                }
+                auto_paged_users.push((request_id.clone(), request.user_id.clone()));
+            }
+        }
+
+        // Log auto-paged requests
+        if self.config.audit_logging {
+            for (request_id, user_id) in auto_paged_users {
+                self.log_audit_event("auto_paged", &request_id, &user_id);
             }
         }
 
@@ -453,22 +469,34 @@ impl BreakGlassManager {
     /// Get manager statistics
     pub fn get_stats(&self) -> BreakGlassStats {
         let total_requests = self.active_requests.len();
-        let pending_requests = self.active_requests.values()
+        let pending_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::Pending)
             .count();
-        let approved_requests = self.active_requests.values()
+        let approved_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::Approved)
             .count();
-        let denied_requests = self.active_requests.values()
+        let denied_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::Denied)
             .count();
-        let expired_requests = self.active_requests.values()
+        let expired_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::Expired)
             .count();
-        let auto_paged_requests = self.active_requests.values()
+        let auto_paged_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::AutoPaged)
             .count();
-        let completed_requests = self.active_requests.values()
+        let completed_requests = self
+            .active_requests
+            .values()
             .filter(|r| r.status == BreakGlassStatus::Completed)
             .count();
 
@@ -494,10 +522,7 @@ impl BreakGlassManager {
 
         println!(
             "[AUDIT] {} - Break Glass {} - Request: {}, User: {}",
-            now,
-            event_type,
-            request_id,
-            user_id
+            now, event_type, request_id, user_id
         );
     }
 
@@ -584,11 +609,11 @@ impl PostMortemStub {
         hasher.update(self.user_id.as_bytes());
         hasher.update(self.start_time.to_string().as_bytes());
         hasher.update(self.end_time.to_string().as_bytes());
-        
+
         for operation in &self.operations_performed {
             hasher.update(operation.as_bytes());
         }
-        
+
         format!("{:x}", hasher.finalize())
     }
 }
@@ -599,8 +624,14 @@ mod tests {
 
     #[test]
     fn test_urgency_level_parsing() {
-        assert_eq!(UrgencyLevel::from_string("high").unwrap(), UrgencyLevel::High);
-        assert_eq!(UrgencyLevel::from_string("emergency").unwrap(), UrgencyLevel::Emergency);
+        assert_eq!(
+            UrgencyLevel::from_string("high").unwrap(),
+            UrgencyLevel::High
+        );
+        assert_eq!(
+            UrgencyLevel::from_string("emergency").unwrap(),
+            UrgencyLevel::Emergency
+        );
         assert!(UrgencyLevel::from_string("invalid").is_err());
     }
 
@@ -615,15 +646,17 @@ mod tests {
         let config = BreakGlassConfig::default();
         let mut manager = BreakGlassManager::new(config);
 
-        let request_id = manager.create_request(
-            "session1".to_string(),
-            "user1".to_string(),
-            "Emergency access needed".to_string(),
-            Some("System failure requires immediate access".to_string()),
-            vec!["read".to_string(), "write".to_string()],
-            vec!["/critical/system".to_string()],
-            UrgencyLevel::Emergency,
-        ).unwrap();
+        let request_id = manager
+            .create_request(
+                "session1".to_string(),
+                "user1".to_string(),
+                "Emergency access needed".to_string(),
+                Some("System failure requires immediate access".to_string()),
+                vec!["read".to_string(), "write".to_string()],
+                vec!["/critical/system".to_string()],
+                UrgencyLevel::Emergency,
+            )
+            .unwrap();
 
         assert!(!request_id.is_empty());
         assert_eq!(manager.get_stats().total_requests, 1);
@@ -641,36 +674,42 @@ mod tests {
         manager.add_authorized_signer("signer2".to_string());
         manager.add_authorized_signer("signer3".to_string());
 
-        let request_id = manager.create_request(
-            "session1".to_string(),
-            "user1".to_string(),
-            "Emergency access needed".to_string(),
-            Some("Justification".to_string()),
-            vec!["read".to_string()],
-            vec!["/data".to_string()],
-            UrgencyLevel::High,
-        ).unwrap();
+        let request_id = manager
+            .create_request(
+                "session1".to_string(),
+                "user1".to_string(),
+                "Emergency access needed".to_string(),
+                Some("Justification".to_string()),
+                vec!["read".to_string()],
+                vec!["/data".to_string()],
+                UrgencyLevel::High,
+            )
+            .unwrap();
 
         // First signature should not approve
-        manager.add_signature(
-            &request_id,
-            "signer1".to_string(),
-            "admin".to_string(),
-            "signature1".to_string(),
-            None,
-        ).unwrap();
+        manager
+            .add_signature(
+                &request_id,
+                "signer1".to_string(),
+                "admin".to_string(),
+                "signature1".to_string(),
+                None,
+            )
+            .unwrap();
 
         let request = manager.get_request(&request_id).unwrap();
         assert_eq!(request.status, BreakGlassStatus::Pending);
 
         // Second signature should approve
-        manager.add_signature(
-            &request_id,
-            "signer2".to_string(),
-            "admin".to_string(),
-            "signature2".to_string(),
-            None,
-        ).unwrap();
+        manager
+            .add_signature(
+                &request_id,
+                "signer2".to_string(),
+                "admin".to_string(),
+                "signature2".to_string(),
+                None,
+            )
+            .unwrap();
 
         let request = manager.get_request(&request_id).unwrap();
         assert_eq!(request.status, BreakGlassStatus::Approved);
@@ -703,24 +742,28 @@ mod tests {
 
         manager.add_authorized_signer("signer1".to_string());
 
-        let request_id = manager.create_request(
-            "session1".to_string(),
-            "user1".to_string(),
-            "Emergency access needed".to_string(),
-            Some("Justification".to_string()),
-            vec!["read".to_string()],
-            vec!["/data".to_string()],
-            UrgencyLevel::High,
-        ).unwrap();
+        let request_id = manager
+            .create_request(
+                "session1".to_string(),
+                "user1".to_string(),
+                "Emergency access needed".to_string(),
+                Some("Justification".to_string()),
+                vec!["read".to_string()],
+                vec!["/data".to_string()],
+                UrgencyLevel::High,
+            )
+            .unwrap();
 
         // First signature
-        manager.add_signature(
-            &request_id,
-            "signer1".to_string(),
-            "admin".to_string(),
-            "signature1".to_string(),
-            None,
-        ).unwrap();
+        manager
+            .add_signature(
+                &request_id,
+                "signer1".to_string(),
+                "admin".to_string(),
+                "signature1".to_string(),
+                None,
+            )
+            .unwrap();
 
         // Duplicate signature should fail
         let result = manager.add_signature(
@@ -740,15 +783,17 @@ mod tests {
         let config = BreakGlassConfig::default();
         let mut manager = BreakGlassManager::new(config);
 
-        let request_id = manager.create_request(
-            "session1".to_string(),
-            "user1".to_string(),
-            "Emergency access needed".to_string(),
-            Some("Justification".to_string()),
-            vec!["read".to_string()],
-            vec!["/data".to_string()],
-            UrgencyLevel::High,
-        ).unwrap();
+        let request_id = manager
+            .create_request(
+                "session1".to_string(),
+                "user1".to_string(),
+                "Emergency access needed".to_string(),
+                Some("Justification".to_string()),
+                vec!["read".to_string()],
+                vec!["/data".to_string()],
+                UrgencyLevel::High,
+            )
+            .unwrap();
 
         let request = manager.get_request(&request_id).unwrap();
         let stub = PostMortemStub::new(request);
@@ -770,15 +815,17 @@ mod tests {
 
         // Create many requests to stress test the manager
         for i in 0..100 {
-            let request_id = manager.create_request(
-                format!("session_{}", i),
-                format!("user_{}", i),
-                format!("Request {}", i),
-                Some("Justification".to_string()),
-                vec!["read".to_string()],
-                vec![format!("/data_{}", i)],
-                UrgencyLevel::Medium,
-            ).unwrap();
+            let request_id = manager
+                .create_request(
+                    format!("session_{}", i),
+                    format!("user_{}", i),
+                    format!("Request {}", i),
+                    Some("Justification".to_string()),
+                    vec!["read".to_string()],
+                    vec![format!("/data_{}", i)],
+                    UrgencyLevel::Medium,
+                )
+                .unwrap();
 
             assert!(!request_id.is_empty());
         }
@@ -799,6 +846,8 @@ mod tests {
         );
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Maximum active break glass requests exceeded"));
+        assert!(result
+            .unwrap_err()
+            .contains("Maximum active break glass requests exceeded"));
     }
 }

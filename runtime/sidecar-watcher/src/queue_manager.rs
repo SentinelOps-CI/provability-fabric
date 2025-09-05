@@ -200,15 +200,15 @@ impl QueueManager {
 
     /// Dequeue an item with priority ordering
     #[instrument(skip(self))]
-    pub async fn dequeue(&self, timeout: Duration) -> Result<Option<QueueItem>, QueueError> {
+    pub async fn dequeue(&self, timeout_duration: Duration) -> Result<Option<QueueItem>, QueueError> {
         let start_time = Instant::now();
         
         // Wait for item with timeout
-        let item = timeout(timeout, self.wait_for_item()).await.map_err(|_| {
+        let item = timeout(timeout_duration, self.wait_for_item()).await.map_err(|_| {
             QueueError::DequeueTimeout
         })?;
         
-        if let Some(item) = item {
+        if let Some(ref item) = item {
             let processing_time = start_time.elapsed();
             
             // Record response time
@@ -452,10 +452,11 @@ impl QueueManager {
     pub async fn activate_strict_mode(&self, reason: String) {
         let mut state = self.state.write().await;
         state.strict_mode_active = true;
+        let reason_clone = reason.clone();
         state.strict_mode_reason = Some(StrictModeReason::ManualActivation { reason });
         state.strict_mode_activated_at = Some(Instant::now());
         
-        info!("Strict mode manually activated: {}", reason);
+        info!("Strict mode manually activated: {}", reason_clone);
         self.activate_strict_mode_metrics().await;
     }
 

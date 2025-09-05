@@ -286,7 +286,7 @@ impl ClockModel {
 
     /// Check if clock drift is within tolerance
     pub fn is_drift_acceptable(&self) -> bool {
-        self.drift_estimate.abs() < Duration::from_millis(self.epsilon_ms)
+        self.drift_estimate < Duration::from_millis(self.epsilon_ms)
     }
 
     /// Get ε tolerance

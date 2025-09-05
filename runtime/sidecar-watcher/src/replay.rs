@@ -30,7 +30,7 @@ mod instant_serde {
     {
         let system_now = SystemTime::now();
         let instant_now = Instant::now();
-        let duration_since_instant = instant_now.duration_since(*instant).unwrap_or(Duration::ZERO);
+        let duration_since_instant = instant_now.checked_duration_since(*instant).unwrap_or(Duration::ZERO);
         let approx_system_time = system_now - duration_since_instant;
         approx_system_time.serialize(serializer)
     }
