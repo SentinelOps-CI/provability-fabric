@@ -1,14 +1,60 @@
-import axios from 'axios';
+// console/src/services/api.ts
+import axios, { AxiosHeaders } from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+/**
+ * Choose a sane default base URL:
+ * - In the browser, use same-origin (so Console → Nginx → api-gateway proxy works)
+ * - As a fallback (e.g. in tests), use the docker compose service name for the gateway
+ */
+const DEFAULT_BASE =
+  (typeof window !== 'undefined' && window.location?.origin)
+    ? window.location.origin
+    : 'http://api-gateway:8000';
 
+const API_BASE_URL =
+  (process.env.REACT_APP_API_BASE_URL?.trim() || DEFAULT_BASE);
+
+/** Shared Axios instance */
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+/**
+ * ---- Interceptors ----
+ * Axios v1 exposes `config.headers` as an AxiosHeaders object.
+ * Do NOT replace it with a plain object; use AxiosHeaders to set values.
+ */
+api.interceptors.request.use((config) => {
+  const headers = AxiosHeaders.from(config.headers);
+  headers.set('X-Requested-With', 'XMLHttpRequest');
+  config.headers = headers;
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Basic shape-safe logging without depending on AxiosError type guards
+    const status = error?.response?.status;
+    if (status === 401) {
+      console.error('Authentication required');
+    } else if (status >= 500) {
+      console.error('Server error:', error?.response?.data ?? error?.message);
+    } else if (!status) {
+      // Network or CORS errors often present without a status
+      console.error('Network error:', error?.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
+/* =========================
+ *      API FUNCTIONS
+ * ========================= */
 
 // Spec Service APIs
 export const compilePolicy = async (request: {
@@ -172,31 +218,14 @@ export const downloadReplayArtifact = async (jobId: string, artifact: string) =>
   return response.data;
 };
 
-// Health check for all services
+// Health check for all services (via gateway)
 export const checkServiceHealth = async (service: string) => {
   try {
-    const response = await api.get(`/api/v1/health`, {
-      timeout: 5000,
-    });
+    const response = await api.get('/api/v1/health', { timeout: 5000 });
     return { service, status: 'healthy', data: response.data };
-  } catch (error) {
-    return { service, status: 'unhealthy', error: (error as Error).message };
+  } catch (error: any) {
+    return { service, status: 'unhealthy', error: error?.message ?? String(error) };
   }
 };
-
-// Error handling interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle authentication errors
-      console.error('Authentication required');
-    } else if (error.response?.status >= 500) {
-      // Handle server errors
-      console.error('Server error:', error.response.data);
-    }
-    return Promise.reject(error);
-  }
-);
 
 export default api;

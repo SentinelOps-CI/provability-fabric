@@ -5,7 +5,7 @@
 FROM node:18-alpine AS sdk
 WORKDIR /sdk
 # Bring in the whole SDK (so its build can run)
-COPY sdks/typescript/ ./
+COPY core/sdk/typescript/ ./
 # Install & build the SDK (dev deps are fine in this stage)
 RUN npm install --no-audit --no-fund
 RUN npm run build
