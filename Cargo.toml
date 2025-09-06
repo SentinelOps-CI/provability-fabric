@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "runtime/attestor",
+    "runtime/egress-firewall",
+    "runtime/kms-proxy",
+    "runtime/tool-broker",
+    "runtime/sidecar-watcher",
+    "runtime/sidecar-watcher/fuzz",
+    "runtime/wasm-sandbox",
+    "adapters/httpget",
+    "adapters/fileread",
+    "core/sdk/rust"
+]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+

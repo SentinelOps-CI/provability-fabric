@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
@@ -5,7 +6,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --include=dev
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --no-audit --no-fund
 
 COPY . .
 RUN npm run build
@@ -19,5 +20,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
 EXPOSE 4000
+
+ENV NODE_ENV=production
+USER node
 
 CMD ["npm", "start"] 

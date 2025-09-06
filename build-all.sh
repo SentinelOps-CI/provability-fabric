@@ -4,6 +4,7 @@
 # Copyright 2025 SentinelOps Platform Contributors
 
 set -e  # Exit on any error
+set -o pipefail
 
 echo "🔨 SentinelOps Platform - Build All Components"
 echo "=============================================="
@@ -47,8 +48,12 @@ done
 echo ""
 echo "📦 Building TypeScript SDK..."
 cd core/sdk/typescript
-npm install
-npm run build
+if command -v npm &> /dev/null; then
+    npm ci --no-audit --no-fund || npm install
+    npm run build
+else
+    print_error "npm not found - skipping TypeScript SDK build"
+fi
 print_status "TypeScript SDK built successfully"
 cd ../../..
 
@@ -56,8 +61,12 @@ cd ../../..
 echo ""
 echo "🎯 Building Demo Application..."
 cd demos/verifiable-mcp-fraud
-npm install
-npm run build
+if command -v npm &> /dev/null; then
+    npm ci --no-audit --no-fund || npm install
+    npm run build
+else
+    print_error "npm not found - skipping Demo build"
+fi
 print_status "Demo application built successfully"
 cd ../..
 
@@ -65,8 +74,12 @@ cd ../..
 echo ""
 echo "🖥️  Building Console UI..."
 cd console
-npm install
-npm run build
+if command -v npm &> /dev/null; then
+    npm ci --no-audit --no-fund || npm install
+    npm run build
+else
+    print_error "npm not found - skipping Console UI build"
+fi
 print_status "Console UI built successfully"
 cd ..
 
