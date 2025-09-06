@@ -50,7 +50,14 @@ Write-Host ""
 Write-Host "📦 Building TypeScript SDK..." -ForegroundColor Yellow
 try {
     Set-Location "core\sdk\typescript"
-    & npm install
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        & npm ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { & npm install }
+    }
+    else {
+        Write-Fail "npm not found - skipping TypeScript SDK build"
+        throw
+    }
     if ($LASTEXITCODE -eq 0) {
         & npm run build
         if ($LASTEXITCODE -eq 0) {
@@ -76,7 +83,14 @@ Write-Host ""
 Write-Host "🎯 Building Demo Application..." -ForegroundColor Yellow
 try {
     Set-Location "demos\verifiable-mcp-fraud"
-    & npm install
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        & npm ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { & npm install }
+    }
+    else {
+        Write-Fail "npm not found - skipping Demo build"
+        throw
+    }
     if ($LASTEXITCODE -eq 0) {
         & npm run build
         if ($LASTEXITCODE -eq 0) {
@@ -102,7 +116,14 @@ Write-Host ""
 Write-Host "🖥️ Building Console UI..." -ForegroundColor Yellow
 try {
     Set-Location "console"
-    & npm install
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        & npm ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { & npm install }
+    }
+    else {
+        Write-Fail "npm not found - skipping Console UI build"
+        throw
+    }
     if ($LASTEXITCODE -eq 0) {
         & npm run build
         if ($LASTEXITCODE -eq 0) {

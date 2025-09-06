@@ -46,7 +46,7 @@ vendor/
 **/vendor
 
 # Keep essential files for Docker builds
-!sdks/typescript/
+!core/sdk/typescript/
 !demos/verifiable-mcp-fraud/
 !services/*/
 !runtime/*/

@@ -1,0 +1,16 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Treat binaries correctly
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.wasm binary
+*.pdf binary
+
+# Large artifacts (consider LFS if they grow)
+/evidence/** -text
+/docs/img/** -text
+/bundles/** -text
