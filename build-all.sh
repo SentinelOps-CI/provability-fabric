@@ -43,14 +43,14 @@ for service in "${services[@]}"; do
     cd ../..
 done
 
-# Build TypeScript SDK
+# Build TypeScript SDK (canonical location)
 echo ""
 echo "📦 Building TypeScript SDK..."
-cd sdks/typescript
+cd core/sdk/typescript
 npm install
 npm run build
 print_status "TypeScript SDK built successfully"
-cd ../..
+cd ../../..
 
 # Build Demo Application
 echo ""

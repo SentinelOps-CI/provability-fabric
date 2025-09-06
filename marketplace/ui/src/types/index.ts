@@ -1,13 +1,25 @@
+export type Compatibility = {
+  /** Required fabric compatibility */
+  'fabric-version': string;
+  /** Optional adapter/spec tags used by marketplace filters/search */
+  adapters?: string[];
+  specs?: string[];
+  /** Future-safe: allow extra keys as string or string[] */
+  [key: string]: string | string[] | undefined;
+};
+
+export interface File {
+  path: string;
+  hash: string;
+  size?: number;
+}
+
 export interface Package {
   id: string;
   name: string;
   version: string;
-  type: 'adapter' | 'spec' | 'proofpack';
-  compatibility: {
-    'fabric-version': string;
-    adapters?: string[];
-    specs?: string[];
-  };
+  type: 'adapter' | 'spec' | 'proofpack' | string;
+  compatibility: Compatibility;
   description: string;
   author: string;
   license: string;
@@ -20,12 +32,6 @@ export interface Package {
   updated: string;
   downloads: number;
   rating: number;
-}
-
-export interface File {
-  path: string;
-  hash: string;
-  size?: number;
 }
 
 export interface InstallRequest {
@@ -50,4 +56,13 @@ export interface SearchResponse {
 export interface PackageListResponse {
   packages: Package[];
   total: number;
+}
+
+/** Auth user shape for UI; token is optional for local/dev flows */
+export interface User {
+  id: string;
+  name: string;
+  email?: string;
+  token?: string;
+  [key: string]: unknown;
 }

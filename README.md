@@ -13,8 +13,6 @@ An open-source framework that enforces provable behavioral guarantees through fo
 
 ## Repository Structure
 
-The repository has been reorganized for better clarity and maintainability:
-
 ```
 provability-fabric/
 ├── README.md                 # Project documentation
@@ -61,7 +59,6 @@ See `docs/standards.md`, `docs/Evidence.md`, and `docs/Replay.md` for usage.
 ```bash
 # Clone the repository
 git clone https://github.com/provability-fabric.git
-cd provability-fabric
 
 # Run the installation script
 ./scripts/install.sh           # For Linux/macOS
@@ -91,12 +88,8 @@ The project includes a comprehensive web ecosystem with real-time capabilities, 
 cd runtime/ledger && node minimal-server.js
 # Available at: http://localhost:8080
 
-# 2. Start the Admin Dashboard
-cd admin-interface && node server.js
-# Available at: http://localhost:9000
-
-# 3. Start the Marketplace UI with Advanced Features
-cd marketplace/ui && npm install && npm start
+# 2. Start the Console UI
+cd console && npm install && npm start
 # Available at: http://localhost:3000
 
 # 4. Start the Documentation Site
@@ -108,7 +101,6 @@ mkdocs serve --dev-addr=127.0.0.1:8002
 ```bash
 # Clone the repository
 git clone https://github.com/provability-fabric.git
-cd provability-fabric
 
 # Build the CLI from source
 cd core/cli/pf
@@ -209,7 +201,7 @@ Provability-Fabric consists of six core components with comprehensive security a
 5. **WebSocket Real-Time System** - Live communication for monitoring and notifications
 6. **Authentication & User Management** - JWT-based security with role-based access control
 
-### Security Architecture
+### Architecture
 
 ```mermaid
 flowchart TD
@@ -239,22 +231,6 @@ flowchart TD
     U --> V[Dashboard Monitoring]
     V --> W[Ledger Integration]
 
-    X[Plan-DSL] --> Y[Policy Kernel]
-    Y --> Z[Capability Tokens]
-    Z --> AA[Retrieval Gateway]
-    AA --> BB[Egress Firewall]
-    BB --> CC[Evidence Bundles]
-
-    DD[Multi-Channel Input] --> EE[Trusted/Untrusted Channels]
-    EE --> FF[Injection Hardening]
-    FF --> GG[Quoting/Typing]
-
-    HH[SLO Thresholds] --> II[Performance Gates]
-    II --> JJ[Component Budgets]
-
-    KK[Non-Interference] --> LL[Egress Certificates]
-    LL --> MM[Influencing Labels]
-
     style A fill:#e1f5fe
     style C fill:#f3e5f5
     style F fill:#fff3e0
@@ -264,105 +240,7 @@ flowchart TD
     style X fill:#fff8e1
     style Y fill:#fce4ec
     style Z fill:#e0f2f1
-    style AA fill:#f3e5f5
-    style BB fill:#fff3e0
-    style CC fill:#e8f5e8
-    style DD fill:#e8f5e8
-    style EE fill:#fff3e0
-    style FF fill:#f3e5f5
-    style GG fill:#e1f5fe
-    style HH fill:#fff8e1
-    style II fill:#fce4ec
-    style JJ fill:#e0f2f1
-    style KK fill:#f3e5f5
-    style LL fill:#fff3e0
-    style MM fill:#e8f5e8
 ```
-
-### Running Tests
-
-```bash
-# Run complete TRUST-FIRE suite (from repository root)
-python tests/trust_fire_orchestrator.py
-
-# Run comprehensive implementation tests
-python test_all_components.py
-
-# Run security mechanism tests
-python tests/redteam/abac_fuzz.py --queries 1000
-python tests/redteam/pii_leak.py --vectors 1000
-
-# Run individual integration tests
-python tests/integration/test_broker_enforcement.py
-python tests/integration/test_kms_attestation.py
-python tests/integration/test_invariant_gate.py
-
-# Run individual phases
-python tests/privacy/privacy_burn_down.py --tenant-id acme-beta
-python tests/security/malicious_adapter_test.py
-python tests/chaos/chaos_rollback_test.py
-
-# Generate evidence bundles
-python tools/evidence/bundle_case.py --days 1
-
-# Run impacted-only CI tools
-python tools/select_impacted.py
-python tools/gen_allowlist_from_lean.py
-
-# Test multi-channel input contract
-python tests/redteam/injection_runner.py
-
-# Test SLO performance gates
-node tests/perf/latency_k6.js
-```
-
-## Data Retention & Storage Optimization
-
-The Data Retention Manager implements OPT-20 data retention policies and storage cost optimization:
-
-### Features
-
-- **7-Day Hot Storage** - PostgreSQL-based fast access for recent data
-- **Weekly Roll-ups** - Automated migration to S3 as compressed Parquet files
-- **BigQuery Integration** - External table creation for cold storage analytics
-- **Safety-Case Deduplication** - Plan hash and policy hash-based deduplication
-- **Cost Optimization** - Storage tier analysis with savings recommendations
-- **Compression** - Zstandard compression for 60-80% size reduction
-
-### Usage
-
-```bash
-# Clean up hot storage (remove data older than 7 days)
-python ops/retention/retention_manager.py --config config.yaml --action cleanup-hot
-
-# Roll up data to warm storage (S3)
-python ops/retention/retention_manager.py --config config.yaml --action rollup-warm
-
-# Create BigQuery external tables
-python ops/retention/retention_manager.py --config config.yaml --action create-bigquery
-
-# Generate cost analysis report
-python ops/retention/retention_manager.py --config config.yaml --action cost-report
-
-# Run all operations
-python ops/retention/retention_manager.py --config config.yaml --action all --dry-run
-```
-
-### Configuration
-
-The retention manager requires a YAML configuration file with:
-
-- PostgreSQL connection details for hot storage
-- S3 bucket configuration for warm storage
-- BigQuery project settings for cold storage
-- Table-specific retention policies
-- Compression settings
-
-### Cost Benefits
-
-- **Hot to Warm Migration**: Save ~$0.0875/GB/month
-- **Compression**: Additional 60-80% cost reduction
-- **Automated Lifecycle**: S3 lifecycle policies for further optimization
 
 ## Contributing
 
@@ -373,7 +251,6 @@ We welcome contributions! Please see our [Contributing Guide](docs/community/gov
 ```bash
 # Clone the repository
 git clone https://github.com/provability-fabric.git
-cd provability-fabric
 
 # Build CLI tools from source
 cd core/cli/pf && go build -o pf.exe . && cd ../..
@@ -386,11 +263,11 @@ if [ -f "tools/compliance/requirements.txt" ]; then pip install -r tools/complia
 if [ -f "tools/insure/requirements.txt" ]; then pip install -r tools/insure/requirements.txt; fi
 if [ -f "tools/proofbot/requirements.txt" ]; then pip install -r tools/proofbot/requirements.txt; fi
 
-# Install Node.js dependencies for UI components
-cd marketplace/ui && npm install && cd ../..
+# Install Node.js dependencies for Console UI
+cd console && npm install && cd ..
 
-# Start the UI development server (optional)
-cd marketplace/ui && npm start
+# Start the Console UI development server (optional)
+cd console && npm start
 # The UI will be available at http://localhost:3000
 
 # Run tests (from repository root)
@@ -475,18 +352,6 @@ If you're using Git Bash on Windows and encounter issues:
 5. **"Device or resource busy" errors**: Close any applications (file explorers, editors) that might be accessing the files
 6. **File removal issues**: The scripts now use Windows-compatible file removal methods
 7. **Backslash interpretation**: Git Bash interprets backslashes as escape characters, so always use forward slashes
-
-### Known Issues
-
-1. **Kubernetes Deployment**: The deployment files in `runtime/admission-controller/deploy/admission/templates/` are Helm templates and cannot be applied directly with `kubectl apply`. Use the inline deployment examples provided in the README or set up Helm properly.
-
-2. **Chaos Test Output**: The chaos rollback test runs but may not produce visible output in some environments. This is expected behavior as the test simulates failure scenarios.
-
-3. **Git Bash on Windows**: Installation scripts may have path and execution issues in Git Bash on Windows. **Use Windows Command Prompt instead of Git Bash for running installation scripts.**
-
-4. **UI Development**: The React UI requires proper TypeScript configuration and may need dependency reinstallation if module resolution errors occur. The `tsconfig.json` file has been added to resolve these issues.
-
-5. **Heroicons Library**: The UI uses Heroicons v2, which has different icon names than v1. The codebase has been updated to use the correct icon names.
 
 ## License
 

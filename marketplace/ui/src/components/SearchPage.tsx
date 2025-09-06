@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { ChartBarIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import { marketplaceAPI } from '../services/api';
-import { Package } from '../types';
+import type { Package } from '../types';
 import { AdvancedSearch, SearchFilters } from './AdvancedSearch';
 import { searchEngine } from '../utils/searchEngine';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -14,14 +14,16 @@ export const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchMetrics, setSearchMetrics] = useState({ executionTime: 0, total: 0 });
-  
+
   // WebSocket for real-time updates
-  const { isConnected, lastMessage } = useWebSocket({
+  const { isConnected } = useWebSocket({
     onMessage: (message) => {
       if (message.type === 'new_package') {
-        // Add new package to the list and refresh search
-        setAllPackages(prev => [message.package, ...prev]);
-        searchEngine.updatePackages([message.package, ...allPackages]);
+        setAllPackages(prev => {
+          const updated = [message.package as Package, ...prev];
+          searchEngine.updatePackages(updated);
+          return updated;
+        });
       }
     }
   });
@@ -32,8 +34,8 @@ export const SearchPage: React.FC = () => {
       try {
         setLoading(true);
         const response = await marketplaceAPI.getPackages();
-        setAllPackages(response.packages);
-        searchEngine.updatePackages(response.packages);
+        setAllPackages(response.packages as Package[]);
+        searchEngine.updatePackages(response.packages as Package[]);
       } catch (err) {
         setError('Failed to load packages');
         console.error('Load packages error:', err);
@@ -67,9 +69,9 @@ export const SearchPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const searchResult = searchEngine.search(filters);
-      setResults(searchResult.packages);
+      setResults(searchResult.packages as unknown as Package[]);
       setSearchMetrics({
         executionTime: searchResult.executionTime,
         total: searchResult.total
@@ -143,7 +145,17 @@ export const SearchPage: React.FC = () => {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
           <button
-            onClick={() => performSearch(query)}
+            onClick={() =>
+              performAdvancedSearch({
+                query: searchParams.get('q') ?? '',
+                type: '',
+                author: '',
+                minRating: 0,
+                compatibility: '',
+                sortBy: 'relevance',
+                sortOrder: 'desc'
+              })
+            }
             className="mt-4 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
           >
             Retry
@@ -155,7 +167,10 @@ export const SearchPage: React.FC = () => {
         <div className="mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {results.map((pkg) => (
-              <div key={pkg.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-indigo-300">
+              <div
+                key={pkg.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all hover:border-indigo-300"
+              >
                 <div className="flex flex-col h-full">
                   {/* Package Header */}
                   <div className="flex items-start justify-between mb-3">
@@ -173,15 +188,11 @@ export const SearchPage: React.FC = () => {
 
                   {/* Package Title */}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-indigo-600">
-                    <Link to={`/package/${pkg.id}`}>
-                      {pkg.name}
-                    </Link>
+                    <Link to={`/package/${pkg.id}`}>{pkg.name}</Link>
                   </h3>
 
                   {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 flex-1 line-clamp-3">
-                    {pkg.description}
-                  </p>
+                  <p className="text-gray-600 text-sm mb-4 flex-1 line-clamp-3">{pkg.description}</p>
 
                   {/* Metadata */}
                   <div className="space-y-2">
@@ -216,10 +227,7 @@ export const SearchPage: React.FC = () => {
         <div className="text-center py-12">
           <p className="text-gray-500">No packages match your search criteria</p>
           <p className="text-sm text-gray-400 mt-2">Try adjusting your filters or search terms</p>
-          <button
-            onClick={clearFilters}
-            className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-          >
+          <button onClick={clearFilters} className="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
             Clear Filters
           </button>
         </div>

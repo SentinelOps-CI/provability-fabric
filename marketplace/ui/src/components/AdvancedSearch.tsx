@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useDebounce } from '../hooks/useDebounce';
 
+// Re-export the canonical Package type so any legacy imports stay working.
+export type { Package } from '../types';
+
 export interface SearchFilters {
   query: string;
   type: string;
@@ -10,20 +13,6 @@ export interface SearchFilters {
   compatibility: string;
   sortBy: 'relevance' | 'downloads' | 'rating' | 'updated' | 'name';
   sortOrder: 'asc' | 'desc';
-}
-
-export interface Package {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  author: string;
-  type: string;
-  downloads: number;
-  rating: number;
-  updated: string;
-  created: string;
-  compatibility: { [key: string]: string };
 }
 
 interface AdvancedSearchProps {
@@ -84,14 +73,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   useEffect(() => {
     const updatedFilters = { ...filters, query: debouncedQuery };
     onSearch(updatedFilters);
-    
+
     // Save to search history if query is not empty
     if (debouncedQuery.trim() && !searchHistory.includes(debouncedQuery.trim())) {
       const newHistory = [debouncedQuery.trim(), ...searchHistory.slice(0, 9)]; // Keep last 10 searches
       setSearchHistory(newHistory);
       localStorage.setItem('searchHistory', JSON.stringify(newHistory));
     }
-  }, [debouncedQuery, filters.type, filters.author, filters.minRating, filters.compatibility, filters.sortBy, filters.sortOrder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    debouncedQuery,
+    filters.type,
+    filters.author,
+    filters.minRating,
+    filters.compatibility,
+    filters.sortBy,
+    filters.sortOrder
+  ]);
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -111,7 +109,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   };
 
   const hasActiveFilters = useMemo(() => {
-    return filters.type || filters.author || filters.minRating > 0 || filters.compatibility;
+    return !!(filters.type || filters.author || filters.minRating > 0 || filters.compatibility);
   }, [filters]);
 
   const clearSearchHistory = () => {
@@ -292,11 +290,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           ) : (
             <span>
               {resultsCount} {resultsCount === 1 ? 'result' : 'results'}
-              {filters.query && ` for "${filters.query}"`}
+              {filters.query && ` for "${filters.query}""`}
             </span>
           )}
         </div>
-        
+
         {hasActiveFilters && (
           <div className="flex items-center space-x-2">
             <span className="text-xs">Active filters:</span>

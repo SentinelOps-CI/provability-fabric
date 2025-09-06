@@ -143,7 +143,7 @@ lint:
 	# TypeScript
 	cd console && npm run lint
 	cd demos/verifiable-mcp-fraud && npm run lint
-	cd sdks/typescript && npm run lint
+	cd core/sdk/typescript && npm run lint
 	# Python
 	python -m flake8 tools/ tests/ --max-line-length=100
 	@$(ECHOOK) "✅ Linting completed"
