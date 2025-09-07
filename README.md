@@ -5,10 +5,7 @@
 # Provability Fabric
 
 <!-- Badges -->
-[![CERT Validate](https://github.com/SentinelOps-CI/provability-fabric/actions/workflows/cert-validate.yml/badge.svg)](https://github.com/SentinelOps-CI/provability-fabric/actions/workflows/cert-validate.yml)
-[![Nightly Replay](https://github.com/SentinelOps-CI/provability-fabric/actions/workflows/nightly-replay.yml/badge.svg)](https://github.com/SentinelOps-CI/provability-fabric/actions/workflows/nightly-replay.yml)
 [![PR Comments](https://img.shields.io/badge/PR%20Comments-Enabled-blue.svg)](#)
-
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
