@@ -9,6 +9,9 @@ import EvidencePage from './pages/EvidencePage';
 import ReplayPage from './pages/ReplayPage';
 import CompliancePage from './pages/CompliancePage';
 import SettingsPage from './pages/SettingsPage';
+import DevModePage from './pages/DevModePage';
+import PerfPage from './pages/PerfPage';
+import HeatmapPage from './pages/HeatmapPage';
 import './App.css';
 
 const queryClient = new QueryClient({
@@ -35,6 +38,9 @@ function App() {
               <Route path="/replay" element={<ReplayPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/dev" element={<DevModePage />} />
+              <Route path="/perf" element={<PerfPage />} />
+              <Route path="/heatmap" element={<HeatmapPage />} />
             </Routes>
           </Layout>
           <Toaster

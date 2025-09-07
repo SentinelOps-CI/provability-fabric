@@ -17,27 +17,107 @@ import (
 	"strings"
 	"time"
 
+	"bytes"
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"io"
+	"sort"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
+// Signer defines a pluggable signature backend
+// Implementations: file (Ed25519 PEM), kms, vault (stubs)
+// Returned signature is base64url-encoded
+type Signer interface {
+	Sign(message []byte) (string, error)
+}
+
+type fileSigner struct {
+	priv ed25519.PrivateKey
+}
+
+type kmsSigner struct{}
+
+type vaultSigner struct{}
+
+func (s *fileSigner) Sign(message []byte) (string, error) {
+	sig := ed25519.Sign(s.priv, message)
+	return base64.RawURLEncoding.EncodeToString(sig), nil
+}
+
+func (s *kmsSigner) Sign(message []byte) (string, error) {
+	return "", fmt.Errorf("kms signer not implemented")
+}
+func (s *vaultSigner) Sign(message []byte) (string, error) {
+	return "", fmt.Errorf("vault signer not implemented")
+}
+
+// newSignerFromEnv selects a signer based on CERT_SIGNER_BACKEND
+// file: CERT_SIGNER_FILE=/path/to/ed25519.pem
+// kms|vault: placeholders for now
+func newSignerFromEnv() (Signer, error) {
+	backend := os.Getenv("CERT_SIGNER_BACKEND")
+	switch strings.ToLower(backend) {
+	case "file":
+		path := os.Getenv("CERT_SIGNER_FILE")
+		if strings.TrimSpace(path) == "" {
+			return nil, fmt.Errorf("CERT_SIGNER_FILE required for file backend")
+		}
+		pemBytes, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		block, _ := pem.Decode(pemBytes)
+		if block == nil {
+			return nil, fmt.Errorf("no PEM block found in %s", path)
+		}
+		if k, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+			if priv, ok := k.(ed25519.PrivateKey); ok {
+				return &fileSigner{priv: priv}, nil
+			}
+			return nil, fmt.Errorf("not an Ed25519 private key")
+		}
+		if len(block.Bytes) == ed25519.PrivateKeySize {
+			return &fileSigner{priv: ed25519.PrivateKey(block.Bytes)}, nil
+		}
+		return nil, fmt.Errorf("unsupported private key format")
+	case "kms":
+		return &kmsSigner{}, nil
+	case "vault":
+		return &vaultSigner{}, nil
+	default:
+		return nil, fmt.Errorf("no signer configured")
+	}
+}
+
 // CertV1 represents a CERT-V1 certificate
 type CertV1 struct {
-	BundleID        string                 `json:"bundle_id"`
-	PolicyHash      string                 `json:"policy_hash"`
-	ProofHash       string                 `json:"proof_hash"`
-	AutomataHash    string                 `json:"automata_hash"`
-	LabelerHash     string                 `json:"labeler_hash"`
-	NIClaim         string                 `json:"ni_claim"`
-	NIMonitor       string                 `json:"ni_monitor"` // "inapplicable" | "accept" | "reject" | "error"
-	SidecarBuild    string                 `json:"sidecar_build"`
-	AttestationRef  string                 `json:"attestation_ref,omitempty"`
-	Extensions      map[string]interface{} `json:"extensions,omitempty"`
-	Timestamp       time.Time              `json:"timestamp"`
-	TenantID        string                 `json:"tenant_id"`
-	SessionID       string                 `json:"session_id"`
-	Morph           *MorphInfo             `json:"morph,omitempty"`
+	BundleID       string                 `json:"bundle_id"`
+	PolicyHash     string                 `json:"policy_hash"`
+	ProofHash      string                 `json:"proof_hash"`
+	AutomataHash   string                 `json:"automata_hash"`
+	LabelerHash    string                 `json:"labeler_hash"`
+	NIClaim        string                 `json:"ni_claim"`
+	NIMonitor      string                 `json:"ni_monitor"` // "inapplicable" | "accept" | "reject" | "error"
+	SidecarBuild   string                 `json:"sidecar_build"`
+	AttestationRef string                 `json:"attestation_ref,omitempty"`
+	Extensions     map[string]interface{} `json:"extensions,omitempty"`
+	Timestamp      time.Time              `json:"timestamp"`
+	TenantID       string                 `json:"tenant_id"`
+	SessionID      string                 `json:"session_id"`
+	// Common top-level permission evidence fields
+	PermitDecision    string     `json:"permit_decision,omitempty"`
+	PathWitnessOK     bool       `json:"path_witness_ok,omitempty"`
+	LabelDerivationOK bool       `json:"label_derivation_ok,omitempty"`
+	Epoch             int        `json:"epoch,omitempty"`
+	EgressProfile     string     `json:"egress_profile,omitempty"`
+	Morph             *MorphInfo `json:"morph,omitempty"`
+	Sig               string     `json:"sig,omitempty"`
 }
 
 // MorphInfo contains Morph execution environment details
@@ -50,14 +130,14 @@ type MorphInfo struct {
 
 // CertSearchRequest represents certificate search parameters
 type CertSearchRequest struct {
-	TenantID     string    `json:"tenant_id,omitempty"`
-	PolicyHash   string    `json:"policy_hash,omitempty"`
-	SessionID    string    `json:"session_id,omitempty"`
-	StartTime    time.Time `json:"start_time,omitempty"`
-	EndTime      time.Time `json:"end_time,omitempty"`
-	NIMonitor    string    `json:"ni_monitor,omitempty"`
-	Limit        int       `json:"limit,omitempty"`
-	Offset       int       `json:"offset,omitempty"`
+	TenantID   string    `json:"tenant_id,omitempty"`
+	PolicyHash string    `json:"policy_hash,omitempty"`
+	SessionID  string    `json:"session_id,omitempty"`
+	StartTime  time.Time `json:"start_time,omitempty"`
+	EndTime    time.Time `json:"end_time,omitempty"`
+	NIMonitor  string    `json:"ni_monitor,omitempty"`
+	Limit      int       `json:"limit,omitempty"`
+	Offset     int       `json:"offset,omitempty"`
 }
 
 // CertSearchResponse represents search results
@@ -82,11 +162,30 @@ type CompliancePacket struct {
 	Conformance   string    `json:"conformance"`
 }
 
+// CertValidationRequest allows server-side validation of raw CERT JSON bytes or structured cert
+type CertValidationRequest struct {
+	// One of Raw or Cert must be provided
+	Raw     json.RawMessage `json:"raw,omitempty"`
+	Cert    *CertV1         `json:"cert,omitempty"`
+	JWKSURL string          `json:"jwks_url,omitempty"`
+	PEMPub  string          `json:"pem_pub,omitempty"` // optional PEM-encoded Ed25519 public key
+}
+
+// CertValidationResponse is returned by /evidence/validate
+type CertValidationResponse struct {
+	SchemaValid      bool              `json:"schema_valid"`
+	SignatureChecked bool              `json:"signature_checked"`
+	SignatureValid   bool              `json:"signature_valid"`
+	Errors           []string          `json:"errors,omitempty"`
+	Details          map[string]string `json:"details,omitempty"`
+}
+
 // EvidenceService handles CERT-V1 storage, validation, and compliance
 type EvidenceService struct {
 	db          *sql.DB
 	storagePath string
 	schemaData  []byte
+	signer      Signer
 }
 
 // NewEvidenceService creates a new evidence service instance
@@ -96,25 +195,25 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if dbURL == "" {
 		dbURL = "postgres://postgres:password@localhost:5432/evidence?sslmode=disable"
 	}
-	
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	
+
 	// Test connection
 	if err := db.Ping(); err != nil {
 		log.Printf("Warning: Database connection failed: %v", err)
 		// Continue without database for development
 	}
-	
+
 	// Storage path
 	storagePath := os.Getenv("EVIDENCE_STORAGE_PATH")
 	if storagePath == "" {
 		storagePath = "/tmp/evidence"
 	}
 	os.MkdirAll(storagePath, 0755)
-	
+
 	// Load CERT-V1 schema
 	schemaPath := "external/CERT-V1/schema/cert-v1.schema.json"
 	schemaData, err := os.ReadFile(schemaPath)
@@ -122,18 +221,25 @@ func NewEvidenceService() (*EvidenceService, error) {
 		log.Printf("Warning: Could not load CERT-V1 schema: %v", err)
 		schemaData = []byte(`{"type": "object"}`) // Fallback schema
 	}
-	
+
 	service := &EvidenceService{
 		db:          db,
 		storagePath: storagePath,
 		schemaData:  schemaData,
 	}
-	
+
+	// Initialize signer from environment (optional)
+	if signer, err := newSignerFromEnv(); err == nil {
+		service.signer = signer
+	} else if os.Getenv("CERT_SIGNER_BACKEND") != "" {
+		log.Printf("Warning: signer init failed: %v", err)
+	}
+
 	// Initialize database schema
 	if err := service.initializeSchema(); err != nil {
 		log.Printf("Warning: Could not initialize database schema: %v", err)
 	}
-	
+
 	return service, nil
 }
 
@@ -142,7 +248,7 @@ func (s *EvidenceService) initializeSchema() error {
 	if s.db == nil {
 		return nil // Skip if no database
 	}
-	
+
 	schema := `
 	CREATE TABLE IF NOT EXISTS certificates (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -174,7 +280,7 @@ func (s *EvidenceService) initializeSchema() error {
 		FOR ALL TO ALL
 		USING (tenant_id = current_setting('app.current_tenant', true));
 	`
-	
+
 	_, err := s.db.Exec(schema)
 	return err
 }
@@ -185,19 +291,19 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 	if err := s.validateCertificate(cert); err != nil {
 		return fmt.Errorf("certificate validation failed: %w", err)
 	}
-	
+
 	// Store in database
 	if s.db != nil {
 		if err := s.storeCertInDB(cert); err != nil {
 			log.Printf("Warning: Database storage failed: %v", err)
 		}
 	}
-	
+
 	// Store in filesystem
 	if err := s.storeCertInFS(cert); err != nil {
 		return fmt.Errorf("filesystem storage failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -210,10 +316,10 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 	if req.Limit > 1000 {
 		req.Limit = 1000
 	}
-	
+
 	var certificates []CertV1
 	var total int
-	
+
 	if s.db != nil {
 		// Database search
 		certs, count, err := s.searchCertsInDB(req)
@@ -227,7 +333,7 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 		// Filesystem search fallback
 		return s.searchCertsInFS(req)
 	}
-	
+
 	return &CertSearchResponse{
 		Certificates: certificates,
 		Total:        total,
@@ -243,16 +349,16 @@ func (s *EvidenceService) BuildCompliancePacket(ctx context.Context, req CertSea
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Generate audit proof
 	auditProof, err := s.generateAuditProof(searchResp.Certificates)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Generate conformance report
 	conformance := s.generateConformanceReport(searchResp.Certificates)
-	
+
 	packet := &CompliancePacket{
 		PacketID:      uuid.New().String(),
 		GeneratedAt:   time.Now(),
@@ -265,7 +371,7 @@ func (s *EvidenceService) BuildCompliancePacket(ctx context.Context, req CertSea
 		ReplayResults: []string{}, // Would be populated from replay service
 		Conformance:   conformance,
 	}
-	
+
 	return packet, nil
 }
 
@@ -296,7 +402,7 @@ func (s *EvidenceService) validateCertificate(cert CertV1) error {
 	if cert.SidecarBuild == "" {
 		return fmt.Errorf("missing sidecar_build")
 	}
-	
+
 	// Validate ni_monitor values
 	validNIMonitor := []string{"inapplicable", "accept", "reject", "error"}
 	valid := false
@@ -309,7 +415,7 @@ func (s *EvidenceService) validateCertificate(cert CertV1) error {
 	if !valid {
 		return fmt.Errorf("invalid ni_monitor value: %s", cert.NIMonitor)
 	}
-	
+
 	return nil
 }
 
@@ -322,18 +428,18 @@ func (s *EvidenceService) storeCertInDB(cert CertV1) error {
 			timestamp, cert_data
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
-	
+
 	certData, err := json.Marshal(cert)
 	if err != nil {
 		return err
 	}
-	
+
 	_, err = s.db.Exec(query,
 		cert.BundleID, cert.PolicyHash, cert.ProofHash, cert.AutomataHash,
 		cert.LabelerHash, cert.NIClaim, cert.NIMonitor, cert.SidecarBuild,
 		cert.TenantID, cert.SessionID, cert.Timestamp, string(certData),
 	)
-	
+
 	return err
 }
 
@@ -344,17 +450,47 @@ func (s *EvidenceService) storeCertInFS(cert CertV1) error {
 	if err := os.MkdirAll(certDir, 0755); err != nil {
 		return err
 	}
-	
+
 	// Generate filename with timestamp
 	filename := fmt.Sprintf("%d_%s.cert.json", cert.Timestamp.Unix(), uuid.New().String()[:8])
 	certPath := filepath.Join(certDir, filename)
-	
+
+	// Ensure extensions carry key permission evidence fields for compatibility
+	if cert.Extensions == nil {
+		cert.Extensions = map[string]interface{}{}
+	}
+	if cert.PermitDecision != "" {
+		cert.Extensions["permit_decision"] = cert.PermitDecision
+	}
+	cert.Extensions["path_witness_ok"] = cert.PathWitnessOK
+	cert.Extensions["label_derivation_ok"] = cert.LabelDerivationOK
+	if cert.Epoch != 0 {
+		cert.Extensions["permission_epoch"] = cert.Epoch
+	}
+	if cert.EgressProfile != "" {
+		cert.Extensions["egress_profile"] = cert.EgressProfile
+	}
+
+	// Sign the canonical JSON (without sig) if signer configured
+	if s.signer != nil {
+		var generic map[string]interface{}
+		b, _ := json.Marshal(cert)
+		_ = json.Unmarshal(b, &generic)
+		delete(generic, "sig")
+		canon, err := marshalCanonicalJSON(generic)
+		if err == nil {
+			if sig, err := s.signer.Sign(canon); err == nil {
+				cert.Sig = sig
+			}
+		}
+	}
+
 	// Write certificate
 	certData, err := json.MarshalIndent(cert, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(certPath, certData, 0644)
 }
 
@@ -364,48 +500,48 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	var conditions []string
 	var args []interface{}
 	argIndex := 1
-	
+
 	if req.TenantID != "" {
 		conditions = append(conditions, fmt.Sprintf("tenant_id = $%d", argIndex))
 		args = append(args, req.TenantID)
 		argIndex++
 	}
-	
+
 	if req.PolicyHash != "" {
 		conditions = append(conditions, fmt.Sprintf("policy_hash = $%d", argIndex))
 		args = append(args, req.PolicyHash)
 		argIndex++
 	}
-	
+
 	if req.SessionID != "" {
 		conditions = append(conditions, fmt.Sprintf("session_id = $%d", argIndex))
 		args = append(args, req.SessionID)
 		argIndex++
 	}
-	
+
 	if !req.StartTime.IsZero() {
 		conditions = append(conditions, fmt.Sprintf("timestamp >= $%d", argIndex))
 		args = append(args, req.StartTime)
 		argIndex++
 	}
-	
+
 	if !req.EndTime.IsZero() {
 		conditions = append(conditions, fmt.Sprintf("timestamp <= $%d", argIndex))
 		args = append(args, req.EndTime)
 		argIndex++
 	}
-	
+
 	if req.NIMonitor != "" {
 		conditions = append(conditions, fmt.Sprintf("ni_monitor = $%d", argIndex))
 		args = append(args, req.NIMonitor)
 		argIndex++
 	}
-	
+
 	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
-	
+
 	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM certificates %s", whereClause)
 	var total int
@@ -413,66 +549,66 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	if err != nil {
 		return nil, 0, err
 	}
-	
+
 	// Data query
 	dataQuery := fmt.Sprintf(`
 		SELECT cert_data FROM certificates %s 
 		ORDER BY timestamp DESC 
 		LIMIT $%d OFFSET $%d
 	`, whereClause, argIndex, argIndex+1)
-	
+
 	args = append(args, req.Limit, req.Offset)
-	
+
 	rows, err := s.db.Query(dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
-	
+
 	var certificates []CertV1
 	for rows.Next() {
 		var certData string
 		if err := rows.Scan(&certData); err != nil {
 			continue
 		}
-		
+
 		var cert CertV1
 		if err := json.Unmarshal([]byte(certData), &cert); err != nil {
 			continue
 		}
-		
+
 		certificates = append(certificates, cert)
 	}
-	
+
 	return certificates, total, nil
 }
 
 // searchCertsInFS searches certificates in filesystem (fallback)
 func (s *EvidenceService) searchCertsInFS(req CertSearchRequest) (*CertSearchResponse, error) {
 	var certificates []CertV1
-	
+
 	certsDir := filepath.Join(s.storagePath, "certs")
-	
+
 	err := filepath.Walk(certsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Continue on errors
 		}
-		
+
 		if !strings.HasSuffix(path, ".cert.json") {
 			return nil
 		}
-		
+
 		// Read certificate
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
-		
+
 		var cert CertV1
 		if err := json.Unmarshal(data, &cert); err != nil {
 			return nil
 		}
-		
+
 		// Apply filters
 		if req.TenantID != "" && cert.TenantID != req.TenantID {
 			return nil
@@ -492,33 +628,33 @@ func (s *EvidenceService) searchCertsInFS(req CertSearchRequest) (*CertSearchRes
 		if !req.EndTime.IsZero() && cert.Timestamp.After(req.EndTime) {
 			return nil
 		}
-		
+
 		certificates = append(certificates, cert)
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Apply pagination
 	total := len(certificates)
 	start := req.Offset
 	end := req.Offset + req.Limit
-	
+
 	if start > total {
 		start = total
 	}
 	if end > total {
 		end = total
 	}
-	
+
 	if start < end {
 		certificates = certificates[start:end]
 	} else {
 		certificates = []CertV1{}
 	}
-	
+
 	return &CertSearchResponse{
 		Certificates: certificates,
 		Total:        total,
@@ -536,55 +672,55 @@ func (s *EvidenceService) generateAuditProof(certs []CertV1) (string, error) {
 		hash := fmt.Sprintf("%x", sha256.Sum256(certData))
 		hashes = append(hashes, hash)
 	}
-	
+
 	// Create audit proof structure
 	auditProof := map[string]interface{}{
 		"certificate_count": len(certs),
-		"hash_chain":       hashes,
-		"root_hash":        s.calculateRootHash(hashes),
-		"generated_at":     time.Now().Unix(),
+		"hash_chain":        hashes,
+		"root_hash":         s.calculateRootHash(hashes),
+		"generated_at":      time.Now().Unix(),
 	}
-	
+
 	proofData, err := json.Marshal(auditProof)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return string(proofData), nil
 }
 
 // generateConformanceReport creates conformance documentation
 func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 	var report strings.Builder
-	
+
 	report.WriteString("# Compliance Conformance Report\n\n")
 	report.WriteString(fmt.Sprintf("Generated: %s\n", time.Now().Format(time.RFC3339)))
 	report.WriteString(fmt.Sprintf("Total Certificates: %d\n\n", len(certs)))
-	
+
 	// Analyze certificate distribution
 	niMonitorCounts := make(map[string]int)
 	policyHashes := make(map[string]int)
-	
+
 	for _, cert := range certs {
 		niMonitorCounts[cert.NIMonitor]++
 		policyHashes[cert.PolicyHash]++
 	}
-	
+
 	report.WriteString("## Non-Interference Monitor Results\n\n")
 	for status, count := range niMonitorCounts {
 		report.WriteString(fmt.Sprintf("- %s: %d certificates\n", status, count))
 	}
-	
+
 	report.WriteString("\n## Policy Distribution\n\n")
 	for hash, count := range policyHashes {
 		report.WriteString(fmt.Sprintf("- Policy %s: %d certificates\n", hash[:16], count))
 	}
-	
+
 	// Compliance summary
 	report.WriteString("\n## Compliance Summary\n\n")
 	acceptCount := niMonitorCounts["accept"]
 	totalCount := len(certs)
-	
+
 	if totalCount > 0 {
 		complianceRate := float64(acceptCount) / float64(totalCount) * 100
 		report.WriteString(fmt.Sprintf("- Compliance Rate: %.2f%%\n", complianceRate))
@@ -593,7 +729,7 @@ func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 		report.WriteString(fmt.Sprintf("- Rejected: %d\n", niMonitorCounts["reject"]))
 		report.WriteString(fmt.Sprintf("- Errors: %d\n", niMonitorCounts["error"]))
 	}
-	
+
 	return report.String()
 }
 
@@ -605,7 +741,7 @@ func (s *EvidenceService) calculateRootHash(hashes []string) string {
 	if len(hashes) == 1 {
 		return hashes[0]
 	}
-	
+
 	// Simple hash combination (in production would use proper Merkle tree)
 	combined := strings.Join(hashes, "")
 	hash := sha256.Sum256([]byte(combined))
@@ -613,57 +749,68 @@ func (s *EvidenceService) calculateRootHash(hashes []string) string {
 }
 
 // HTTP handlers
+func writeError(c *gin.Context, status int, code, cause, action, docs string) {
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"code":     code,
+			"cause":    cause,
+			"action":   action,
+			"docs_url": docs,
+		},
+	})
+}
+
 func (s *EvidenceService) storeCertHandler(c *gin.Context) {
 	var cert CertV1
 	if err := c.ShouldBindJSON(&cert); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Fix JSON payload and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
-	
+
 	if err := s.StoreCertificate(c.Request.Context(), cert); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeError(c, http.StatusInternalServerError, "CERT_STORE_FAILED", err.Error(), "Check schema/signature and retry", "https://docs.sentinelops.dev/error-catalog#CERT_STORE_FAILED")
 		return
 	}
-	
+
 	c.JSON(http.StatusCreated, gin.H{"status": "stored"})
 }
 
 func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 	var req CertSearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Fix JSON payload and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
-	
+
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, resp)
 }
 
 func (s *EvidenceService) getCertHandler(c *gin.Context) {
 	certID := c.Param("id")
-	
+
 	// Search by ID (simplified)
 	req := CertSearchRequest{
 		SessionID: certID,
 		Limit:     1,
 	}
-	
+
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
 		return
 	}
-	
+
 	if len(resp.Certificates) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Certificate not found"})
+		writeError(c, http.StatusNotFound, "CERT_NOT_FOUND", "Certificate not found", "Check session id or time window", "https://docs.sentinelops.dev/error-catalog#CERT_NOT_FOUND")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, resp.Certificates[0])
 }
 
@@ -673,31 +820,31 @@ func (s *EvidenceService) buildPacketHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	packet, err := s.BuildCompliancePacket(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, packet)
 }
 
 func (s *EvidenceService) downloadPacketHandler(c *gin.Context) {
 	packetID := c.Param("id")
-	
+
 	// Create temporary zip file
 	zipPath := filepath.Join(s.storagePath, fmt.Sprintf("packet_%s.zip", packetID))
-	
+
 	if err := s.createPacketZip(packetID, zipPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=compliance_packet_%s.zip", packetID))
 	c.File(zipPath)
-	
+
 	// Clean up
 	go func() {
 		time.Sleep(1 * time.Minute)
@@ -711,29 +858,29 @@ func (s *EvidenceService) createPacketZip(packetID, zipPath string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	w := zip.NewWriter(file)
 	defer w.Close()
-	
+
 	// Add placeholder files (in production would include actual compliance data)
 	files := map[string]string{
 		"cert.json":        `{"packet_id": "` + packetID + `"}`,
 		"audit-proof.json": `{"proof": "placeholder"}`,
 		"conformance.md":   "# Conformance Report\n\nPlaceholder content",
 	}
-	
+
 	for filename, content := range files {
 		f, err := w.Create(filename)
 		if err != nil {
 			return err
 		}
-		
+
 		_, err = f.Write([]byte(content))
 		if err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -744,15 +891,253 @@ func (s *EvidenceService) healthHandler(c *gin.Context) {
 			dbStatus = "connected"
 		}
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"status":      "healthy",
-		"service":     "evidence-service",
-		"version":     "1.0.0",
-		"timestamp":   time.Now(),
-		"database":    dbStatus,
-		"storage":     s.storagePath,
+		"status":    "healthy",
+		"service":   "evidence-service",
+		"version":   "1.0.0",
+		"timestamp": time.Now(),
+		"database":  dbStatus,
+		"storage":   s.storagePath,
 	})
+}
+
+func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
+	var req CertValidationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var raw []byte
+	if len(req.Raw) != 0 {
+		raw = req.Raw
+	} else if req.Cert != nil {
+		b, err := json.Marshal(req.Cert)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid cert object"})
+			return
+		}
+		raw = b
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing cert payload"})
+		return
+	}
+
+	// Parse generically to inspect signature field
+	var generic map[string]interface{}
+	if err := json.Unmarshal(raw, &generic); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
+
+	resp := CertValidationResponse{Details: map[string]string{}}
+
+	// Schema validation (quick structural check; can be replaced with full jsonschema)
+	if err := s.quickSchemaValidate(generic); err != nil {
+		resp.SchemaValid = false
+		resp.Errors = append(resp.Errors, err.Error())
+	} else {
+		resp.SchemaValid = true
+	}
+
+	// Signature validation (optional if sig present)
+	sigVal, hasSig := generic["sig"]
+	if hasSig {
+		resp.SignatureChecked = true
+		delete(generic, "sig")
+		canon, err := marshalCanonicalJSON(generic)
+		if err != nil {
+			resp.Errors = append(resp.Errors, "canonicalize_error")
+			c.JSON(http.StatusOK, resp)
+			return
+		}
+		sigStr, _ := sigVal.(string)
+		valid, reason := verifySignature(canon, sigStr, req.JWKSURL, req.PEMPub)
+		resp.SignatureValid = valid
+		if !valid {
+			resp.Errors = append(resp.Errors, reason)
+		}
+	} else {
+		resp.SignatureChecked = false
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *EvidenceService) quickSchemaValidate(cert map[string]interface{}) error {
+	required := []string{"bundle_id", "policy_hash", "proof_hash", "automata_hash", "labeler_hash", "ni_monitor", "permit_decision", "path_witness_ok", "label_derivation_ok", "epoch", "egress_profile"}
+	for _, k := range required {
+		if _, ok := cert[k]; !ok {
+			return fmt.Errorf("missing required field: %s", k)
+		}
+	}
+	if v, ok := cert["ni_monitor"].(string); ok {
+		switch v {
+		case "inapplicable", "accept", "reject", "error":
+		default:
+			return fmt.Errorf("invalid ni_monitor value: %s", v)
+		}
+	} else {
+		return fmt.Errorf("ni_monitor must be string")
+	}
+	return nil
+}
+
+func verifySignature(message []byte, sigBase64 string, jwksURL string, pemPub string) (bool, string) {
+	// decode base64 (std or url)
+	var sig []byte
+	if b, err := base64.StdEncoding.DecodeString(sigBase64); err == nil {
+		sig = b
+	} else if b2, err2 := base64.RawURLEncoding.DecodeString(sigBase64); err2 == nil {
+		sig = b2
+	} else {
+		return false, "sig_decode_error"
+	}
+	// try PEM
+	if strings.TrimSpace(pemPub) != "" {
+		if pub, err := loadEd25519PublicKeyFromPEMString(pemPub); err == nil {
+			if ed25519.Verify(pub, message, sig) {
+				return true, ""
+			}
+		}
+	}
+	// try JWKS
+	if strings.TrimSpace(jwksURL) != "" {
+		if pubs, err := fetchEd25519KeysFromJWKS(jwksURL); err == nil {
+			for _, pub := range pubs {
+				if ed25519.Verify(pub, message, sig) {
+					return true, ""
+				}
+			}
+		}
+	}
+	return false, "signature_mismatch"
+}
+
+func loadEd25519PublicKeyFromPEMString(pemData string) (ed25519.PublicKey, error) {
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found")
+	}
+	// Try PKIX
+	if pub, err := x509.ParsePKIXPublicKey(block.Bytes); err == nil {
+		if ed, ok := pub.(ed25519.PublicKey); ok {
+			return ed, nil
+		}
+		return nil, fmt.Errorf("not an Ed25519 public key")
+	}
+	// Try raw bytes
+	if len(block.Bytes) == ed25519.PublicKeySize {
+		return ed25519.PublicKey(block.Bytes), nil
+	}
+	return nil, fmt.Errorf("unsupported public key format")
+}
+
+// marshalCanonicalJSON encodes a value with deterministic key ordering (RFC-like)
+func marshalCanonicalJSON(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := writeCanonicalJSON(&buf, v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func writeCanonicalJSON(buf *bytes.Buffer, v interface{}) error {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		buf.WriteByte('{')
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			kb, _ := json.Marshal(k)
+			buf.Write(kb)
+			buf.WriteByte(':')
+			if err := writeCanonicalJSON(buf, t[k]); err != nil {
+				return err
+			}
+			if i < len(keys)-1 {
+				buf.WriteByte(',')
+			}
+		}
+		buf.WriteByte('}')
+		return nil
+	case []interface{}:
+		buf.WriteByte('[')
+		for i, elem := range t {
+			if err := writeCanonicalJSON(buf, elem); err != nil {
+				return err
+			}
+			if i < len(t)-1 {
+				buf.WriteByte(',')
+			}
+		}
+		buf.WriteByte(']')
+		return nil
+	case json.Number:
+		buf.WriteString(string(t))
+		return nil
+	case string, float64, float32, bool, int, int64, nil:
+		b, err := json.Marshal(t)
+		if err != nil {
+			return err
+		}
+		buf.Write(b)
+		return nil
+	default:
+		b, err := json.Marshal(t)
+		if err != nil {
+			return err
+		}
+		var vv interface{}
+		if err := json.Unmarshal(b, &vv); err != nil {
+			return err
+		}
+		return writeCanonicalJSON(buf, vv)
+	}
+}
+
+// fetchEd25519KeysFromJWKS fetches public keys; kept minimal to avoid extra deps
+func fetchEd25519KeysFromJWKS(url string) ([]ed25519.PublicKey, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("jwks http error: %s", resp.Status)
+	}
+	var jwks struct {
+		Keys []struct {
+			Kty string `json:"kty"`
+			Crv string `json:"crv"`
+			X   string `json:"x"`
+			Use string `json:"use"`
+			Alg string `json:"alg"`
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	data, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(data, &jwks); err != nil {
+		return nil, err
+	}
+	var pubs []ed25519.PublicKey
+	for _, k := range jwks.Keys {
+		if strings.EqualFold(k.Kty, "OKP") && strings.EqualFold(k.Crv, "Ed25519") {
+			if raw, err := base64.RawURLEncoding.DecodeString(k.X); err == nil {
+				if len(raw) == ed25519.PublicKeySize {
+					pubs = append(pubs, ed25519.PublicKey(raw))
+				}
+			}
+		}
+	}
+	if len(pubs) == 0 {
+		return nil, fmt.Errorf("no ed25519 keys in JWKS")
+	}
+	return pubs, nil
 }
 
 func main() {
@@ -761,24 +1146,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize evidence service: %v", err)
 	}
-	
+
 	// Set up Gin router
 	r := gin.Default()
-	
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusOK)
 			return
 		}
-		
+
 		c.Next()
 	})
-	
+
 	// API routes
 	v1 := r.Group("/api/v1")
 	{
@@ -787,15 +1172,16 @@ func main() {
 		v1.GET("/evidence/cert/:id", service.getCertHandler)
 		v1.POST("/compliance/packet", service.buildPacketHandler)
 		v1.GET("/compliance/packet/:id", service.downloadPacketHandler)
+		v1.GET("/evidence/validate", service.verifyCertHandler)
 		v1.GET("/health", service.healthHandler)
 	}
-	
+
 	// Get port from environment
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8004"
 	}
-	
+
 	log.Printf("Evidence Service starting on port %s", port)
 	log.Fatal(r.Run(":" + port))
 }

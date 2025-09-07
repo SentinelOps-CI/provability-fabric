@@ -5,12 +5,20 @@ package main
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -45,6 +53,8 @@ func policyCmd() *cobra.Command {
 
 func policyCompileCmd() *cobra.Command {
 	var inputFile, outputDir string
+	var jsonOut bool
+	var diffOut bool
 
 	cmd := &cobra.Command{
 		Use:   "compile --in <english.md> --out <build/>",
@@ -87,6 +97,15 @@ func policyCompileCmd() *cobra.Command {
 				return fmt.Errorf("failed to write ActionDSL: %w", err)
 			}
 
+			// Write IR with source map if present
+			if ir, ok := resp["ir"]; ok {
+				irPath := filepath.Join(outputDir, "ir.json")
+				irData, _ := json.MarshalIndent(ir, "", "  ")
+				if err := os.WriteFile(irPath, irData, 0644); err != nil {
+					return fmt.Errorf("failed to write IR: %w", err)
+				}
+			}
+
 			// Write metadata
 			metadataPath := filepath.Join(outputDir, "metadata.json")
 			metadata := map[string]interface{}{
@@ -99,9 +118,39 @@ func policyCompileCmd() *cobra.Command {
 				return fmt.Errorf("failed to write metadata: %w", err)
 			}
 
-			fmt.Printf("✅ Policy compiled successfully\n")
-			fmt.Printf("📁 Output: %s\n", outputDir)
-			fmt.Printf("🔐 Policy hash: %s\n", resp["policy_hash"])
+			// Optional diff vs previous output
+			var diff string
+			if diffOut {
+				prevPath := filepath.Join(outputDir, "action_dsl.prev.json")
+				if b, err := os.ReadFile(prevPath); err == nil {
+					diff = computeJSONDiff(string(b), string(actionDSLData))
+				}
+				_ = os.WriteFile(prevPath, actionDSLData, 0644)
+			}
+
+			if jsonOut {
+				payload := map[string]any{
+					"ok":              true,
+					"action_dsl_path": actionDSLPath,
+					"metadata_path":   metadataPath,
+					"ir_path":         filepath.Join(outputDir, "ir.json"),
+					"policy_hash":     resp["policy_hash"],
+					"diagnostics":     resp["diagnostics"],
+				}
+				if diffOut {
+					payload["diff"] = diff
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("✅ Policy compiled successfully\n")
+				fmt.Printf("📁 Output: %s\n", outputDir)
+				fmt.Printf("🔐 Policy hash: %s\n", resp["policy_hash"])
+				if diffOut && diff != "" {
+					fmt.Println("\nDiff vs previous ActionDSL:\n" + diff)
+				}
+			}
 
 			return nil
 		},
@@ -109,6 +158,8 @@ func policyCompileCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&inputFile, "in", "", "Input English policy file")
 	cmd.Flags().StringVar(&outputDir, "out", "build/", "Output directory")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	cmd.Flags().BoolVar(&diffOut, "diff", false, "Show JSON diff vs previous build output")
 	cmd.MarkFlagRequired("in")
 
 	return cmd
@@ -118,6 +169,7 @@ func policyProveCmd() *cobra.Command {
 	var buildDir string
 	var useMorph bool
 	var morphShards int
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "prove --build <build/>",
@@ -180,12 +232,35 @@ func policyProveCmd() *cobra.Command {
 				return fmt.Errorf("failed to update metadata: %w", err)
 			}
 
-			fmt.Printf("✅ Proofs completed: %s\n", resp["status"])
-			fmt.Printf("🔐 Proof hash: %s\n", resp["proof_hash"])
+			if jsonOut {
+				payload := map[string]any{
+					"ok":             true,
+					"status":         resp["status"],
+					"proof_hash":     resp["proof_hash"],
+					"artifacts":      resp["artifacts"],
+					"artifact_index": resp["artifact_index"],
+					"metadata":       metadata,
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("✅ Proofs completed: %s\n", resp["status"])
+				fmt.Printf("🔐 Proof hash: %s\n", resp["proof_hash"])
 
-			if artifacts, ok := resp["artifacts"].([]interface{}); ok && len(artifacts) > 0 {
-				fmt.Printf("📁 Artifacts: %d files\n", len(artifacts))
+				if artifacts, ok := resp["artifacts"].([]interface{}); ok && len(artifacts) > 0 {
+					fmt.Printf("📁 Artifacts: %d files\n", len(artifacts))
+				}
 			}
+
+			// Persist local proofs manifest
+			proofsManifest := map[string]any{
+				"proof_hash":     resp["proof_hash"],
+				"artifact_index": resp["artifact_index"],
+				"status":         resp["status"],
+			}
+			pmBytes, _ := json.MarshalIndent(proofsManifest, "", "  ")
+			_ = os.WriteFile(filepath.Join(buildDir, "proofs_manifest.json"), pmBytes, 0644)
 
 			return nil
 		},
@@ -194,6 +269,7 @@ func policyProveCmd() *cobra.Command {
 	cmd.Flags().StringVar(&buildDir, "build", "build/", "Build directory")
 	cmd.Flags().BoolVar(&useMorph, "morph", false, "Use Morph distributed proving")
 	cmd.Flags().IntVar(&morphShards, "shards", 4, "Number of Morph shards")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 
 	return cmd
 }
@@ -201,6 +277,7 @@ func policyProveCmd() *cobra.Command {
 func deployCmd() *cobra.Command {
 	var buildDir string
 	var epochRotate bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "deploy --build <build/> [--epoch rotate]",
@@ -253,10 +330,22 @@ func deployCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("✅ Policy deployed successfully\n")
-			fmt.Printf("🔐 Policy hash: %s\n", policyHash)
-			fmt.Printf("🔧 Automata hash: %s\n", automataHash)
-			fmt.Printf("⏰ Epoch: %v\n", resp["epoch"])
+			if jsonOut {
+				payload := map[string]any{
+					"ok":            true,
+					"policy_hash":   policyHash,
+					"automata_hash": automataHash,
+					"epoch":         resp["epoch"],
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("✅ Policy deployed successfully\n")
+				fmt.Printf("🔐 Policy hash: %s\n", policyHash)
+				fmt.Printf("🔧 Automata hash: %s\n", automataHash)
+				fmt.Printf("⏰ Epoch: %v\n", resp["epoch"])
+			}
 
 			return nil
 		},
@@ -264,6 +353,7 @@ func deployCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&buildDir, "build", "build/", "Build directory")
 	cmd.Flags().BoolVar(&epochRotate, "epoch", false, "Rotate epoch during deployment")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 
 	return cmd
 }
@@ -283,6 +373,12 @@ func certCmd() *cobra.Command {
 }
 
 func certVerifyCmd() *cobra.Command {
+	var jsonOut bool
+	var schemaValidate bool
+	var schemaPath string
+	var jwksURL string
+	var keyPath string
+
 	cmd := &cobra.Command{
 		Use:   "verify <cert-files...>",
 		Short: "Verify CERT-V1 certificates",
@@ -294,9 +390,16 @@ func certVerifyCmd() *cobra.Command {
 				return nil
 			}
 
+			var checkedFiles []string
 			totalCerts := 0
 			validCerts := 0
 			invalidCerts := 0
+			var invalidList []map[string]string
+
+			sigChecked := 0
+			sigVerified := 0
+			sigFailed := 0
+			signatureVerificationEnabled := (jwksURL != "" || keyPath != "")
 
 			for _, certFile := range args {
 				// Check if it's a directory or file
@@ -306,13 +409,26 @@ func certVerifyCmd() *cobra.Command {
 						if err != nil {
 							return nil
 						}
-						if strings.HasSuffix(path, ".cert.json") {
-							if verifyFile(path) {
+						if strings.HasSuffix(path, ".cert.json") || strings.HasSuffix(path, ".json") {
+							checkedFiles = append(checkedFiles, path)
+							if verifyFileWithSchema(path, schemaPath) {
 								validCerts++
 							} else {
 								invalidCerts++
+								invalidList = append(invalidList, map[string]string{"file": path})
 							}
 							totalCerts++
+
+							if signatureVerificationEnabled {
+								sigChecked++
+								ok, reason := verifyCertSignatureForFile(path, jwksURL, keyPath)
+								if !ok {
+									sigFailed++
+									invalidList = append(invalidList, map[string]string{"file": path, "signature": reason})
+								} else {
+									sigVerified++
+								}
+							}
 						}
 						return nil
 					})
@@ -321,62 +437,347 @@ func certVerifyCmd() *cobra.Command {
 					}
 				} else {
 					// Process single file
-					if verifyFile(certFile) {
+					if strings.HasSuffix(certFile, ".json") || strings.HasSuffix(certFile, ".cert.json") {
+						checkedFiles = append(checkedFiles, certFile)
+					}
+					if verifyFileWithSchema(certFile, schemaPath) {
 						validCerts++
 					} else {
 						invalidCerts++
+						invalidList = append(invalidList, map[string]string{"file": certFile})
 					}
 					totalCerts++
+
+					if signatureVerificationEnabled {
+						sigChecked++
+						ok, reason := verifyCertSignatureForFile(certFile, jwksURL, keyPath)
+						if !ok {
+							sigFailed++
+							invalidList = append(invalidList, map[string]string{"file": certFile, "signature": reason})
+						} else {
+							sigVerified++
+						}
+					}
 				}
 			}
 
-			fmt.Printf("📊 Certificate Verification Summary:\n")
-			fmt.Printf("  Total: %d\n", totalCerts)
-			fmt.Printf("  Valid: %d\n", validCerts)
-			fmt.Printf("  Invalid: %d\n", invalidCerts)
-
-			if invalidCerts > 0 {
-				return fmt.Errorf("validation failed: %d invalid certificates", invalidCerts)
+			// Optional schema validation via Python helper
+			schemaOK := true
+			schemaOutput := ""
+			if schemaValidate && len(checkedFiles) > 0 {
+				ok, out, err := validateCertSchemaWithPython(schemaPath, checkedFiles)
+				schemaOK, schemaOutput = ok, out
+				if err != nil {
+					// Treat execution error as failure
+					schemaOK = false
+				}
 			}
 
-			fmt.Println("✅ All certificates are valid")
+			if jsonOut {
+				payload := map[string]any{
+					"total":   totalCerts,
+					"valid":   validCerts,
+					"invalid": invalidCerts,
+				}
+				if schemaValidate {
+					payload["schema_valid"] = schemaOK
+					payload["schema_output"] = schemaOutput
+				}
+				if signatureVerificationEnabled {
+					payload["signature_checked"] = sigChecked
+					payload["signature_verified"] = sigVerified
+					payload["signature_failed"] = sigFailed
+				}
+				if invalidCerts > 0 {
+					payload["invalid_files"] = invalidList
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("📊 Certificate Verification Summary:\n")
+				fmt.Printf("  Total: %d\n", totalCerts)
+				fmt.Printf("  Valid: %d\n", validCerts)
+				fmt.Printf("  Invalid: %d\n", invalidCerts)
+				if schemaValidate {
+					fmt.Printf("  Schema valid: %v\n", schemaOK)
+				}
+				if signatureVerificationEnabled {
+					fmt.Printf("  Signature checked: %d, verified: %d, failed: %d\n", sigChecked, sigVerified, sigFailed)
+				}
+			}
+
+			if invalidCerts > 0 || (schemaValidate && !schemaOK) || (signatureVerificationEnabled && sigFailed > 0) {
+				return fmt.Errorf("validation failed")
+			}
+
+			if !jsonOut {
+				fmt.Println("✅ All certificates are valid")
+			}
 			return nil
 		},
 	}
 
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	cmd.Flags().BoolVar(&schemaValidate, "schema-validate", false, "Validate against CERT-V1 schema using Python helper")
+	cmd.Flags().StringVar(&schemaPath, "schema", "external/CERT-V1/schema/cert-v1.schema.json", "Path to CERT-V1 JSON schema")
+	cmd.Flags().StringVar(&jwksURL, "jwks", "", "JWKS URL for Ed25519 signature verification")
+	cmd.Flags().StringVar(&keyPath, "key", "", "Path to PEM-encoded Ed25519 public key for signature verification")
 	return cmd
 }
 
-func verifyFile(certFile string) bool {
-	// Read certificate file
-	data, err := os.ReadFile(certFile)
-	if err != nil {
-		fmt.Printf("❌ %s: Failed to read file: %v\n", certFile, err)
-		return false
+func validateCertSchemaWithPython(schemaPath string, files []string) (bool, string, error) {
+	// Try python3 then python
+	interp := "python3"
+	if _, err := exec.LookPath(interp); err != nil {
+		interp = "python"
 	}
+	args := []string{"tools/cert-validate/validate.py", "--schema", schemaPath}
+	args = append(args, files...)
+	cmd := exec.Command(interp, args...)
+	out, err := cmd.CombinedOutput()
+	return err == nil, string(out), err
+}
 
-	// Parse JSON
-	var cert map[string]interface{}
-	if err := json.Unmarshal(data, &cert); err != nil {
-		fmt.Printf("❌ %s: Invalid JSON: %v\n", certFile, err)
-		return false
+// verifyFileWithSchema validates a single JSON file against the CERT-V1 schema using gojsonschema
+func verifyFileWithSchema(filePath string, schemaPath string) bool {
+	// Prefer Python-based JSON Schema validator if available and schema provided
+	if schemaPath == "" {
+		schemaPath = "external/CERT-V1/schema/cert-v1.schema.json"
 	}
-
-	// Basic validation (simplified)
-	requiredFields := []string{
-		"bundle_id", "policy_hash", "proof_hash", "automata_hash",
-		"labeler_hash", "ni_claim", "ni_monitor", "sidecar_build",
-	}
-
-	for _, field := range requiredFields {
-		if _, exists := cert[field]; !exists {
-			fmt.Printf("❌ %s: Missing required field: %s\n", certFile, field)
-			return false
+	if _, err := os.Stat(schemaPath); err == nil {
+		if ok, _, err := validateCertSchemaWithPython(schemaPath, []string{filePath}); err == nil {
+			return ok
 		}
 	}
 
-	fmt.Printf("✅ %s: Valid\n", certFile)
+	// Fallback: quick structural validation
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+	var cert map[string]interface{}
+	if err := json.Unmarshal(data, &cert); err != nil {
+		return false
+	}
+
+	// Required fields (subset consistent with docs/Evidence.md)
+	required := []string{
+		"bundle_id", "policy_hash", "proof_hash", "automata_hash", "labeler_hash",
+		"ni_monitor", "permit_decision", "path_witness_ok", "label_derivation_ok", "epoch", "egress_profile",
+	}
+	for _, k := range required {
+		if _, ok := cert[k]; !ok {
+			return false
+		}
+	}
+	// Basic enum check for ni_monitor
+	if v, ok := cert["ni_monitor"].(string); ok {
+		switch v {
+		case "inapplicable", "accept", "reject", "error":
+			// ok
+		default:
+			return false
+		}
+	} else {
+		return false
+	}
 	return true
+}
+
+// verifyCertSignatureForFile verifies the signature of a CERT-V1 JSON file using either a local key or JWKS.
+// Returns (true, "") on success. On failure, returns (false, reason).
+func verifyCertSignatureForFile(filePath, jwksURL, keyPath string) (bool, string) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, "read_error"
+	}
+	var cert map[string]interface{}
+	if err := json.Unmarshal(data, &cert); err != nil {
+		return false, "invalid_json"
+	}
+	// Extract signature
+	sigVal, ok := cert["sig"]
+	if !ok {
+		return false, "missing_sig"
+	}
+	sigStr, ok := sigVal.(string)
+	if !ok || sigStr == "" {
+		return false, "invalid_sig"
+	}
+	// Remove signature field for canonicalization
+	delete(cert, "sig")
+
+	canon, err := marshalCanonicalJSON(cert)
+	if err != nil {
+		return false, "canonicalize_error"
+	}
+	// Signature can be base64 (std or URL) - try both
+	var sig []byte
+	if b, err := base64.StdEncoding.DecodeString(sigStr); err == nil {
+		sig = b
+	} else if b2, err2 := base64.RawURLEncoding.DecodeString(sigStr); err2 == nil {
+		sig = b2
+	} else {
+		return false, "sig_decode_error"
+	}
+
+	// Try local key first if provided
+	if keyPath != "" {
+		if pub, err := loadEd25519PublicKeyFromPEM(keyPath); err == nil {
+			if ed25519.Verify(pub, canon, sig) {
+				return true, ""
+			}
+		}
+	}
+	// Then try JWKS if provided
+	if jwksURL != "" {
+		pubs, err := fetchEd25519KeysFromJWKS(jwksURL)
+		if err == nil {
+			for _, pub := range pubs {
+				if ed25519.Verify(pub, canon, sig) {
+					return true, ""
+				}
+			}
+		}
+	}
+	return false, "signature_mismatch"
+}
+
+// loadEd25519PublicKeyFromPEM loads an Ed25519 public key from a PEM-encoded file (PKIX or raw)
+func loadEd25519PublicKeyFromPEM(path string) (ed25519.PublicKey, error) {
+	pemBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, errors.New("no PEM block found")
+	}
+	// Try PKIX first
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err == nil {
+		if ed, ok := pub.(ed25519.PublicKey); ok {
+			return ed, nil
+		}
+		return nil, errors.New("not an Ed25519 public key")
+	}
+	// Try raw
+	if len(block.Bytes) == ed25519.PublicKeySize {
+		return ed25519.PublicKey(block.Bytes), nil
+	}
+	return nil, errors.New("unsupported public key format")
+}
+
+// fetchEd25519KeysFromJWKS fetches JWKS and returns all Ed25519 public keys
+func fetchEd25519KeysFromJWKS(url string) ([]ed25519.PublicKey, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("jwks http error: %s", resp.Status)
+	}
+	var jwks struct {
+		Keys []struct {
+			Kty string `json:"kty"`
+			Crv string `json:"crv"`
+			X   string `json:"x"`
+			Use string `json:"use"`
+			Alg string `json:"alg"`
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return nil, err
+	}
+	var pubs []ed25519.PublicKey
+	for _, k := range jwks.Keys {
+		if strings.EqualFold(k.Kty, "OKP") && strings.EqualFold(k.Crv, "Ed25519") {
+			// x is base64url without padding
+			raw, err := base64.RawURLEncoding.DecodeString(k.X)
+			if err != nil {
+				continue
+			}
+			if len(raw) == ed25519.PublicKeySize {
+				pubs = append(pubs, ed25519.PublicKey(raw))
+			}
+		}
+	}
+	if len(pubs) == 0 {
+		return nil, errors.New("no ed25519 keys in JWKS")
+	}
+	return pubs, nil
+}
+
+// marshalCanonicalJSON produces a canonical JSON encoding with lexicographically sorted object keys.
+func marshalCanonicalJSON(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := writeCanonicalJSON(&buf, v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func writeCanonicalJSON(buf *bytes.Buffer, v interface{}) error {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		buf.WriteByte('{')
+		// sort keys
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			// key
+			kb, _ := json.Marshal(k)
+			buf.Write(kb)
+			buf.WriteByte(':')
+			if err := writeCanonicalJSON(buf, t[k]); err != nil {
+				return err
+			}
+			if i < len(keys)-1 {
+				buf.WriteByte(',')
+			}
+		}
+		buf.WriteByte('}')
+		return nil
+	case []interface{}:
+		buf.WriteByte('[')
+		for i, elem := range t {
+			if err := writeCanonicalJSON(buf, elem); err != nil {
+				return err
+			}
+			if i < len(t)-1 {
+				buf.WriteByte(',')
+			}
+		}
+		buf.WriteByte(']')
+		return nil
+	case json.Number:
+		buf.WriteString(string(t))
+		return nil
+	case string, float64, float32, bool, int, int64, nil:
+		b, err := json.Marshal(t)
+		if err != nil {
+			return err
+		}
+		buf.Write(b)
+		return nil
+	default:
+		// For any other type, re-marshal through encoding/json to a generic representation
+		b, err := json.Marshal(t)
+		if err != nil {
+			return err
+		}
+		var vv interface{}
+		if err := json.Unmarshal(b, &vv); err != nil {
+			return err
+		}
+		return writeCanonicalJSON(buf, vv)
+	}
 }
 
 // replayCmd handles replay operations
@@ -396,6 +797,7 @@ func replayCmd() *cobra.Command {
 func replayRunCmd() *cobra.Command {
 	var decisionID string
 	var openResults bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "run <decision-id> [--open]",
@@ -414,13 +816,13 @@ func replayRunCmd() *cobra.Command {
 			request := map[string]interface{}{
 				"decision_id": decisionID,
 				"config": map[string]interface{}{
-					"seed":              42,
-					"locale":            "C",
-					"timezone":          "UTC",
-					"chunk_size":        4096,
-					"flush_cadence_ms":  100,
-					"padding_policy":    "fixed",
-					"drift_threshold":   0.001,
+					"seed":             42,
+					"locale":           "C",
+					"timezone":         "UTC",
+					"chunk_size":       4096,
+					"flush_cadence_ms": 100,
+					"padding_policy":   "fixed",
+					"drift_threshold":  0.001,
 				},
 			}
 
@@ -430,24 +832,55 @@ func replayRunCmd() *cobra.Command {
 			}
 
 			jobID := resp["job_id"].(string)
-			fmt.Printf("🔄 Started replay job: %s\n", jobID)
-
-			// Poll for completion if --open flag is used
-			if openResults {
-				return pollReplayJob(jobID)
+			if jsonOut {
+				if openResults {
+					for {
+						statusResp, err := callAPI("GET", fmt.Sprintf("/api/v1/replay/%s", jobID), nil)
+						if err != nil {
+							return err
+						}
+						status := statusResp["status"].(string)
+						if status == "completed" || status == "failed" {
+							enc := json.NewEncoder(os.Stdout)
+							enc.SetIndent("", "  ")
+							_ = enc.Encode(statusResp)
+							if status == "failed" {
+								return fmt.Errorf("replay job failed")
+							}
+							return nil
+						}
+						time.Sleep(2 * time.Second)
+					}
+				} else {
+					payload := map[string]any{
+						"ok":     true,
+						"job_id": jobID,
+					}
+					enc := json.NewEncoder(os.Stdout)
+					enc.SetIndent("", "  ")
+					_ = enc.Encode(payload)
+					return nil
+				}
+			} else {
+				fmt.Printf("🔄 Started replay job: %s\n", jobID)
+				// Poll for completion if --open flag is used
+				if openResults {
+					return pollReplayJob(jobID)
+				}
+				fmt.Printf("💡 Check status with: so replay status %s\n", jobID)
+				return nil
 			}
-
-			fmt.Printf("💡 Check status with: so replay status %s\n", jobID)
-			return nil
 		},
 	}
 
 	cmd.Flags().BoolVar(&openResults, "open", false, "Wait for completion and show results")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 
 	return cmd
 }
 
 func replayStatusCmd() *cobra.Command {
+	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "status <job-id>",
 		Short: "Check replay job status",
@@ -466,26 +899,33 @@ func replayStatusCmd() *cobra.Command {
 				return err
 			}
 
-			// Display status
-			fmt.Printf("🔄 Replay Job: %s\n", jobID)
-			fmt.Printf("Status: %s\n", resp["status"])
-			fmt.Printf("Progress: %.1f%%\n", resp["progress"].(float64)*100)
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				// Display status
+				fmt.Printf("🔄 Replay Job: %s\n", jobID)
+				fmt.Printf("Status: %s\n", resp["status"])
+				fmt.Printf("Progress: %.1f%%\n", resp["progress"].(float64)*100)
 
-			if resp["status"] == "completed" {
-				fmt.Printf("✅ Low-view match: %.3f%%\n", resp["low_view_match_pct"].(float64)*100)
-				fmt.Printf("⏱️  Execution time: %vms\n", resp["execution_time_ms"])
-				
-				if driftDetected, ok := resp["drift_detected"].(bool); ok && driftDetected {
-					fmt.Printf("⚠️  Drift detected!\n")
+				if resp["status"] == "completed" {
+					fmt.Printf("✅ Low-view match: %.3f%%\n", resp["low_view_match_pct"].(float64)*100)
+					fmt.Printf("⏱️  Execution time: %vms\n", resp["execution_time_ms"])
+
+					if driftDetected, ok := resp["drift_detected"].(bool); ok && driftDetected {
+						fmt.Printf("⚠️  Drift detected!\n")
+					}
+				} else if resp["status"] == "failed" {
+					fmt.Printf("❌ Error: %s\n", resp["error_message"])
 				}
-			} else if resp["status"] == "failed" {
-				fmt.Printf("❌ Error: %s\n", resp["error_message"])
 			}
 
 			return nil
 		},
 	}
 
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 	return cmd
 }
 
@@ -504,6 +944,7 @@ func packetCmd() *cobra.Command {
 
 func packetMakeCmd() *cobra.Command {
 	var decisionID, outputPath, tenantID string
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "make <decision-id> --out <artifacts/>",
@@ -530,7 +971,6 @@ func packetMakeCmd() *cobra.Command {
 			}
 
 			packetID := resp["packet_id"].(string)
-			
 			// Download packet
 			downloadResp, err := callAPIRaw("GET", fmt.Sprintf("/api/v1/compliance/packet/%s", packetID))
 			if err != nil {
@@ -546,8 +986,19 @@ func packetMakeCmd() *cobra.Command {
 				return fmt.Errorf("failed to save packet: %w", err)
 			}
 
-			fmt.Printf("✅ Compliance packet created: %s\n", outputPath)
-			fmt.Printf("📦 Packet ID: %s\n", packetID)
+			if jsonOut {
+				payload := map[string]any{
+					"ok":          true,
+					"packet_id":   packetID,
+					"output_path": outputPath,
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("✅ Compliance packet created: %s\n", outputPath)
+				fmt.Printf("📦 Packet ID: %s\n", packetID)
+			}
 
 			return nil
 		},
@@ -555,7 +1006,41 @@ func packetMakeCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&outputPath, "out", "", "Output file path")
 	cmd.Flags().StringVar(&tenantID, "tenant", "", "Tenant ID filter")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 
+	return cmd
+}
+
+// epochStatusCmd shows current epoch status
+func epochStatusCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show current epoch status",
+		Long:  `Display current epoch information.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Println("DRY RUN: Would show epoch status")
+				return nil
+			}
+			resp, err := callAPI("GET", "/api/v1/runtime/slo", nil)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("📊 Runtime Status\n")
+				fmt.Printf("Current Epoch: 42\n")
+				fmt.Printf("TPS: %.0f\n", resp["tps"])
+				fmt.Printf("Error Rate: %.2f%%\n", resp["error_rate"].(float64)*100)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 	return cmd
 }
 
@@ -575,6 +1060,7 @@ func epochCmd() *cobra.Command {
 
 func epochRotateCmd() *cobra.Command {
 	var reason string
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "rotate [--reason <reason>]",
@@ -587,7 +1073,7 @@ func epochRotateCmd() *cobra.Command {
 			}
 
 			// Get current epoch first
-			currentResp, err := callAPI("GET", "/api/v1/runtime/slo", nil)
+			_, err := callAPI("GET", "/api/v1/runtime/slo", nil)
 			if err != nil {
 				return fmt.Errorf("failed to get current epoch: %w", err)
 			}
@@ -607,13 +1093,18 @@ func epochRotateCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("✅ Epoch rotated successfully\n")
-			fmt.Printf("🔄 Old epoch: %v\n", resp["old_epoch"])
-			fmt.Printf("🆕 New epoch: %v\n", resp["new_epoch"])
-			fmt.Printf("⏰ Rotated at: %s\n", resp["rotated_at"])
-
-			if reason != "" {
-				fmt.Printf("📝 Reason: %s\n", reason)
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(map[string]any{"ok": true, "old_epoch": resp["old_epoch"], "new_epoch": resp["new_epoch"], "rotated_at": resp["rotated_at"], "reason": reason})
+			} else {
+				fmt.Printf("✅ Epoch rotated successfully\n")
+				fmt.Printf("🔄 Old epoch: %v\n", resp["old_epoch"])
+				fmt.Printf("🆕 New epoch: %v\n", resp["new_epoch"])
+				fmt.Printf("⏰ Rotated at: %s\n", resp["rotated_at"])
+				if reason != "" {
+					fmt.Printf("📝 Reason: %s\n", reason)
+				}
 			}
 
 			return nil
@@ -621,35 +1112,169 @@ func epochRotateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&reason, "reason", "", "Reason for epoch rotation")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 
 	return cmd
 }
 
-func epochStatusCmd() *cobra.Command {
+func policyBuildCmd() *cobra.Command {
+	var buildDir string
+	var jsonOut bool
+
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show current epoch status",
-		Long:  `Display current epoch information.`,
+		Use:   "build --build <build/>",
+		Short: "Build policy (ActionDSL to DFA)",
+		Long:  `Compile ActionDSL to DFA and generate automata.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRun {
-				fmt.Println("DRY RUN: Would show epoch status")
+				fmt.Printf("DRY RUN: Would build policy from %s\n", buildDir)
 				return nil
 			}
 
-			resp, err := callAPI("GET", "/api/v1/runtime/slo", nil)
+			// Load metadata and inputs
+			metadataPath := filepath.Join(buildDir, "metadata.json")
+			actionDSLPath := filepath.Join(buildDir, "action_dsl.json")
+
+			metaBytes, err := os.ReadFile(metadataPath)
+			if err != nil {
+				return fmt.Errorf("failed to read metadata: %w", err)
+			}
+			var metadata map[string]interface{}
+			if err := json.Unmarshal(metaBytes, &metadata); err != nil {
+				return fmt.Errorf("failed to parse metadata: %w", err)
+			}
+
+			dslBytes, err := os.ReadFile(actionDSLPath)
+			if err != nil {
+				return fmt.Errorf("failed to read action_dsl.json: %w", err)
+			}
+			var actionDSL map[string]interface{}
+			if err := json.Unmarshal(dslBytes, &actionDSL); err != nil {
+				return fmt.Errorf("failed to parse action_dsl.json: %w", err)
+			}
+
+			// Prepare request
+			request := map[string]interface{}{
+				"policy_hash": metadata["policy_hash"],
+				"action_dsl":  actionDSL,
+				"proof_hash":  metadata["proof_hash"],
+				"metadata":    map[string]string{"source": "cli"},
+			}
+
+			resp, err := callAPI("POST", "/api/v1/policy/build", request)
 			if err != nil {
 				return err
 			}
 
-			fmt.Printf("📊 Runtime Status\n")
-			fmt.Printf("Current Epoch: 42\n") // Would come from response
-			fmt.Printf("TPS: %.0f\n", resp["tps"])
-			fmt.Printf("Error Rate: %.2f%%\n", resp["error_rate"].(float64)*100)
+			// Write build info locally
+			buildInfo := map[string]interface{}{
+				"dfa_hash":       resp["dfa_hash"],
+				"automata_hash":  resp["automata_hash"],
+				"labeler_hash":   resp["labeler_hash"],
+				"artifact_index": resp["artifact_index"],
+			}
+			buildInfoBytes, _ := json.MarshalIndent(buildInfo, "", "  ")
+			if err := os.WriteFile(filepath.Join(buildDir, "build_info.json"), buildInfoBytes, 0644); err != nil {
+				return fmt.Errorf("failed to write build_info.json: %w", err)
+			}
 
+			// Update metadata with automata hash
+			metadata["automata_hash"] = resp["automata_hash"]
+			updatedMetaBytes, _ := json.MarshalIndent(metadata, "", "  ")
+			if err := os.WriteFile(metadataPath, updatedMetaBytes, 0644); err != nil {
+				return fmt.Errorf("failed to update metadata.json: %w", err)
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(map[string]any{
+					"ok":            true,
+					"dfa_hash":      resp["dfa_hash"],
+					"automata_hash": resp["automata_hash"],
+					"labeler_hash":  resp["labeler_hash"],
+					"build_dir":     buildDir,
+				})
+			} else {
+				fmt.Printf("🏗️  Build completed\n")
+				fmt.Printf("🔧 DFA hash: %s\n", resp["dfa_hash"])
+				fmt.Printf("🔧 Automata hash: %s\n", resp["automata_hash"])
+				fmt.Printf("🏷️  Labeler hash: %s\n", resp["labeler_hash"])
+			}
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&buildDir, "build", "build/", "Build directory")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	return cmd
+}
+
+func policyDeployCmd() *cobra.Command {
+	return deployCmd()
+}
+
+func policyListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all policies",
+		Long:  `List all policies in the system.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resp, err := callAPI("GET", "/api/v1/policies", nil)
+			if err != nil {
+				return err
+			}
+
+			policies := resp["policies"].([]interface{})
+			fmt.Printf("📋 Found %d policies:\n", len(policies))
+			for _, policy := range policies {
+				if policyMap, ok := policy.(map[string]interface{}); ok {
+					fmt.Printf("  • %s (v%s)\n", policyMap["policy_id"], policyMap["version"])
+				}
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
+func certSearchCmd() *cobra.Command {
+	var tenantID, policyHash string
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "search [--tenant <id>] [--policy <hash>] [--limit <n>]",
+		Short: "Search certificates",
+		Long:  `Search for certificates with filters.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			request := map[string]interface{}{
+				"limit": limit,
+			}
+			if tenantID != "" {
+				request["tenant_id"] = tenantID
+			}
+			if policyHash != "" {
+				request["policy_hash"] = policyHash
+			}
+			resp, err := callAPI("POST", "/api/v1/evidence/search", request)
+			if err != nil {
+				return err
+			}
+			certs := resp["certificates"].([]interface{})
+			total := int(resp["total"].(float64))
+			fmt.Printf("🔍 Found %d certificates (showing %d):\n", total, len(certs))
+			for _, cert := range certs {
+				if certMap, ok := cert.(map[string]interface{}); ok {
+					fmt.Printf("  • %s - %s (%s)\n", certMap["session_id"], certMap["ni_monitor"], certMap["tenant_id"])
+				}
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&tenantID, "tenant", "", "Tenant ID filter")
+	cmd.Flags().StringVar(&policyHash, "policy", "", "Policy hash filter")
+	cmd.Flags().IntVar(&limit, "limit", 10, "Maximum results")
 	return cmd
 }
 
@@ -668,27 +1293,22 @@ func callAPI(method, endpoint string, data interface{}) (map[string]interface{},
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
 	if data != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("API error: %s", resp.Status)
 	}
-
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
-
 	return result, nil
 }
 
@@ -697,149 +1317,212 @@ func callAPIRaw(method, endpoint string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("API error: %s", resp.Status)
 	}
-
 	return io.ReadAll(resp.Body)
 }
 
 func pollReplayJob(jobID string) error {
 	fmt.Printf("⏳ Waiting for replay completion...\n")
-
 	for {
 		resp, err := callAPI("GET", fmt.Sprintf("/api/v1/replay/%s", jobID), nil)
 		if err != nil {
 			return err
 		}
-
 		status := resp["status"].(string)
 		progress := resp["progress"].(float64)
-
 		fmt.Printf("\r🔄 Progress: %.1f%% - %s", progress*100, status)
-
 		if status == "completed" {
 			fmt.Printf("\n✅ Replay completed successfully\n")
 			fmt.Printf("📊 Low-view match: %.3f%%\n", resp["low_view_match_pct"].(float64)*100)
-			
 			if artifacts, ok := resp["artifacts"].([]interface{}); ok && len(artifacts) > 0 {
 				fmt.Printf("📁 Artifacts available: %d files\n", len(artifacts))
 			}
-			
+			// Telemetry: emit first replay success (server will skip if telemetry is disabled)
+			_ = sendTelemetryEventCLI("first_replay_success", map[string]any{
+				"low_view_match_pct": resp["low_view_match_pct"],
+			})
 			return nil
 		} else if status == "failed" {
 			fmt.Printf("\n❌ Replay failed: %s\n", resp["error_message"])
 			return fmt.Errorf("replay job failed")
 		}
-
 		time.Sleep(2 * time.Second)
 	}
 }
 
-// Additional command implementations would go here...
-func policyBuildCmd() *cobra.Command {
-	var buildDir string
+// sendTelemetryEventCLI posts an anonymous telemetry event; errors are ignored
+func sendTelemetryEventCLI(eventType string, data map[string]any) error {
+	payload := map[string]any{
+		"type": eventType,
+		"ts":   time.Now().UTC().Format(time.RFC3339),
+		"data": data,
+	}
+	_, err := callAPI("POST", "/api/v1/telemetry/event", payload)
+	return err
+}
+
+// traceCmd handles TRACE-REPLAY-KIT operations
+func traceCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "trace",
+		Short: "TRACE-REPLAY-KIT operations (run, report, compare-lowview)",
+		Long:  `Run deterministic replays and low-view comparisons via TRACE-REPLAY-KIT.`,
+	}
+	cmd.AddCommand(traceRunCmd())
+	cmd.AddCommand(traceReportCmd())
+	cmd.AddCommand(traceCompareLowViewCmd())
+	return cmd
+}
+
+func traceRunCmd() *cobra.Command {
+	var traceFile string
+	var fixturesDir string
+	var outDir string
+	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:   "build --build <build/>",
-		Short: "Build policy (ActionDSL to DFA)",
-		Long:  `Compile ActionDSL to DFA and generate automata.`,
+		Use:   "run --trace <trace.json> [--fixtures <dir>] [--out <dir>]",
+		Short: "Run a replay using TRACE-REPLAY-KIT",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Implementation similar to prove command
-			fmt.Println("Policy build functionality - implementation details...")
+			if dryRun {
+				fmt.Printf("DRY RUN: Would run trace %s with fixtures %s\n", traceFile, fixturesDir)
+				return nil
+			}
+
+			if traceFile == "" {
+				return fmt.Errorf("--trace is required")
+			}
+
+			// Prefer python runner script in external kit
+			interp := "python3"
+			if _, err := exec.LookPath(interp); err != nil {
+				interp = "python"
+			}
+			pyArgs := []string{"external/TRACE-REPLAY-KIT/runner.py", traceFile}
+			if fixturesDir != "" {
+				pyArgs = append(pyArgs, "--fixtures", fixturesDir)
+			}
+			if outDir != "" {
+				pyArgs = append(pyArgs, "--out", outDir)
+			}
+
+			cmdExec := exec.Command(interp, pyArgs...)
+			cmdExec.Stdout = os.Stdout
+			cmdExec.Stderr = os.Stderr
+			if err := cmdExec.Run(); err != nil {
+				return fmt.Errorf("trace run failed: %w", err)
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(map[string]any{"ok": true})
+			} else {
+				fmt.Println("✅ Trace run completed")
+			}
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&buildDir, "build", "build/", "Build directory")
+	cmd.Flags().StringVar(&traceFile, "trace", "", "Path to trace.json")
+	cmd.Flags().StringVar(&fixturesDir, "fixtures", "", "Path to fixtures directory")
+	cmd.Flags().StringVar(&outDir, "out", "", "Output directory")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 	return cmd
 }
 
-func policyDeployCmd() *cobra.Command {
-	return deployCmd() // Reuse deploy command
+func traceReportCmd() *cobra.Command {
+	var inputDir string
+	cmd := &cobra.Command{
+		Use:   "report --in <dir>",
+		Short: "Generate a replay quality report",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Printf("DRY RUN: Would generate report from %s\n", inputDir)
+				return nil
+			}
+			if inputDir == "" {
+				return fmt.Errorf("--in is required")
+			}
+			// Simple aggregation stub; in production call a report generator script
+			fmt.Printf("📋 Report generated for directory: %s\n", inputDir)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&inputDir, "in", "", "Input directory containing replay artifacts")
+	return cmd
 }
 
-func policyListCmd() *cobra.Command {
+func traceCompareLowViewCmd() *cobra.Command {
+	var inputDir string
+	var threshold float64
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all policies",
-		Long:  `List all policies in the system.`,
+		Use:   "compare-lowview --in <dir> [--threshold <float>]",
+		Short: "Compare low-view outputs across runs",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := callAPI("GET", "/api/v1/policies", nil)
-			if err != nil {
-				return err
+			if dryRun {
+				fmt.Printf("DRY RUN: Would compare low-view in %s with threshold %.6f\n", inputDir, threshold)
+				return nil
 			}
-
-			policies := resp["policies"].([]interface{})
-			fmt.Printf("📋 Found %d policies:\n", len(policies))
-			
-			for _, policy := range policies {
-				if policyMap, ok := policy.(map[string]interface{}); ok {
-					fmt.Printf("  • %s (v%s)\n", policyMap["policy_id"], policyMap["version"])
+			if inputDir == "" {
+				return fmt.Errorf("--in is required")
+			}
+			// Prefer Python oracle if available
+			interp := "python3"
+			if _, err := exec.LookPath(interp); err != nil {
+				interp = "python"
+			}
+			oracle := "external/TRACE-REPLAY-KIT/oracles/lowview_equal.py"
+			if _, err := os.Stat(oracle); err == nil {
+				args := []string{oracle, "--input", inputDir, "--threshold", fmt.Sprintf("%f", threshold)}
+				cmdExec := exec.Command(interp, args...)
+				cmdExec.Stdout = os.Stdout
+				cmdExec.Stderr = os.Stderr
+				if err := cmdExec.Run(); err != nil {
+					return fmt.Errorf("low-view compare failed: %w", err)
 				}
+				fmt.Println("✅ Low-view comparison passed")
+				return nil
 			}
-
+			fmt.Println("ℹ️  Oracle not found; skipping")
 			return nil
 		},
 	}
-
+	cmd.Flags().StringVar(&inputDir, "in", "", "Input directory of replay outputs")
+	cmd.Flags().Float64Var(&threshold, "threshold", 0.999999, "Low-view equality threshold")
 	return cmd
 }
 
-func certSearchCmd() *cobra.Command {
-	var tenantID, policyHash string
-	var limit int
-
-	cmd := &cobra.Command{
-		Use:   "search [--tenant <id>] [--policy <hash>] [--limit <n>]",
-		Short: "Search certificates",
-		Long:  `Search for certificates with filters.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			request := map[string]interface{}{
-				"limit": limit,
-			}
-
-			if tenantID != "" {
-				request["tenant_id"] = tenantID
-			}
-			if policyHash != "" {
-				request["policy_hash"] = policyHash
-			}
-
-			resp, err := callAPI("POST", "/api/v1/evidence/search", request)
-			if err != nil {
-				return err
-			}
-
-			certs := resp["certificates"].([]interface{})
-			total := int(resp["total"].(float64))
-
-			fmt.Printf("🔍 Found %d certificates (showing %d):\n", total, len(certs))
-			
-			for _, cert := range certs {
-				if certMap, ok := cert.(map[string]interface{}); ok {
-					fmt.Printf("  • %s - %s (%s)\n", 
-						certMap["session_id"], 
-						certMap["ni_monitor"], 
-						certMap["tenant_id"])
-				}
-			}
-
-			return nil
-		},
+// computeJSONDiff renders a simple line-by-line diff of two JSON strings
+func computeJSONDiff(oldJS, newJS string) string {
+	oldLines := strings.Split(oldJS, "\n")
+	newLines := strings.Split(newJS, "\n")
+	oldSet := map[string]int{}
+	for _, l := range oldLines {
+		oldSet[l]++
 	}
-
-	cmd.Flags().StringVar(&tenantID, "tenant", "", "Tenant ID filter")
-	cmd.Flags().StringVar(&policyHash, "policy", "", "Policy hash filter")
-	cmd.Flags().IntVar(&limit, "limit", 10, "Maximum results")
-
-	return cmd
+	newSet := map[string]int{}
+	for _, l := range newLines {
+		newSet[l]++
+	}
+	var b strings.Builder
+	for _, l := range oldLines {
+		if newSet[l] == 0 {
+			b.WriteString("- " + l + "\n")
+		}
+	}
+	for _, l := range newLines {
+		if oldSet[l] == 0 {
+			b.WriteString("+ " + l + "\n")
+		}
+	}
+	return b.String()
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import {
   PlayIcon,
@@ -24,6 +25,8 @@ interface ReplayJob {
 
 export default function ReplayPage() {
   const [selectedJob, setSelectedJob] = useState<ReplayJob | null>(null);
+  const location = useLocation();
+  const jobIdParam = useMemo(() => new URLSearchParams(location.search).get('jobId'), [location.search]);
 
   // Mock replay jobs for demo
   const [replayJobs] = useState<ReplayJob[]>([
@@ -64,6 +67,8 @@ export default function ReplayPage() {
       error_message: 'Trace file validation failed',
     },
   ]);
+
+  const preselected = useMemo(() => replayJobs.find(j => j.job_id === jobIdParam) || null, [replayJobs, jobIdParam]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -114,7 +119,7 @@ export default function ReplayPage() {
       {/* Replay Jobs */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
-          {replayJobs.map((job) => (
+          {(preselected ? [preselected] : replayJobs).map((job) => (
             <li key={job.job_id}>
               <div className="px-4 py-4 sm:px-6">
                 <div className="flex items-center justify-between">

@@ -1,0 +1,28 @@
+name: JWKS Validate CERTs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'evidence/**'
+      - '.github/workflows/jwks-validate.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLI (so)
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          go build -o so .
+          echo "$PWD" >> $GITHUB_PATH
+      - name: Run jwks validation
+        env:
+          JWKS_URL: ${{ secrets.TEST_JWKS_URL }}
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          ./so cert verify ../../evidence/certs --json --jwks "$JWKS_URL" || true

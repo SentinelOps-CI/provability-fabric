@@ -160,6 +160,16 @@ export const searchCertificates = async (request: {
   return response.data;
 };
 
+export const verifyCertificate = async (payload: {
+  raw?: any;
+  cert?: any;
+  jwks_url?: string;
+  pem_pub?: string;
+}) => {
+  const response = await api.post('/api/v1/evidence/validate', payload);
+  return response.data;
+};
+
 export const getCertificate = async (certId: string) => {
   const response = await api.get(`/api/v1/evidence/cert/${certId}`);
   return response.data;
@@ -215,6 +225,28 @@ export const downloadReplayArtifact = async (jobId: string, artifact: string) =>
   const response = await api.get(`/api/v1/replay/${jobId}/artifact/${artifact}`, {
     responseType: 'blob',
   });
+  return response.data;
+};
+
+// Dev Mode (E4)
+export const getDevModeStreamUrl = (jobId: string) => `${API_BASE_URL}/api/v1/replay/${jobId}/stream`;
+export const getDFAState = async (jobId: string) => {
+  const response = await api.get(`/api/v1/replay/${jobId}/dfa_state`);
+  return response.data as { job_id: string; state_id: number };
+};
+
+// Telemetry (M1)
+export const getTelemetryOpt = async () => {
+  const response = await api.get('/api/v1/telemetry/opt');
+  return response.data as { enabled: boolean };
+};
+export const setTelemetryOpt = async (enabled: boolean) => {
+  const response = await api.post('/api/v1/telemetry/opt', { enabled });
+  return response.data as { ok: boolean; enabled: boolean };
+};
+export const sendTelemetryEvent = async (type: string, data?: Record<string, any>) => {
+  const payload = { type, ts: new Date().toISOString(), data: data ?? {} };
+  const response = await api.post('/api/v1/telemetry/event', payload);
   return response.data;
 };
 

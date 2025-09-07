@@ -5,6 +5,7 @@ go 1.23
 require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/spf13/cobra v1.8.0
+	github.com/xeipuuv/gojsonschema v1.2.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 )

@@ -1,0 +1,14 @@
+{
+  "bundle_id": "standards-lane",
+  "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "proof_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "automata_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "labeler_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "ni_claim": "global_non_interference",
+  "ni_monitor": "accept",
+  "sidecar_build": "tests@1.0.0",
+  "tenant_id": "acme-corp",
+  "session_id": "test-session-1",
+  "timestamp": "2025-01-27T10:30:00Z",
+  "egress_profile": "HTTP-EGRESS@1.0"
+}

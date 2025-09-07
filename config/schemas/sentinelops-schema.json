@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.sentinelops.dev/sentinelops-schema.json",
+  "title": "SentinelOps Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "egress_profile": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Named egress profile to apply to sidecar/policies"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emit": { "type": "boolean" }
+      },
+      "required": ["emit"]
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lowview_min": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 1
+        }
+      },
+      "required": ["lowview_min"]
+    }
+  },
+  "required": ["egress_profile", "evidence", "replay"]
+}
+
+

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import {
   Cog6ToothIcon,
   ShieldCheckIcon,
   GlobeAltIcon,
 } from '@heroicons/react/24/outline';
+import { getTelemetryOpt, setTelemetryOpt } from '../services/api';
 
 interface PlatformSettings {
   mode: 'local_loopback' | 'end_to_end';
@@ -52,6 +53,11 @@ export default function SettingsPage() {
   });
 
   const [hasChanges, setHasChanges] = useState(false);
+  const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    getTelemetryOpt().then((d) => setTelemetryEnabled(!!d.enabled)).catch(() => {});
+  }, []);
 
   const handleSettingChange = (section: keyof PlatformSettings, key: string, value: any) => {
     setSettings(prev => ({
@@ -108,6 +114,18 @@ export default function SettingsPage() {
     toast.success('Settings reset to defaults');
   };
 
+  const handleTelemetryToggle = async (enabled: boolean) => {
+    try {
+      setTelemetryEnabled(enabled);
+      const resp = await setTelemetryOpt(enabled);
+      if (!resp?.ok) throw new Error('failed');
+      toast.success(`Telemetry ${enabled ? 'enabled' : 'disabled'}`);
+    } catch {
+      setTelemetryEnabled((prev) => !prev);
+      toast.error('Failed to update telemetry setting');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="md:flex md:items-center md:justify-between">
@@ -135,6 +153,30 @@ export default function SettingsPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Telemetry */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Telemetry</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-gray-900">Anonymous usage telemetry</div>
+              <div className="text-xs text-gray-500">Init→first valid cert, first replay success. No PII. Toggle anytime.</div>
+            </div>
+            <label className="inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={telemetryEnabled}
+                onChange={(e) => handleTelemetryToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 relative">
+                <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${telemetryEnabled ? 'translate-x-5' : ''}`} />
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Mode Configuration */}

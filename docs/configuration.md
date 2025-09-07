@@ -47,6 +47,19 @@ Provability-Fabric uses a hierarchical configuration system that supports:
 
 ## Core Configuration
 
+### Telemetry
+
+Anonymous, opt-in telemetry can be configured at the API gateway:
+
+```bash
+# Enable anonymous, opt-in telemetry by default (users can still opt-out in Console)
+TELEMETRY_DEFAULT_ENABLED=true
+```
+
+- If `TELEMETRY_DEFAULT_ENABLED` is unset or set to `false`, telemetry starts disabled.
+- Users can toggle telemetry in the Console under Settings.
+- Server-side handlers scrub payloads to avoid PII.
+
 ### Main Configuration File
 
 ```yaml

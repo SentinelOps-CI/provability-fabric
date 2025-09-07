@@ -20,52 +20,61 @@ import (
 
 // PolicyBuildRequest represents a request to build a policy
 type PolicyBuildRequest struct {
-	PolicyHash    string                 `json:"policy_hash" binding:"required"`
-	ActionDSL     map[string]interface{} `json:"action_dsl" binding:"required"`
-	ProofHash     string                 `json:"proof_hash" binding:"required"`
-	Metadata      map[string]string      `json:"metadata,omitempty"`
-	SigningKey    string                 `json:"signing_key,omitempty"`
+	PolicyHash string                 `json:"policy_hash" binding:"required"`
+	ActionDSL  map[string]interface{} `json:"action_dsl" binding:"required"`
+	ProofHash  string                 `json:"proof_hash" binding:"required"`
+	Metadata   map[string]string      `json:"metadata,omitempty"`
+	SigningKey string                 `json:"signing_key,omitempty"`
 }
 
 // PolicyBuildResponse represents the build result
 type PolicyBuildResponse struct {
-	BuildID       string            `json:"build_id"`
-	DFAHash       string            `json:"dfa_hash"`
-	AutomataHash  string            `json:"automata_hash"`
-	LabelerHash   string            `json:"labeler_hash"`
+	BuildID       string                 `json:"build_id"`
+	DFAHash       string                 `json:"dfa_hash"`
+	AutomataHash  string                 `json:"automata_hash"`
+	LabelerHash   string                 `json:"labeler_hash"`
 	ProofInputs   map[string]interface{} `json:"proof_inputs"`
-	Artifacts     []string          `json:"artifacts"`
-	Signature     string            `json:"signature,omitempty"`
-	Status        string            `json:"status"`
-	Timestamp     time.Time         `json:"timestamp"`
-	ExecutionTime int               `json:"execution_time_ms"`
+	Artifacts     []string               `json:"artifacts"`
+	ArtifactIndex []ArtifactMeta         `json:"artifact_index"`
+	Signature     string                 `json:"signature,omitempty"`
+	Status        string                 `json:"status"`
+	Timestamp     time.Time              `json:"timestamp"`
+	ExecutionTime int                    `json:"execution_time_ms"`
+}
+
+// ArtifactMeta describes a stored artifact
+type ArtifactMeta struct {
+	Name   string `json:"name"`
+	Sha256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+	Path   string `json:"path"`
 }
 
 // DFAState represents a state in the compiled DFA
 type DFAState struct {
-	StateID     int               `json:"state_id"`
-	Name        string            `json:"name"`
-	Type        string            `json:"type"` // "initial" | "accept" | "reject" | "intermediate"
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	StateID  int               `json:"state_id"`
+	Name     string            `json:"name"`
+	Type     string            `json:"type"` // "initial" | "accept" | "reject" | "intermediate"
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // DFATransition represents a transition in the DFA
 type DFATransition struct {
-	FromState   int               `json:"from_state"`
-	ToState     int               `json:"to_state"`
-	Trigger     string            `json:"trigger"`
-	Guard       string            `json:"guard,omitempty"`
-	Action      string            `json:"action,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	FromState int               `json:"from_state"`
+	ToState   int               `json:"to_state"`
+	Trigger   string            `json:"trigger"`
+	Guard     string            `json:"guard,omitempty"`
+	Action    string            `json:"action,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 // CompiledDFA represents the complete compiled automata
 type CompiledDFA struct {
-	States       []DFAState       `json:"states"`
-	Transitions  []DFATransition  `json:"transitions"`
-	InitialState int              `json:"initial_state"`
-	AcceptStates []int            `json:"accept_states"`
-	RejectStates []int            `json:"reject_states"`
+	States       []DFAState        `json:"states"`
+	Transitions  []DFATransition   `json:"transitions"`
+	InitialState int               `json:"initial_state"`
+	AcceptStates []int             `json:"accept_states"`
+	RejectStates []int             `json:"reject_states"`
 	Metadata     map[string]string `json:"metadata"`
 }
 
@@ -79,40 +88,41 @@ type LabelerConfig struct {
 
 // Label represents an information flow label
 type Label struct {
-	Name        string   `json:"name"`
-	Level       int      `json:"level"`
-	Categories  []string `json:"categories,omitempty"`
-	Tenant      string   `json:"tenant,omitempty"`
+	Name       string   `json:"name"`
+	Level      int      `json:"level"`
+	Categories []string `json:"categories,omitempty"`
+	Tenant     string   `json:"tenant,omitempty"`
 }
 
 // LabelRule represents a labeling rule
 type LabelRule struct {
-	Pattern     string `json:"pattern"`
-	Label       string `json:"label"`
-	Condition   string `json:"condition,omitempty"`
+	Pattern   string `json:"pattern"`
+	Label     string `json:"label"`
+	Condition string `json:"condition,omitempty"`
 }
 
 // FlowPolicy represents an information flow policy
 type FlowPolicy struct {
-	From        string `json:"from"`
-	To          string `json:"to"`
-	Allowed     bool   `json:"allowed"`
-	Condition   string `json:"condition,omitempty"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Allowed   bool   `json:"allowed"`
+	Condition string `json:"condition,omitempty"`
 }
 
 // PolicyBuild represents a signed policy build
 type PolicyBuild struct {
-	BuildID      string        `json:"build_id"`
-	PolicyHash   string        `json:"policy_hash"`
-	ProofHash    string        `json:"proof_hash"`
-	DFAHash      string        `json:"dfa_hash"`
-	AutomataHash string        `json:"automata_hash"`
-	LabelerHash  string        `json:"labeler_hash"`
-	CompiledDFA  CompiledDFA   `json:"compiled_dfa"`
-	Labeler      LabelerConfig `json:"labeler"`
-	Signature    string        `json:"signature"`
-	CreatedAt    time.Time     `json:"created_at"`
-	Metadata     map[string]string `json:"metadata"`
+	BuildID       string            `json:"build_id"`
+	PolicyHash    string            `json:"policy_hash"`
+	ProofHash     string            `json:"proof_hash"`
+	DFAHash       string            `json:"dfa_hash"`
+	AutomataHash  string            `json:"automata_hash"`
+	LabelerHash   string            `json:"labeler_hash"`
+	CompiledDFA   CompiledDFA       `json:"compiled_dfa"`
+	Labeler       LabelerConfig     `json:"labeler"`
+	Signature     string            `json:"signature"`
+	CreatedAt     time.Time         `json:"created_at"`
+	Metadata      map[string]string `json:"metadata"`
+	ArtifactIndex []ArtifactMeta    `json:"artifact_index"`
 }
 
 // BuildOrchestrator handles ActionDSL compilation and policy builds
@@ -127,10 +137,10 @@ func NewBuildOrchestrator() *BuildOrchestrator {
 	if cachePath == "" {
 		cachePath = "/tmp/build-cache"
 	}
-	
+
 	// Ensure cache directory exists
 	os.MkdirAll(cachePath, 0755)
-	
+
 	return &BuildOrchestrator{
 		builds:    make(map[string]PolicyBuild),
 		cachePath: cachePath,
@@ -141,21 +151,21 @@ func NewBuildOrchestrator() *BuildOrchestrator {
 func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequest) (*PolicyBuildResponse, error) {
 	startTime := time.Now()
 	buildID := uuid.New().String()
-	
+
 	// Compile ActionDSL to DFA
 	dfa, err := s.compileActionDSLToDFA(req.ActionDSL)
 	if err != nil {
 		return nil, fmt.Errorf("DFA compilation failed: %w", err)
 	}
-	
+
 	// Generate labeler configuration
 	labeler := s.generateLabelerConfig(req.ActionDSL)
-	
+
 	// Calculate hashes
 	dfaHash := s.calculateDFAHash(dfa)
 	automataHash := s.calculateAutomataHash(dfa)
 	labelerHash := s.calculateLabelerHash(labeler)
-	
+
 	// Create policy build
 	build := PolicyBuild{
 		BuildID:      buildID,
@@ -169,7 +179,7 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		CreatedAt:    time.Now(),
 		Metadata:     req.Metadata,
 	}
-	
+
 	// Sign the build if signing key provided
 	if req.SigningKey != "" {
 		signature, err := s.signPolicyBuild(build, req.SigningKey)
@@ -178,16 +188,15 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		}
 		build.Signature = signature
 	}
-	
-	// Store build
-	s.builds[buildID] = build
-	
+
 	// Generate artifacts
-	artifacts, err := s.generateBuildArtifacts(build)
+	artifacts, index, err := s.generateBuildArtifacts(&build)
 	if err != nil {
 		return nil, fmt.Errorf("artifact generation failed: %w", err)
 	}
-	
+	build.ArtifactIndex = index
+	s.builds[buildID] = build
+
 	return &PolicyBuildResponse{
 		BuildID:       buildID,
 		DFAHash:       dfaHash,
@@ -195,6 +204,7 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		LabelerHash:   labelerHash,
 		ProofInputs:   map[string]interface{}{"dfa": dfa, "labeler": labeler},
 		Artifacts:     artifacts,
+		ArtifactIndex: index,
 		Signature:     build.Signature,
 		Status:        "success",
 		Timestamp:     time.Now(),
@@ -208,16 +218,16 @@ func (s *BuildOrchestrator) compileActionDSLToDFA(actionDSL map[string]interface
 	var transitions []DFATransition
 	var acceptStates []int
 	var rejectStates []int
-	
+
 	// Create initial state
 	states = append(states, DFAState{
 		StateID: 0,
 		Name:    "initial",
 		Type:    "initial",
 	})
-	
+
 	stateCounter := 1
-	
+
 	// Process rules from ActionDSL
 	if rules, ok := actionDSL["rules"].([]interface{}); ok {
 		for _, rule := range rules {
@@ -228,19 +238,19 @@ func (s *BuildOrchestrator) compileActionDSLToDFA(actionDSL map[string]interface
 			}
 		}
 	}
-	
+
 	// Add accept and reject states
 	acceptState := stateCounter
 	rejectState := stateCounter + 1
-	
-	states = append(states, 
+
+	states = append(states,
 		DFAState{StateID: acceptState, Name: "accept", Type: "accept"},
 		DFAState{StateID: rejectState, Name: "reject", Type: "reject"},
 	)
-	
+
 	acceptStates = append(acceptStates, acceptState)
 	rejectStates = append(rejectStates, rejectState)
-	
+
 	return CompiledDFA{
 		States:       states,
 		Transitions:  transitions,
@@ -258,14 +268,14 @@ func (s *BuildOrchestrator) compileActionDSLToDFA(actionDSL map[string]interface
 func (s *BuildOrchestrator) compileRule(rule map[string]interface{}, stateCounter *int) ([]DFAState, []DFATransition) {
 	var states []DFAState
 	var transitions []DFATransition
-	
+
 	ruleType, _ := rule["type"].(string)
 	ruleID, _ := rule["rule_id"].(string)
-	
+
 	// Create state for this rule
 	ruleState := *stateCounter
 	*stateCounter++
-	
+
 	states = append(states, DFAState{
 		StateID: ruleState,
 		Name:    fmt.Sprintf("rule_%s", ruleID),
@@ -275,11 +285,11 @@ func (s *BuildOrchestrator) compileRule(rule map[string]interface{}, stateCounte
 			"rule_id":   ruleID,
 		},
 	})
-	
+
 	// Create transition from initial state
 	trigger := s.generateTriggerFromRule(rule)
 	guard := s.generateGuardFromRule(rule)
-	
+
 	transitions = append(transitions, DFATransition{
 		FromState: 0,
 		ToState:   ruleState,
@@ -290,7 +300,7 @@ func (s *BuildOrchestrator) compileRule(rule map[string]interface{}, stateCounte
 			"rule_id": ruleID,
 		},
 	})
-	
+
 	return states, transitions
 }
 
@@ -304,7 +314,7 @@ func (s *BuildOrchestrator) generateTriggerFromRule(rule map[string]interface{})
 			return actionType
 		}
 	}
-	
+
 	return "any"
 }
 
@@ -314,7 +324,7 @@ func (s *BuildOrchestrator) generateGuardFromRule(rule map[string]interface{}) s
 		guardData, _ := json.Marshal(guard)
 		return string(guardData)
 	}
-	
+
 	return "true"
 }
 
@@ -323,15 +333,15 @@ func (s *BuildOrchestrator) generateLabelerConfig(actionDSL map[string]interface
 	var labels []Label
 	var labelRules []LabelRule
 	var flowPolicies []FlowPolicy
-	
+
 	// Default labels
-	labels = append(labels, 
+	labels = append(labels,
 		Label{Name: "public", Level: 0, Categories: []string{"unclassified"}},
 		Label{Name: "internal", Level: 1, Categories: []string{"internal"}},
 		Label{Name: "confidential", Level: 2, Categories: []string{"confidential"}},
 		Label{Name: "secret", Level: 3, Categories: []string{"secret"}},
 	)
-	
+
 	// Generate labeling rules from policy
 	if rules, ok := actionDSL["rules"].([]interface{}); ok {
 		for _, rule := range rules {
@@ -343,7 +353,7 @@ func (s *BuildOrchestrator) generateLabelerConfig(actionDSL map[string]interface
 			}
 		}
 	}
-	
+
 	// Default flow policies (allow upward flow, deny downward)
 	for i := 0; i < len(labels); i++ {
 		for j := i; j < len(labels); j++ {
@@ -354,7 +364,7 @@ func (s *BuildOrchestrator) generateLabelerConfig(actionDSL map[string]interface
 			})
 		}
 	}
-	
+
 	return LabelerConfig{
 		Labels:       labels,
 		LabelRules:   labelRules,
@@ -395,7 +405,7 @@ func (s *BuildOrchestrator) generateLabelRuleFromPolicyRule(rule map[string]inte
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -414,58 +424,86 @@ func (s *BuildOrchestrator) signPolicyBuild(build PolicyBuild, signingKey string
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Calculate signature (simplified - in practice would use proper crypto)
 	hash := sha256.Sum256(buildData)
 	signature := fmt.Sprintf("sig_%x", hash)
-	
+
 	return signature, nil
 }
 
-// generateBuildArtifacts creates build artifacts
-func (s *BuildOrchestrator) generateBuildArtifacts(build PolicyBuild) ([]string, error) {
+// generateBuildArtifacts creates build artifacts and computes content-addressed hashes
+func (s *BuildOrchestrator) generateBuildArtifacts(build *PolicyBuild) ([]string, []ArtifactMeta, error) {
 	var artifacts []string
-	
+	var index []ArtifactMeta
+
 	// Create build directory
 	buildDir := filepath.Join(s.cachePath, build.BuildID)
 	if err := os.MkdirAll(buildDir, 0755); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	
+
 	// Write DFA artifact
 	dfaPath := filepath.Join(buildDir, "compiled_dfa.json")
 	dfaData, err := json.MarshalIndent(build.CompiledDFA, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := os.WriteFile(dfaPath, dfaData, 0644); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	artifacts = append(artifacts, dfaPath)
-	
+
 	// Write labeler artifact
 	labelerPath := filepath.Join(buildDir, "labeler_config.json")
 	labelerData, err := json.MarshalIndent(build.Labeler, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := os.WriteFile(labelerPath, labelerData, 0644); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	artifacts = append(artifacts, labelerPath)
-	
+
 	// Write build manifest
 	manifestPath := filepath.Join(buildDir, "build_manifest.json")
 	manifestData, err := json.MarshalIndent(build, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := os.WriteFile(manifestPath, manifestData, 0644); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	artifacts = append(artifacts, manifestPath)
-	
-	return artifacts, nil
+
+	// Compute content-addressed hashes and sizes
+	files := []struct{ name, path string }{
+		{"compiled_dfa.json", dfaPath},
+		{"labeler_config.json", labelerPath},
+		{"build_manifest.json", manifestPath},
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f.path)
+		if err != nil {
+			return nil, nil, err
+		}
+		h := sha256.Sum256(data)
+		sha := fmt.Sprintf("%x", h)
+		info, _ := os.Stat(f.path)
+		index = append(index, ArtifactMeta{
+			Name:   f.name,
+			Sha256: sha,
+			Size: func() int64 {
+				if info != nil {
+					return info.Size()
+				}
+				return int64(len(data))
+			}(),
+			Path: f.path,
+		})
+	}
+
+	return artifacts, index, nil
 }
 
 // calculateDFAHash computes hash for DFA
@@ -485,7 +523,7 @@ func (s *BuildOrchestrator) calculateAutomataHash(dfa CompiledDFA) string {
 		"accept_states": dfa.AcceptStates,
 		"reject_states": dfa.RejectStates,
 	}
-	
+
 	data, _ := json.Marshal(structure)
 	hash := sha256.Sum256(data)
 	return fmt.Sprintf("%x", hash)
@@ -505,25 +543,25 @@ func (s *BuildOrchestrator) buildPolicyHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	resp, err := s.BuildPolicy(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, resp)
 }
 
 func (s *BuildOrchestrator) getBuildHandler(c *gin.Context) {
 	buildID := c.Param("id")
-	
+
 	build, exists := s.builds[buildID]
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Build not found"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, build)
 }
 
@@ -532,11 +570,53 @@ func (s *BuildOrchestrator) listBuildsHandler(c *gin.Context) {
 	for _, build := range s.builds {
 		builds = append(builds, build)
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"builds": builds,
 		"count":  len(builds),
 	})
+}
+
+// listArtifactsHandler returns artifact metadata for a build
+func (s *BuildOrchestrator) listArtifactsHandler(c *gin.Context) {
+	buildID := c.Param("id")
+	build, exists := s.builds[buildID]
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Build not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"artifacts": build.ArtifactIndex})
+}
+
+// downloadArtifactHandler streams an artifact by sha256
+func (s *BuildOrchestrator) downloadArtifactHandler(c *gin.Context) {
+	buildID := c.Param("id")
+	sha := c.Param("sha")
+	build, exists := s.builds[buildID]
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Build not found"})
+		return
+	}
+	for _, meta := range build.ArtifactIndex {
+		if meta.Sha256 == sha {
+			// Verify file exists and matches hash
+			data, err := os.ReadFile(meta.Path)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			h := sha256.Sum256(data)
+			if fmt.Sprintf("%x", h) != sha {
+				c.JSON(http.StatusConflict, gin.H{"error": "hash mismatch"})
+				return
+			}
+			c.Header("Content-Type", "application/json")
+			c.Writer.WriteHeader(http.StatusOK)
+			_, _ = c.Writer.Write(data)
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": "Artifact not found"})
 }
 
 func (s *BuildOrchestrator) healthHandler(c *gin.Context) {
@@ -552,39 +632,41 @@ func (s *BuildOrchestrator) healthHandler(c *gin.Context) {
 func main() {
 	// Initialize service
 	service := NewBuildOrchestrator()
-	
+
 	// Set up Gin router
 	r := gin.Default()
-	
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusOK)
 			return
 		}
-		
+
 		c.Next()
 	})
-	
+
 	// API routes
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/policy/build", service.buildPolicyHandler)
 		v1.GET("/builds/:id", service.getBuildHandler)
 		v1.GET("/builds", service.listBuildsHandler)
+		v1.GET("/builds/:id/artifacts", service.listArtifactsHandler)
+		v1.GET("/builds/:id/artifact/:sha", service.downloadArtifactHandler)
 		v1.GET("/health", service.healthHandler)
 	}
-	
+
 	// Get port from environment
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8003"
 	}
-	
+
 	log.Printf("Build Orchestrator starting on port %s", port)
 	log.Fatal(r.Run(":" + port))
 }

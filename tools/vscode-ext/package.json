@@ -1,0 +1,102 @@
+{
+  "name": "sentinelops-vscode-ext",
+  "displayName": "SentinelOps Platform Tools",
+  "description": "DSL Preview, diagnostics, and CERT-V1 utilities for Provability-Fabric",
+  "version": "0.0.1",
+  "publisher": "sentinelops",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sentinelops.openDslPreview",
+        "title": "SentinelOps: Open DSL Preview"
+      },
+      {
+        "command": "sentinelops.validateCert",
+        "title": "SentinelOps: Validate CERT"
+      },
+      {
+        "command": "sentinelops.runReplayFromCert",
+        "title": "SentinelOps: Run Replay from CERT"
+      },
+      {
+        "command": "sentinelops.copyCertHash",
+        "title": "SentinelOps: Copy CERT Hash"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "SentinelOps",
+      "properties": {
+        "sentinelops.cliPath": {
+          "type": "string",
+          "default": "so",
+          "description": "Path to the SentinelOps CLI (so)"
+        },
+        "sentinelops.compileOutDir": {
+          "type": "string",
+          "default": "build",
+          "description": "Output directory used by so policy compile"
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "sentinelops.validateCert",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sentinelops.runReplayFromCert",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@11"
+        },
+        {
+          "command": "sentinelops.copyCertHash",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@12"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "sentinelops.validateCert",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sentinelops.runReplayFromCert",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@11"
+        },
+        {
+          "command": "sentinelops.copyCertHash",
+          "when": "resourceExtname == .json || resourceExtname == .cert.json",
+          "group": "navigation@12"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.4.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {}
+}
+
+
