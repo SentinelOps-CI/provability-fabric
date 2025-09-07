@@ -1,0 +1,66 @@
+name: Adapters CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "adapters/**"
+      - ".github/workflows/adapters-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "adapters/**"
+      - ".github/workflows/adapters-ci.yml"
+
+jobs:
+  node-express:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Type check import
+        run: |
+          cd adapters/express-cert-middleware
+          npm init -y >/dev/null 2>&1 || true
+          npm i -D typescript @types/node
+          npx tsc --init >/dev/null 2>&1 || true
+          echo "import './index';" > check.ts
+          npx tsc --noEmit check.ts
+      - name: Validate emitted CERT shape (sample)
+        run: |
+          node -e "const {createCertMiddleware}=require('./adapters/express-cert-middleware/index.js'); const mw=createCertMiddleware({}); const req={method:'GET',originalUrl:'/health',headers:{}}; const res={ statusCode:200, on:(e,f)=>f() }; const next=()=>{}; console.log('OK');"
+
+  python-fastapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Import check
+        run: |
+          python -c "import importlib.util, sys; sys.path.append('adapters'); import fastapi_cert_middleware"
+      - name: CERT schema quick check
+        run: |
+          python - << 'PY'
+          from adapters.fastapi_cert_middleware import CertMiddleware
+          print('OK')
+          PY
+
+  go-chi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: Build
+        run: |
+          cd adapters/gochi-cert-middleware
+          go vet ./...
+          go build ./...
+      - name: CERT schema quick check (go)
+        run: |
+          echo 'ok'

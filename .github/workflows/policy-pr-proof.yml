@@ -1,0 +1,174 @@
+name: Policy Proof & Replay (PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "policies/**"
+      - "bundles/**"
+      - "core/lean-libs/**"
+      - "services/spec-service/**"
+      - "services/proof-service/**"
+      - "core/cli/pf/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  proof-and-comment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/cli/pf/go.mod
+
+      - name: Build CLI (so)
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          go build -o so .
+          echo "$PWD" >> $GITHUB_PATH
+
+      - name: Compile policy (if policy.md exists)
+        id: compile
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          # Discover a policy file to compile; fall back to docs example
+          POLICY_FILE=$(git ls-files | grep -E '(^|/)policy\.md$' | head -n1 || true)
+          if [ -z "$POLICY_FILE" ]; then
+            echo "No policy.md found; skipping compile"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ./so policy compile --in "$POLICY_FILE" --out build/ --json > compile.json
+          cat compile.json
+          ACTION_DSL=$(jq -r '.action_dsl_path' compile.json)
+          POLICY_HASH=$(jq -r '.policy_hash' compile.json)
+          echo "policy_hash=$POLICY_HASH" >> $GITHUB_OUTPUT
+          echo "action_dsl=$ACTION_DSL" >> $GITHUB_OUTPUT
+
+      - name: Prove policy
+        if: steps.compile.outputs.skip != 'true'
+        id: prove
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          ./so policy prove --build build/ --json > prove.json || true
+          cat prove.json
+          PROOF_HASH=$(jq -r '.proof_hash // empty' prove.json)
+          STATUS=$(jq -r '.status // "failed"' prove.json)
+          echo "proof_hash=$PROOF_HASH" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "success" ]; then
+            echo "Proofs failed or stale"
+            exit 1
+          fi
+
+      - name: Build automata
+        if: steps.compile.outputs.skip != 'true'
+        id: build
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          ./so policy build --build build/ --json > build.json
+          cat build.json
+          AUTOMATA_HASH=$(jq -r '.automata_hash' build.json)
+          echo "automata_hash=$AUTOMATA_HASH" >> $GITHUB_OUTPUT
+
+      - name: Fetch current epoch
+        id: epoch
+        run: |
+          set -euo pipefail
+          EPOCH=$(curl -sS http://localhost:8000/api/v1/runtime/slo | jq -r '.epoch // 0')
+          echo "epoch=$EPOCH" >> $GITHUB_OUTPUT
+
+      - name: Post PR comment with hashes
+        if: ${{ github.event_name == 'pull_request' && steps.compile.outputs.skip != 'true' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = `Policy Hashes\n\n` +
+              `- policy_hash: ${process.env.POLICY_HASH}\n` +
+              `- proof_hash: ${process.env.PROOF_HASH}\n` +
+              `- automata_hash: ${process.env.AUTOMATA_HASH}\n` +
+              `- epoch: ${process.env.EPOCH}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+        env:
+          POLICY_HASH: ${{ steps.compile.outputs.policy_hash }}
+          PROOF_HASH: ${{ steps.prove.outputs.proof_hash }}
+          AUTOMATA_HASH: ${{ steps.build.outputs.automata_hash }}
+          EPOCH: ${{ steps.epoch.outputs.epoch }}
+
+  sample-replay:
+    needs: proof-and-comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ always() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/cli/pf/go.mod
+
+      - name: Build CLI (so)
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          go build -o so .
+          echo "$PWD" >> $GITHUB_PATH
+
+      - name: Run sample replay
+        id: replay
+        run: |
+          set -euo pipefail
+          cd core/cli/pf
+          DECISION_ID="pr-${{ github.event.pull_request.number }}-${{ github.run_id }}"
+          ./so replay run "$DECISION_ID" --open --json > replay.json || true
+          cat replay.json || true
+          LOWVIEW=$(jq -r '.low_view_match_pct // empty' replay.json)
+          STATUS=$(jq -r '.status // empty' replay.json)
+          echo "lowview=$LOWVIEW" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR with replay result
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const lv = process.env.LOWVIEW || 'N/A';
+            const status = process.env.STATUS || 'unknown';
+            const body = `Sample Replay\n\n` +
+              `- low_view %: ${lv}\n` +
+              `- status: ${status}\n` +
+              `- Counterexample Explorer: ${process.env.CEX_URL}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+        env:
+          LOWVIEW: ${{ steps.replay.outputs.lowview }}
+          STATUS: ${{ steps.replay.outputs.status }}
+          CEX_URL: https://console.localhost/replay/last

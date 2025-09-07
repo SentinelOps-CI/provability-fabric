@@ -1,3 +1,12 @@
+# Developer convenience: bring up full stack locally
+.PHONY: dev-up
+dev-up:
+	@echo "Starting platform services via docker compose..."
+	docker compose up -d --build
+	@echo "API Gateway: http://localhost:8000"
+	@echo "Spec Service: http://localhost:8001"
+	@echo "Replay Service: http://localhost:8005"
+
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 

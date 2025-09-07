@@ -19,16 +19,20 @@ import (
 
 // ServiceConfig represents configuration for a backend service
 type ServiceConfig struct {
-	Name     string
-	URL      string
-	Path     string
+	Name       string
+	URL        string
+	Path       string
 	HealthPath string
 }
 
 // APIGateway handles routing to backend services
 type APIGateway struct {
-	services map[string]ServiceConfig
-	proxies  map[string]*httputil.ReverseProxy
+	services         map[string]ServiceConfig
+	proxies          map[string]*httputil.ReverseProxy
+	telemetryEnabled bool
+	firstInitAt      time.Time
+	firstCertAt      time.Time
+	currentEpoch     int
 }
 
 // NewAPIGateway creates a new API gateway instance
@@ -41,7 +45,7 @@ func NewAPIGateway() *APIGateway {
 			HealthPath: "/api/v1/health",
 		},
 		"proof": {
-			Name:       "proof-service", 
+			Name:       "proof-service",
 			URL:        getEnvOrDefault("PROOF_SERVICE_URL", "http://localhost:8002"),
 			Path:       "/api/v1/proofs",
 			HealthPath: "/api/v1/health",
@@ -82,20 +86,24 @@ func NewAPIGateway() *APIGateway {
 		proxies[key] = httputil.NewSingleHostReverseProxy(target)
 	}
 
+	telemetryDefault := strings.EqualFold(getEnvOrDefault("TELEMETRY_DEFAULT_ENABLED", "false"), "true")
+
 	return &APIGateway{
-		services: services,
-		proxies:  proxies,
+		services:         services,
+		proxies:          proxies,
+		telemetryEnabled: telemetryDefault,
+		currentEpoch:     42,
 	}
 }
 
 // routeRequest routes requests to appropriate backend services
 func (gw *APIGateway) routeRequest(c *gin.Context) {
 	path := c.Request.URL.Path
-	
+
 	// Route based on path patterns
 	var serviceKey string
 	var targetPath string
-	
+
 	switch {
 	case strings.HasPrefix(path, "/api/v1/policy/compile") || strings.HasPrefix(path, "/api/v1/policies"):
 		serviceKey = "spec"
@@ -116,7 +124,7 @@ func (gw *APIGateway) routeRequest(c *gin.Context) {
 		serviceKey = "runtime"
 		targetPath = path
 	default:
-		c.JSON(http.StatusNotFound, gin.H{"error": "Service not found"})
+		writeError(c, http.StatusNotFound, "SERVICE_NOT_FOUND", "No backend matched the path", "Check URL or service path prefix", "https://docs.sentinelops.dev/error-catalog#SERVICE_NOT_FOUND")
 		return
 	}
 
@@ -124,7 +132,7 @@ func (gw *APIGateway) routeRequest(c *gin.Context) {
 	proxy, exists := gw.proxies[serviceKey]
 	if !exists {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "Service unavailable",
+			"error":   "Service unavailable",
 			"service": serviceKey,
 		})
 		return
@@ -132,7 +140,7 @@ func (gw *APIGateway) routeRequest(c *gin.Context) {
 
 	// Update request path
 	c.Request.URL.Path = targetPath
-	
+
 	// Proxy the request
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
@@ -145,6 +153,7 @@ func (gw *APIGateway) healthHandler(c *gin.Context) {
 		"version":   "1.0.0",
 		"timestamp": time.Now(),
 		"services":  make(map[string]interface{}),
+		"telemetry": map[string]any{"enabled": gw.telemetryEnabled},
 	}
 
 	// Check health of all backend services
@@ -152,7 +161,7 @@ func (gw *APIGateway) healthHandler(c *gin.Context) {
 	for key, service := range gw.services {
 		serviceHealth := gw.checkServiceHealth(service)
 		health["services"].(map[string]interface{})[key] = serviceHealth
-		
+
 		if serviceHealth.(map[string]interface{})["status"] != "healthy" {
 			overallHealthy = false
 		}
@@ -173,7 +182,7 @@ func (gw *APIGateway) healthHandler(c *gin.Context) {
 // checkServiceHealth checks the health of a backend service
 func (gw *APIGateway) checkServiceHealth(service ServiceConfig) interface{} {
 	client := &http.Client{Timeout: 5 * time.Second}
-	
+
 	resp, err := client.Get(service.URL + service.HealthPath)
 	if err != nil {
 		return map[string]interface{}{
@@ -223,15 +232,83 @@ func (gw *APIGateway) setupRuntimeEndpoints(r *gin.Engine) {
 	}
 }
 
+// Telemetry endpoints (inline)
+func (gw *APIGateway) setupTelemetryEndpoints(r *gin.Engine) {
+	tele := r.Group("/api/v1/telemetry")
+	{
+		tele.GET("/opt", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"enabled": gw.telemetryEnabled})
+		})
+		tele.POST("/opt", func(c *gin.Context) {
+			var req struct {
+				Enabled bool `json:"enabled"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			gw.telemetryEnabled = req.Enabled
+			c.JSON(http.StatusOK, gin.H{"ok": true, "enabled": gw.telemetryEnabled})
+		})
+		tele.POST("/event", func(c *gin.Context) {
+			if !gw.telemetryEnabled {
+				c.JSON(http.StatusOK, gin.H{"ok": true, "skipped": true})
+				return
+			}
+			var payload map[string]any
+			if err := c.ShouldBindJSON(&payload); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			// Minimal redaction: drop obvious PII keys if present
+			delete(payload, "user")
+			delete(payload, "email")
+			delete(payload, "token")
+			// Best-effort scrubbing in nested data
+			if data, ok := payload["data"].(map[string]any); ok {
+				for k, v := range data {
+					lk := strings.ToLower(k)
+					if strings.Contains(lk, "email") || strings.Contains(lk, "token") || strings.Contains(lk, "secret") || strings.Contains(lk, "user") {
+						delete(data, k)
+						continue
+					}
+					if s, ok := v.(string); ok {
+						data[k] = redactPIIString(s)
+					}
+				}
+				payload["data"] = data
+			}
+
+			// Compute time-to-first-cert (init -> first_valid_cert)
+			if t, ok := payload["type"].(string); ok {
+				now := time.Now()
+				if t == "init" && gw.firstInitAt.IsZero() {
+					gw.firstInitAt = now
+				}
+				if t == "first_valid_cert" && gw.firstCertAt.IsZero() {
+					gw.firstCertAt = now
+					if !gw.firstInitAt.IsZero() {
+						delta := gw.firstCertAt.Sub(gw.firstInitAt)
+						log.Printf("telemetry metric time_to_first_cert_ms=%d", delta.Milliseconds())
+					}
+				}
+			}
+
+			log.Printf("telemetry event: %v", payload)
+			c.JSON(http.StatusOK, gin.H{"ok": true})
+		})
+	}
+}
+
 func (gw *APIGateway) deployPolicyHandler(c *gin.Context) {
 	var req struct {
 		PolicyHash   string `json:"policy_hash" binding:"required"`
 		AutomataHash string `json:"automata_hash" binding:"required"`
 		Epoch        int    `json:"epoch" binding:"required"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Fix request body and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
 
@@ -243,6 +320,8 @@ func (gw *APIGateway) deployPolicyHandler(c *gin.Context) {
 		"status":        "deployed",
 		"deployed_at":   time.Now(),
 	})
+	// Track current epoch
+	gw.currentEpoch = req.Epoch
 }
 
 func (gw *APIGateway) rotateEpochHandler(c *gin.Context) {
@@ -251,24 +330,26 @@ func (gw *APIGateway) rotateEpochHandler(c *gin.Context) {
 		NewEpoch int    `json:"new_epoch" binding:"required"`
 		Reason   string `json:"reason,omitempty"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Fix request body and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"old_epoch":   req.OldEpoch,
-		"new_epoch":   req.NewEpoch,
-		"rotated_at":  time.Now(),
-		"rotated_by":  "api-gateway", // Would be actual user
-		"reason":      req.Reason,
+		"old_epoch":  req.OldEpoch,
+		"new_epoch":  req.NewEpoch,
+		"rotated_at": time.Now(),
+		"rotated_by": "api-gateway", // Would be actual user
+		"reason":     req.Reason,
 	})
+	gw.currentEpoch = req.NewEpoch
 }
 
 func (gw *APIGateway) getSLOHandler(c *gin.Context) {
 	// Mock SLO data
 	c.JSON(http.StatusOK, gin.H{
+		"epoch": gw.currentEpoch,
 		"latency": map[string]interface{}{
 			"p50": 1.2,
 			"p95": 2.1,
@@ -299,13 +380,41 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
+// redactPIIString performs coarse redaction for emails and tokens inside strings
+func redactPIIString(s string) string {
+	// redact email-like substrings
+	if strings.Contains(s, "@") {
+		return "[REDACTED_EMAIL]"
+	}
+	ls := strings.ToLower(s)
+	if strings.HasPrefix(ls, "bearer ") {
+		return "Bearer [REDACTED]"
+	}
+	if strings.HasPrefix(s, "sk-") || strings.HasPrefix(s, "pk_") {
+		return "[REDACTED_KEY]"
+	}
+	return s
+}
+
+// writeError returns a standardized error envelope
+func writeError(c *gin.Context, status int, code, cause, action, docs string) {
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"code":     code,
+			"cause":    cause,
+			"action":   action,
+			"docs_url": docs,
+		},
+	})
+}
+
 func main() {
 	// Initialize gateway
 	gateway := NewAPIGateway()
-	
+
 	// Set up Gin router
 	r := gin.Default()
-	
+
 	// CORS configuration
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"*"}
@@ -315,7 +424,7 @@ func main() {
 
 	// Request logging middleware
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\n",
 			param.ClientIP,
 			param.TimeStamp.Format(time.RFC1123),
 			param.Method,
@@ -331,10 +440,11 @@ func main() {
 	// Gateway-level endpoints
 	r.GET("/health", gateway.healthHandler)
 	r.GET("/metrics", gateway.metricsHandler)
-	
-	// Setup runtime endpoints (inline)
+
+	// Setup inline endpoints
 	gateway.setupRuntimeEndpoints(r)
-	
+	gateway.setupTelemetryEndpoints(r)
+
 	// Route all other API requests to backend services
 	r.NoRoute(gateway.routeRequest)
 
@@ -349,6 +459,6 @@ func main() {
 	for key, service := range gateway.services {
 		log.Printf("  %s: %s -> %s", key, service.Path, service.URL)
 	}
-	
+
 	log.Fatal(r.Run(":" + port))
 }

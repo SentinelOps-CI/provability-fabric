@@ -9,6 +9,9 @@ import {
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
+  BoltIcon,
+  ChartBarIcon,
+  FireIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -21,6 +24,9 @@ const navigation = [
   { name: 'Evidence', href: '/evidence', icon: DocumentMagnifyingGlassIcon },
   { name: 'Replay', href: '/replay', icon: ArrowPathIcon },
   { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon },
+  { name: 'Perf', href: '/perf', icon: ChartBarIcon },
+  { name: 'Heatmap', href: '/heatmap', icon: FireIcon },
+  { name: 'Dev Mode', href: '/dev', icon: BoltIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 

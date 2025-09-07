@@ -42,8 +42,9 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "pf",
-		Short: "Provability-Fabric CLI tool",
+		Use:     "so",
+		Aliases: []string{"pf"},
+		Short:   "Provability-Fabric CLI tool",
 		Long: `Provability-Fabric (pf) is a command-line tool for managing AI agent specifications
 with provable behavioral guarantees through formal verification.`,
 	}
@@ -61,7 +62,9 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(runCmd())
 	rootCmd.AddCommand(auditCmd())
 	rootCmd.AddCommand(performanceCmd())
-	
+	// Config doctor command
+	rootCmd.AddCommand(doctorCmd())
+
 	// New SentinelOps Platform commands
 	rootCmd.AddCommand(policyCmd())
 	rootCmd.AddCommand(certCmd())
@@ -69,6 +72,8 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(packetCmd())
 	rootCmd.AddCommand(deployCmd())
 	rootCmd.AddCommand(epochCmd())
+	rootCmd.AddCommand(perfCmd())
+	rootCmd.AddCommand(traceCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -78,6 +83,7 @@ with provable behavioral guarantees through formal verification.`,
 
 func initCmd() *cobra.Command {
 	var agentName string
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "init [agent-name]",
@@ -111,11 +117,26 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("failed to copy template files: %w", err)
 			}
 
-			fmt.Printf("✅ Created agent bundle: %s\n", agentBundleDir)
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(map[string]any{
+					"ok":          true,
+					"bundle_path": agentBundleDir,
+					"agent":       agentName,
+				})
+			} else {
+				fmt.Printf("✅ Created agent bundle: %s\n", agentBundleDir)
+			}
+			// Anonymous telemetry (opt-in enforced server-side): emit init event
+			_ = sendTelemetryEventCLI("init", map[string]any{
+				"template": "v1",
+			})
 			return nil
 		},
 	}
 
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
 	return cmd
 }
 
@@ -1910,6 +1931,7 @@ func performanceCmd() *cobra.Command {
 	var outputPath string
 	var measureSidecar bool
 	var k6Script string
+	var smoke bool
 
 	cmd := &cobra.Command{
 		Use:   "performance",
@@ -1927,6 +1949,12 @@ func performanceCmd() *cobra.Command {
 			baselineMetrics, err := measureBaselinePerformance(duration, concurrency)
 			if err != nil {
 				return fmt.Errorf("baseline measurement failed: %w", err)
+			}
+
+			// When smoke is enabled, just print concise stats and exit
+			if smoke {
+				fmt.Printf("P50=%v P95=%v P99=%v TPS=%.2f\n", baselineMetrics.AverageLatency, baselineMetrics.P95Latency, baselineMetrics.P99Latency, baselineMetrics.RequestsPerSecond)
+				return nil
 			}
 
 			// Measure sidecar overhead if requested
@@ -1960,6 +1988,7 @@ func performanceCmd() *cobra.Command {
 	cmd.Flags().StringVar(&outputPath, "output", "", "Output file path for performance report")
 	cmd.Flags().BoolVar(&measureSidecar, "measure-sidecar", false, "Measure sidecar overhead")
 	cmd.Flags().StringVar(&k6Script, "k6-script", "", "Path to k6 performance test script")
+	cmd.Flags().BoolVar(&smoke, "smoke", false, "Print P50/95/99 and TPS and exit")
 	return cmd
 }
 
@@ -2281,4 +2310,65 @@ func getCurrentCPUUsage() float64 {
 	// Simplified CPU usage measurement
 	// In a real implementation, this would use proper system metrics
 	return rand.Float64() * 20 // Simulate 0-20% CPU usage
+}
+
+func perfCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "perf",
+		Short: "Performance tools",
+		Long:  `Performance smoke tests and HUD.`,
+	}
+
+	cmd.AddCommand(perfSmokeCmd())
+	return cmd
+}
+
+func perfSmokeCmd() *cobra.Command {
+	var duration int
+	var concurrency int
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "smoke",
+		Short: "Run 60s smoke test and print P50/95/99 and TPS",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Println("DRY RUN: Would run perf smoke test")
+				return nil
+			}
+
+			if duration <= 0 {
+				duration = 60
+			}
+			if concurrency <= 0 {
+				concurrency = 10
+			}
+
+			metrics, err := measureBaselinePerformance(duration, concurrency)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				payload := map[string]any{
+					"ok":  true,
+					"p50": metrics.AverageLatency,
+					"p95": metrics.P95Latency,
+					"p99": metrics.P99Latency,
+					"tps": metrics.RequestsPerSecond,
+				}
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(payload)
+			} else {
+				fmt.Printf("P50=%v P95=%v P99=%v TPS=%.2f\n", metrics.AverageLatency, metrics.P95Latency, metrics.P99Latency, metrics.RequestsPerSecond)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVar(&duration, "duration", 60, "Test duration in seconds (default 60)")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of concurrent requests")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	return cmd
 }

@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SPEC_SERVICE_URL=http://spec-service:8001
+      - REPLAY_SERVICE_URL=http://replay-service:8005
+      - EVIDENCE_SERVICE_URL=http://evidence-service:8004
+    depends_on:
+      - spec-service
+      - replay-service
+      - evidence-service
+
+  spec-service:
+    build:
+      context: ../../services/spec-service
+    expose:
+      - "8001"
+
+  replay-service:
+    build:
+      context: ../../services/replay-service
+    expose:
+      - "8005"
+
+  evidence-service:
+    build:
+      context: ../../services/evidence-service
+    expose:
+      - "8004"
+
+  retriever:
+    image: curlimages/curl:8.6.0
+    command: ["sh", "-c", "while true; do curl -sS http://api-gateway:8000/health >/dev/null; sleep 5; done"]
+    depends_on:
+      - api-gateway

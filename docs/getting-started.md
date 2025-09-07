@@ -172,3 +172,15 @@ pf monitor my-first-agent
 ## License
 
 Apache 2.0 License - see [LICENSE](../LICENSE) for details.
+
+## Telemetry (Anonymous, Opt-In)
+
+The console and CLI support anonymous, opt-in telemetry to help improve Developer Experience (DX).
+
+- What is collected: minimal event types and timestamps for “init → first valid cert” and “first replay success”. No PII is collected; payloads are scrubbed server-side.
+- Opt-in: Disabled by default unless `TELEMETRY_DEFAULT_ENABLED=true` is set on the API gateway. Users can enable/disable in the Console under Settings → Anonymous usage telemetry.
+- Disable:
+  - Console: Settings → toggle off “Anonymous usage telemetry”.
+  - Environment: unset `TELEMETRY_DEFAULT_ENABLED` or set `TELEMETRY_DEFAULT_ENABLED=false` on the API gateway service.
+
+See also: `docs/configuration.md` for environment variables.
