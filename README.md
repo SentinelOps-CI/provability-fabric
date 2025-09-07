@@ -226,22 +226,10 @@ flowchart TD
     C --> O[Transparency Ledger]
     O --> P[GraphQL API]
 
-    Q[TRUST-FIRE Test Suite] --> R[GA Validation]
-    R --> S[Production Ready]
-
-    T[Marketplace UI] --> U[Package Management]
-    U --> V[Dashboard Monitoring]
-    V --> W[Ledger Integration]
-
     style A fill:#e1f5fe
     style C fill:#f3e5f5
     style F fill:#fff3e0
     style O fill:#e8f5e8
-    style Q fill:#ffebee
-    style T fill:#f0f8ff
-    style X fill:#fff8e1
-    style Y fill:#fce4ec
-    style Z fill:#e0f2f1
 ```
 
 ## Contributing
