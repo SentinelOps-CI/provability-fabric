@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/Provability-Fabric.png" alt="Provability Fabric Logo" width="200"/>
+  <img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric Logo" width="200"/>
 </p>
 
 # Provability Fabric
