@@ -1,7 +1,3 @@
-<p align="center">
-  <img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric Logo" width="200"/>
-</p>
-
 # Provability Fabric
 
 <!-- Badges -->
@@ -12,6 +8,10 @@
 [![Lean on Morph](https://img.shields.io/badge/Lean%20on%20Morph-Sharded%20CI-blue)](.github/workflows/lean-morph.yml)
 
 An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
+
+<p align="center">
+  <img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric Logo" width="200"/>
+</p>
 
 ## Repository Structure
 
