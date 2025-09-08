@@ -38,12 +38,13 @@ import (
 
 var (
 	dryRun bool
+	rootCmd *cobra.Command
 )
 
-func main() {
-	var rootCmd = &cobra.Command{
-		Use:     "so",
-		Aliases: []string{"pf"},
+func init() {
+	rootCmd = &cobra.Command{
+		Use:     "pf",
+		Aliases: []string{"so"},
 		Short:   "Provability-Fabric CLI tool",
 		Long: `Provability-Fabric (pf) is a command-line tool for managing AI agent specifications
 with provable behavioral guarantees through formal verification.`,
@@ -74,7 +75,9 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(epochCmd())
 	rootCmd.AddCommand(perfCmd())
 	rootCmd.AddCommand(traceCmd())
+}
 
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
