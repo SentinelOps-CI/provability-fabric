@@ -223,6 +223,10 @@ flowchart TD
     M --> N[Reach Set]
     N --> C
 
+    O[GPU Neural Network] --> P[α-β-CROWN Adapter]
+    P --> Q[GPU Verification Proof]
+    Q --> C
+
     C --> O[Transparency Ledger]
     O --> P[GraphQL API]
 
@@ -352,6 +356,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [Lean 4](https://leanprover.github.io/) - Formal proof system
 - [Marabou](https://github.com/NeuralNetworkVerification/Marabou) - Neural network verification
 - [DryVR](https://github.com/verivital/dryvr) - Hybrid system verification
+- [α-β-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) - GPU-accelerated neural network verification
 - [Sigstore](https://sigstore.dev/) - Cryptographic signing
 - [Memurai](https://docs.memurai.com/) - Redis-compatible server for Windows
 

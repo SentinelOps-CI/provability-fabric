@@ -80,6 +80,9 @@ nav:
       - Original Deployment Guide: deployment-guide.md
   - Developer Guide: developer-guide.md
   - Examples: examples.md
+  - Adapters:
+      - Overview: adapters.md
+      - α-β-CROWN Adapter: alpha-beta-crown-adapter.md
   - Security: security/overview.md
   - API Reference: api-reference.md
   - Testing: testing-guide.md
