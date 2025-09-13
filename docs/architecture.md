@@ -57,7 +57,7 @@ Runtime guards provide continuous monitoring and enforcement:
 The verification engine validates agent specifications:
 
 - **Lean Proof Checker** - Verifies mathematical proofs
-- **Neural Network Verifiers** - Uses Marabou for NN properties
+- **Neural Network Verifiers** - Uses Marabou for NN properties and α-β-CROWN for GPU-accelerated verification
 - **Hybrid System Analyzers** - Uses DryVR for complex systems
 - **Proof Quality Gates** - Ensures proof completeness and correctness
 

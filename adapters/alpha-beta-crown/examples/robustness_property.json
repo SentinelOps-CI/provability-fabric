@@ -1,0 +1,14 @@
+{
+  "type": "robustness",
+  "input_bounds": {
+    "lower": [0.0, 0.0, 0.0, 0.0],
+    "upper": [1.0, 1.0, 1.0, 1.0]
+  },
+  "output_bounds": {
+    "lower": [0.0],
+    "upper": [1.0]
+  },
+  "epsilon": 0.1,
+  "property": "adversarial_robustness",
+  "description": "Verify robustness against adversarial perturbations with epsilon=0.1"
+}

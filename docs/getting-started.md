@@ -21,7 +21,7 @@ This creates a complete pipeline from formal specification to deployed, verified
 - **Automatic Sidecar Injection** - Runtime monitoring without code changes
 - **Admission Controllers** - Validate proofs before deployment
 - **Transparency Ledger** - Immutable record of specifications and verification status
-- **Multiple Verification Engines** - Support for Marabou (neural networks) and DryVR (hybrid systems)
+- **Multiple Verification Engines** - Support for Marabou (neural networks), DryVR (hybrid systems), and α-β-CROWN (GPU-accelerated neural networks)
 - **Production Ready** - Comprehensive CI/CD integration, security policies, and community governance
 
 ## Quick Start

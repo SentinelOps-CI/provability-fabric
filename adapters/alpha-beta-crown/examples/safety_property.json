@@ -1,0 +1,13 @@
+{
+  "type": "safety",
+  "input_bounds": {
+    "lower": [-1.0, -1.0, -1.0],
+    "upper": [1.0, 1.0, 1.0]
+  },
+  "output_bounds": {
+    "lower": [0.0],
+    "upper": [0.5]
+  },
+  "property": "output_constraint",
+  "description": "Verify that output remains within safe bounds [0.0, 0.5]"
+}

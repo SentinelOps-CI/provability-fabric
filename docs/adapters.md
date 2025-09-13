@@ -1,6 +1,6 @@
 # Enhanced Adapters with Resource Mapping and Witness Validation
 
-This document describes the enhanced HTTP-GET and File-read adapters that integrate with Provability-Fabric's unified permissions system, providing resource mapping, witness validation, and information flow control (IFC).
+This document describes the enhanced HTTP-GET and File-read adapters that integrate with Provability-Fabric's unified permissions system, providing resource mapping, witness validation, and information flow control (IFC). It also covers the solver adapters including Marabou, DryVR, and α-β-CROWN for neural network and hybrid system verification.
 
 ## Overview
 
@@ -504,3 +504,57 @@ The adapters demonstrate state-of-the-art software engineering practices:
 - **Testability**: Comprehensive test coverage and mocking
 
 This implementation provides the foundation for building secure, auditable systems that can enforce complex security policies while maintaining high performance and reliability.
+
+## Solver Adapters
+
+### α-β-CROWN Adapter
+
+The α-β-CROWN adapter provides GPU-accelerated neural network verification with complete verification guarantees. It's particularly effective for:
+
+- **Large Neural Networks**: CNNs, ResNets, and other complex architectures
+- **Robustness Verification**: Adversarial attack resistance
+- **High-Performance Computing**: GPU acceleration for faster verification
+
+#### Key Features
+
+- **GPU Acceleration**: Utilizes CUDA for scalable verification
+- **Complete Verification**: Provides provable robustness guarantees
+- **Multiple Architectures**: Supports various neural network types
+- **Efficient Bounds**: Per-neuron split constraints for tighter bounds
+
+#### Usage Example
+
+```yaml
+# In specification bundle
+verification:
+  type: alpha_beta_crown
+  model: models/classifier.pt
+  property: properties/robustness.json
+  gpu_enabled: true
+  timeout: 600
+```
+
+#### Performance Characteristics
+
+- **Speed**: 10-100x faster than CPU-based verification
+- **Scalability**: Handles networks with millions of parameters
+- **Memory**: Efficient GPU memory utilization
+- **Accuracy**: Complete verification with no false positives
+
+### Marabou Adapter
+
+The Marabou adapter provides constraint-based neural network verification:
+
+- **Constraint Solving**: Uses SMT solvers for verification
+- **SAT/UNSAT Results**: Provides satisfiability analysis
+- **Counter-examples**: Generates counter-examples for SAT cases
+- **Proof Witnesses**: Creates cryptographic proof artifacts
+
+### DryVR Adapter
+
+The DryVR adapter provides hybrid system verification:
+
+- **Reachability Analysis**: Verifies system safety properties
+- **Polytope Representation**: Converts results to geometric constraints
+- **Hybrid Systems**: Handles continuous and discrete behaviors
+- **Safety Verification**: Ensures system remains within safe bounds

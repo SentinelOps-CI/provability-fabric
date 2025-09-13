@@ -93,7 +93,31 @@ proofs:
     file: proofs/latency_bound.lean
 ```
 
-**Marabou Verification (`proofs/accuracy_verification.py`):**
+**α-β-CROWN Verification (`proofs/accuracy_verification.py`):**
+```python
+import subprocess
+import json
+from pathlib import Path
+
+def verify_accuracy_with_alpha_beta_crown():
+    """Verify accuracy using α-β-CROWN adapter."""
+    # Run α-β-CROWN verification
+    result = subprocess.run([
+        "python", "adapter.py",
+        "models/classifier.pt",
+        "properties/accuracy.json",
+        "--out", "witness.json",
+        "--gpu",
+        "--timeout", "600"
+    ], capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        with open("witness.json", "r") as f:
+            witness = json.load(f)
+        return witness["verification_result"] == "verified"
+    return False
+
+# Alternative Marabou Verification (`proofs/accuracy_verification_marabou.py`):
 ```python
 import marabou
 import numpy as np
@@ -767,5 +791,396 @@ These examples demonstrate the flexibility and power of Provability-Fabric for c
 3. **Test Thoroughly**: Use property-based testing and performance testing
 4. **Automate Everything**: Integrate with CI/CD pipelines for continuous verification
 5. **Monitor Runtime**: Use sidecar injection for continuous monitoring
+
+## α-β-CROWN Adapter Examples
+
+### GPU-Accelerated Neural Network Verification
+
+The α-β-CROWN adapter provides high-performance neural network verification with GPU acceleration. Here are practical examples of how to use it:
+
+#### 1. Robustness Verification
+
+Verify that a neural network is robust against adversarial attacks:
+
+**Property File (`properties/robustness.json`):**
+```json
+{
+  "type": "robustness",
+  "input_bounds": {
+    "lower": [0.0, 0.0, 0.0, 0.0],
+    "upper": [1.0, 1.0, 1.0, 1.0]
+  },
+  "output_bounds": {
+    "lower": [0.0],
+    "upper": [1.0]
+  },
+  "epsilon": 0.1,
+  "property": "adversarial_robustness",
+  "description": "Verify robustness against L∞ perturbations with epsilon=0.1"
+}
+```
+
+**Verification Script:**
+```python
+#!/usr/bin/env python3
+"""Robustness verification using α-β-CROWN adapter."""
+
+import subprocess
+import json
+from pathlib import Path
+
+def verify_robustness(model_path: str, property_path: str) -> bool:
+    """Verify neural network robustness using α-β-CROWN."""
+    
+    # Run α-β-CROWN verification
+    result = subprocess.run([
+        "python", "adapter.py",
+        model_path,
+        property_path,
+        "--out", "robustness_witness.json",
+        "--gpu",
+        "--timeout", "600"
+    ], capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        with open("robustness_witness.json", "r") as f:
+            witness = json.load(f)
+        
+        print(f"Verification result: {witness['verification_result']}")
+        print(f"Execution time: {witness['execution_time']:.2f}s")
+        print(f"GPU utilized: {witness['gpu_utilized']}")
+        
+        return witness["verification_result"] == "verified"
+    else:
+        print(f"Verification failed: {result.stderr}")
+        return False
+
+if __name__ == "__main__":
+    success = verify_robustness("models/classifier.pt", "properties/robustness.json")
+    print(f"Robustness verification: {'PASSED' if success else 'FAILED'}")
+```
+
+#### 2. Safety Property Verification
+
+Verify that a neural network satisfies safety constraints:
+
+**Property File (`properties/safety.json`):**
+```json
+{
+  "type": "safety",
+  "input_bounds": {
+    "lower": [-1.0, -1.0, -1.0],
+    "upper": [1.0, 1.0, 1.0]
+  },
+  "output_bounds": {
+    "lower": [0.0],
+    "upper": [0.5]
+  },
+  "property": "output_constraint",
+  "description": "Verify that output remains within safe bounds [0.0, 0.5]"
+}
+```
+
+**Batch Verification:**
+```python
+#!/usr/bin/env python3
+"""Batch verification of multiple properties using α-β-CROWN."""
+
+import subprocess
+import json
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+import time
+
+def verify_single_property(model_path: str, property_path: str, output_path: str) -> dict:
+    """Verify a single property and return results."""
+    start_time = time.time()
+    
+    result = subprocess.run([
+        "python", "adapter.py",
+        model_path,
+        property_path,
+        "--out", output_path,
+        "--gpu",
+        "--timeout", "300"
+    ], capture_output=True, text=True)
+    
+    execution_time = time.time() - start_time
+    
+    if result.returncode == 0:
+        with open(output_path, "r") as f:
+            witness = json.load(f)
+        return {
+            "property": property_path,
+            "success": True,
+            "verification_result": witness["verification_result"],
+            "execution_time": execution_time,
+            "gpu_utilized": witness["gpu_utilized"]
+        }
+    else:
+        return {
+            "property": property_path,
+            "success": False,
+            "error": result.stderr,
+            "execution_time": execution_time
+        }
+
+def batch_verify(model_path: str, properties_dir: str, output_dir: str, max_workers: int = 4):
+    """Verify multiple properties in parallel."""
+    
+    properties_dir = Path(properties_dir)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
+    
+    property_files = list(properties_dir.glob("*.json"))
+    
+    print(f"Verifying {len(property_files)} properties with {max_workers} workers...")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        
+        for prop_file in property_files:
+            output_file = output_dir / f"{prop_file.stem}_witness.json"
+            future = executor.submit(
+                verify_single_property,
+                model_path,
+                str(prop_file),
+                str(output_file)
+            )
+            futures.append(future)
+        
+        results = []
+        for future in futures:
+            results.append(future.result())
+    
+    # Summary
+    successful = sum(1 for r in results if r["success"])
+    total_time = sum(r["execution_time"] for r in results)
+    
+    print(f"\nBatch verification completed:")
+    print(f"  Successful: {successful}/{len(results)}")
+    print(f"  Total time: {total_time:.2f}s")
+    print(f"  Average time: {total_time/len(results):.2f}s per property")
+    
+    return results
+
+if __name__ == "__main__":
+    results = batch_verify(
+        "models/classifier.pt",
+        "properties/",
+        "witnesses/",
+        max_workers=4
+    )
+```
+
+#### 3. Performance Benchmarking
+
+Compare α-β-CROWN performance with other adapters:
+
+**Benchmark Script:**
+```python
+#!/usr/bin/env python3
+"""Performance benchmark comparing α-β-CROWN with Marabou."""
+
+import subprocess
+import json
+import time
+from pathlib import Path
+import matplotlib.pyplot as plt
+
+def benchmark_adapter(adapter_name: str, model_path: str, property_path: str, 
+                     iterations: int = 5) -> dict:
+    """Benchmark a single adapter."""
+    
+    times = []
+    successes = 0
+    
+    for i in range(iterations):
+        start_time = time.time()
+        
+        if adapter_name == "alpha_beta_crown":
+            result = subprocess.run([
+                "python", "adapter.py",
+                model_path, property_path,
+                "--out", f"witness_{i}.json",
+                "--gpu", "--timeout", "600"
+            ], capture_output=True, text=True)
+        elif adapter_name == "marabou":
+            result = subprocess.run([
+                "python", "marabou_adapter.py",
+                model_path, property_path,
+                "--out", f"witness_{i}.json"
+            ], capture_output=True, text=True)
+        
+        execution_time = time.time() - start_time
+        times.append(execution_time)
+        
+        if result.returncode == 0:
+            successes += 1
+    
+    return {
+        "adapter": adapter_name,
+        "iterations": iterations,
+        "successes": successes,
+        "avg_time": sum(times) / len(times),
+        "min_time": min(times),
+        "max_time": max(times),
+        "times": times
+    }
+
+def compare_adapters(model_path: str, property_path: str):
+    """Compare α-β-CROWN and Marabou adapters."""
+    
+    print("Benchmarking α-β-CROWN adapter...")
+    crown_results = benchmark_adapter("alpha_beta_crown", model_path, property_path)
+    
+    print("Benchmarking Marabou adapter...")
+    marabou_results = benchmark_adapter("marabou", model_path, property_path)
+    
+    # Print results
+    print(f"\nα-β-CROWN Results:")
+    print(f"  Success rate: {crown_results['successes']}/{crown_results['iterations']}")
+    print(f"  Average time: {crown_results['avg_time']:.2f}s")
+    print(f"  Min time: {crown_results['min_time']:.2f}s")
+    print(f"  Max time: {crown_results['max_time']:.2f}s")
+    
+    print(f"\nMarabou Results:")
+    print(f"  Success rate: {marabou_results['successes']}/{marabou_results['iterations']}")
+    print(f"  Average time: {marabou_results['avg_time']:.2f}s")
+    print(f"  Min time: {marabou_results['min_time']:.2f}s")
+    print(f"  Max time: {marabou_results['max_time']:.2f}s")
+    
+    # Calculate speedup
+    if marabou_results['avg_time'] > 0:
+        speedup = marabou_results['avg_time'] / crown_results['avg_time']
+        print(f"\nα-β-CROWN speedup: {speedup:.2f}x faster than Marabou")
+    
+    # Plot results
+    plt.figure(figsize=(10, 6))
+    plt.boxplot([crown_results['times'], marabou_results['times']], 
+                labels=['α-β-CROWN', 'Marabou'])
+    plt.ylabel('Execution Time (seconds)')
+    plt.title('Adapter Performance Comparison')
+    plt.savefig('adapter_comparison.png')
+    plt.show()
+
+if __name__ == "__main__":
+    compare_adapters("models/classifier.pt", "properties/robustness.json")
+```
+
+#### 4. Integration with Specification Bundles
+
+Use α-β-CROWN in a complete specification bundle:
+
+**Specification (`spec.yaml`):**
+```yaml
+name: robust-classifier
+version: 1.0.0
+description: Robust image classifier with adversarial guarantees
+
+capabilities:
+  - name: image_classification
+    description: Classify images with robustness guarantees
+    constraints:
+      min_accuracy: 0.95
+      adversarial_robustness: true
+      epsilon: 0.1
+      max_latency_ms: 200
+
+verification:
+  type: alpha_beta_crown
+  model: models/robust_classifier.pt
+  properties:
+    - file: properties/robustness.json
+      type: adversarial_robustness
+    - file: properties/accuracy.json
+      type: accuracy_guarantee
+  gpu_enabled: true
+  timeout: 600
+
+proofs:
+  - name: robustness_verification
+    type: alpha_beta_crown
+    file: proofs/robustness_verification.py
+  - name: accuracy_guarantee
+    type: lean
+    file: proofs/accuracy_guarantee.lean
+```
+
+**Verification Script (`proofs/robustness_verification.py`):**
+```python
+#!/usr/bin/env python3
+"""Robustness verification for specification bundle."""
+
+import subprocess
+import json
+import sys
+from pathlib import Path
+
+def verify_robustness_properties():
+    """Verify all robustness properties in the specification."""
+    
+    model_path = "models/robust_classifier.pt"
+    properties = [
+        "properties/robustness.json",
+        "properties/accuracy.json"
+    ]
+    
+    results = []
+    
+    for prop_file in properties:
+        print(f"Verifying {prop_file}...")
+        
+        result = subprocess.run([
+            "python", "adapter.py",
+            model_path,
+            prop_file,
+            "--out", f"witness_{Path(prop_file).stem}.json",
+            "--gpu",
+            "--timeout", "600"
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            with open(f"witness_{Path(prop_file).stem}.json", "r") as f:
+                witness = json.load(f)
+            
+            results.append({
+                "property": prop_file,
+                "verified": witness["verification_result"] == "verified",
+                "execution_time": witness["execution_time"]
+            })
+        else:
+            results.append({
+                "property": prop_file,
+                "verified": False,
+                "error": result.stderr
+            })
+    
+    # Check if all properties are verified
+    all_verified = all(r["verified"] for r in results)
+    
+    print(f"\nVerification Results:")
+    for result in results:
+        status = "✓ VERIFIED" if result["verified"] else "✗ FAILED"
+        print(f"  {result['property']}: {status}")
+        if "execution_time" in result:
+            print(f"    Time: {result['execution_time']:.2f}s")
+        if "error" in result:
+            print(f"    Error: {result['error']}")
+    
+    return all_verified
+
+if __name__ == "__main__":
+    success = verify_robustness_properties()
+    sys.exit(0 if success else 1)
+```
+
+### Best Practices for α-β-CROWN
+
+1. **GPU Utilization**: Always use `--gpu` flag when CUDA is available
+2. **Timeout Management**: Set appropriate timeouts based on model complexity
+3. **Memory Management**: Monitor GPU memory usage for large models
+4. **Batch Processing**: Use parallel processing for multiple properties
+5. **Error Handling**: Always check return codes and handle failures gracefully
 
 For more examples and use cases, check the `examples/` directory in the repository or explore the community-contributed examples on GitHub.

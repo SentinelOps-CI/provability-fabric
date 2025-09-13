@@ -27,6 +27,7 @@ type ProofRunRequest struct {
 	ProofInputs map[string]interface{} `json:"proof_inputs,omitempty"`
 	UseMorph    bool                   `json:"use_morph,omitempty"`
 	MorphShards int                    `json:"morph_shards,omitempty"`
+	AdapterType string                 `json:"adapter_type,omitempty"` // "marabou", "dryvr", "alpha_beta_crown"
 	Metadata    map[string]string      `json:"metadata,omitempty"`
 }
 
@@ -126,7 +127,7 @@ func (s *ProofService) RunProofs(ctx context.Context, req ProofRunRequest) (*Pro
 	}
 
 	// Generate Lean obligations from ActionDSL
-	obligations, err := s.generateLeanObligations(req.ActionDSL)
+	obligations, err := s.generateLeanObligations(req.ActionDSL, req.AdapterType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate Lean obligations: %w", err)
 	}
@@ -155,7 +156,7 @@ func (s *ProofService) RunProofs(ctx context.Context, req ProofRunRequest) (*Pro
 }
 
 // generateLeanObligations converts ActionDSL to Lean proof obligations
-func (s *ProofService) generateLeanObligations(actionDSL interface{}) (string, error) {
+func (s *ProofService) generateLeanObligations(actionDSL interface{}, adapterType string) (string, error) {
 	// Convert ActionDSL to Lean theorems
 	dslBytes, err := json.Marshal(actionDSL)
 	if err != nil {
@@ -168,13 +169,13 @@ func (s *ProofService) generateLeanObligations(actionDSL interface{}) (string, e
 	}
 
 	// Generate Lean code
-	leanCode := s.generateLeanCode(dsl)
+	leanCode := s.generateLeanCode(dsl, adapterType)
 
 	return leanCode, nil
 }
 
 // generateLeanCode creates Lean proof obligations
-func (s *ProofService) generateLeanCode(dsl map[string]interface{}) string {
+func (s *ProofService) generateLeanCode(dsl map[string]interface{}, adapterType string) string {
 	var leanCode strings.Builder
 
 	leanCode.WriteString("-- Generated Lean proof obligations\n")
@@ -193,6 +194,9 @@ func (s *ProofService) generateLeanCode(dsl map[string]interface{}) string {
 
 	// Generate safety theorems
 	leanCode.WriteString(s.generateSafetyTheorems())
+
+	// Generate adapter-specific obligations
+	leanCode.WriteString(s.generateAdapterObligations(adapterType))
 
 	leanCode.WriteString("\nend GeneratedProofs\n")
 
@@ -663,4 +667,71 @@ func main() {
 
 	log.Printf("Proof Service starting on port %s", port)
 	log.Fatal(r.Run(":" + port))
+}
+
+// generateAdapterObligations creates adapter-specific Lean obligations
+func (s *ProofService) generateAdapterObligations(adapterType string) string {
+	switch adapterType {
+	case "alpha_beta_crown":
+		return s.generateAlphaBetaCrownObligations()
+	case "marabou":
+		return s.generateMarabouObligations()
+	case "dryvr":
+		return s.generateDryVRObligations()
+	default:
+		return ""
+	}
+}
+
+// generateAlphaBetaCrownObligations creates α-β-CROWN specific obligations
+func (s *ProofService) generateAlphaBetaCrownObligations() string {
+	return `
+/-- Theorem: α-β-CROWN verification provides robustness guarantees --/
+theorem alpha_beta_crown_robustness : 
+  ∀ (model : NeuralNetwork) (property : RobustnessProperty) (input : InputSpace),
+    alpha_beta_crown_verify model property input = verified →
+    robust_against_adversarial_attacks model input property.bounds := by
+  sorry
+
+/-- Theorem: GPU acceleration preserves verification correctness --/
+theorem gpu_acceleration_correctness : 
+  ∀ (model : NeuralNetwork) (property : RobustnessProperty),
+    gpu_verify model property = cpu_verify model property := by
+  sorry
+
+/-- Theorem: α-β-CROWN bound propagation is sound --/
+theorem alpha_beta_crown_soundness : 
+  ∀ (model : NeuralNetwork) (bounds : LayerBounds),
+    alpha_beta_crown_propagate_bounds model bounds = verified →
+    ∀ (input : InputSpace), input ∈ bounds.input_bounds →
+    model input ∈ bounds.output_bounds := by
+  sorry
+`
+}
+
+// generateMarabouObligations creates Marabou specific obligations
+func (s *ProofService) generateMarabouObligations() string {
+	return `
+/-- Theorem: Marabou constraint-based verification is sound --/
+theorem marabou_soundness : 
+  ∀ (model : NeuralNetwork) (constraints : ConstraintSet),
+    marabou_verify model constraints = unsat →
+    ¬∃ (input : InputSpace), satisfies_constraints input constraints ∧ violates_property model input := by
+  sorry
+`
+}
+
+// generateDryVRObligations creates DryVR specific obligations
+func (s *ProofService) generateDryVRObligations() string {
+	return `
+/-- Theorem: DryVR reachability analysis is sound --/
+theorem dryvr_soundness : 
+  ∀ (system : HybridSystem) (initial_set : Polytope) (unsafe_set : Polytope),
+    dryvr_reachability system initial_set unsafe_set = safe →
+    ¬∃ (trajectory : SystemTrajectory), 
+      trajectory.start ∈ initial_set ∧ 
+      trajectory.end ∈ unsafe_set ∧ 
+      valid_trajectory system trajectory := by
+  sorry
+`
 }

@@ -28,6 +28,10 @@ flowchart TD
     M --> N[Reach Set]
     N --> C
 
+    O[GPU Neural Network] --> P[α-β-CROWN Adapter]
+    P --> Q[GPU Verification Proof]
+    Q --> C
+
     C --> O[Transparency Ledger]
     O --> P[GraphQL API]
 
