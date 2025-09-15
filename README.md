@@ -60,7 +60,7 @@ See `docs/standards.md`, `docs/Evidence.md`, and `docs/Replay.md` for usage.
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric.git
+git clone https://github.com/SentinelOps-CI/provability-fabric
 
 # Run the installation script
 ./scripts/install.sh           # For Linux/macOS
@@ -102,7 +102,7 @@ mkdocs serve --dev-addr=127.0.0.1:8002
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric.git
+git clone https://github.com/SentinelOps-CI/provability-fabric
 
 # Build the CLI from source
 cd core/cli/pf
@@ -244,7 +244,7 @@ We welcome contributions! Please see our [Contributing Guide](docs/community/gov
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric.git
+git clone https://github.com/SentinelOps-CI/provability-fabric
 
 # Build CLI tools from source
 cd core/cli/pf && go build -o pf.exe . && cd ../..
