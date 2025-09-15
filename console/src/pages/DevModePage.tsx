@@ -46,12 +46,12 @@ export default function DevModePage() {
             break;
           case 'chunk_tick':
             if (ev.data && typeof ev.data.sequence === 'number') {
-              setChunkTicks((prev) => [...prev, ev.data.sequence]);
+              setChunkTicks((prev) => [...prev, ev.data!.sequence]);
             }
             break;
           case 'flush_tick':
             if (ev.data && typeof ev.data.sequence === 'number') {
-              setFlushTicks((prev) => [...prev, ev.data.sequence]);
+              setFlushTicks((prev) => [...prev, ev.data!.sequence]);
             }
             break;
         }

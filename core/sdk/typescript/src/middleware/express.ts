@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-import { Request, Response, NextFunction } from 'express';
+// Express types - using any for now to avoid dependency issues
+type Request = any;
+type Response = any;
+type NextFunction = any;
 import { ProvabilityFabricSDK } from '../index';
 
 export interface PFMiddlewareOptions {
@@ -135,7 +138,7 @@ export function retryMiddleware(options: {
     } catch (error) {
       res.status(500).json({
         error: 'Request failed after retries',
-        details: error.message
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   };
