@@ -36,7 +36,9 @@ class PlatformIntegrationTester:
         # Test 2: Runtime Components Integration
         print("\n2️⃣ Testing Runtime Components Integration")
         print("-" * 40)
-        self.test_results["runtime_components"] = self.test_runtime_components_integration()
+        self.test_results["runtime_components"] = (
+            self.test_runtime_components_integration()
+        )
 
         # Test 3: API Gateway Integration
         print("\n3️⃣ Testing API Gateway Integration")
@@ -197,8 +199,8 @@ class PlatformIntegrationTester:
                 "total_tests": len(self.test_results),
                 "passed": sum(self.test_results.values()),
                 "failed": len(self.test_results) - sum(self.test_results.values()),
-                "success_rate": f"{(sum(self.test_results.values()) / len(self.test_results)) * 100:.1f}%"
-            }
+                "success_rate": f"{(sum(self.test_results.values()) / len(self.test_results)) * 100:.1f}%",
+            },
         }
 
         report_path = self.test_workspace / "platform_integration_report.json"
