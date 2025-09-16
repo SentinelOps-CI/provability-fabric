@@ -28,9 +28,23 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root/
-# If your binary is named differently, change 'sidecar-watcher'
+# Create non-root user for security
+RUN groupadd -r sidecar && useradd -r -g sidecar -d /home/sidecar -s /sbin/nologin sidecar
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /home/sidecar /tmp /var/log && \
+    chown -R sidecar:sidecar /home/sidecar /tmp /var/log && \
+    chmod 755 /home/sidecar /tmp /var/log
+
+WORKDIR /home/sidecar
+
+# Copy binary and set ownership
 COPY --from=builder /app/target/release/sidecar-watcher /usr/local/bin/sidecar-watcher
+RUN chown sidecar:sidecar /usr/local/bin/sidecar-watcher && \
+    chmod +x /usr/local/bin/sidecar-watcher
+
+# Switch to non-root user
+USER sidecar
 
 EXPOSE 8006 9090
 CMD ["sidecar-watcher"]

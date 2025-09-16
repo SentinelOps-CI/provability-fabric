@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-Write-Host "🔨 SentinelOps Platform - Build All Components" -ForegroundColor Green
+Write-Host "SentinelOps Platform - Build All Components" -ForegroundColor Green
 Write-Host "=============================================="
 
 function Write-Success($message) {
@@ -14,7 +14,7 @@ function Write-Fail($message) {
 
 # Build Go services
 Write-Host ""
-Write-Host "🐹 Building Go Services..." -ForegroundColor Yellow
+Write-Host "Building Go Services..." -ForegroundColor Yellow
 $services = @("api-gateway", "spec-service", "proof-service", "build-orchestrator", "evidence-service", "replay-service")
 
 $repoRoot = Get-Location
@@ -47,7 +47,7 @@ foreach ($service in $services) {
 
 # Build TypeScript SDK
 Write-Host ""
-Write-Host "📦 Building TypeScript SDK..." -ForegroundColor Yellow
+Write-Host "Building TypeScript SDK..." -ForegroundColor Yellow
 try {
     Set-Location "core\sdk\typescript"
     if (Get-Command npm -ErrorAction SilentlyContinue) {
@@ -80,7 +80,7 @@ finally {
 
 # Build Demo Application
 Write-Host ""
-Write-Host "🎯 Building Demo Application..." -ForegroundColor Yellow
+Write-Host "Building Demo Application..." -ForegroundColor Yellow
 try {
     Set-Location "demos\verifiable-mcp-fraud"
     if (Get-Command npm -ErrorAction SilentlyContinue) {
@@ -113,7 +113,7 @@ finally {
 
 # Build Console UI
 Write-Host ""
-Write-Host "🖥️ Building Console UI..." -ForegroundColor Yellow
+Write-Host "Building Console UI..." -ForegroundColor Yellow
 try {
     Set-Location "console"
     if (Get-Command npm -ErrorAction SilentlyContinue) {
@@ -147,11 +147,11 @@ finally {
 Write-Host ""
 Write-Host "🎉 Build validation completed!" -ForegroundColor Green
 Write-Host ""
-Write-Host "📋 Summary:" -ForegroundColor Cyan
+Write-Host "Summary:" -ForegroundColor Cyan
 Write-Host "  - Go services (6): Tested" -ForegroundColor White
 Write-Host "  - TypeScript SDK: Tested" -ForegroundColor White
 Write-Host "  - Demo application: Tested" -ForegroundColor White
 Write-Host "  - Console UI: Tested" -ForegroundColor White
 Write-Host ""
-Write-Host '🚀 Ready for Docker deployment!' -ForegroundColor Green
+Write-Host 'Ready for Docker deployment!' -ForegroundColor Green
 Write-Host 'Run: docker compose up --build -d' -ForegroundColor Cyan

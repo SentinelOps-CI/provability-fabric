@@ -1,17 +1,419 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use std::time::Instant;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
+use sidecar_watcher::{
+    dfa::{OptimizedDFA, Event, EventKind, DFATable, Transition, RateLimit},
+    ifc_labels::OptimizedIFCManager,
+    ratelimit::{OptimizedRateLimiter, RateLimitConfig, BucketedRateLimiter},
+    crypto::{AsyncSigningPipeline, SigningWorkerConfig, CertCore, SigningRequest},
+    concurrency::{LockFreeRingBuffer, EpochPolicyManager, EventIngress},
+};
+use ed25519_dalek::{SigningKey, Signer};
+use rand::rngs::OsRng;
 
 /// Performance benchmarks for Provability Fabric Core
 pub fn performance_benchmarks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("core_performance");
+    let mut group = c.benchmark_group("hot_path_performance");
     
     // Set sample size and measurement time for stable results
+    group.sample_size(1000);
+    group.measurement_time(std::time::Duration::from_secs(30));
+    
+    // Benchmark 1: Optimized DFA Hot Path
+    group.bench_function("dfa_hot_path_step", |b| {
+        let table = create_test_dfa_table();
+        let dfa = OptimizedDFA::from_table(table).unwrap();
+        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
+        
+        b.iter(|| {
+            black_box(dfa.step(0, &event))
+        });
+    });
+    
+    // Benchmark 2: IFC Fast Path Operations
+    group.bench_function("ifc_declassify_operation", |b| {
+        let mut manager = OptimizedIFCManager::new().unwrap();
+        let secret_id = manager.get_label("secret").unwrap().id;
+        let internal_id = manager.get_label("internal").unwrap().id;
+        
+        b.iter(|| {
+            black_box(manager.declassify(secret_id, internal_id, 0))
+        });
+    });
+    
+    // Benchmark 3: Optimized Rate Limiting
+    group.bench_function("rate_limit_check", |b| {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 10000,
+            epsilon_ms: 10,
+        };
+        let limiter = OptimizedRateLimiter::new(config);
+        let current_time = 1000;
+        
+        b.iter(|| {
+            black_box(limiter.check(current_time))
+        });
+    });
+    
+    // Benchmark 4: Lock-Free Ring Buffer Operations
+    group.bench_function("ring_buffer_push_pop", |b| {
+        let buffer = LockFreeRingBuffer::new(1024);
+        
+        b.iter(|| {
+            let _ = black_box(buffer.push(42));
+            let _ = black_box(buffer.pop());
+        });
+    });
+    
+    // Benchmark 5: ArcSwap Policy Updates
+    group.bench_function("arcswap_policy_update", |b| {
+        let manager = EpochPolicyManager::new("initial".to_string());
+        
+        b.iter(|| {
+            black_box(manager.update_policy("updated".to_string()))
+        });
+    });
+    
+    group.finish();
+}
+
+/// Sub-millisecond performance benchmarks
+pub fn sub_millisecond_benchmarks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("sub_millisecond_performance");
+    
+    group.sample_size(10000);
+    group.measurement_time(std::time::Duration::from_secs(60));
+    
+    // Benchmark 1: DFA Step Performance (target: <100μs)
+    group.bench_function("dfa_step_100k_ops", |b| {
+        let table = create_test_dfa_table();
+        let dfa = OptimizedDFA::from_table(table).unwrap();
+        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
+        
+        b.iter(|| {
+            for _ in 0..100_000 {
+                black_box(dfa.step(0, &event));
+            }
+        });
+    });
+    
+    // Benchmark 2: IFC Bitset Operations (target: <50μs)
+    group.bench_function("ifc_bitset_operations", |b| {
+        let mut manager = OptimizedIFCManager::new().unwrap();
+        let secret_id = manager.get_label("secret").unwrap().id;
+        let internal_id = manager.get_label("internal").unwrap().id;
+        let required_labels = vec![secret_id];
+        
+        // Pre-declassify
+        manager.declassify(secret_id, internal_id, 0);
+        
+        b.iter(|| {
+            for _ in 0..100_000 {
+                black_box(manager.is_output_allowed(internal_id, 0, &required_labels));
+            }
+        });
+    });
+    
+    // Benchmark 3: Rate Limiting Hot Path (target: <10μs)
+    group.bench_function("rate_limit_hot_path", |b| {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 10000,
+            epsilon_ms: 10,
+        };
+        let limiter = OptimizedRateLimiter::new(config);
+        let current_time = 1000;
+        
+        b.iter(|| {
+            for _ in 0..100_000 {
+                black_box(limiter.check(current_time));
+            }
+        });
+    });
+    
+    // Benchmark 4: Ring Buffer High Throughput (target: <5μs)
+    group.bench_function("ring_buffer_high_throughput", |b| {
+        let buffer = LockFreeRingBuffer::new(10000);
+        
+        b.iter(|| {
+            for i in 0..100_000 {
+                let _ = black_box(buffer.push(i));
+                if i % 2 == 0 {
+                    let _ = black_box(buffer.pop());
+                }
+            }
+        });
+    });
+    
+    // Benchmark 5: Async Signing Pipeline (target: <1ms per 1000 ops)
+    group.bench_function("async_signing_pipeline", |b| {
+        let config = SigningWorkerConfig {
+            max_queue_size: 10000,
+            worker_count: 4,
+            batch_size: 32,
+            batch_timeout: std::time::Duration::from_millis(1),
+            backpressure_threshold: 8000,
+        };
+        
+        let mut pipeline = AsyncSigningPipeline::new(config);
+        let mut rng = OsRng;
+        let signing_key = SigningKey::generate(&mut rng);
+        
+        b.iter(|| {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async {
+                for i in 0..1000 {
+                    let cert_core = CertCore {
+                        content_hash: [i as u8; 32],
+                        timestamp: 1000 + i,
+                        issuer: format!("issuer_{}", i),
+                        subject: format!("subject_{}", i),
+                        request_id: format!("request_{}", i),
+                    };
+                    
+                    let request = SigningRequest {
+                        cert_core,
+                        signing_key: signing_key.clone(),
+                        priority: 0,
+                    };
+                    
+                    let _ = pipeline.submit_request(request).await;
+                }
+                
+                // Collect results
+                for _ in 0..1000 {
+                    let _ = pipeline.get_result().await;
+                }
+            });
+        });
+    });
+    
+    group.finish();
+}
+
+/// Memory efficiency benchmarks
+pub fn memory_efficiency_benchmarks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("memory_efficiency");
+    
     group.sample_size(100);
-    group.measurement_time(std::time::Duration::from_secs(10));
+    group.measurement_time(std::time::Duration::from_secs(30));
+    
+    // Benchmark 1: DFA Memory Layout
+    group.bench_function("dfa_memory_layout", |b| {
+        let table = create_large_dfa_table();
+        let dfa = OptimizedDFA::from_table(table).unwrap();
+        
+        b.iter(|| {
+            let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
+            for _ in 0..1000 {
+                black_box(dfa.step(0, &event));
+            }
+        });
+    });
+    
+    // Benchmark 2: IFC Bitset Memory Usage
+    group.bench_function("ifc_bitset_memory", |b| {
+        let mut manager = OptimizedIFCManager::new().unwrap();
+        
+        b.iter(|| {
+            for i in 0..1000 {
+                let label_id = manager.add_label(
+                    format!("label_{}", i),
+                    i % 10,
+                    vec!["category".to_string()],
+                    "tenant".to_string(),
+                );
+                manager.declassify(label_id, 0, 0);
+            }
+        });
+    });
+    
+    // Benchmark 3: Ring Buffer Memory Efficiency
+    group.bench_function("ring_buffer_memory", |b| {
+        let buffer = LockFreeRingBuffer::new(10000);
+        
+        b.iter(|| {
+            for i in 0..10000 {
+                let _ = black_box(buffer.push(i));
+                if i % 2 == 0 {
+                    let _ = black_box(buffer.pop());
+                }
+            }
+        });
+    });
+    
+    group.finish();
+}
+
+/// Concurrency performance benchmarks
+pub fn concurrency_benchmarks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("concurrency_performance");
+    
+    group.sample_size(100);
+    group.measurement_time(std::time::Duration::from_secs(30));
+    
+    // Benchmark 1: Multi-threaded DFA Processing
+    group.bench_function("multithreaded_dfa", |b| {
+        let table = create_test_dfa_table();
+        let dfa = Arc::new(OptimizedDFA::from_table(table).unwrap());
+        
+        b.iter(|| {
+            let handles: Vec<_> = (0..4)
+                .map(|thread_id| {
+                    let dfa = Arc::clone(&dfa);
+                    std::thread::spawn(move || {
+                        let event = Event::new(EventKind::Call, thread_id as u16, 0, "tool1".to_string());
+                        for _ in 0..25000 {
+                            black_box(dfa.step(0, &event));
+                        }
+                    })
+                })
+                .collect();
+            
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        });
+    });
+    
+    // Benchmark 2: Concurrent Rate Limiting
+    group.bench_function("concurrent_rate_limiting", |b| {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 10000,
+            epsilon_ms: 10,
+        };
+        let limiter = Arc::new(OptimizedRateLimiter::new(config));
+        
+        b.iter(|| {
+            let handles: Vec<_> = (0..4)
+                .map(|_| {
+                    let limiter = Arc::clone(&limiter);
+                    std::thread::spawn(move || {
+                        for i in 0..25000 {
+                            black_box(limiter.check(1000 + i));
+                        }
+                    })
+                })
+                .collect();
+            
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        });
+    });
+    
+    // Benchmark 3: Lock-Free Ring Buffer Concurrency
+    group.bench_function("concurrent_ring_buffer", |b| {
+        let buffer = Arc::new(LockFreeRingBuffer::new(10000));
+        
+        b.iter(|| {
+            let producer_handles: Vec<_> = (0..2)
+                .map(|thread_id| {
+                    let buffer = Arc::clone(&buffer);
+                    std::thread::spawn(move || {
+                        for i in 0..25000 {
+                            while buffer.push(thread_id * 25000 + i).is_err() {
+                                std::thread::yield_now();
+                            }
+                        }
+                    })
+                })
+                .collect();
+            
+            let consumer_handles: Vec<_> = (0..2)
+                .map(|_| {
+                    let buffer = Arc::clone(&buffer);
+                    std::thread::spawn(move || {
+                        let mut count = 0;
+                        while count < 25000 {
+                            if let Some(_) = buffer.pop() {
+                                count += 1;
+                            } else {
+                                std::thread::yield_now();
+                            }
+                        }
+                    })
+                })
+                .collect();
+            
+            for handle in producer_handles {
+                handle.join().unwrap();
+            }
+            for handle in consumer_handles {
+                handle.join().unwrap();
+            }
+        });
+    });
+    
+    group.finish();
+}
+
+/// Helper function to create test DFA table
+fn create_test_dfa_table() -> DFATable {
+    DFATable {
+        states: vec![0, 1, 2, 3, 4, 5],
+        start: 0,
+        accepting: vec![0, 1, 2, 3, 4, 5],
+        transitions: vec![
+            Transition {
+                from_state: 0,
+                event: "call(tool1,1)".to_string(),
+                to_state: 1,
+            },
+            Transition {
+                from_state: 1,
+                event: "emit(plan1)".to_string(),
+                to_state: 2,
+            },
+            Transition {
+                from_state: 2,
+                event: "log(hash1)".to_string(),
+                to_state: 3,
+            },
+        ],
+        rate_limits: vec![
+            RateLimit {
+                tool: "tool1".to_string(),
+                window_ms: 1000,
+                bound: 100,
+            },
+        ],
+    }
+}
+
+/// Helper function to create large DFA table for memory benchmarks
+fn create_large_dfa_table() -> DFATable {
+    let mut states = Vec::new();
+    let mut transitions = Vec::new();
+    
+    // Create 100 states
+    for i in 0..100 {
+        states.push(i);
+    }
+    
+    // Create transitions between states
+    for i in 0..99 {
+        transitions.push(Transition {
+            from_state: i,
+            event: format!("call(tool{},1)", i),
+            to_state: i + 1,
+        });
+    }
+    
+    DFATable {
+        states,
+        start: 0,
+        accepting: vec![99],
+        transitions,
+        rate_limits: vec![],
+    }
+}
     
     // Benchmark 1: Signature Verification Performance
     group.bench_function("ed25519_batch_verification", |b| {
@@ -490,6 +892,9 @@ fn measure_memory_efficiency() -> usize {
 criterion_group!(
     benches,
     performance_benchmarks,
+    sub_millisecond_benchmarks,
+    memory_efficiency_benchmarks,
+    concurrency_benchmarks,
     wasm_benchmarks,
     crypto_benchmarks,
     resource_benchmarks,

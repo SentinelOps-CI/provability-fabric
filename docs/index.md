@@ -112,12 +112,10 @@ cargo test --package crypto
 ### New Features (2025)
 - **[Model Context Protocol (MCP) Integration](mcp-integration.md)** - Complete MCP implementation guide
 - **[MCP Quick Reference](mcp-quick-reference.md)** - Developer quick reference for MCP APIs
-- **[Real-Time Communication](features/real-time-communication.md)** - WebSocket system for live updates
-- **[Advanced Search](features/advanced-search.md)** - Intelligent package discovery with fuzzy search
-- **[Authentication & User Management](features/authentication.md)** - JWT-based security and RBAC
+- **[MCP Migration Guide](mcp-migration-guide.md)** - Migration guide for existing MCP implementations
 
 ### Deployment & Operations
-- **[Production Deployment](deployment/production-deployment.md)** - Complete production setup guide
+- **[Deployment Guide](deployment-guide.md)** - Production deployment instructions
 - **[Testing Guide](testing-guide.md)** - Testing strategies and best practices
 - **[Security](security/README.md)** - Security architecture and best practices
 - **[Runbooks](runbooks/README.md)** - Operational procedures and troubleshooting
@@ -126,6 +124,7 @@ cargo test --package crypto
 - **[CLI Reference](cli-reference.md)** - Command-line interface reference
 - **[Configuration](configuration.md)** - Configuration options and management
 - **[Glossary](glossary.md)** - Terms and definitions
+- **[Standards](standards.md)** - Framework standards and specifications
 
 ## License
 

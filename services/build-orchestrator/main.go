@@ -30,7 +30,6 @@ type PolicyBuildRequest struct {
 // PolicyBuildResponse represents the build result
 type PolicyBuildResponse struct {
 	BuildID       string                 `json:"build_id"`
-	DFAHash       string                 `json:"dfa_hash"`
 	AutomataHash  string                 `json:"automata_hash"`
 	LabelerHash   string                 `json:"labeler_hash"`
 	ProofInputs   map[string]interface{} `json:"proof_inputs"`
@@ -40,6 +39,7 @@ type PolicyBuildResponse struct {
 	Status        string                 `json:"status"`
 	Timestamp     time.Time              `json:"timestamp"`
 	ExecutionTime int                    `json:"execution_time_ms"`
+	PAB           PABManifest            `json:"pab"`
 }
 
 // ArtifactMeta describes a stored artifact
@@ -109,12 +109,11 @@ type FlowPolicy struct {
 	Condition string `json:"condition,omitempty"`
 }
 
-// PolicyBuild represents a signed policy build
+// PolicyBuild represents a signed policy build with proof carries code
 type PolicyBuild struct {
 	BuildID       string            `json:"build_id"`
 	PolicyHash    string            `json:"policy_hash"`
 	ProofHash     string            `json:"proof_hash"`
-	DFAHash       string            `json:"dfa_hash"`
 	AutomataHash  string            `json:"automata_hash"`
 	LabelerHash   string            `json:"labeler_hash"`
 	CompiledDFA   CompiledDFA       `json:"compiled_dfa"`
@@ -123,6 +122,20 @@ type PolicyBuild struct {
 	CreatedAt     time.Time         `json:"created_at"`
 	Metadata      map[string]string `json:"metadata"`
 	ArtifactIndex []ArtifactMeta    `json:"artifact_index"`
+	// New: Proof Artifact Bundle (PAB) structure
+	PAB PABManifest `json:"pab"`
+}
+
+// PABManifest represents the Proof Artifact Bundle manifest
+type PABManifest struct {
+	PolicyHash   string    `json:"policy_hash"`
+	ProofHash    string    `json:"proof_hash"`
+	AutomataHash string    `json:"automata_hash"`
+	LabelerHash  string    `json:"labeler_hash"`
+	SidecarBuild string    `json:"sidecar_build"`
+	Epoch        string    `json:"epoch"`
+	CreatedAt    time.Time `json:"created_at"`
+	Version      string    `json:"version"`
 }
 
 // BuildOrchestrator handles ActionDSL compilation and policy builds
@@ -162,22 +175,33 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 	labeler := s.generateLabelerConfig(req.ActionDSL)
 
 	// Calculate hashes
-	dfaHash := s.calculateDFAHash(dfa)
 	automataHash := s.calculateAutomataHash(dfa)
 	labelerHash := s.calculateLabelerHash(labeler)
+
+	// Create PAB manifest
+	pab := PABManifest{
+		PolicyHash:   req.PolicyHash,
+		ProofHash:    req.ProofHash,
+		AutomataHash: automataHash,
+		LabelerHash:  labelerHash,
+		SidecarBuild: "sidecar-watcher-v1.0.0", // This would be computed from actual sidecar build
+		Epoch:        fmt.Sprintf("%d", time.Now().Unix()),
+		CreatedAt:    time.Now(),
+		Version:      "1.0.0",
+	}
 
 	// Create policy build
 	build := PolicyBuild{
 		BuildID:      buildID,
 		PolicyHash:   req.PolicyHash,
 		ProofHash:    req.ProofHash,
-		DFAHash:      dfaHash,
 		AutomataHash: automataHash,
 		LabelerHash:  labelerHash,
 		CompiledDFA:  dfa,
 		Labeler:      labeler,
 		CreatedAt:    time.Now(),
 		Metadata:     req.Metadata,
+		PAB:          pab,
 	}
 
 	// Sign the build if signing key provided
@@ -199,7 +223,6 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 
 	return &PolicyBuildResponse{
 		BuildID:       buildID,
-		DFAHash:       dfaHash,
 		AutomataHash:  automataHash,
 		LabelerHash:   labelerHash,
 		ProofInputs:   map[string]interface{}{"dfa": dfa, "labeler": labeler},
@@ -209,6 +232,7 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		Status:        "success",
 		Timestamp:     time.Now(),
 		ExecutionTime: int(time.Since(startTime).Milliseconds()),
+		PAB:           pab,
 	}, nil
 }
 
@@ -411,14 +435,14 @@ func (s *BuildOrchestrator) generateLabelRuleFromPolicyRule(rule map[string]inte
 
 // signPolicyBuild creates cryptographic signature for policy build
 func (s *BuildOrchestrator) signPolicyBuild(build PolicyBuild, signingKey string) (string, error) {
-	// Create canonical representation for signing
+	// Create canonical representation for signing including PAB
 	buildData, err := json.Marshal(map[string]interface{}{
 		"build_id":      build.BuildID,
 		"policy_hash":   build.PolicyHash,
 		"proof_hash":    build.ProofHash,
-		"dfa_hash":      build.DFAHash,
 		"automata_hash": build.AutomataHash,
 		"labeler_hash":  build.LabelerHash,
+		"pab":           build.PAB,
 		"created_at":    build.CreatedAt.Unix(),
 	})
 	if err != nil {
@@ -476,11 +500,23 @@ func (s *BuildOrchestrator) generateBuildArtifacts(build *PolicyBuild) ([]string
 	}
 	artifacts = append(artifacts, manifestPath)
 
+	// Write PAB manifest
+	pabPath := filepath.Join(buildDir, "pab_manifest.json")
+	pabData, err := json.MarshalIndent(build.PAB, "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := os.WriteFile(pabPath, pabData, 0644); err != nil {
+		return nil, nil, err
+	}
+	artifacts = append(artifacts, pabPath)
+
 	// Compute content-addressed hashes and sizes
 	files := []struct{ name, path string }{
 		{"compiled_dfa.json", dfaPath},
 		{"labeler_config.json", labelerPath},
 		{"build_manifest.json", manifestPath},
+		{"pab_manifest.json", pabPath},
 	}
 	for _, f := range files {
 		data, err := os.ReadFile(f.path)

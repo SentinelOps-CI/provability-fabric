@@ -255,7 +255,7 @@ func validatePod(pod *corev1.Pod) (*AdmissionResponse, error) {
 		fmt.Printf("Warning: failed to post to ledger: %v\n", err)
 	}
 
-	// Inject sidecar watcher container
+	// Inject sidecar watcher container with security hardening
 	sidecarContainer := corev1.Container{
 		Name:  "sidecar-watcher",
 		Image: "provability-fabric/sidecar-watcher:latest",
@@ -279,14 +279,70 @@ func validatePod(pod *corev1.Pod) (*AdmissionResponse, error) {
 				Name:          "metrics",
 			},
 		},
+		SecurityContext: &corev1.SecurityContext{
+			// Apply RuntimeDefault seccomp profile to restrict system calls
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			// Drop all capabilities and add only necessary ones
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{
+					"ALL",
+				},
+				Add: []corev1.Capability{
+					"NET_BIND_SERVICE", // Only allow binding to privileged ports
+				},
+			},
+			// Run as non-root user
+			RunAsNonRoot: &[]bool{true}[0],
+			RunAsUser:    &[]int64{65534}[0], // nobody user
+			RunAsGroup:   &[]int64{65534}[0], // nogroup
+			// Disable privilege escalation
+			AllowPrivilegeEscalation: &[]bool{false}[0],
+			// Read-only root filesystem
+			ReadOnlyRootFilesystem: &[]bool{true}[0],
+			// Disable raw sockets and shell access
+			Privileged: &[]bool{false}[0],
+		},
+		// Mount tmpfs for writable directories
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "tmp",
+				MountPath: "/tmp",
+			},
+			{
+				Name:      "var-log",
+				MountPath: "/var/log",
+			},
+		},
 	}
 
-	// Create patch to add sidecar container
+	// Create patch to add sidecar container and volumes
 	patch := []map[string]interface{}{
 		{
 			"op":    "add",
 			"path":  "/spec/containers/-",
 			"value": sidecarContainer,
+		},
+		{
+			"op":   "add",
+			"path": "/spec/volumes/-",
+			"value": map[string]interface{}{
+				"name": "tmp",
+				"emptyDir": map[string]interface{}{
+					"medium": "Memory",
+				},
+			},
+		},
+		{
+			"op":   "add",
+			"path": "/spec/volumes/-",
+			"value": map[string]interface{}{
+				"name": "var-log",
+				"emptyDir": map[string]interface{}{
+					"medium": "Memory",
+				},
+			},
 		},
 	}
 

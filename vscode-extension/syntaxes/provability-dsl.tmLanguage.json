@@ -1,0 +1,112 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Provability DSL",
+    "scopeName": "source.provability-dsl",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#operators"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.dsl",
+                    "begin": "//",
+                    "end": "$"
+                },
+                {
+                    "name": "comment.block.dsl",
+                    "begin": "/\\*",
+                    "end": "\\*/"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.dsl",
+                    "match": "\\b(allow|forbid|rate\\s+limit|budget\\s+limit|to|per|operations|max|window|currency)\\b"
+                },
+                {
+                    "name": "keyword.operator.dsl",
+                    "match": "\\b(and|or|not|true|false)\\b"
+                },
+                {
+                    "name": "entity.name.type.role.dsl",
+                    "match": "\\b(role|principal|user|admin|system|service)\\b"
+                },
+                {
+                    "name": "entity.name.type.action.dsl",
+                    "match": "\\b(call|access|read|write|emit|log|declassify)\\b"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.dsl",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.dsl",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.single.dsl",
+                    "begin": "'",
+                    "end": "'",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.dsl",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.integer.dsl",
+                    "match": "\\b\\d+\\b"
+                },
+                {
+                    "name": "constant.numeric.float.dsl",
+                    "match": "\\b\\d+\\.\\d+\\b"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.comparison.dsl",
+                    "match": "(==|!=|<=|>=|<|>)"
+                },
+                {
+                    "name": "keyword.operator.logical.dsl",
+                    "match": "(\\|\\||&&|!)"
+                },
+                {
+                    "name": "keyword.operator.assignment.dsl",
+                    "match": "(=)"
+                }
+            ]
+        }
+    }
+}
