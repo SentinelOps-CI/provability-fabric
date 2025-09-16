@@ -10,6 +10,10 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
 import axios from 'axios';
+import { ToolSignatureManager } from './tool-signature-manager';
+import { CertificateManager } from './certificate-manager';
+import { EgressProfileManager } from './egress-profile-manager';
+import { JCSValidator } from './jcs-validator';
 
 interface McpRequest {
   method: string;
@@ -39,6 +43,10 @@ export class McpProxy {
   private prisma: PrismaClient;
   private logger: winston.Logger;
   private sidecarUrl: string;
+  private toolSignatureManager: ToolSignatureManager;
+  private certificateManager: CertificateManager;
+  private egressProfileManager: EgressProfileManager;
+  private jcsValidator: JCSValidator;
 
   constructor(
     prisma: PrismaClient, 
@@ -48,6 +56,10 @@ export class McpProxy {
     this.prisma = prisma;
     this.logger = logger;
     this.sidecarUrl = sidecarUrl;
+    this.toolSignatureManager = new ToolSignatureManager(logger);
+    this.certificateManager = new CertificateManager(logger);
+    this.egressProfileManager = new EgressProfileManager(logger);
+    this.jcsValidator = new JCSValidator(logger);
   }
 
   /**
@@ -59,9 +71,64 @@ export class McpProxy {
         // Parse tenant from JWT (set by auth middleware)
         const tenantId = (req as any).user?.tenant_id;
         const userId = (req as any).user?.sub;
+        const rlsTokenHash = (req as any).user?.rls_token_hash;
 
         // Validate MCP request format
         const mcpRequest = this.validateMcpRequest(req.body);
+
+        // Early JCS validation for input rejection
+        const earlyValidation = this.performEarlyJCSValidation(mcpRequest);
+        if (earlyValidation.reject) {
+          this.logger.warn('MCP: Early JCS validation failed', {
+            reason: earlyValidation.reason,
+            method: mcpRequest.method,
+            tenantId
+          });
+
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32600,
+              message: 'Invalid request',
+              data: {
+                reason: earlyValidation.reason,
+                type: 'jcs_validation_failed'
+              }
+            },
+            id: mcpRequest.id
+          });
+        }
+
+        // Enforce RLS claims validation
+        if (tenantId && rlsTokenHash) {
+          const rlsValidation = this.certificateManager.enforceRLSClaims(
+            tenantId,
+            rlsTokenHash,
+            ['mcp_access'] // Required permission for MCP access
+          );
+
+          if (!rlsValidation.allowed) {
+            this.logger.warn('MCP: RLS claims validation failed', {
+              tenantId,
+              rlsTokenHash: rlsTokenHash.substring(0, 16) + '...',
+              reason: rlsValidation.reason,
+              violations: rlsValidation.violations
+            });
+
+            return res.status(403).json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32000,
+                message: 'RLS claims validation failed',
+                data: {
+                  reason: rlsValidation.reason,
+                  violations: rlsValidation.violations
+                }
+              },
+              id: mcpRequest.id
+            });
+          }
+        }
         
         this.logger.info('MCP: Proxying request', {
           method: mcpRequest.method,
@@ -70,10 +137,33 @@ export class McpProxy {
           requestId: mcpRequest.id
         });
 
+        // Start timeline tracking for tool calls
+        let decisionId: string | null = null;
+        if (mcpRequest.method === 'tools/call') {
+          const sessionId = (req as any).sessionId || `session_${Date.now()}`;
+          const toolName = mcpRequest.params?.name || 'unknown';
+          decisionId = this.egressProfileManager.startDecisionTimeline(
+            mcpRequest.id?.toString() || 'unknown',
+            sessionId,
+            tenantId || 'anonymous',
+            toolName
+          );
+        }
+
         // Enforce policies through sidecar integration
         const policyResult = await this.enforcePolicy(mcpRequest, tenantId, userId);
         
         if (!policyResult.allowed) {
+          // Add timeline event for policy violation
+          if (decisionId) {
+            this.egressProfileManager.addTimelineEvent(decisionId, 'policy_check', {
+              policyResult: policyResult.reason,
+              violatedConstraints: policyResult.violatedConstraints,
+              requestId: mcpRequest.id?.toString(),
+              sessionId: (req as any).sessionId
+            });
+          }
+
           this.logger.warn('MCP: Request blocked by policy', {
             method: mcpRequest.method,
             reason: policyResult.reason,
@@ -106,12 +196,22 @@ export class McpProxy {
           requestId: mcpRequest.id
         });
 
+        // Add timeline event for successful validation
+        if (decisionId) {
+          this.egressProfileManager.addTimelineEvent(decisionId, 'validation_completed', {
+            policyResult: 'passed',
+            requestId: mcpRequest.id?.toString(),
+            sessionId: (req as any).sessionId
+          });
+        }
+
         // Attach validated context to request
         (req as any).mcpContext = {
           tenantId,
           userId,
           validated: true,
-          policyResult
+          policyResult,
+          decisionId
         };
 
         next();
@@ -160,6 +260,61 @@ export class McpProxy {
   }
 
   /**
+   * Perform early JCS validation for input rejection
+   */
+  private performEarlyJCSValidation(request: McpRequest): { reject: boolean; reason?: string } {
+    try {
+      // Get appropriate schema based on method
+      let schemaName: string;
+      switch (request.method) {
+        case 'tools/call':
+          schemaName = 'tool_call';
+          break;
+        case 'resources/read':
+          schemaName = 'tenant_context';
+          break;
+        default:
+          // For unknown methods, use basic validation
+          return { reject: false };
+      }
+
+      const schema = this.jcsValidator.getSchema(schemaName);
+      if (!schema) {
+        return { reject: false }; // No schema available, skip validation
+      }
+
+      // Early rejection check
+      const earlyReject = this.jcsValidator.earlyReject(request.params, schema);
+      if (earlyReject.reject) {
+        return earlyReject;
+      }
+
+      // Full JCS validation for tool calls
+      if (request.method === 'tools/call') {
+        const validation = this.jcsValidator.validateInput(request.params, schema, {
+          strictMode: true,
+          allowAdditionalProperties: false
+        });
+
+        if (!validation.valid) {
+          return {
+            reject: true,
+            reason: `JCS validation failed: ${validation.errors.join(', ')}`
+          };
+        }
+      }
+
+      return { reject: false };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        reject: true,
+        reason: `JCS validation error: ${errorMessage}`
+      };
+    }
+  }
+
+  /**
    * Enforce provability-fabric policies for MCP requests
    */
   private async enforcePolicy(
@@ -191,7 +346,7 @@ export class McpProxy {
       }
 
       // Method-specific policy enforcement
-      const methodPolicyResult = await this.enforceMethodPolicy(request);
+      const methodPolicyResult = await this.enforceMethodPolicy(request, tenantId);
       if (!methodPolicyResult.allowed) {
         return methodPolicyResult;
       }
@@ -294,12 +449,12 @@ export class McpProxy {
   /**
    * Method-specific policy enforcement
    */
-  private async enforceMethodPolicy(request: McpRequest): Promise<PolicyEnforcementResult> {
+  private async enforceMethodPolicy(request: McpRequest, tenantId?: string): Promise<PolicyEnforcementResult> {
     const { method, params } = request;
 
     switch (method) {
       case 'tools/call':
-        return this.enforceToolCallPolicy(params);
+        return this.enforceToolCallPolicy(params, tenantId);
       
       case 'resources/read':
         return this.enforceResourceReadPolicy(params);
@@ -316,47 +471,53 @@ export class McpProxy {
   }
 
   /**
-   * Enforce policies for tool calls
+   * Enforce policies for tool calls with tool signature validation
    */
-  private async enforceToolCallPolicy(params: any): Promise<PolicyEnforcementResult> {
+  private async enforceToolCallPolicy(params: any, tenantId?: string): Promise<PolicyEnforcementResult> {
     const { name: toolName, arguments: toolArgs } = params;
 
-    // Validate tool arguments based on tool type
-    switch (toolName) {
-      case 'query_capsules':
-        // Ensure reasonable query limits
-        if (toolArgs?.limit && toolArgs.limit > 1000) {
-          return {
-            allowed: false,
-            reason: 'Query limit too high',
-            violatedConstraints: ['max_query_limit']
-          };
-        }
-        break;
+    // Get current epoch (simplified - in production, this would come from a time service)
+    const epoch = Math.floor(Date.now() / (60 * 1000)); // 1-minute epochs
 
-      case 'verify_behavior_guarantee':
-        // Ensure required parameters are present
-        if (!toolArgs?.capsuleId || !toolArgs?.behaviorSpec) {
-          return {
-            allowed: false,
-            reason: 'Missing required parameters for behavior verification',
-            violatedConstraints: ['required_parameters']
-          };
-        }
-        break;
+    // Validate tool call using tool signature manager
+    const validationResult = this.toolSignatureManager.validateToolCall(
+      toolName,
+      toolArgs,
+      tenantId || 'anonymous',
+      epoch
+    );
 
-      case 'log_audit_event':
-        // Validate audit event severity
-        const validSeverities = ['info', 'warning', 'error', 'critical'];
-        if (toolArgs?.severity && !validSeverities.includes(toolArgs.severity)) {
-          return {
-            allowed: false,
-            reason: 'Invalid audit event severity',
-            violatedConstraints: ['valid_severity']
-          };
-        }
-        break;
+    if (!validationResult.allowed) {
+      return {
+        allowed: false,
+        reason: validationResult.reason,
+        violatedConstraints: ['tool_signature_validation']
+      };
     }
+
+    // Additional sidecar constraint checks
+    if (validationResult.toolSignature) {
+      const sidecarResult = this.toolSignatureManager.checkSidecarConstraints(
+        validationResult.toolSignature,
+        tenantId || 'anonymous',
+        epoch
+      );
+
+      if (!sidecarResult.allowed) {
+        return {
+          allowed: false,
+          reason: sidecarResult.reason,
+          violatedConstraints: sidecarResult.constraints || ['sidecar_constraint']
+        };
+      }
+    }
+
+    this.logger.info('MCP: Tool call policy enforcement passed', {
+      toolName,
+      toolSignature: validationResult.toolSignature,
+      tenantId,
+      epoch
+    });
 
     return { allowed: true };
   }
@@ -465,13 +626,29 @@ export class McpProxy {
    * Get proxy statistics for monitoring
    */
   async getStats(tenantId?: string): Promise<any> {
+    // Clean up expired entries
+    this.toolSignatureManager.cleanupExpiredEntries();
+    this.certificateManager.cleanupExpiredEntries();
+    this.egressProfileManager.cleanupOldExplanations();
+    this.jcsValidator.clearCache();
+    
+    // Get component stats
+    const toolStats = this.toolSignatureManager.getCacheStats();
+    const certStats = this.certificateManager.getStats();
+    const egressStats = this.egressProfileManager.getStats();
+    const jcsStats = this.jcsValidator.getStats();
+    
     // Return proxy statistics for monitoring dashboard
     return {
       totalRequests: 0, // TODO: Implement counters
       blockedRequests: 0,
       averageResponseTime: 0,
       tenantId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      toolSignatureManager: toolStats,
+      certificateManager: certStats,
+      egressProfileManager: egressStats,
+      jcsValidator: jcsStats
     };
   }
 }

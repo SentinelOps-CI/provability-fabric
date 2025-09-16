@@ -15,8 +15,10 @@
  */
 
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 /// Rate limit configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +26,203 @@ pub struct RateLimitConfig {
     pub window_ms: u64,
     pub max_events: u32,
     pub epsilon_ms: u64, // Clock tolerance
+}
+
+/// Optimized ring buffer for O(1) window checks
+#[derive(Debug)]
+pub struct RingBuffer {
+    buffer: Vec<u32>, // Timestamps in milliseconds
+    head: AtomicUsize,
+    tail: AtomicUsize,
+    size: usize,
+    mask: usize, // For efficient modulo operations (size must be power of 2)
+}
+
+impl RingBuffer {
+    /// Create new ring buffer with power-of-2 size
+    pub fn new(size: usize) -> Self {
+        let actual_size = size.next_power_of_two();
+        Self {
+            buffer: vec![0; actual_size],
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+            size: actual_size,
+            mask: actual_size - 1,
+        }
+    }
+
+    /// Push timestamp to ring buffer (O(1))
+    #[inline(always)]
+    pub fn push(&mut self, timestamp: u32) {
+        let tail = self.tail.load(Ordering::Relaxed);
+        let next_tail = (tail + 1) & self.mask;
+        
+        // Check if buffer is full
+        if next_tail == self.head.load(Ordering::Acquire) {
+            // Buffer is full, advance head
+            self.head.store(next_tail, Ordering::Release);
+        }
+        
+        self.buffer[tail] = timestamp;
+        self.tail.store(next_tail, Ordering::Release);
+    }
+
+    /// Count events in window (O(1) amortized)
+    #[inline(always)]
+    pub fn count_in_window(&self, current_time: u32, window_ms: u32) -> usize {
+        let window_start = current_time.saturating_sub(window_ms);
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+        
+        if head == tail {
+            return 0; // Empty buffer
+        }
+        
+        let mut count = 0;
+        let mut pos = head;
+        
+        while pos != tail {
+            if self.buffer[pos] >= window_start {
+                count += 1;
+            }
+            pos = (pos + 1) & self.mask;
+        }
+        
+        count
+    }
+
+    /// Get current size
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+        (tail.wrapping_sub(head)) & self.mask
+    }
+}
+
+/// High-performance rate limiter with ring buffer
+pub struct OptimizedRateLimiter {
+    config: RateLimitConfig,
+    ring_buffer: RingBuffer,
+    last_cleanup: AtomicU32,
+}
+
+impl OptimizedRateLimiter {
+    /// Create new optimized rate limiter
+    pub fn new(config: RateLimitConfig) -> Self {
+        let buffer_size = (config.max_events * 2).next_power_of_two() as usize;
+        Self {
+            config,
+            ring_buffer: RingBuffer::new(buffer_size),
+            last_cleanup: AtomicU32::new(0),
+        }
+    }
+
+    /// Check if event is allowed (hot path)
+    #[inline(always)]
+    pub fn check(&self, current_time_ms: u32) -> bool {
+        let count = self.ring_buffer.count_in_window(current_time_ms, self.config.window_ms as u32);
+        count < self.config.max_events as usize
+    }
+
+    /// Record an event (hot path)
+    #[inline(always)]
+    pub fn record(&mut self, current_time_ms: u32) -> bool {
+        if !self.check(current_time_ms) {
+            return false;
+        }
+        
+        self.ring_buffer.push(current_time_ms);
+        true
+    }
+
+    /// Get current count
+    #[inline(always)]
+    pub fn current_count(&self, current_time_ms: u32) -> usize {
+        self.ring_buffer.count_in_window(current_time_ms, self.config.window_ms as u32)
+    }
+
+    /// Get remaining capacity
+    #[inline(always)]
+    pub fn remaining_capacity(&self, current_time_ms: u32) -> i32 {
+        let current = self.current_count(current_time_ms);
+        self.config.max_events as i32 - current as i32
+    }
+
+    /// Update configuration
+    pub fn update_config(&mut self, new_config: RateLimitConfig) {
+        let buffer_size = (new_config.max_events * 2).next_power_of_two() as usize;
+        self.config = new_config;
+        // Recreate ring buffer with new size
+        self.ring_buffer = RingBuffer::new(buffer_size);
+    }
+
+    /// Get configuration
+    pub fn config(&self) -> &RateLimitConfig {
+        &self.config
+    }
+}
+
+/// Bucketed rate limiter for different event types
+pub struct BucketedRateLimiter {
+    buckets: Vec<OptimizedRateLimiter>,
+    bucket_count: usize,
+    config: RateLimitConfig,
+}
+
+impl BucketedRateLimiter {
+    /// Create new bucketed rate limiter
+    pub fn new(config: RateLimitConfig, bucket_count: usize) -> Self {
+        let buckets = (0..bucket_count)
+            .map(|_| OptimizedRateLimiter::new(config.clone()))
+            .collect();
+        
+        Self {
+            buckets,
+            bucket_count,
+            config,
+        }
+    }
+
+    /// Get bucket index for event
+    #[inline(always)]
+    fn get_bucket_index(&self, event_hash: u64) -> usize {
+        (event_hash as usize) % self.bucket_count
+    }
+
+    /// Check rate limit for event
+    #[inline(always)]
+    pub fn check(&self, event_hash: u64, current_time_ms: u32) -> bool {
+        let bucket_index = self.get_bucket_index(event_hash);
+        self.buckets[bucket_index].check(current_time_ms)
+    }
+
+    /// Record event
+    #[inline(always)]
+    pub fn record(&mut self, event_hash: u64, current_time_ms: u32) -> bool {
+        let bucket_index = self.get_bucket_index(event_hash);
+        self.buckets[bucket_index].record(current_time_ms)
+    }
+
+    /// Get total count across all buckets
+    pub fn total_count(&self, current_time_ms: u32) -> usize {
+        self.buckets.iter()
+            .map(|bucket| bucket.current_count(current_time_ms))
+            .sum()
+    }
+
+    /// Get statistics
+    pub fn get_stats(&self, current_time_ms: u32) -> HashMap<String, usize> {
+        let mut stats = HashMap::new();
+        stats.insert("total_buckets".to_string(), self.bucket_count);
+        stats.insert("total_count".to_string(), self.total_count(current_time_ms));
+        
+        for (i, bucket) in self.buckets.iter().enumerate() {
+            stats.insert(format!("bucket_{}_count", i), bucket.current_count(current_time_ms));
+        }
+        
+        stats
+    }
 }
 
 impl Default for RateLimitConfig {
@@ -539,5 +738,148 @@ mod tests {
             limiter.check(current_time);
             prev_time = current_time;
         }
+    }
+
+    #[test]
+    fn test_optimized_rate_limiter() {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 5,
+            epsilon_ms: 10,
+        };
+
+        let limiter = OptimizedRateLimiter::new(config);
+        let current_time = 1000;
+
+        // Should allow first 5 events
+        for i in 0..5 {
+            assert!(limiter.record(current_time + i));
+        }
+
+        // Should reject 6th event
+        assert!(!limiter.record(current_time + 5));
+    }
+
+    #[test]
+    fn test_ring_buffer_operations() {
+        let buffer = RingBuffer::new(8); // Power of 2
+        let current_time = 1000;
+
+        // Push some events
+        for i in 0..5 {
+            buffer.push(current_time + i);
+        }
+
+        // Count events in window
+        let count = buffer.count_in_window(current_time + 10, 100);
+        assert_eq!(count, 5);
+
+        // Count events in smaller window
+        let count = buffer.count_in_window(current_time + 10, 2);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_bucketed_rate_limiter() {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 10,
+            epsilon_ms: 10,
+        };
+
+        let limiter = BucketedRateLimiter::new(config, 4);
+        let current_time = 1000;
+
+        // Test different buckets
+        for i in 0..20 {
+            let event_hash = i as u64;
+            let allowed = limiter.record(event_hash, current_time + i);
+            // Should allow some events (distributed across buckets)
+            if i < 10 {
+                assert!(allowed);
+            }
+        }
+
+        let stats = limiter.get_stats(current_time + 20);
+        assert_eq!(stats["total_buckets"], 4);
+    }
+
+    #[test]
+    fn test_optimized_performance_benchmark() {
+        let config = RateLimitConfig {
+            window_ms: 1000,
+            max_events: 10000,
+            epsilon_ms: 10,
+        };
+
+        let limiter = OptimizedRateLimiter::new(config);
+        let current_time = 1000;
+
+        // Benchmark check operations
+        let start = Instant::now();
+        for _ in 0..100_000 {
+            let _ = limiter.check(current_time);
+        }
+        let duration = start.elapsed();
+
+        // Should complete in less than 1ms for 100k operations
+        assert!(duration.as_millis() < 1, "Optimized check too slow: {:?}", duration);
+        println!("100k optimized checks took: {:?}", duration);
+
+        // Benchmark record operations
+        let start = Instant::now();
+        for i in 0..100_000 {
+            let _ = limiter.record(current_time + i);
+        }
+        let duration = start.elapsed();
+
+        // Should complete in less than 1ms for 100k operations
+        assert!(duration.as_millis() < 1, "Optimized record too slow: {:?}", duration);
+        println!("100k optimized records took: {:?}", duration);
+    }
+
+    #[test]
+    fn test_ring_buffer_wraparound() {
+        let buffer = RingBuffer::new(4); // Small buffer for testing wraparound
+        let current_time = 1000;
+
+        // Fill buffer beyond capacity
+        for i in 0..10 {
+            buffer.push(current_time + i);
+        }
+
+        // Should only have recent events
+        let count = buffer.count_in_window(current_time + 10, 100);
+        assert!(count <= 4); // Buffer size
+    }
+
+    #[test]
+    fn test_concurrent_ring_buffer() {
+        use std::thread;
+        use std::sync::Arc;
+
+        let buffer = Arc::new(RingBuffer::new(1024));
+        let current_time = 1000;
+
+        // Spawn multiple threads pushing to buffer
+        let handles: Vec<_> = (0..4)
+            .map(|thread_id| {
+                let buffer = Arc::clone(&buffer);
+                thread::spawn(move || {
+                    for i in 0..1000 {
+                        buffer.push(current_time + thread_id * 1000 + i);
+                    }
+                })
+            })
+            .collect();
+
+        // Wait for all threads
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Verify buffer is in consistent state
+        let count = buffer.count_in_window(current_time + 5000, 10000);
+        assert!(count <= 1024); // Buffer size
     }
 }

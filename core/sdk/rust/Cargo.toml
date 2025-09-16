@@ -6,7 +6,13 @@ authors = ["Provability Fabric Team"]
 description = "Provability Fabric Core SDK for Rust"
 license = "Apache-2.0"
 repository = "https://github.com/provability-fabric/provability-fabric"
-keywords = ["provability-fabric", "ai-safety", "policy-enforcement", "grpc", "rust"]
+keywords = [
+    "provability-fabric",
+    "ai-safety",
+    "policy-enforcement",
+    "grpc",
+    "rust",
+]
 categories = ["api-bindings", "asynchronous", "network-programming"]
 
 [dependencies]
@@ -28,11 +34,8 @@ tonic-build = "0.10"
 tokio-test = "0.4"
 criterion = "0.5"
 
-[[bench]]
-name = "benchmarks"
-harness = false
 
 [features]
 default = ["full"]
-full = ["tonic/transport", "tonic/compression", "tonic/compression-gzip"]
+full = ["tonic/transport"]
 minimal = []

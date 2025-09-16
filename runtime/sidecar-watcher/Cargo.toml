@@ -27,6 +27,13 @@ metrics = "0.21"
 thiserror = "1.0"
 k8s-openapi = { version = "0.20", features = ["v1_28"] }
 kube = { version = "0.87", features = ["client", "config"] }
+# Performance optimization dependencies
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+blake3 = "1.5"
+serde_cbor = "0.11"
+rand = "0.8"
+arc-swap = "1.6"
+parking_lot = "0.12"
 
 [dev-dependencies]
 tokio-test = "0.4"

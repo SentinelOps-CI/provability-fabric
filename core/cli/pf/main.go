@@ -75,6 +75,10 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(perfCmd())
 	rootCmd.AddCommand(traceCmd())
 
+	// Enhanced unified commands for developer workflow
+	rootCmd.AddCommand(explainStateCmd())
+	rootCmd.AddCommand(unifiedCommands())
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

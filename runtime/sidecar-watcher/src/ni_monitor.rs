@@ -644,6 +644,58 @@ impl NIMonitor {
         self.state.add_event(event)
     }
 
+    /// Track MonNI predicate online and emit ni_monitor status
+    ///
+    /// This method implements the local monitor to global NI bridge by tracking
+    /// the MonNI_L predicate online and emitting accept|reject|inapplicable status
+    /// for each input prefix. This provides the runtime component of the bridge
+    /// that connects to the global non-interference properties proven offline.
+    pub fn track_monni_online(&mut self, prefix: &NIPrefix) -> NIMonitorStatus {
+        // Check if prefix violates non-interference
+        if prefix.violates_ni() {
+            self.state.violation_count += 1;
+            return NIMonitorStatus::Reject;
+        }
+
+        // Check if prefix is inapplicable (no events or invalid state)
+        if prefix.events.is_empty() {
+            return NIMonitorStatus::Inapplicable;
+        }
+
+        // Check if all bridge conditions are satisfied
+        if !self.state.check_bridge_conditions() {
+            return NIMonitorStatus::Reject;
+        }
+
+        // If all checks pass, the prefix is accepted
+        NIMonitorStatus::Accept
+    }
+
+    /// Get current MonNI status for all prefixes
+    ///
+    /// This method provides the current status of the MonNI_L predicate for all
+    /// tracked prefixes, enabling the runtime to emit ni_monitor statuses as
+    /// required by the bridge theorem.
+    pub fn get_monni_status(&self) -> HashMap<String, NIMonitorStatus> {
+        let mut statuses = HashMap::new();
+
+        for (prefix_id, prefix) in &self.state.prefixes {
+            let status = if prefix.violates_ni() {
+                NIMonitorStatus::Reject
+            } else if prefix.events.is_empty() {
+                NIMonitorStatus::Inapplicable
+            } else if self.state.check_bridge_conditions() {
+                NIMonitorStatus::Accept
+            } else {
+                NIMonitorStatus::Reject
+            };
+
+            statuses.insert(prefix_id.clone(), status);
+        }
+
+        statuses
+    }
+
     /// Check all prefixes for violations
     pub fn check_violations(&self) -> Vec<String> {
         self.state.check_all_prefixes()
@@ -711,6 +763,17 @@ pub struct NIVerificationResult {
     pub violations: Vec<String>,
     pub proof_obligations: Vec<NIProofObligation>,
     pub timestamp: u64,
+}
+
+/// MonNI monitor status for each prefix
+///
+/// This enum represents the possible states of the MonNI_L predicate
+/// as tracked online by the runtime monitor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum NIMonitorStatus {
+    Accept,
+    Reject,
+    Inapplicable,
 }
 
 #[cfg(test)]

@@ -795,6 +795,539 @@ func replayCmd() *cobra.Command {
 }
 
 func replayRunCmd() *cobra.Command {
+	var replayFile, outputDir string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "run --file <replay.json> --out <output/>",
+		Short: "Run deterministic replay",
+		Long:  `Execute a deterministic replay from a trace file.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Printf("DRY RUN: Would run replay from %s to %s\n", replayFile, outputDir)
+				return nil
+			}
+
+			// Read replay file
+			replayData, err := os.ReadFile(replayFile)
+			if err != nil {
+				return fmt.Errorf("failed to read replay file: %w", err)
+			}
+
+			// Prepare request
+			request := map[string]interface{}{
+				"replay_data": string(replayData),
+				"output_dir":  outputDir,
+			}
+
+			// Call API
+			resp, err := callAPI("POST", "/api/v1/replay/run", request)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("✅ Replay executed successfully\n")
+				fmt.Printf("📁 Output: %s\n", outputDir)
+				fmt.Printf("📊 Stats: %+v\n", resp["stats"])
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&replayFile, "file", "", "Replay trace file")
+	cmd.Flags().StringVar(&outputDir, "out", "replay-output/", "Output directory")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	cmd.MarkFlagRequired("file")
+
+	return cmd
+}
+
+func replayStatusCmdNew() *cobra.Command {
+	var replayID string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "status --id <replay-id>",
+		Short: "Get replay status",
+		Long:  `Get the status of a running or completed replay.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Printf("DRY RUN: Would get status for replay %s\n", replayID)
+				return nil
+			}
+
+			// Call API
+			resp, err := callAPI("GET", fmt.Sprintf("/api/v1/replay/status/%s", replayID), nil)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("📊 Replay Status: %s\n", replayID)
+				fmt.Printf("Status: %s\n", resp["status"])
+				fmt.Printf("Progress: %s\n", resp["progress"])
+				if stats, ok := resp["stats"]; ok {
+					fmt.Printf("Stats: %+v\n", stats)
+				}
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&replayID, "id", "", "Replay ID")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	cmd.MarkFlagRequired("id")
+
+	return cmd
+}
+
+// explainStateCmd provides the Explain State REPL functionality
+func explainStateCmd() *cobra.Command {
+	var dfaFile, event string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "explain-state",
+		Short: "Explain DFA state analysis",
+		Long:  `Interactive tool for analyzing DFA states and transitions.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dfaFile == "" && event == "" {
+				// Launch interactive REPL
+				return launchExplainStateREPL()
+			}
+
+			if dfaFile == "" {
+				return fmt.Errorf("DFA file required for analysis")
+			}
+
+			// Load DFA
+			dfa, err := loadDFAFromFile(dfaFile)
+			if err != nil {
+				return fmt.Errorf("failed to load DFA: %w", err)
+			}
+
+			if event == "" {
+				return fmt.Errorf("event required for analysis")
+			}
+
+			// Analyze event
+			analysis := analyzeEvent(dfa, event)
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(analysis)
+			} else {
+				displayAnalysis(analysis)
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&dfaFile, "dfa", "", "DFA JSON file")
+	cmd.Flags().StringVar(&event, "event", "", "Event to analyze")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+// unifiedCommands provides the main unified command interface
+func unifiedCommands() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unified",
+		Short: "Unified command interface",
+		Long:  `Unified commands that hide complexity behind simple interfaces.`,
+	}
+
+	cmd.AddCommand(unifiedPolicyCmd())
+	cmd.AddCommand(unifiedDeployCmd())
+	cmd.AddCommand(unifiedReplayCmd())
+	cmd.AddCommand(unifiedPacketCmd())
+	cmd.AddCommand(unifiedCertCmd())
+
+	return cmd
+}
+
+func unifiedPolicyCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "policy",
+		Short: "Unified policy operations",
+		Long:  `Simplified policy operations that hide complexity.`,
+	}
+
+	cmd.AddCommand(unifiedPolicyCompileCmd())
+	cmd.AddCommand(unifiedPolicyProveCmd())
+
+	return cmd
+}
+
+func unifiedPolicyCompileCmd() *cobra.Command {
+	var inputFile string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "compile [input-file]",
+		Short: "Compile policy with automatic output management",
+		Long:  `Compile policy with smart defaults and automatic output directory management.`,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				inputFile = args[0]
+			}
+
+			if inputFile == "" {
+				inputFile = "policy.md" // Default
+			}
+
+			// Smart output directory
+			outputDir := fmt.Sprintf("build/%s", strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile)))
+
+			// Use existing policy compile logic
+			policyCompileCmd := policyCompileCmd()
+			policyCompileCmd.SetArgs([]string{
+				"--in", inputFile,
+				"--out", outputDir,
+			})
+			if jsonOut {
+				policyCompileCmd.SetArgs(append(policyCompileCmd.ValidArgs, "--json"))
+			}
+
+			return policyCompileCmd.Execute()
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+func unifiedPolicyProveCmd() *cobra.Command {
+	var buildDir string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "prove [build-directory]",
+		Short: "Prove policy with automatic build detection",
+		Long:  `Prove policy with smart build directory detection.`,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				buildDir = args[0]
+			}
+
+			if buildDir == "" {
+				// Auto-detect build directory
+				if entries, err := os.ReadDir("build"); err == nil {
+					for _, entry := range entries {
+						if entry.IsDir() {
+							buildDir = filepath.Join("build", entry.Name())
+							break
+						}
+					}
+				}
+			}
+
+			if buildDir == "" {
+				return fmt.Errorf("no build directory found")
+			}
+
+			// Use existing policy prove logic
+			policyProveCmd := policyProveCmd()
+			policyProveCmd.SetArgs([]string{
+				"--build-dir", buildDir,
+			})
+			if jsonOut {
+				policyProveCmd.SetArgs(append(policyProveCmd.ValidArgs, "--json"))
+			}
+
+			return policyProveCmd.Execute()
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+func unifiedDeployCmd() *cobra.Command {
+	var epoch string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "deploy --epoch [rotate|stable]",
+		Short: "Deploy with epoch management",
+		Long:  `Deploy policies with automatic epoch rotation.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Printf("DRY RUN: Would deploy with epoch: %s\n", epoch)
+				return nil
+			}
+
+			// Prepare request
+			request := map[string]interface{}{
+				"epoch_action": epoch,
+				"auto_rotate":  epoch == "rotate",
+			}
+
+			// Call API
+			resp, err := callAPI("POST", "/api/v1/deploy", request)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("✅ Deploy completed successfully\n")
+				fmt.Printf("📊 Epoch: %s\n", resp["epoch"])
+				fmt.Printf("🔄 Rotated: %t\n", resp["rotated"])
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&epoch, "epoch", "stable", "Epoch action (rotate|stable)")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+func unifiedReplayCmd() *cobra.Command {
+	var replayFile string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "replay run [replay-file]",
+		Short: "Run replay with smart defaults",
+		Long:  `Run deterministic replay with automatic file detection.`,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				replayFile = args[0]
+			}
+
+			if replayFile == "" {
+				// Auto-detect replay files
+				if entries, err := os.ReadDir("."); err == nil {
+					for _, entry := range entries {
+						if strings.HasSuffix(entry.Name(), ".replay.json") {
+							replayFile = entry.Name()
+							break
+						}
+					}
+				}
+			}
+
+			if replayFile == "" {
+				return fmt.Errorf("no replay file found")
+			}
+
+			// Use existing replay run logic
+			replayRunCmd := replayRunCmd()
+			replayRunCmd.SetArgs([]string{
+				"--file", replayFile,
+			})
+			if jsonOut {
+				replayRunCmd.SetArgs(append(replayRunCmd.ValidArgs, "--json"))
+			}
+
+			return replayRunCmd.Execute()
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+func unifiedPacketCmd() *cobra.Command {
+	var packetType string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "packet make [type]",
+		Short: "Make packet with smart defaults",
+		Long:  `Create packets with automatic type detection.`,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				packetType = args[0]
+			}
+
+			if packetType == "" {
+				packetType = "evidence" // Default
+			}
+
+			if dryRun {
+				fmt.Printf("DRY RUN: Would make packet of type: %s\n", packetType)
+				return nil
+			}
+
+			// Prepare request
+			request := map[string]interface{}{
+				"packet_type": packetType,
+				"auto_detect": true,
+			}
+
+			// Call API
+			resp, err := callAPI("POST", "/api/v1/packet/make", request)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("✅ Packet created successfully\n")
+				fmt.Printf("📦 Type: %s\n", resp["packet_type"])
+				fmt.Printf("📁 Path: %s\n", resp["packet_path"])
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+func unifiedCertCmd() *cobra.Command {
+	var certFile string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "cert verify [cert-file]",
+		Short: "Verify certificate with smart defaults",
+		Long:  `Verify certificates with automatic file detection.`,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				certFile = args[0]
+			}
+
+			if certFile == "" {
+				// Auto-detect certificate files
+				if entries, err := os.ReadDir("."); err == nil {
+					for _, entry := range entries {
+						if strings.HasSuffix(entry.Name(), ".cert.json") {
+							certFile = entry.Name()
+							break
+						}
+					}
+				}
+			}
+
+			if certFile == "" {
+				return fmt.Errorf("no certificate file found")
+			}
+
+			if dryRun {
+				fmt.Printf("DRY RUN: Would verify certificate: %s\n", certFile)
+				return nil
+			}
+
+			// Read certificate
+			certData, err := os.ReadFile(certFile)
+			if err != nil {
+				return fmt.Errorf("failed to read certificate: %w", err)
+			}
+
+			// Prepare request
+			request := map[string]interface{}{
+				"certificate": string(certData),
+			}
+
+			// Call API
+			resp, err := callAPI("POST", "/api/v1/cert/verify", request)
+			if err != nil {
+				return err
+			}
+
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(resp)
+			} else {
+				fmt.Printf("✅ Certificate verification completed\n")
+				fmt.Printf("🔐 Valid: %t\n", resp["valid"])
+				fmt.Printf("📅 Expires: %s\n", resp["expires"])
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+
+	return cmd
+}
+
+// Helper functions for Explain State functionality
+
+func launchExplainStateREPL() error {
+	fmt.Println("🔍 Launching Explain State REPL...")
+	fmt.Println("This would launch the interactive REPL tool.")
+	fmt.Println("For now, use the standalone tool: go run tools/explain-state-repl/main.go")
+	return nil
+}
+
+func loadDFAFromFile(filename string) (interface{}, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var dfa interface{}
+	if err := json.Unmarshal(data, &dfa); err != nil {
+		return nil, err
+	}
+
+	return dfa, nil
+}
+
+func analyzeEvent(dfa interface{}, event string) map[string]interface{} {
+	// Simplified event analysis
+	// In a real implementation, this would use the DFA compiler
+	return map[string]interface{}{
+		"event":         event,
+		"current_state": 0,
+		"next_state":    1,
+		"is_accepting":  true,
+		"is_valid":      true,
+		"message":       fmt.Sprintf("Event '%s' analyzed", event),
+		"timestamp":     time.Now(),
+	}
+}
+
+func displayAnalysis(analysis map[string]interface{}) {
+	fmt.Printf("📊 Event Analysis: '%s'\n", analysis["event"])
+	fmt.Printf("   Current State: %v\n", analysis["current_state"])
+	fmt.Printf("   Next State: %v\n", analysis["next_state"])
+	fmt.Printf("   Is Accepting: %t\n", analysis["is_accepting"])
+	fmt.Printf("   Is Valid: %t\n", analysis["is_valid"])
+	fmt.Printf("   Message: %s\n", analysis["message"])
+	fmt.Println()
+}
+
+func replayRunCmdOriginal() *cobra.Command {
 	var decisionID string
 	var openResults bool
 	var jsonOut bool

@@ -8,7 +8,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-provability-fabric-sidecar-watcher = { path = "../" }
+sidecar-watcher = { path = "../" }
 
 [[bin]]
 name = "json_actions"

@@ -63,13 +63,32 @@ export class TenantError extends Error {
   }
 }
 
-// Auth0 JWT validation middleware with error handling
+// Enhanced Auth0 JWT validation middleware with certificate chain pinning and error handling
 export const authMiddleware = jwt({
   secret: jwksRsa.expressJwtSecret({
     cache: true,
     rateLimit: true,
     jwksRequestsPerMinute: 5,
-    jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`
+    jwksUri: process.env.JWKS_URI || `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
+    // Add certificate chain pinning
+    requestAgent: new (require('https').Agent)({
+      checkServerIdentity: (host: string, cert: any) => {
+        // Certificate chain pinning validation
+        const expectedPins = process.env.CERTIFICATE_PINS?.split(',') || [];
+        const certFingerprint = require('crypto')
+          .createHash('sha256')
+          .update(cert.raw)
+          .digest('base64');
+        
+        const certPin = `sha256/${certFingerprint}`;
+        
+        if (expectedPins.length > 0 && !expectedPins.includes(certPin)) {
+          throw new Error(`Certificate pin validation failed. Expected: ${expectedPins.join(', ')}, Got: ${certPin}`);
+        }
+        
+        return undefined; // Use default hostname validation
+      }
+    })
   }),
   audience: process.env.AUTH0_AUDIENCE,
   issuer: `https://${process.env.AUTH0_DOMAIN}/`,

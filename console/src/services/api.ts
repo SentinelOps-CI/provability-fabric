@@ -260,4 +260,71 @@ export const checkServiceHealth = async (service: string) => {
   }
 };
 
+// Enhanced Evidence API functions
+
+/**
+ * Get detailed certificate information (core or extended)
+ */
+export const getCertificateDetails = async (bundleId: string, sessionId: string): Promise<any> => {
+  const response = await api.get(`/api/v1/evidence/cert/${bundleId}/${sessionId}`);
+  return response.data;
+};
+
+/**
+ * Promote a test vector to golden status
+ */
+export const promoteToGolden = async (decisionId: string, testVectorPath: string): Promise<void> => {
+  await api.post(`/api/v1/replay/promote-golden`, {
+    decision_id: decisionId,
+    test_vector_path: testVectorPath,
+  });
+};
+
+/**
+ * Get policy diff analysis
+ */
+export const getPolicyDiffAnalysis = async (analysisId: string): Promise<any> => {
+  const response = await api.get(`/api/v1/policy-diff/analysis/${analysisId}`);
+  return response.data;
+};
+
+/**
+ * Start policy diff analysis
+ */
+export const startPolicyDiffAnalysis = async (request: {
+  pull_request_id: string;
+  base_policy_hash: string;
+  head_policy_hash: string;
+  sample_size?: number;
+  tenant_id?: string;
+  start_time?: string;
+  end_time?: string;
+  include_replay?: boolean;
+}): Promise<any> => {
+  const response = await api.post('/api/v1/policy-diff/analyze', request);
+  return response.data;
+};
+
+/**
+ * Get enhanced replay status with metrics
+ */
+export const getEnhancedReplayStatus = async (jobId: string): Promise<any> => {
+  const response = await api.get(`/api/v1/replay/enhanced/${jobId}`);
+  return response.data;
+};
+
+/**
+ * Start enhanced replay
+ */
+export const startEnhancedReplay = async (request: {
+  decision_id: string;
+  trace_file?: string;
+  config?: any;
+  use_morph?: boolean;
+  metadata?: Record<string, string>;
+}): Promise<any> => {
+  const response = await api.post('/api/v1/replay/enhanced', request);
+  return response.data;
+};
+
 export default api;
