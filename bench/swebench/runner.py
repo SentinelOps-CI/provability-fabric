@@ -916,11 +916,11 @@ def _execute_run(config: RunConfig) -> int:
     cost_reports: List[dict] = []
     model_name = f"pf-swebench-{config.engine}"
     effective_model_name = config.engine
-    if config.engine == "openhands":
+    if config.engine in ("openhands", "direct_agent"):
         if effective_llm_model is not None and provider_for_model:
             effective_model_name = effective_llm_model(provider_for_model, resolved_model_raw)
         else:
-            effective_model_name = resolved_model_raw
+            effective_model_name = (resolved_model_raw or "").strip() or config.engine
     workspace_root = None
     repo_root = Path(__file__).resolve().parent.parent.parent
     guard_shell = Path(__file__).parent / "guard" / (
@@ -1193,7 +1193,11 @@ def _execute_run(config: RunConfig) -> int:
                     apply_report["diff_stat_file"] = diff_stat_file
                 if not applies:
                     if empty_patch_reason is None:
-                        empty_patch_reason = "apply_check_failed"
+                        # Empty engine patch + apply check fails with "empty patch" is not a merge conflict.
+                        if not (model_patch or "").strip():
+                            empty_patch_reason = "agent_no_changes"
+                        else:
+                            empty_patch_reason = "apply_check_failed"
                     model_patch = ""
                     log_text = log_text + "\npatch_apply_check=failed"
                     _log("  patch_apply_check: failed (emitting empty patch)")
