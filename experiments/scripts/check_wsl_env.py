@@ -16,6 +16,11 @@ import os
 import subprocess
 import sys
 
+
+def _is_docker_failure(message: str) -> bool:
+    return message.startswith("docker")
+
+
 def _early_exit_if_failed(failed: list[str]) -> int | None:
     # PF_WSL_PREFLIGHT_MINIMAL=1: unit tests only; avoid importing datasets after an early failure.
     if failed and os.environ.get("PF_WSL_PREFLIGHT_MINIMAL") == "1":
@@ -103,7 +108,15 @@ def main() -> int:
             else:
                 print("Warning: %s (bench uses Docker from WSL.)" % msg, file=sys.stderr)
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-        msg = "docker: %s" % e
+        if isinstance(e, FileNotFoundError):
+            msg = (
+                "docker: command not found (install Docker Engine; SWE-bench harness needs it). "
+                "Debian/Ubuntu: sudo apt-get update && sudo apt-get install -y docker.io && "
+                "sudo systemctl enable --now docker; then sudo usermod -aG docker \"$USER\" "
+                "and re-login (or newgrp docker), or use sudo docker. Verify: docker run --rm hello-world"
+            )
+        else:
+            msg = "docker: %s" % e
         if strict:
             failed.append(msg)
         else:
@@ -159,11 +172,24 @@ def main() -> int:
         for f in failed:
             print("  - %s" % f, file=sys.stderr)
         print("", file=sys.stderr)
-        print("Install deps in WSL using a dedicated venv (avoids conflicts with other projects):", file=sys.stderr)
-        print("  bash experiments/scripts/setup_swebench_venv.sh", file=sys.stderr)
-        print("Or manually: python3 -m venv .venv-wsl && . .venv-wsl/bin/activate", file=sys.stderr)
-        print("  pip install -r bench/swebench/requirements-swebench.txt", file=sys.stderr)
-        print("Then re-run this script (or run-baseline-pf-cycle.sh; it will use .venv-wsl if present).", file=sys.stderr)
+        non_docker = [f for f in failed if not _is_docker_failure(f)]
+        if not non_docker:
+            print(
+                "Only Docker is missing or unreachable; Python imports above are fine.",
+                file=sys.stderr,
+            )
+            print("", file=sys.stderr)
+            print("Quick setup on Debian bookworm / Ubuntu:", file=sys.stderr)
+            print("  sudo apt-get update && sudo apt-get install -y docker.io", file=sys.stderr)
+            print("  sudo systemctl enable --now docker", file=sys.stderr)
+            print('  sudo usermod -aG docker "$USER" && newgrp docker   # or log out and back in', file=sys.stderr)
+            print("  docker run --rm hello-world", file=sys.stderr)
+        else:
+            print("Install deps in WSL using a dedicated venv (avoids conflicts with other projects):", file=sys.stderr)
+            print("  bash experiments/scripts/setup_swebench_venv.sh", file=sys.stderr)
+            print("Or manually: python3 -m venv .venv-wsl && . .venv-wsl/bin/activate", file=sys.stderr)
+            print("  pip install -r bench/swebench/requirements-swebench.txt", file=sys.stderr)
+            print("Then re-run this script (or run-baseline-pf-cycle.sh; it will use .venv-wsl if present).", file=sys.stderr)
         return 1
 
     if relaxed_win:
