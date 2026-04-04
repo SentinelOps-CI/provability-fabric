@@ -12,6 +12,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
+def test_resolved_runner_model_env_over_cli(monkeypatch):
+    from experiments.scripts.run_direct_agent_ab_gate import _resolved_runner_model
+
+    monkeypatch.delenv("OPENHANDS_MODEL", raising=False)
+    assert _resolved_runner_model("cli-model") == "cli-model"
+    monkeypatch.setenv("OPENHANDS_MODEL", "env-model")
+    assert _resolved_runner_model("cli-model") == "env-model"
+
+
 def test_default_ab_checkpoint_shape():
     from experiments.scripts.run_direct_agent_ab_gate import _default_ab_checkpoint
 
