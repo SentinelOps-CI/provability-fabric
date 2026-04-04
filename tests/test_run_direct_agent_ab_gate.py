@@ -12,6 +12,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
+def test_default_ab_checkpoint_shape():
+    from experiments.scripts.run_direct_agent_ab_gate import _default_ab_checkpoint
+
+    ck = _default_ab_checkpoint()
+    assert ck["phase"] == "init"
+    assert ck["phases"]["baseline"]["status"] == "pending"
+    assert ck["phases"]["candidate"]["status"] == "pending"
+    assert ck["phases"]["compare"]["status"] == "pending"
+
+
 def test_instances_with_critical_drop(tmp_path: Path):
     from experiments.scripts.run_direct_agent_ab_gate import _instances_with_critical_drop
 

@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 #
-# Strict 10-instance A/B gate for direct_agent (candidate) vs openhands (baseline).
+# Strict 10-instance A/B gate: baseline vs direct_agent candidate (compare_runs "pf" arm).
+# Default baseline engine is direct_agent (OpenAI-compatible loop, no OpenHands package/CLI).
+# Use --baseline-engine openhands for classic A/B vs the OpenHands engine.
 # LLM is configured via env (e.g. OPENHANDS_PROVIDER=prime_intellect, PRIME_INTELLECT_API_KEY,
 # OPENHANDS_MODEL=google/gemini-2.5-flash); --model forwards --openhands-model to the runner.
 
@@ -61,6 +63,17 @@ def _load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _default_ab_checkpoint() -> dict[str, Any]:
+    return {
+        "phase": "init",
+        "phases": {
+            "baseline": {"status": "pending"},
+            "candidate": {"status": "pending"},
+            "compare": {"status": "pending"},
+        },
+    }
 
 
 def _phase_stdout(log_path: Path) -> str:
@@ -254,8 +267,19 @@ def _run_watchdog(
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
-            "Run strict A/B gate: openhands-engine baseline vs direct_agent candidate. "
+            "Run strict A/B gate: configurable baseline engine vs direct_agent candidate. "
+            "Default baseline is direct_agent (no OpenHands dependency). "
             "Set OPENHANDS_PROVIDER / API keys / OPENHANDS_MODEL (e.g. prime_intellect + Prime model id)."
+        ),
+    )
+    ap.add_argument(
+        "--baseline-engine",
+        choices=("openhands", "direct_agent"),
+        default="direct_agent",
+        help=(
+            "Runner --engine for the baseline phase. "
+            "direct_agent: same custom OpenAI-compatible loop as the candidate (no OpenHands module/CLI). "
+            "openhands: classic A/B against the OpenHands engine."
         ),
     )
     ap.add_argument("--dataset", default="Lite")
@@ -288,27 +312,15 @@ def main() -> int:
     ids_file = Path(args.instance_ids_file).resolve() if args.instance_ids_file else (out_dir / "instance_ids.txt")
     checkpoint_path = out_dir / "ab_gate_checkpoint.json"
     decision_path = out_dir / "ab_gate_decision.json"
-    checkpoint = _load_json(
-        checkpoint_path,
-        {
-            "phase": "init",
-            "phases": {
-                "baseline": {"status": "pending"},
-                "candidate": {"status": "pending"},
-                "compare": {"status": "pending"},
-            },
-        },
-    )
+    checkpoint = _load_json(checkpoint_path, _default_ab_checkpoint())
     if not args.resume:
-        checkpoint = {
-            "phase": "init",
-            "phases": {
-                "baseline": {"status": "pending"},
-                "candidate": {"status": "pending"},
-                "compare": {"status": "pending"},
-            },
-        }
+        checkpoint = _default_ab_checkpoint()
         _write_json(checkpoint_path, checkpoint)
+    else:
+        prev_eng = checkpoint.get("baseline_engine")
+        if prev_eng is not None and prev_eng != args.baseline_engine:
+            checkpoint = _default_ab_checkpoint()
+            _write_json(checkpoint_path, checkpoint)
 
     # If no explicit IDs file, sample deterministic IDs once and reuse for resume.
     if not args.instance_ids_file and not ids_file.exists():
@@ -331,7 +343,7 @@ def main() -> int:
             print(smp.stderr, file=sys.stderr)
             return smp.returncode
 
-    baseline_out = out_dir / "predictions_baseline_openhands.jsonl"
+    baseline_out = out_dir / f"predictions_baseline_{args.baseline_engine}.jsonl"
     candidate_out = out_dir / "predictions_candidate_direct_agent.jsonl"
 
     common_args = [
@@ -372,7 +384,7 @@ def main() -> int:
                 sys.executable,
                 str(RUNNER),
                 "--engine",
-                "openhands",
+                args.baseline_engine,
                 "--out",
                 str(baseline_out),
                 *common_args,
@@ -396,6 +408,8 @@ def main() -> int:
             "log_path": base["log_path"],
             "ended_at": time.time(),
         }
+        if checkpoint["phases"]["baseline"]["status"] == "success":
+            checkpoint["baseline_engine"] = args.baseline_engine
         _write_json(checkpoint_path, checkpoint)
         if checkpoint["phases"]["baseline"]["status"] != "success":
             summary = {
