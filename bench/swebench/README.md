@@ -74,6 +74,31 @@ Both `pf bench swebench run` and `python bench/swebench/runner.py` invoke the sa
 - **Viewing trajectory and running OpenHands manually:** The trajectory is a **data file** (raw OpenHands CLI stdout), not a script. It contains banner lines (e.g. "Initializing agent...", "Agent is working") and JSON event blocks separated by `--JSON Event--`. View with `cat workspaces/<instance_id>/scratch/openhands_trajectory.jsonl` or `head -n 100 ...`; to count event kinds: `grep -o '"kind": "[^"]*"' workspaces/<instance_id>/scratch/openhands_trajectory.jsonl | sort | uniq -c`. Do not execute the file. To run the OpenHands CLI manually with headless, set **LLM_API_KEY** and **LLM_MODEL**: `export LLM_API_KEY="${OPENAI_API_KEY}" LLM_MODEL="${OPENHANDS_MODEL:-gpt-4o-mini}"` then e.g. `cd workspaces/astropy__astropy-12907/repo && openhands --headless --override-with-envs --json -t "Create an empty file named test_edit.txt."`
 - Run from the repository root so that `bench/swebench/runner.py` is available and paths resolve correctly.
 
+## Disk space (small GCP / CI VMs)
+
+Default **10 GB** boot disks on cloud VMs are easy to exhaust when you run SWE-bench with Docker and HuggingFace-backed datasets. Space disappears into several buckets at once, so failures can look like flaky I/O, `docker pull` errors, broken `pip`/`uv` installs, or harness timeouts instead of a clear “disk full” message.
+
+**What consumes space**
+
+- **Docker**: harness and base images, build cache, and container layers under `/var/lib/docker`.
+- **HuggingFace / `datasets`**: model and dataset cache, often multiple GiB after first use (default under `~/.cache/huggingface`).
+- **Workspaces**: one git clone (or more) per instance under `workspaces/<instance_id>/`; large repos add up quickly.
+- **Toolchains**: Python packages (wheels), `uv` managed Pythons, apt upgrades, logs, and run outputs under `runs/`.
+
+**Checks**
+
+- `df -h` (watch `/` and any extra volumes).
+- `du -sh ~/.cache/huggingface workspaces runs /var/lib/docker 2>/dev/null` to see the largest consumers.
+
+**Mitigations**
+
+- **Resize** the boot disk in your cloud console (or start instances with **at least ~50 GB** if you plan repeated OpenHands + harness + dataset work).
+- **Move caches**: set `HF_HOME` (and optionally Docker’s data root) to a larger attached data disk, not the tiny boot volume.
+- **Prune** when safe: `docker system prune` / `docker image prune` (only if you do not need old images); delete stale `workspaces/` trees and old `runs/` you no longer need.
+- **Do not** commit caches or `node_modules`-style trees into git; keep `.gitignore` aligned with local artifact dirs.
+
+If jobs start failing mysteriously mid-run, check disk **before** chasing network or API issues.
+
 ## Troubleshooting signatures (quick reference)
 
 | Symptom | Likely cause | Recovery |
