@@ -124,6 +124,7 @@ def test_compare_runs_require_patch_apply_fails_when_applies_false():
                 "--pf-eval-dir", str(pf_eval),
                 "--baseline-run-dir", str(baseline_run),
                 "--pf-run-dir", str(pf_run),
+                "--out", str(exp_dir),
                 "--require-harness",
                 "--require-patch-apply",
             ],
@@ -132,6 +133,12 @@ def test_compare_runs_require_patch_apply_fails_when_applies_false():
             text=True,
         )
         assert proc.returncode != 0
+        cmp_path = exp_dir / "compare.json"
+        assert cmp_path.is_file(), "compare.json must be written even when strict gates fail"
+        import json as _json
+
+        rep = _json.loads(cmp_path.read_text(encoding="utf-8"))
+        assert (rep.get("patch_apply") or {}).get("applies_false", 0) >= 1
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
