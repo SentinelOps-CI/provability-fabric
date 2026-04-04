@@ -103,3 +103,6 @@ echo "Disk (GCP / small VMs): a 10 GB boot disk is usually too small for Docker 
 echo "  + workspace clones. Run df -h before long jobs; if space is tight, resize the disk, set"
 echo "  HF_HOME on a larger volume, prune docker images, and remove stale workspaces/. Details:"
 echo "  bench/swebench/README.md (Disk space)."
+echo ""
+echo "Long SSH sessions: install tmux/screen once (avoids losing the gate on disconnect):"
+echo "  bash experiments/scripts/install_vm_runner_extras.sh"

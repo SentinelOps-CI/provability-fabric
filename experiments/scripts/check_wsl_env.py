@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 
@@ -196,6 +197,12 @@ def main() -> int:
         print(
             "Windows preflight: OK for repo scripts. Before baseline/PF runs: open WSL, "
             "activate .venv-wsl, run `python experiments/scripts/check_wsl_env.py` again.",
+            file=sys.stderr,
+        )
+    elif strict and not shutil.which("tmux") and not shutil.which("screen"):
+        print(
+            "Note: neither tmux nor screen on PATH. Long jobs over SSH stop if the session drops; "
+            "install one: bash experiments/scripts/install_vm_runner_extras.sh",
             file=sys.stderr,
         )
     return 0
