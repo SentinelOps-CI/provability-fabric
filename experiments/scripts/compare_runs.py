@@ -837,6 +837,11 @@ def main() -> int:
                 % applies_false,
                 file=sys.stderr,
             )
+            print(
+                "Hint: to emit compare.json anyway, omit --require-patch-apply, or re-run the gate with "
+                "--explore-compare (see bench/swebench/README.md, Direct-agent A/B gate).",
+                file=sys.stderr,
+            )
             return 1
 
     pa_total = (report.get("patch_apply") or {}).get("total") or 0
