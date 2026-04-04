@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# Recommended dependencies for SWE-bench runner and harness.
+# For golden runs, pin exact versions (e.g. datasets==X.Y.Z swebench==A.B.C)
+# and record the pip hash in the run README; check env_drift in compare.json after each run.
+#
+# Install in a dedicated venv to avoid conflicts with other projects (corridor-os, crewai,
+# guardrails-ai, etc.). From repo root: python -m venv .venv-wsl && . .venv-wsl/bin/activate
+# (WSL) or python -m venv .venv && .venv\Scripts\activate (Windows), then:
+#   pip install -r bench/swebench/requirements-swebench.txt
+#
+datasets
+swebench
+# Property-based tests (tests/test_evidence_bundle_properties.py, etc.)
+hypothesis>=6.0
+# OpenHands: use a version range to avoid pulling conflicting deps from other projects.
+# Pin to exact version (e.g. openhands==1.12.2) for reproducible golden runs.
+openhands>=1.11,<1.14
