@@ -272,6 +272,49 @@ def _run_watchdog(
     }
 
 
+def _diagnose_strict_compare_failure(
+    compare: dict[str, Any],
+    *,
+    baseline_run_id: str,
+    candidate_run_id: str,
+    runs_parent: Path,
+) -> None:
+    """Print stderr hints when strict compare fails (esp. agent_no_changes)."""
+    pa = compare.get("patch_apply") or {}
+    applies_false = int(pa.get("applies_false") or 0)
+    total = int(pa.get("total") or 0)
+    if applies_false <= 0 or total <= 0:
+        return
+    reasons = compare.get("empty_patch_reasons_topN") or []
+    agent_nc = sum(int(x.get("count") or 0) for x in reasons if str(x.get("reason")) == "agent_no_changes")
+    apply_fail = sum(int(x.get("count") or 0) for x in reasons if str(x.get("reason")) == "apply_check_failed")
+    lines = [
+        "",
+        "ab-gate: strict compare failed (see compare.json).",
+        "  patch_apply: applies_false=%s / total=%s" % (applies_false, total),
+    ]
+    if agent_nc >= total * 0.75:
+        lines.extend(
+            [
+                "  Most instances: agent_no_changes — direct_agent did not leave a non-empty patch that passes "
+                "git apply --check (LLM loop / model / prompt), not infra.",
+                "  Full gate without promote: re-run with --explore-compare.",
+                "  One-instance debug (baseline): %s/%s/<instance_id>/engine_trace.json"
+                % (runs_parent, baseline_run_id),
+                "  Same for candidate run: %s/%s/<instance_id>/engine_trace.json"
+                % (runs_parent, candidate_run_id),
+                "  Pull latest bench fixes: git pull (branch feat/swebench-gate-vm-bundle). "
+                "Budgets: try --max-iterations 40 --timeout 1800.",
+            ]
+        )
+    elif apply_fail >= total * 0.25:
+        lines.append(
+            "  Many apply_check_failed — model produced diffs that do not apply cleanly to the harness base; "
+            "inspect patch_apply_check.json stderr under each instance dir in baseline and candidate runs."
+        )
+    print("\n".join(lines), file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
@@ -600,6 +643,13 @@ def main() -> int:
     )
     print(json.dumps(summary, indent=2))
     if cmp["returncode"] != 0:
+        if compare and not args.explore_compare:
+            _diagnose_strict_compare_failure(
+                compare,
+                baseline_run_id=baseline_run_id,
+                candidate_run_id=candidate_run_id,
+                runs_parent=(REPO_ROOT / args.runs_dir).resolve(),
+            )
         print(_phase_stdout(compare_log))
     return int(cmp["returncode"])
 
