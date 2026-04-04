@@ -12,6 +12,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
+def test_explore_compare_env_allowed(monkeypatch):
+    from experiments.scripts.run_direct_agent_ab_gate import _explore_compare_env_allowed
+
+    monkeypatch.delenv("PF_AB_GATE_ALLOW_EXPLORE", raising=False)
+    assert _explore_compare_env_allowed() is False
+    monkeypatch.setenv("PF_AB_GATE_ALLOW_EXPLORE", "1")
+    assert _explore_compare_env_allowed() is True
+
+
 def test_resolved_runner_model_env_over_cli(monkeypatch):
     from experiments.scripts.run_direct_agent_ab_gate import _resolved_runner_model
 

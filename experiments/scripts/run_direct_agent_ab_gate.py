@@ -5,6 +5,7 @@
 # Strict 10-instance A/B gate: baseline vs direct_agent candidate (compare_runs "pf" arm).
 # Default baseline engine is direct_agent (OpenAI-compatible loop, no OpenHands package/CLI).
 # Use --baseline-engine openhands for classic A/B vs the OpenHands engine.
+# Non-strict compare: set PF_AB_GATE_ALLOW_EXPLORE=1 and pass --explore-compare (otherwise refused).
 # LLM is configured via env (e.g. OPENHANDS_PROVIDER=prime_intellect, PRIME_INTELLECT_API_KEY,
 # OPENHANDS_MODEL=google/gemini-2.5-flash); --model forwards --openhands-model to the runner.
 
@@ -82,6 +83,11 @@ def _resolved_runner_model(model_arg: str) -> str:
     if env_m:
         return env_m
     return (model_arg or "").strip()
+
+
+def _explore_compare_env_allowed() -> bool:
+    v = (os.environ.get("PF_AB_GATE_ALLOW_EXPLORE") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
 
 
 def _phase_stdout(log_path: Path) -> str:
@@ -298,7 +304,7 @@ def _diagnose_strict_compare_failure(
             [
                 "  Most instances: agent_no_changes — direct_agent did not leave a non-empty patch that passes "
                 "git apply --check (LLM loop / model / prompt), not infra.",
-                "  Full gate without promote: re-run with --explore-compare.",
+                "  Non-strict compare (not a real gate): PF_AB_GATE_ALLOW_EXPLORE=1 and --explore-compare.",
                 "  One-instance debug (baseline): %s/%s/<instance_id>/engine_trace.json"
                 % (runs_parent, baseline_run_id),
                 "  Same for candidate run: %s/%s/<instance_id>/engine_trace.json"
@@ -352,11 +358,40 @@ def main() -> int:
         "--explore-compare",
         action="store_true",
         help=(
-            "Run compare_runs without --require-patch-apply or --require-priced-models. "
-            "Use when you want compare.json despite empty/non-applying patches (not a merge/promote gate)."
+            "NON-STRICT: compare_runs without --require-patch-apply or --require-priced-models. "
+            "Exit 0 does not mean a real gate passed. Refused unless PF_AB_GATE_ALLOW_EXPLORE=1 is set."
+        ),
+    )
+    ap.add_argument(
+        "--require-harness-compare",
+        action="store_true",
+        help=(
+            "Real gate + harness: pass --require-harness to compare_runs (baseline/eval and pf/eval must exist; "
+            "solve_rate non-null). Incompatible with --explore-compare."
         ),
     )
     args = ap.parse_args()
+
+    if args.explore_compare and args.require_harness_compare:
+        print(
+            "ab-gate: --explore-compare cannot be used with --require-harness-compare.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.explore_compare and not _explore_compare_env_allowed():
+        print(
+            "ab-gate: refusing --explore-compare without PF_AB_GATE_ALLOW_EXPLORE=1.\n"
+            "Explore mode skips patch-apply and priced-model requirements; a long run can exit 0 with empty "
+            "or meaningless parity. For the real gate, omit --explore-compare (default).",
+            file=sys.stderr,
+        )
+        return 2
+    if args.explore_compare:
+        print(
+            "ab-gate: EXPLORE compare (PF_AB_GATE_ALLOW_EXPLORE=1) — not a promote/real gate.",
+            file=sys.stderr,
+            flush=True,
+        )
 
     resolved_model = _resolved_runner_model(args.model)
     if not resolved_model:
@@ -372,6 +407,13 @@ def main() -> int:
         % (args.baseline_engine, resolved_model, _msrc),
         flush=True,
     )
+    if not args.explore_compare:
+        _h = " + harness reports" if args.require_harness_compare else ""
+        print(
+            "ab-gate: strict compare (require patch apply + priced models%s). Exit 0 => real gate passed for this step."
+            % _h,
+            flush=True,
+        )
 
     out_dir = (REPO_ROOT / args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -586,6 +628,8 @@ def main() -> int:
     ]
     if not args.explore_compare:
         compare_cmd.extend(["--require-patch-apply", "--require-priced-models"])
+        if args.require_harness_compare:
+            compare_cmd.append("--require-harness")
     cmp = _run_watchdog(
         cmd=compare_cmd,
         cwd=REPO_ROOT,
@@ -637,6 +681,8 @@ def main() -> int:
                 else ("strict gate passed" if cmp["returncode"] == 0 else "strict gate failed")
             ),
             "explore_compare": bool(args.explore_compare),
+            "strict_compare": bool(not args.explore_compare),
+            "require_harness_compare": bool(args.require_harness_compare),
             "summary_path": str(out_dir / "ab_gate_summary.json"),
             "checkpoint_path": str(checkpoint_path),
         },
