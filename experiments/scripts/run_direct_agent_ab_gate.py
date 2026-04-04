@@ -272,6 +272,14 @@ def main() -> int:
     ap.add_argument("--max-task-chars", type=int, default=12000)
     ap.add_argument("--resume", action="store_true", default=True)
     ap.add_argument("--no-resume", dest="resume", action="store_false")
+    ap.add_argument(
+        "--explore-compare",
+        action="store_true",
+        help=(
+            "Run compare_runs without --require-patch-apply or --require-priced-models. "
+            "Use when you want compare.json despite empty/non-applying patches (not a merge/promote gate)."
+        ),
+    )
     args = ap.parse_args()
 
     out_dir = (REPO_ROOT / args.out_dir).resolve()
@@ -483,21 +491,22 @@ def main() -> int:
     checkpoint["phases"]["compare"] = {"status": "running", "started_at": time.time()}
     _write_json(checkpoint_path, checkpoint)
     compare_log = out_dir / "phase_compare.log"
+    compare_cmd: list[str] = [
+        sys.executable,
+        str(COMPARE),
+        "--experiment-dir",
+        str(out_dir),
+        "--baseline-run-dir",
+        str(baseline_run_dir),
+        "--pf-run-dir",
+        str(candidate_run_dir),
+        "--out",
+        str(out_dir),
+    ]
+    if not args.explore_compare:
+        compare_cmd.extend(["--require-patch-apply", "--require-priced-models"])
     cmp = _run_watchdog(
-        cmd=[
-            sys.executable,
-            str(COMPARE),
-            "--experiment-dir",
-            str(out_dir),
-            "--baseline-run-dir",
-            str(baseline_run_dir),
-            "--pf-run-dir",
-            str(candidate_run_dir),
-            "--out",
-            str(out_dir),
-            "--require-patch-apply",
-            "--require-priced-models",
-        ],
+        cmd=compare_cmd,
         cwd=REPO_ROOT,
         hard_timeout_s=600,
         idle_timeout_s=180,
@@ -540,8 +549,13 @@ def main() -> int:
     _write_json(
         decision_path,
         {
-            "promotable": bool(cmp["returncode"] == 0),
-            "reason": "strict gate passed" if cmp["returncode"] == 0 else "strict gate failed",
+            "promotable": bool(cmp["returncode"] == 0 and not args.explore_compare),
+            "reason": (
+                "explore compare only (--explore-compare); not a strict promote gate"
+                if args.explore_compare
+                else ("strict gate passed" if cmp["returncode"] == 0 else "strict gate failed")
+            ),
+            "explore_compare": bool(args.explore_compare),
             "summary_path": str(out_dir / "ab_gate_summary.json"),
             "checkpoint_path": str(checkpoint_path),
         },
