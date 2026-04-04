@@ -124,6 +124,12 @@ Use `--count 1` and a fresh `--out-dir` for a short smoke. For **`pit_*`** keys,
 
 **Strict compare:** the gate runs **`compare_runs`** with **`--require-patch-apply`** and **`--require-priced-models`**. If you see **`patch_apply.applies_false=20`** on a 10-instance run, that is **10 baseline + 10 candidate** instances where **`git apply --check`** did not succeed (often empty patches or bad diffs). That is a real quality signal, not a tooling bug. To still generate **`compare.json`** for analysis, either run **`compare_runs.py`** without those flags, or re-run the gate with **`--explore-compare`** ( **`ab_gate_decision.json`** will mark **`promotable: false`** and **`explore_compare: true`** even when compare exits 0).
 
+**Defaults:** the gate uses **`--timeout 1200`** and **`--max-iterations 25`**, aligned with **`bench/swebench/run_config.py`**. Lower budgets often yield **`agent_no_changes`** on the OpenHands baseline.
+
+**`solve_rate: null`:** compare only has harness solve rates when **`baseline/eval`** and **`pf/eval`** exist under the experiment dir (SWE-bench harness output). Agent-only runs still produce **`compare.json`**; run **`experiments/scripts/run_swebench_eval.py`** (or your harness wrapper) and point **`compare_runs`** at those eval dirs when you need **`solve_rate`**.
+
+**GCP / SSH:** install **`tmux`** before multi-hour gates so disconnects do not kill the process: **`bash experiments/scripts/install_vm_runner_extras.sh`** (or **`sudo apt-get install -y tmux`**). **`check_wsl_env.py`** prints a reminder when neither **`tmux`** nor **`screen`** is on **`PATH`**.
+
 ## Troubleshooting signatures (quick reference)
 
 | Symptom | Likely cause | Recovery |

@@ -263,8 +263,9 @@ def main() -> int:
     ap.add_argument("--count", type=int, default=10)
     ap.add_argument("--instance-ids-file", default="")
     ap.add_argument("--model", default="")
-    ap.add_argument("--timeout", type=int, default=480)
-    ap.add_argument("--max-iterations", type=int, default=3)
+    # Match bench/swebench/run_config.py defaults (openhands_timeout=1200, max_iterations=25).
+    ap.add_argument("--timeout", type=int, default=1200)
+    ap.add_argument("--max-iterations", type=int, default=25)
     ap.add_argument("--runs-dir", default="runs")
     ap.add_argument("--out-dir", default="runs/direct-agent-ab-gate")
     ap.add_argument("--timeout-run-s", type=int, default=36000)
