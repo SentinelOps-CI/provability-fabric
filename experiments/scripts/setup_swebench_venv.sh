@@ -77,8 +77,22 @@ else
 fi
 
 echo ""
-echo "Verifying environment..."
-python experiments/scripts/check_wsl_env.py
+echo "Verifying Python packages..."
+python -c "import datasets, swebench, openhands; print('datasets, swebench, openhands: ok')"
+
+CHECK_SCRIPT="$REPO_ROOT/experiments/scripts/check_wsl_env.py"
+if [ -f "$CHECK_SCRIPT" ]; then
+  echo ""
+  echo "Running full preflight (Docker + modules)..."
+  if ! python "$CHECK_SCRIPT"; then
+    echo ""
+    echo "Warning: check_wsl_env.py failed (often Docker not installed or daemon not running)." >&2
+    echo "  Install/start Docker, then: source $VENV_DIR/bin/activate && python experiments/scripts/check_wsl_env.py" >&2
+  fi
+else
+  echo ""
+  echo "Note: missing $CHECK_SCRIPT (pull latest feat/swebench-gate-vm-bundle for the full preflight script)."
+fi
 
 echo ""
 echo "Done. Activate this venv before running the runner:"
