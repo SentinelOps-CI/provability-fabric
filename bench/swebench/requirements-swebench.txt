@@ -12,6 +12,7 @@ datasets
 swebench
 # Property-based tests (tests/test_evidence_bundle_properties.py, etc.)
 hypothesis>=6.0
-# OpenHands: use a version range to avoid pulling conflicting deps from other projects.
-# Pin to exact version (e.g. openhands==1.12.2) for reproducible golden runs.
-openhands>=1.11,<1.14
+# OpenHands (PyPI): releases in the 1.11–1.13 range require Python >= 3.12. On 3.11 this line is
+# skipped automatically; use Python 3.12+ venv for --engine openhands, or install from the
+# upstream OpenHands repo / uv per their docs. Do not use the unrelated `openhands==0.0.0` stub on PyPI.
+openhands>=1.11,<1.14; python_version >= "3.12"
