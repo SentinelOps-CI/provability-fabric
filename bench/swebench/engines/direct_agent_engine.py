@@ -174,8 +174,24 @@ def _call_openai_compatible_chat(
     return str(content), data
 
 
-def _extract_json_blob(text: str) -> Optional[dict[str, Any]]:
+def _strip_optional_markdown_fence(text: str) -> str:
+    """Remove leading ``` / ```json and trailing ``` so chat models' JSON parses."""
     s = (text or "").strip()
+    if not s.startswith("```"):
+        return s
+    lines = s.splitlines()
+    if not lines:
+        return s
+    if not lines[0].lstrip().startswith("```"):
+        return s
+    body = lines[1:]
+    while body and body[-1].strip() == "```":
+        body = body[:-1]
+    return "\n".join(body).strip()
+
+
+def _extract_json_blob(text: str) -> Optional[dict[str, Any]]:
+    s = _strip_optional_markdown_fence((text or "").strip())
     if not s:
         return None
     try:
@@ -230,7 +246,7 @@ def _git_apply_check(repo_dir: Path, patch: str) -> tuple[bool, str]:
         p = tf.name
     try:
         proc = subprocess.run(
-            ["git", "apply", "--check", p],
+            ["git", "apply", "--check", "--whitespace=nowarn", p],
             cwd=repo_dir,
             capture_output=True,
             text=True,
@@ -240,7 +256,7 @@ def _git_apply_check(repo_dir: Path, patch: str) -> tuple[bool, str]:
             return True, ""
         # Patch was produced from current working tree state; reverse-check validates structure.
         rev = subprocess.run(
-            ["git", "apply", "--check", "--reverse", p],
+            ["git", "apply", "--check", "--reverse", "--whitespace=nowarn", p],
             cwd=repo_dir,
             capture_output=True,
             text=True,
