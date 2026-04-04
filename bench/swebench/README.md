@@ -122,6 +122,8 @@ python experiments/scripts/run_direct_agent_ab_gate.py \
 
 Use `--count 1` and a fresh `--out-dir` for a short smoke. For **`pit_*`** keys, keep **`OPENAI_API_KEY`** unset unless you intentionally call OpenAI’s platform API; Prime defaults to **`https://api.pinference.ai/api/v1`** when no custom base URL is set (`bench/swebench/provider_env.py`). Run long jobs under **`tmux`** or **`screen`** on cloud VMs.
 
+**Strict compare:** the gate runs **`compare_runs`** with **`--require-patch-apply`** and **`--require-priced-models`**. If you see **`patch_apply.applies_false=20`** on a 10-instance run, that is **10 baseline + 10 candidate** instances where **`git apply --check`** did not succeed (often empty patches or bad diffs). That is a real quality signal, not a tooling bug. To still generate **`compare.json`** for analysis, either run **`compare_runs.py`** without those flags, or re-run the gate with **`--explore-compare`** ( **`ab_gate_decision.json`** will mark **`promotable: false`** and **`explore_compare: true`** even when compare exits 0).
+
 ## Troubleshooting signatures (quick reference)
 
 | Symptom | Likely cause | Recovery |
