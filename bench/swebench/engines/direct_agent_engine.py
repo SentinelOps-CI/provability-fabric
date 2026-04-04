@@ -131,12 +131,20 @@ def _call_openai_compatible_chat(
     provider: str = "openai",
 ) -> tuple[str, dict[str, Any]]:
     url = base_url.rstrip("/") + "/chat/completions"
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
     }
-    body = json.dumps(payload).encode("utf-8")
+    # OpenAI-compatible JSON mode (helps Gemini-style models return parseable objects).
+    # Prime Inference: on by default; disable with PF_DIRECT_AGENT_JSON_OBJECT=0 if the API returns 400.
+    # Other providers: opt-in with PF_DIRECT_AGENT_JSON_OBJECT=1.
+    _jo = (os.environ.get("PF_DIRECT_AGENT_JSON_OBJECT") or "").strip().lower()
+    if provider == "prime_intellect":
+        if _jo not in ("0", "false", "no", "off"):
+            payload["response_format"] = {"type": "json_object"}
+    elif _jo in ("1", "true", "yes", "on"):
+        payload["response_format"] = {"type": "json_object"}
     # Avoid default Python-urllib User-Agent; some CDNs (e.g. Cloudflare) return 403/1010 for it.
     _ua = (os.environ.get("PF_LLM_HTTP_USER_AGENT") or "").strip()
     if not _ua:
@@ -151,15 +159,21 @@ def _call_openai_compatible_chat(
         team_id = _prime_team_id()
         if team_id:
             headers["X-Prime-Team-ID"] = team_id
-    req = urllib.request.Request(
-        url=url,
-        data=body,
-        method="POST",
-        headers=headers,
-    )
-    with urllib.request.urlopen(req, timeout=max(30, timeout_s)) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
-    data = json.loads(raw)
+
+    def _post(p: dict[str, Any]) -> dict[str, Any]:
+        b = json.dumps(p).encode("utf-8")
+        r = urllib.request.Request(url=url, data=b, method="POST", headers=headers)
+        with urllib.request.urlopen(r, timeout=max(30, timeout_s)) as resp:
+            raw_inner = resp.read().decode("utf-8", errors="replace")
+        return json.loads(raw_inner)
+
+    try:
+        data = _post(payload)
+    except urllib.error.HTTPError as e:
+        if e.code == 400 and payload.pop("response_format", None) is not None:
+            data = _post(payload)
+        else:
+            raise
     choices = data.get("choices") or []
     if not choices:
         return "", data

@@ -700,133 +700,143 @@ def main() -> int:
         except (json.JSONDecodeError, OSError):
             pass
 
+    exit_code = 0
+
     if args.require_harness:
         br_path = find_run_report(baseline_eval)
         pr_path = find_run_report(pf_eval)
         if not br_path or not br_path.exists():
             print("Error: --require-harness: baseline eval report not found in %s" % baseline_eval, file=sys.stderr)
-            return 1
-        if not pr_path or not pr_path.exists():
+            exit_code = 1
+        elif not pr_path or not pr_path.exists():
             print("Error: --require-harness: PF eval report not found in %s" % pf_eval, file=sys.stderr)
-            return 1
-        if report.get("baseline", {}).get("solve_rate") is None:
+            exit_code = 1
+        elif report.get("baseline", {}).get("solve_rate") is None:
             print("Error: --require-harness: baseline solve_rate is null (harness report missing or invalid)", file=sys.stderr)
-            return 1
-        if report.get("pf", {}).get("solve_rate") is None:
+            exit_code = 1
+        elif report.get("pf", {}).get("solve_rate") is None:
             print("Error: --require-harness: PF solve_rate is null (harness report missing or invalid)", file=sys.stderr)
-            return 1
-
-        # Predictions and run_status live in the parent of the run dir (e.g. runs/.../baseline/),
-        # not necessarily under exp_dir (which may point to experiments/).
-        baseline_pred_dir = baseline_run.parent if baseline_run else exp_dir / "baseline"
-        pf_pred_dir = pf_run.parent if pf_run else exp_dir / "pf"
-        for label, pred_dir, eval_dir, run_dir, report_path in [
-            ("baseline", baseline_pred_dir, baseline_eval, baseline_run, br_path),
-            ("pf", pf_pred_dir, pf_eval, pf_run, pr_path),
-        ]:
-            pred_file = pred_dir / "predictions.jsonl"
-            if pred_file.exists() and report_path and report_path.exists():
-                pred_mtime = pred_file.stat().st_mtime
-                eval_mtime = report_path.stat().st_mtime
-                # Allow tolerance for clock skew / WSL-Windows mtime; only fail if predictions clearly newer
-                stale_tolerance_s = 60.0
-                if pred_mtime > eval_mtime + stale_tolerance_s:
-                    print(
-                        "Error: --require-harness: predictions file is newer than eval report (%s); re-run harness before compare"
-                        % label,
-                        file=sys.stderr,
-                    )
-                    return 1
-            status_path = pred_dir / "run_status.json"
-            if not status_path.exists():
-                print("Error: --require-harness: run_status.json not found in %s (run_id check skipped)" % pred_dir, file=sys.stderr)
-                return 1
-            try:
-                run_status = json.loads(status_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as e:
-                print("Error: --require-harness: failed to read run_status.json in %s: %s" % (pred_dir, e), file=sys.stderr)
-                return 1
-            expected_run_id = run_status.get("run_id")
-            if not expected_run_id:
-                print("Error: --require-harness: run_id missing in %s" % status_path, file=sys.stderr)
-                return 1
-            expected_run_id = str(expected_run_id)
-            if run_dir and run_dir.exists() and run_dir.name != expected_run_id:
-                print(
-                    "Error: --require-harness: run_id mismatch (%s): run_dir.name=%s, run_status.run_id=%s"
-                    % (label, run_dir.name, expected_run_id),
-                    file=sys.stderr,
-                )
-                return 1
-            eval_meta_path = eval_dir / "eval_metadata.json"
-            if eval_meta_path.exists():
-                try:
-                    eval_meta = json.loads(eval_meta_path.read_text(encoding="utf-8"))
-                    eval_run_id = eval_meta.get("run_id")
-                    if eval_run_id is not None and str(eval_run_id) != expected_run_id:
+            exit_code = 1
+        else:
+            # Predictions and run_status live in the parent of the run dir (e.g. runs/.../baseline/),
+            # not necessarily under exp_dir (which may point to experiments/).
+            baseline_pred_dir = baseline_run.parent if baseline_run else exp_dir / "baseline"
+            pf_pred_dir = pf_run.parent if pf_run else exp_dir / "pf"
+            for label, pred_dir, eval_dir, run_dir, report_path in [
+                ("baseline", baseline_pred_dir, baseline_eval, baseline_run, br_path),
+                ("pf", pf_pred_dir, pf_eval, pf_run, pr_path),
+            ]:
+                pred_file = pred_dir / "predictions.jsonl"
+                if pred_file.exists() and report_path and report_path.exists():
+                    pred_mtime = pred_file.stat().st_mtime
+                    eval_mtime = report_path.stat().st_mtime
+                    # Allow tolerance for clock skew / WSL-Windows mtime; only fail if predictions clearly newer
+                    stale_tolerance_s = 60.0
+                    if pred_mtime > eval_mtime + stale_tolerance_s:
                         print(
-                            "Error: --require-harness: run_id mismatch (%s): eval_metadata.run_id=%s, run_status.run_id=%s"
-                            % (label, eval_run_id, expected_run_id),
-                            file=sys.stderr,
-                        )
-                        return 1
-                except (json.JSONDecodeError, OSError):
-                    pass
-            pred_sha_path = pred_dir / "predictions.sha256"
-            if eval_meta_path.exists() and pred_sha_path.exists():
-                try:
-                    eval_meta = json.loads(eval_meta_path.read_text(encoding="utf-8"))
-                    stored_sha = eval_meta.get("predictions_sha256")
-                    current_sha = pred_sha_path.read_text(encoding="utf-8").strip()
-                    if stored_sha and current_sha and stored_sha != current_sha:
-                        print(
-                            "Error: --require-harness: predictions_sha256 mismatch (%s): eval was run on different predictions"
+                            "Error: --require-harness: predictions file is newer than eval report (%s); re-run harness before compare"
                             % label,
                             file=sys.stderr,
                         )
-                        return 1
-                except (json.JSONDecodeError, OSError):
-                    pass
-
-        # Budget drift: baseline and PF must use same timeout_sec, max_steps, max_tool_calls, model_params
-        if baseline_run and baseline_run.exists() and pf_run and pf_run.exists():
-            base_man = _load_run_manifest(baseline_run)
-            pf_man = _load_run_manifest(pf_run)
-            if base_man is not None and pf_man is not None:
-                base_budget = _budget_slice(base_man)
-                pf_budget = _budget_slice(pf_man)
-                drift: dict[str, Any] = {}
-                for key in list(base_budget) + list(pf_budget):
-                    if base_budget.get(key) != pf_budget.get(key):
-                        drift[key] = {"baseline": base_budget.get(key), "pf": pf_budget.get(key)}
-                if drift:
-                    report["budget_drift"] = drift
+                        exit_code = 1
+                        break
+                status_path = pred_dir / "run_status.json"
+                if not status_path.exists():
+                    print("Error: --require-harness: run_status.json not found in %s (run_id check skipped)" % pred_dir, file=sys.stderr)
+                    exit_code = 1
+                    break
+                try:
+                    run_status = json.loads(status_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError) as e:
+                    print("Error: --require-harness: failed to read run_status.json in %s: %s" % (pred_dir, e), file=sys.stderr)
+                    exit_code = 1
+                    break
+                expected_run_id = run_status.get("run_id")
+                if not expected_run_id:
+                    print("Error: --require-harness: run_id missing in %s" % status_path, file=sys.stderr)
+                    exit_code = 1
+                    break
+                expected_run_id = str(expected_run_id)
+                if run_dir and run_dir.exists() and run_dir.name != expected_run_id:
                     print(
-                        "Error: --require-harness: baseline and PF run configs differ (budget_drift). "
-                        "Ensure same timeout_sec, max_steps, max_tool_calls, model, model_params for parity.",
+                        "Error: --require-harness: run_id mismatch (%s): run_dir.name=%s, run_status.run_id=%s"
+                        % (label, run_dir.name, expected_run_id),
                         file=sys.stderr,
                     )
-                    for k, v in drift.items():
-                        print("  %s: baseline=%s pf=%s" % (k, v.get("baseline"), v.get("pf")), file=sys.stderr)
-                    return 1
+                    exit_code = 1
+                    break
+                eval_meta_path = eval_dir / "eval_metadata.json"
+                if eval_meta_path.exists():
+                    try:
+                        eval_meta = json.loads(eval_meta_path.read_text(encoding="utf-8"))
+                        eval_run_id = eval_meta.get("run_id")
+                        if eval_run_id is not None and str(eval_run_id) != expected_run_id:
+                            print(
+                                "Error: --require-harness: run_id mismatch (%s): eval_metadata.run_id=%s, run_status.run_id=%s"
+                                % (label, eval_run_id, expected_run_id),
+                                file=sys.stderr,
+                            )
+                            exit_code = 1
+                            break
+                    except (json.JSONDecodeError, OSError):
+                        pass
+                pred_sha_path = pred_dir / "predictions.sha256"
+                if eval_meta_path.exists() and pred_sha_path.exists():
+                    try:
+                        eval_meta = json.loads(eval_meta_path.read_text(encoding="utf-8"))
+                        stored_sha = eval_meta.get("predictions_sha256")
+                        current_sha = pred_sha_path.read_text(encoding="utf-8").strip()
+                        if stored_sha and current_sha and stored_sha != current_sha:
+                            print(
+                                "Error: --require-harness: predictions_sha256 mismatch (%s): eval was run on different predictions"
+                                % label,
+                                file=sys.stderr,
+                            )
+                            exit_code = 1
+                            break
+                    except (json.JSONDecodeError, OSError):
+                        pass
+
+            # Budget drift: baseline and PF must use same timeout_sec, max_steps, max_tool_calls, model_params
+            if exit_code == 0 and baseline_run and baseline_run.exists() and pf_run and pf_run.exists():
+                base_man = _load_run_manifest(baseline_run)
+                pf_man = _load_run_manifest(pf_run)
+                if base_man is not None and pf_man is not None:
+                    base_budget = _budget_slice(base_man)
+                    pf_budget = _budget_slice(pf_man)
+                    drift: dict[str, Any] = {}
+                    for key in list(base_budget) + list(pf_budget):
+                        if base_budget.get(key) != pf_budget.get(key):
+                            drift[key] = {"baseline": base_budget.get(key), "pf": pf_budget.get(key)}
+                    if drift:
+                        report["budget_drift"] = drift
+                        print(
+                            "Error: --require-harness: baseline and PF run configs differ (budget_drift). "
+                            "Ensure same timeout_sec, max_steps, max_tool_calls, model, model_params for parity.",
+                            file=sys.stderr,
+                        )
+                        for k, v in drift.items():
+                            print("  %s: baseline=%s pf=%s" % (k, v.get("baseline"), v.get("pf")), file=sys.stderr)
+                        exit_code = 1
 
     if args.require_compliance:
         if not pf_run or not pf_run.exists():
             print("Error: --require-compliance: PF run dir not set or does not exist", file=sys.stderr)
-            return 1
-        missing = []
-        for d in pf_run.iterdir():
-            if not d.is_dir() or d.name.startswith("."):
-                continue
-            if (d / "metadata.json").exists() and not (d / COMPLIANCE_FILENAME).exists():
-                missing.append(d.name)
-        if missing:
-            print(
-                "Error: --require-compliance: missing policy_compliance_summary.json for %d instance(s), e.g. %s"
-                % (len(missing), missing[:3]),
-                file=sys.stderr,
-            )
-            return 1
+            exit_code = 1
+        else:
+            missing = []
+            for d in pf_run.iterdir():
+                if not d.is_dir() or d.name.startswith("."):
+                    continue
+                if (d / "metadata.json").exists() and not (d / COMPLIANCE_FILENAME).exists():
+                    missing.append(d.name)
+            if missing:
+                print(
+                    "Error: --require-compliance: missing policy_compliance_summary.json for %d instance(s), e.g. %s"
+                    % (len(missing), missing[:3]),
+                    file=sys.stderr,
+                )
+                exit_code = 1
 
     if args.require_patch_apply:
         pa = report.get("patch_apply") or {}
@@ -838,11 +848,11 @@ def main() -> int:
                 file=sys.stderr,
             )
             print(
-                "Hint: to emit compare.json anyway, omit --require-patch-apply, or re-run the gate with "
+                "Hint: compare.json is still written for diagnosis. For a non-strict gate, re-run with "
                 "--explore-compare (see bench/swebench/README.md, Direct-agent A/B gate).",
                 file=sys.stderr,
             )
-            return 1
+            exit_code = 1
 
     pa_total = (report.get("patch_apply") or {}).get("total") or 0
     if (
@@ -865,7 +875,7 @@ def main() -> int:
         for err in _pe:
             print("Error: --require-priced-models: %s" % err, file=sys.stderr)
         if _pe:
-            return 1
+            exit_code = 1
 
     compare_json = out_dir / "compare.json"
     compare_csv = out_dir / "compare.csv"
@@ -883,7 +893,7 @@ def main() -> int:
             print("jsonschema not installed; skipping compare.json schema validation", file=sys.stderr)
         except jsonschema.ValidationError as e:
             print("Error: compare.json failed schema validation: %s" % (e.message if hasattr(e, "message") else e), file=sys.stderr)
-            return 1
+            exit_code = 1
 
     rows = build_csv_rows(baseline_eval, pf_eval, baseline_run, pf_run, report)
     if rows:
@@ -907,7 +917,7 @@ def main() -> int:
     print(f"Wrote {compare_json}")
     print(f"Wrote {compare_csv}")
     print(f"Wrote {metrics_full_path}")
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":
