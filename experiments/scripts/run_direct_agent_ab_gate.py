@@ -311,6 +311,8 @@ def _diagnose_strict_compare_failure(
                 % (runs_parent, candidate_run_id),
                 "  Pull latest bench fixes: git pull (branch feat/swebench-gate-vm-bundle). "
                 "Budgets: try --max-iterations 40 --timeout 1800.",
+                "  If engine_trace MessageEvent has empty_assistant_text=true, open raw_response_excerpt in that "
+                "event (Prime/Gateway returned 200 but no assistant string we could parse).",
             ]
         )
     elif apply_fail >= total * 0.25:

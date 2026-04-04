@@ -40,6 +40,51 @@ def test_coerce_actions_list_nested_and_single():
     assert dae._coerce_actions_list({"foo": 1}) is None
 
 
+def test_extract_actions_from_tool_calls_arguments_json():
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    raw = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {
+                                "name": "plan",
+                                "arguments": '{"actions":[{"type":"finish","summary":"noop"}]}',
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+    al = dae._extract_actions_from_tool_calls(raw)
+    assert al == [{"type": "finish", "summary": "noop"}]
+
+
+def test_completion_debug_excerpt_shape():
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    raw = {
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": None, "tool_calls": [{"id": "1"}]},
+            }
+        ]
+    }
+    ex = dae._completion_debug_excerpt(raw, max_len=500)
+    assert ex.get("finish_reason") == "stop"
+    assert "tool_calls" in (ex.get("message_keys") or [])
+    assert ex.get("tool_calls_count") == 1
+    assert "raw_response_excerpt" in ex
+
+
 def test_assistant_text_from_completion_gemini_style_parts():
     from bench.swebench.engines import direct_agent_engine as dae
 

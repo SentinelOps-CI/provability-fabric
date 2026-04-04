@@ -138,20 +138,39 @@ def _assistant_text_from_completion(data: dict[str, Any]) -> str:
             if not isinstance(item, dict):
                 continue
             t = str(item.get("type") or "")
-            if t in ("text", "output_text", "input_text"):
+            if t in (
+                "text",
+                "output_text",
+                "input_text",
+                "reasoning",
+                "thinking",
+                "reasoning_content",
+            ):
                 txt = item.get("text")
                 if txt is None and isinstance(item.get("content"), str):
                     txt = item.get("content")
                 if txt:
                     parts.append(str(txt))
+            elif item.get("text"):
+                parts.append(str(item["text"]))
+            elif isinstance(item.get("content"), str) and item["content"].strip():
+                parts.append(str(item["content"]))
         if parts:
             return "\n".join(parts)
+    for rk in ("reasoning_content", "reasoning"):
+        rv = msg.get(rk)
+        if isinstance(rv, str) and rv.strip():
+            return rv
     ref = msg.get("refusal")
     if isinstance(ref, str) and ref.strip():
         return ref
     tx = ch0.get("text")
     if isinstance(tx, str) and tx.strip():
         return tx
+    # Some gateways put the payload at the top level.
+    ot = data.get("output_text")
+    if isinstance(ot, str) and ot.strip():
+        return ot
     return ""
 
 
@@ -184,6 +203,59 @@ def _coerce_actions_list(parsed: dict[str, Any]) -> Optional[list[Any]]:
             if it in ("edit_file", "write_file", "finish"):
                 return [inner]
     return None
+
+
+def _extract_actions_from_tool_calls(raw_resp: dict[str, Any]) -> Optional[list[Any]]:
+    """When message.content is empty but the model emitted OpenAI-style tool_calls with JSON arguments."""
+    choices = raw_resp.get("choices") or []
+    if not choices or not isinstance(choices[0], dict):
+        return None
+    msg = choices[0].get("message")
+    if not isinstance(msg, dict):
+        return None
+    tc = msg.get("tool_calls")
+    if not isinstance(tc, list):
+        return None
+    for call in tc:
+        if not isinstance(call, dict):
+            continue
+        fn = call.get("function")
+        if not isinstance(fn, dict):
+            continue
+        raw = fn.get("arguments")
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            al = _coerce_actions_list(obj)
+            if al is not None:
+                return al
+    return None
+
+
+def _completion_debug_excerpt(raw_resp: dict[str, Any], max_len: int = 4000) -> dict[str, Any]:
+    """Structured hints when assistant text is empty (for engine_trace.json)."""
+    out: dict[str, Any] = {}
+    choices = raw_resp.get("choices")
+    if isinstance(choices, list) and choices:
+        ch0 = choices[0]
+        if isinstance(ch0, dict):
+            out["finish_reason"] = ch0.get("finish_reason")
+            msg = ch0.get("message")
+            if isinstance(msg, dict):
+                out["message_keys"] = sorted(msg.keys())
+                tc = msg.get("tool_calls")
+                if isinstance(tc, list) and tc:
+                    out["tool_calls_count"] = len(tc)
+    try:
+        raw = json.dumps(raw_resp, ensure_ascii=False)
+    except (TypeError, ValueError):
+        raw = str(raw_resp)
+    out["raw_response_excerpt"] = raw[:max_len]
+    return out
 
 
 def _call_openai_compatible_chat(
@@ -562,17 +634,23 @@ def solve(
                 )
                 return SolveResult("", trace, False, f"direct_agent exception: {e}")
 
-            trace.raw_events.append(
-                {
-                    "kind": "MessageEvent",
-                    "iteration": it + 1,
-                    "content": content[:4000],
-                    "latency_s": round(time.perf_counter() - step_t0, 4),
-                    "timestamp": time.time(),
-                    "usage": (raw_resp.get("usage") or {}),
-                }
-            )
+            msg_ev: dict[str, Any] = {
+                "kind": "MessageEvent",
+                "iteration": it + 1,
+                "content": content[:4000],
+                "latency_s": round(time.perf_counter() - step_t0, 4),
+                "timestamp": time.time(),
+                "usage": (raw_resp.get("usage") or {}),
+            }
+            if not (content or "").strip():
+                msg_ev["empty_assistant_text"] = True
+                msg_ev.update(_completion_debug_excerpt(raw_resp))
+            trace.raw_events.append(msg_ev)
             parsed = _extract_json_blob(content)
+            if not parsed and not (content or "").strip():
+                tc_actions = _extract_actions_from_tool_calls(raw_resp)
+                if tc_actions is not None:
+                    parsed = {"actions": tc_actions}
             if not parsed:
                 messages.append(
                     {
