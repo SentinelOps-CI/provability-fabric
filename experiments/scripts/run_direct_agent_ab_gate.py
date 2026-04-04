@@ -76,6 +76,14 @@ def _default_ab_checkpoint() -> dict[str, Any]:
     }
 
 
+def _resolved_runner_model(model_arg: str) -> str:
+    """Same precedence as bench/swebench/provider_env.resolve_openhands_model: env then CLI."""
+    env_m = (os.environ.get("OPENHANDS_MODEL") or "").strip()
+    if env_m:
+        return env_m
+    return (model_arg or "").strip()
+
+
 def _phase_stdout(log_path: Path) -> str:
     try:
         return log_path.read_text(encoding="utf-8", errors="replace")
@@ -306,6 +314,21 @@ def main() -> int:
         ),
     )
     args = ap.parse_args()
+
+    resolved_model = _resolved_runner_model(args.model)
+    if not resolved_model:
+        print(
+            "ab-gate: no model id: set OPENHANDS_MODEL or pass --model <id> "
+            "(empty model produces useless runs and compare failures).",
+            file=sys.stderr,
+        )
+        return 2
+    _msrc = "OPENHANDS_MODEL" if (os.environ.get("OPENHANDS_MODEL") or "").strip() else "--model"
+    print(
+        "ab-gate: baseline_engine=%s model=%s (source=%s)"
+        % (args.baseline_engine, resolved_model, _msrc),
+        flush=True,
+    )
 
     out_dir = (REPO_ROOT / args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
