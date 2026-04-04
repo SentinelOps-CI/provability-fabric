@@ -102,7 +102,7 @@ If jobs start failing mysteriously mid-run, check disk **before** chasing networ
 
 ## Direct-agent A/B gate (Prime Intellect)
 
-`experiments/scripts/run_direct_agent_ab_gate.py` runs a **strict** comparison: baseline uses **`--engine openhands`** (the OpenHands agent against your configured LLM), candidate uses **`--engine direct_agent`**. The word **openhands** here is the **engine name**, not the LLM vendor. To drive both phases through **Prime Intellect** Inference, set:
+`experiments/scripts/run_direct_agent_ab_gate.py` runs a **strict** comparison: by default the baseline uses **`--engine direct_agent`** (the same custom OpenAI-compatible loop as the candidate, no OpenHands package/CLI). The candidate always uses **`--engine direct_agent`**. For a classic A/B against the OpenHands runtime, pass **`--baseline-engine openhands`**. Env names like **`OPENHANDS_*`** still configure LLM routing for both engines where applicable. To drive phases through **Prime Intellect** Inference, set:
 
 ```bash
 export OPENHANDS_PROVIDER=prime_intellect
@@ -124,7 +124,7 @@ Use `--count 1` and a fresh `--out-dir` for a short smoke. For **`pit_*`** keys,
 
 **Strict compare:** the gate runs **`compare_runs`** with **`--require-patch-apply`** and **`--require-priced-models`**. If you see **`patch_apply.applies_false=20`** on a 10-instance run, that is **10 baseline + 10 candidate** instances where **`git apply --check`** did not succeed (often empty patches or bad diffs). That is a real quality signal, not a tooling bug. To still generate **`compare.json`** for analysis, either run **`compare_runs.py`** without those flags, or re-run the gate with **`--explore-compare`** ( **`ab_gate_decision.json`** will mark **`promotable: false`** and **`explore_compare: true`** even when compare exits 0).
 
-**Defaults:** the gate uses **`--timeout 1200`** and **`--max-iterations 25`**, aligned with **`bench/swebench/run_config.py`**. Lower budgets often yield **`agent_no_changes`** on the OpenHands baseline.
+**Defaults:** the gate uses **`--timeout 1200`** and **`--max-iterations 25`**, aligned with **`bench/swebench/run_config.py`**, and **`--baseline-engine direct_agent`**. Lower budgets often yield **`agent_no_changes`**. If you use **`--baseline-engine openhands`**, the same budgets apply to that baseline.
 
 **`solve_rate: null`:** compare only has harness solve rates when **`baseline/eval`** and **`pf/eval`** exist under the experiment dir (SWE-bench harness output). Agent-only runs still produce **`compare.json`**; run **`experiments/scripts/run_swebench_eval.py`** (or your harness wrapper) and point **`compare_runs`** at those eval dirs when you need **`solve_rate`**.
 
