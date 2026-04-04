@@ -848,8 +848,9 @@ def main() -> int:
                 file=sys.stderr,
             )
             print(
-                "Hint: compare.json is still written for diagnosis. For a non-strict gate, re-run with "
-                "--explore-compare (see bench/swebench/README.md, Direct-agent A/B gate).",
+                "Hint: compare.json is still written for diagnosis. Non-strict gate: "
+                "PF_AB_GATE_ALLOW_EXPLORE=1 and run_direct_agent_ab_gate.py --explore-compare "
+                "(see bench/swebench/README.md).",
                 file=sys.stderr,
             )
             exit_code = 1
