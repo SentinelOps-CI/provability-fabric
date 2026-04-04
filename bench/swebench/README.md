@@ -100,6 +100,28 @@ Default **10 GB** boot disks on cloud VMs are easy to exhaust when you run SWE-b
 
 If jobs start failing mysteriously mid-run, check disk **before** chasing network or API issues.
 
+## Direct-agent A/B gate (Prime Intellect)
+
+`experiments/scripts/run_direct_agent_ab_gate.py` runs a **strict** comparison: baseline uses **`--engine openhands`** (the OpenHands agent against your configured LLM), candidate uses **`--engine direct_agent`**. The word **openhands** here is the **engine name**, not the LLM vendor. To drive both phases through **Prime Intellect** Inference, set:
+
+```bash
+export OPENHANDS_PROVIDER=prime_intellect
+export PRIME_INTELLECT_API_KEY='pit_...'
+export OPENHANDS_MODEL='google/gemini-2.5-flash'
+# optional: export PRIME_INTELLECT_BASE_URL='https://...'
+```
+
+Then from the repo root (venv active, Docker up, `check_wsl_env.py` green):
+
+```bash
+python experiments/scripts/run_direct_agent_ab_gate.py \
+  --model "${OPENHANDS_MODEL}" \
+  --count 10 \
+  --out-dir runs/direct-agent-ab-gate
+```
+
+Use `--count 1` and a fresh `--out-dir` for a short smoke. For **`pit_*`** keys, keep **`OPENAI_API_KEY`** unset unless you intentionally call OpenAI’s platform API; Prime defaults to **`https://api.pinference.ai/api/v1`** when no custom base URL is set (`bench/swebench/provider_env.py`). Run long jobs under **`tmux`** or **`screen`** on cloud VMs.
+
 ## Troubleshooting signatures (quick reference)
 
 | Symptom | Likely cause | Recovery |

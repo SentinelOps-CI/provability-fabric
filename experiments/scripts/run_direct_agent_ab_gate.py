@@ -3,6 +3,8 @@
 # Copyright 2025 Provability-Fabric Contributors
 #
 # Strict 10-instance A/B gate for direct_agent (candidate) vs openhands (baseline).
+# LLM is configured via env (e.g. OPENHANDS_PROVIDER=prime_intellect, PRIME_INTELLECT_API_KEY,
+# OPENHANDS_MODEL=google/gemini-2.5-flash); --model forwards --openhands-model to the runner.
 
 from __future__ import annotations
 
@@ -250,7 +252,12 @@ def _run_watchdog(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Run strict A/B gate: openhands baseline vs direct_agent candidate.")
+    ap = argparse.ArgumentParser(
+        description=(
+            "Run strict A/B gate: openhands-engine baseline vs direct_agent candidate. "
+            "Set OPENHANDS_PROVIDER / API keys / OPENHANDS_MODEL (e.g. prime_intellect + Prime model id)."
+        ),
+    )
     ap.add_argument("--dataset", default="Lite")
     ap.add_argument("--split", default="test")
     ap.add_argument("--count", type=int, default=10)
