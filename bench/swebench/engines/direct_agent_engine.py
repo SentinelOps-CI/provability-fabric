@@ -107,7 +107,9 @@ def _repo_file_excerpt(repo_dir: Path, max_files: int = 60) -> str:
 def _build_system_prompt() -> str:
     return (
         "You are a coding agent operating on a local git repository.\n"
-        "Return STRICT JSON only with an 'actions' array.\n"
+        "Return STRICT JSON only. The root object MUST have key \"actions\" whose value is a JSON array "
+        "(possibly empty only if you then add finish in the same array).\n"
+        "Example root: {\"actions\":[{\"type\":\"edit_file\",\"path\":\"src/x.py\",\"old_string\":\"a\",\"new_string\":\"b\"}]}\n"
         "Allowed actions:\n"
         "1) {\"type\":\"edit_file\",\"path\":\"relative/path\",\"old_string\":\"...\",\"new_string\":\"...\"}\n"
         "2) {\"type\":\"write_file\",\"path\":\"relative/path\",\"content\":\"...\"}\n"
@@ -118,6 +120,70 @@ def _build_system_prompt() -> str:
         "- Prefer one or few precise edits over broad refactors.\n"
         "- If no further edits are needed, return finish.\n"
     )
+
+
+def _assistant_text_from_completion(data: dict[str, Any]) -> str:
+    """Extract assistant text from /chat/completions JSON (OpenAI + Gemini-compatible variants)."""
+    choices = data.get("choices") or []
+    if not choices or not isinstance(choices[0], dict):
+        return ""
+    ch0 = choices[0]
+    msg = ch0.get("message") if isinstance(ch0.get("message"), dict) else {}
+    content = msg.get("content")
+    if isinstance(content, str) and content.strip():
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            t = str(item.get("type") or "")
+            if t in ("text", "output_text", "input_text"):
+                txt = item.get("text")
+                if txt is None and isinstance(item.get("content"), str):
+                    txt = item.get("content")
+                if txt:
+                    parts.append(str(txt))
+        if parts:
+            return "\n".join(parts)
+    ref = msg.get("refusal")
+    if isinstance(ref, str) and ref.strip():
+        return ref
+    tx = ch0.get("text")
+    if isinstance(tx, str) and tx.strip():
+        return tx
+    return ""
+
+
+def _coerce_actions_list(parsed: dict[str, Any]) -> Optional[list[Any]]:
+    """
+    Normalize model JSON into an actions list.
+    Many models omit the top-level \"actions\" key or nest it; json_object mode still allows arbitrary keys.
+    """
+    if not isinstance(parsed, dict):
+        return None
+    a = parsed.get("actions")
+    if isinstance(a, list):
+        return a
+    t = str(parsed.get("type") or "").strip().lower()
+    if t in ("edit_file", "write_file", "finish"):
+        return [parsed]
+    single = parsed.get("action")
+    if isinstance(single, dict):
+        return [single]
+    for k in ("result", "data", "output", "response", "tool_calls"):
+        inner = parsed.get(k)
+        if isinstance(inner, list) and inner and isinstance(inner[0], dict):
+            # e.g. "tool_calls": [{"function": {...}}] — not our schema; skip
+            continue
+        if isinstance(inner, dict):
+            ia = inner.get("actions")
+            if isinstance(ia, list):
+                return ia
+            it = str(inner.get("type") or "").strip().lower()
+            if it in ("edit_file", "write_file", "finish"):
+                return [inner]
+    return None
 
 
 def _call_openai_compatible_chat(
@@ -174,18 +240,7 @@ def _call_openai_compatible_chat(
             data = _post(payload)
         else:
             raise
-    choices = data.get("choices") or []
-    if not choices:
-        return "", data
-    msg = choices[0].get("message") or {}
-    content = msg.get("content") or ""
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
-                parts.append(str(item["text"]))
-        content = "\n".join(parts)
-    return str(content), data
+    return _assistant_text_from_completion(data), data
 
 
 def _strip_optional_markdown_fence(text: str) -> str:
@@ -342,8 +397,8 @@ def _attempt_one_repair_iteration(
     parsed = _extract_json_blob(content)
     if not parsed:
         return False, "repair_json_invalid"
-    actions = parsed.get("actions")
-    if not isinstance(actions, list):
+    actions = _coerce_actions_list(parsed)
+    if actions is None:
         return False, "repair_actions_missing"
     for action in actions:
         if not isinstance(action, dict):
@@ -527,9 +582,18 @@ def solve(
                 )
                 continue
 
-            actions = parsed.get("actions")
-            if not isinstance(actions, list):
-                messages.append({"role": "user", "content": "Missing actions list. Return actions JSON only."})
+            actions = _coerce_actions_list(parsed)
+            if actions is None:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Invalid JSON shape. The root object must contain key \"actions\" (array), e.g. "
+                            '{"actions":[{"type":"edit_file","path":"relative/path.py","old_string":"...","new_string":"..."}]} '
+                            'or {"actions":[{"type":"finish","summary":"done"}]}.'
+                        ),
+                    }
+                )
                 continue
 
             action_feedback: list[str] = []

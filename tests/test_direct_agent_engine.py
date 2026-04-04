@@ -31,6 +31,35 @@ def _init_repo(repo_dir: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, check=True, capture_output=True, text=True)
 
 
+def test_coerce_actions_list_nested_and_single():
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    assert dae._coerce_actions_list({"actions": [{"type": "finish"}]}) == [{"type": "finish"}]
+    assert dae._coerce_actions_list({"type": "finish", "summary": "x"}) == [{"type": "finish", "summary": "x"}]
+    assert dae._coerce_actions_list({"result": {"actions": [{"type": "finish"}]}}) == [{"type": "finish"}]
+    assert dae._coerce_actions_list({"foo": 1}) is None
+
+
+def test_assistant_text_from_completion_gemini_style_parts():
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    data = {
+        "choices": [
+            {
+                "message": {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": '{"actions":[{"type":"finish","summary":"x"}]}',
+                        },
+                    ]
+                }
+            }
+        ]
+    }
+    assert "actions" in dae._assistant_text_from_completion(data)
+
+
 def test_extract_json_blob_strips_markdown_fence():
     from bench.swebench.engines import direct_agent_engine as dae
 
