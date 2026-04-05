@@ -10,6 +10,8 @@
 #          --update-run-ids  after compare passes, update run-ids.md via update_run_ids_if_green.py
 #          --triage         after compare, run list_delta_cases + extract_case_bundle (and optionally export_publish_artifacts)
 #
+# If bash reports $'\r': command not found, a script or .env has Windows CRLF; fix with:
+#   sed -i 's/\r$//' .env
 # Smoke run (optional): To validate one instance before a full baseline/PF run, invoke the runner with
 #   --max_instances 1  (and the same --out / --runs-dir). Phase 1.1 and the pre-Phase 4.1 harness deps
 #   check (requests, datasets) catch env and harness issues early.
@@ -84,6 +86,13 @@ case "$ENGINE" in
     echo "Error: --engine must be openhands, direct_agent, or mock (got: $ENGINE)" >&2
     exit 1 ;;
 esac
+
+# direct_agent + default fallback hides failures behind OpenHands CLI and used a tiny task budget (see PF_OPENHANDS_MAX_TASK_CHARS).
+# For this canonical cycle, stay on direct_agent unless you explicitly export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=1.
+if [ "$ENGINE" = "direct_agent" ]; then
+  export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-0}"
+  echo "[cycle] PF_DIRECT_AGENT_FALLBACK_OPENHANDS=$PF_DIRECT_AGENT_FALLBACK_OPENHANDS (set to 1 to retry failures via OpenHands subprocess)"
+fi
 
 EXP=runs/exp-step2-lite-smoke
 BASELINE_DIR=$EXP/baseline

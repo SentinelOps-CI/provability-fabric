@@ -1039,7 +1039,8 @@ def _run_openhands_subprocess(
     # Pass task via --file.
     # Older/newer OpenHands CLI stacks can still fail in tmux with "set-environment ... command too long"
     # depending on how the toolchain serializes payloads. We therefore apply deterministic compaction.
-    max_task_chars = max(400, int(os.environ.get("PF_OPENHANDS_MAX_TASK_CHARS", "500") or "500"))
+    # Default matches direct_agent (12000); set PF_OPENHANDS_MAX_TASK_CHARS lower only if you hit env limits.
+    max_task_chars = max(400, int(os.environ.get("PF_OPENHANDS_MAX_TASK_CHARS", "12000") or "12000"))
     task_text_effective, task_delivery_report = _compact_task_text_for_openhands(
         task_text,
         scratch_dir=scratch_dir,
