@@ -110,8 +110,9 @@ def _repo_file_excerpt(repo_dir: Path, max_files: int = 60) -> str:
 def _build_system_prompt() -> str:
     return (
         "You are a coding agent operating on a local git repository.\n"
-        "Return STRICT JSON only. The root object MUST have key \"actions\" whose value is a JSON array "
-        "(possibly empty only if you then add finish in the same array).\n"
+        "Return STRICT JSON only (no markdown fences, no prose outside the object). "
+        "The root object MUST have key \"actions\" whose value is a JSON array. "
+        "Include at least one edit_file or write_file before any finish action unless the repo already satisfies the task.\n"
         "Example root: {\"actions\":[{\"type\":\"edit_file\",\"path\":\"src/x.py\",\"old_string\":\"a\",\"new_string\":\"b\"}]}\n"
         "Allowed actions:\n"
         "1) {\"type\":\"edit_file\",\"path\":\"relative/path\",\"old_string\":\"...\",\"new_string\":\"...\"}\n"
