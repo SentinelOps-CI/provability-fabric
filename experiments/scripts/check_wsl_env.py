@@ -3,7 +3,8 @@
 # Copyright 2025 Provability-Fabric Contributors
 #
 # Preflight checks for the real run + harness loop (Step 2). Full checks require Linux/WSL:
-# - resource (SWE-bench harness), fcntl (OpenHands), Docker, datasets, swebench, openhands.
+# - resource (SWE-bench harness), fcntl (POSIX file locking used by tooling), Docker, datasets, swebench;
+#   openhands optional when using --skip-openhands (direct_agent engine).
 # On native Windows (PowerShell + Windows Python), Linux-only modules are skipped; the script
 # still checks requests and Docker, prints where to run the full preflight, and exits 0 unless
 # requests fails. Use --strict-linux from Linux CI to keep hard failures on missing deps.
@@ -39,7 +40,7 @@ def _early_exit_if_failed(failed: list[str]) -> int | None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="WSL/Linux preflight for SWE-bench + OpenHands.")
+    ap = argparse.ArgumentParser(description="WSL/Linux preflight for SWE-bench + agent engine (OpenHands or direct_agent).")
     ap.add_argument(
         "--docker-pull",
         action="store_true",
@@ -49,6 +50,11 @@ def main() -> int:
         "--strict-linux",
         action="store_true",
         help="Fail if resource/fcntl/datasets/openhands missing (use on Linux/WSL; default on Windows is relaxed).",
+    )
+    ap.add_argument(
+        "--skip-openhands",
+        action="store_true",
+        help="With --strict-linux: do not require the openhands package (for SWE-bench runs with --engine direct_agent).",
     )
     args = ap.parse_args()
     failed: list[str] = []
@@ -160,11 +166,14 @@ def main() -> int:
         except ImportError as e:
             failed.append("datasets+swebench: %s" % e)
 
-        try:
-            import openhands  # noqa: F401
-            print("openhands ok")
-        except ImportError as e:
-            failed.append("openhands: %s" % e)
+        if args.skip_openhands:
+            print("openhands: skipped (--skip-openhands)")
+        else:
+            try:
+                import openhands  # noqa: F401
+                print("openhands ok")
+            except ImportError as e:
+                failed.append("openhands: %s" % e)
     else:
         print("datasets+swebench+openhands: skipped (install in WSL venv for bench runs)")
 
