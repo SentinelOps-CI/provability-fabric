@@ -700,20 +700,24 @@ def solve(
                 )
                 continue
 
-            action_feedback: list[str] = []
+            # Apply edit_file/write_file before honoring finish. Many models (e.g. Gemini) list finish
+            # first or emit only finish on turn 1; honoring finish first skips edits in the same JSON.
+            edits_first: list[dict[str, Any]] = []
+            finish_actions: list[dict[str, Any]] = []
             for action in actions:
                 if not isinstance(action, dict):
                     continue
                 at = str(action.get("type") or "").strip().lower()
                 if at == "finish":
-                    trace.tool_calls.append({"name": "finish", "args": {}})
-                    trace.raw_events.append(
-                        {"kind": "ActionEvent", "tool_name": "finish", "timestamp": time.time()}
-                    )
-                    finish_seen = True
-                    action_feedback.append("finish acknowledged")
-                    break
+                    finish_actions.append(action)
+                else:
+                    edits_first.append(action)
 
+            action_feedback: list[str] = []
+            for action in edits_first:
+                if not isinstance(action, dict):
+                    continue
+                at = str(action.get("type") or "").strip().lower()
                 if at == "edit_file":
                     rel = str(action.get("path") or "").strip()
                     old = str(action.get("old_string") or "")
@@ -760,6 +764,20 @@ def solve(
                     continue
 
                 action_feedback.append(f"unsupported action type: {at}")
+
+            allow_finish_without_edits = it >= max_iterations - 1
+            if finish_actions:
+                if not edited_paths and not allow_finish_without_edits:
+                    action_feedback.append(
+                        "finish ignored: implement the fix with at least one successful edit_file or write_file first."
+                    )
+                else:
+                    trace.tool_calls.append({"name": "finish", "args": {}})
+                    trace.raw_events.append(
+                        {"kind": "ActionEvent", "tool_name": "finish", "timestamp": time.time()}
+                    )
+                    finish_seen = True
+                    action_feedback.append("finish acknowledged")
 
             if finish_seen:
                 break
