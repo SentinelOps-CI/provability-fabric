@@ -5,6 +5,7 @@
 # SWE-bench bench runner: single entry point to run SWE-bench instances and emit
 # predictions.jsonl plus PF evidence bundles (runs/<run_id>/<instance_id>/).
 
+import errno
 import hashlib
 import json
 import os
@@ -22,12 +23,43 @@ from typing import Any, Dict, List, Optional
 _LOG_PREFIX = "[pf-swebench]"
 
 
+def _stderr_write_safe(text: str) -> None:
+    """Write to stderr; ignore EPIPE when stderr is piped (e.g. 2>&1 | tee) and the reader exits."""
+    try:
+        sys.stderr.write(text)
+        sys.stderr.flush()
+    except BrokenPipeError:
+        return
+    except OSError as e:
+        if getattr(e, "errno", None) == errno.EPIPE:
+            return
+        raise
+
+
 def _log(msg: str) -> None:
     """Print a log line to stderr with prefix and optional timestamp."""
     if os.environ.get("PF_SWEBENCH_QUIET", "").lower() in ("1", "true", "yes"):
         return
     ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
-    print(f"{_LOG_PREFIX} {ts} {msg}", file=sys.stderr, flush=True)
+    _stderr_write_safe(f"{_LOG_PREFIX} {ts} {msg}\n")
+
+
+def _eprint(msg: str) -> None:
+    """Print one line to stderr without raising if the pipe is broken."""
+    _stderr_write_safe(msg + "\n")
+
+
+def _stdout_line_safe(*parts: object) -> None:
+    """Print to stdout; ignore EPIPE when stdout is piped and the reader exits early."""
+    try:
+        print(*parts)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        return
+    except OSError as e:
+        if getattr(e, "errno", None) == errno.EPIPE:
+            return
+        raise
 
 
 def _verbose_instance_logs_enabled() -> bool:
@@ -53,6 +85,7 @@ try:
         effective_llm_model,
         llm_env_diagnostics,
         normalize_openhands_provider,
+        openhands_litellm_model,
         openhands_preflight_log_line,
         resolve_openhands_model,
     )
@@ -62,6 +95,7 @@ except ImportError:
             effective_llm_model,
             llm_env_diagnostics,
             normalize_openhands_provider,
+            openhands_litellm_model,
             openhands_preflight_log_line,
             resolve_openhands_model,
         )
@@ -69,6 +103,7 @@ except ImportError:
         effective_llm_model = None  # type: ignore[misc, assignment]
         llm_env_diagnostics = None  # type: ignore[misc, assignment]
         normalize_openhands_provider = None  # type: ignore[misc, assignment]
+        openhands_litellm_model = None  # type: ignore[misc, assignment]
         openhands_preflight_log_line = None  # type: ignore[misc, assignment]
         resolve_openhands_model = None  # type: ignore[misc, assignment]
 
@@ -917,7 +952,9 @@ def _execute_run(config: RunConfig) -> int:
     model_name = f"pf-swebench-{config.engine}"
     effective_model_name = config.engine
     if config.engine in ("openhands", "direct_agent"):
-        if effective_llm_model is not None and provider_for_model:
+        if openhands_litellm_model is not None and provider_for_model:
+            effective_model_name = openhands_litellm_model(provider_for_model, resolved_model_raw)
+        elif effective_llm_model is not None and provider_for_model:
             effective_model_name = effective_llm_model(provider_for_model, resolved_model_raw)
         else:
             effective_model_name = (resolved_model_raw or "").strip() or config.engine
@@ -977,7 +1014,7 @@ def _execute_run(config: RunConfig) -> int:
                     _log("  workspace: ready in %.1fs" % (time.perf_counter() - t_workspace))
                 except Exception as e:
                     _log("  workspace: failed in %.1fs - %s" % (time.perf_counter() - t_workspace, e))
-                    print(f"Workspace materialization failed for {iid}: {e}", file=sys.stderr)
+                    _eprint("Workspace materialization failed for %s: %s" % (iid, e))
             elif not config.no_workspace:
                 _log("  workspace: skipped (no repo/base_commit)")
             if config.effective_guarded and config.engine == "mock" and workspace_root is None:
@@ -1109,7 +1146,7 @@ def _execute_run(config: RunConfig) -> int:
                         engine_success = False
                         engine_error = str(e)[:500]
                         _log("  engine: exception (recording engine_error)")
-                        print("Error: %s" % e, file=sys.stderr)
+                        _eprint("Error: %s" % e)
             finally:
                 wall_clock_s = time.perf_counter() - t0
                 _log("  engine: done in %.1fs (patch_len=%d)" % (wall_clock_s, len(model_patch)))
@@ -1406,11 +1443,11 @@ def _execute_run(config: RunConfig) -> int:
         success, artifact_hash, failure = run_proof(proofs_dir, run_dir)
         proof_time_s = time.perf_counter() - t_proof0
         if success:
-            print("Proof:", "ok", f"artifact_hash={artifact_hash}")
+            _stdout_line_safe("Proof:", "ok", f"artifact_hash={artifact_hash}")
         else:
             if failure is not None:
                 write_proof_failure(run_dir, failure)
-            print("Proof:", "failed", f"see {run_dir / 'proof_failure.json'}", file=sys.stderr)
+            _eprint("Proof: failed see %s" % (run_dir / "proof_failure.json",))
 
     replay_time_s = 0.0  # Replay is run separately (pf bench swebench replay); optional future: time it here
     for rec in cost_reports:
@@ -1467,11 +1504,11 @@ def _execute_run(config: RunConfig) -> int:
     pfmeta_path = _pfmeta_path(config.out)
     write_pfmeta_jsonl(pfmeta_path, pfmeta_rows)
 
-    print("Run ID:", run_id)
-    print("Predictions:", config.out)
-    print("PF metadata:", str(pfmeta_path))
-    print("Evidence:", str(run_dir))
-    print("Instances:", len(instances))
+    _stdout_line_safe("Run ID:", run_id)
+    _stdout_line_safe("Predictions:", config.out)
+    _stdout_line_safe("PF metadata:", str(pfmeta_path))
+    _stdout_line_safe("Evidence:", str(run_dir))
+    _stdout_line_safe("Instances:", len(instances))
     return 0
 
 
@@ -1492,4 +1529,8 @@ def main() -> int:
     return _execute_run(config)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except BrokenPipeError:
+        # Stdout/stderr closed (e.g. `runner 2>&1 | head`); artifacts are already on disk.
+        sys.exit(0)
