@@ -223,8 +223,8 @@ def test_direct_agent_patch_failure_type_empty():
         assert ft == "empty_patch"
 
 
-def test_direct_agent_prime_uses_openhands_litellm_model_for_chat_body():
-    """Prime + vendor models must use the same id shape as OpenHands (openai/google/...)."""
+def test_direct_agent_prime_uses_effective_model_for_chat_body_not_litellm_prefix():
+    """Raw HTTP to Prime must use vendor ids (google/...); openai/ prefix is LiteLLM/OpenHands-only."""
     from bench.swebench.engines import direct_agent_engine as dae
 
     class _FakeProxy:
@@ -283,9 +283,9 @@ def test_direct_agent_prime_uses_openhands_litellm_model_for_chat_body():
                 ),
             )
 
-    assert captured["model"] == "openai/google/gemini-2.5-flash"
+    assert captured["model"] == "google/gemini-2.5-flash"
     starts = [e for e in res.trace.raw_events if e.get("kind") == "DirectAgentStartEvent"]
-    assert starts and starts[0].get("llm_model_request") == "openai/google/gemini-2.5-flash"
+    assert starts and starts[0].get("llm_model_request") == "google/gemini-2.5-flash"
     assert res.success is True
 
 

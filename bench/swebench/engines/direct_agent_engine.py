@@ -51,7 +51,6 @@ try:
         effective_llm_model as _effective_llm_model,
         llm_credentials as _llm_credentials,
         normalize_openhands_provider as _normalize_provider,
-        openhands_litellm_model as _openhands_litellm_model,
         prime_team_id as _prime_team_id,
     )
 except ImportError:
@@ -60,7 +59,6 @@ except ImportError:
             effective_llm_model as _effective_llm_model,
             llm_credentials as _llm_credentials,
             normalize_openhands_provider as _normalize_provider,
-            openhands_litellm_model as _openhands_litellm_model,
             prime_team_id as _prime_team_id,
         )
     except ImportError:
@@ -68,7 +66,6 @@ except ImportError:
             effective_llm_model as _effective_llm_model,
             llm_credentials as _llm_credentials,
             normalize_openhands_provider as _normalize_provider,
-            openhands_litellm_model as _openhands_litellm_model,
             prime_team_id as _prime_team_id,
         )
 
@@ -316,12 +313,20 @@ def _call_openai_compatible_chat(
         r = urllib.request.Request(url=url, data=b, method="POST", headers=headers)
         with urllib.request.urlopen(r, timeout=max(30, timeout_s)) as resp:
             raw_inner = resp.read().decode("utf-8", errors="replace")
-        return json.loads(raw_inner)
+        try:
+            return json.loads(raw_inner)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                "chat completions body is not JSON (len=%d prefix=%r)"
+                % (len(raw_inner), raw_inner[:400])
+            ) from e
 
     try:
         data = _post(payload)
     except urllib.error.HTTPError as e:
-        if e.code == 400 and payload.pop("response_format", None) is not None:
+        code = int(getattr(e, "code", 0) or 0)
+        # Some gateways reject json_object with 400; others use 422 for "unsupported field".
+        if code in (400, 422) and payload.pop("response_format", None) is not None:
             data = _post(payload)
         else:
             raise
@@ -525,8 +530,16 @@ def solve(
 
     cfg = config if config is not None else DirectAgentConfig()
     model_raw = str(getattr(cfg, "model_name", "") or "").strip() or "gpt-4o-mini"
-    max_iterations = int(getattr(cfg, "max_iterations", 3) or 3)
-    timeout_seconds = int(getattr(cfg, "timeout_seconds", 480) or 480)
+    # If max_iterations==1, allow_finish_without_edits is True on the first turn (it==0 >= max-1),
+    # so a lone "finish" exits immediately with an empty patch (~0.5s/instance). SWE-bench needs retries.
+    max_iterations = max(3, int(getattr(cfg, "max_iterations", 3) or 3))
+    # Avoid `int(x or 480)` when x is negative (truthy): that kept bad timeouts from manifests/CLI.
+    _raw_timeout = getattr(cfg, "timeout_seconds", 480)
+    try:
+        timeout_seconds = int(_raw_timeout) if _raw_timeout is not None else 480
+    except (TypeError, ValueError):
+        timeout_seconds = 480
+    timeout_seconds = min(86400, max(30, timeout_seconds))
     temperature = float(getattr(cfg, "temperature", 0.0) or 0.0)
 
     trace = EngineTrace()
@@ -569,11 +582,8 @@ def solve(
             success=False,
             error="Missing base URL for direct_agent provider routing",
         )
-    # Prime HTTP path uses the same LiteLLM-style model id as OpenHands (e.g. openai/google/...).
-    if provider == "prime_intellect":
-        model = _openhands_litellm_model(provider, model_raw)
-    else:
-        model = _effective_llm_model(provider, model_raw)
+    # Prime: vendor ids (google/...); OpenAI: as configured. LiteLLM's openai/ prefix is OpenHands-only.
+    model = _effective_llm_model(provider, model_raw)
     trace.raw_events.append(
         {
             "kind": "DirectAgentStartEvent",
@@ -581,6 +591,8 @@ def solve(
             "provider": provider,
             "llm_model_request": model,
             "llm_model_config_raw": model_raw,
+            "max_iterations": max_iterations,
+            "timeout_seconds": timeout_seconds,
         }
     )
 
@@ -594,6 +606,7 @@ def solve(
         compat_proxy = _PrimeStrictCompatProxy(base_url, extra_headers=extra)
         chat_base = compat_proxy.start()
         trace.prime_proxy_enabled = True
+        time.sleep(0.05)
 
     repo_files = _repo_file_excerpt(repo_dir)
     messages: list[dict[str, Any]] = [
@@ -765,7 +778,8 @@ def solve(
 
                 action_feedback.append(f"unsupported action type: {at}")
 
-            allow_finish_without_edits = it >= max_iterations - 1
+            # Last iteration only (requires max_iterations>=2 for any "premature finish" guard on early turns).
+            allow_finish_without_edits = max_iterations > 1 and it >= max_iterations - 1
             if finish_actions:
                 if not edited_paths and not allow_finish_without_edits:
                     action_feedback.append(
