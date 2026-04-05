@@ -179,6 +179,8 @@ mkdir -p "$BASELINE_DIR"
 BASELINE_LOG=$(mktemp)
 # OPENHANDS_TIMEOUT env overrides per-instance timeout (default 1200s; align with manifest budgets.timeout_sec)
 OPENHANDS_TIMEOUT=${OPENHANDS_TIMEOUT:-1200}
+# Prime local compat proxy upstream read (default was 180s → "Remote end closed connection" on slow turns).
+export PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S="${PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S:-$OPENHANDS_TIMEOUT}"
 $RUN_CMD \
   --dataset Lite \
   --instance-ids-file experiments/exp-step2-lite-smoke/instance_ids.txt \

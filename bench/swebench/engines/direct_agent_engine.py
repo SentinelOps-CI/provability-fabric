@@ -275,6 +275,29 @@ def _direct_agent_json_object_enabled(provider: str) -> bool:
     return provider == "prime_intellect"
 
 
+def _is_transient_llm_transport_error(exc: BaseException) -> bool:
+    """True for disconnects / resets common when upstream or the local Prime proxy times out."""
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, (BrokenPipeError, ConnectionResetError)):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) in (104, 54, 10054):
+        return True
+    if isinstance(exc, urllib.error.URLError) and exc.reason is not None:
+        return _is_transient_llm_transport_error(exc.reason)
+    s = str(exc).lower()
+    return any(
+        n in s
+        for n in (
+            "remote end closed connection",
+            "connection reset",
+            "broken pipe",
+            "timed out",
+            "connection aborted",
+        )
+    )
+
+
 def _call_openai_compatible_chat(
     *,
     base_url: str,
@@ -286,13 +309,6 @@ def _call_openai_compatible_chat(
     provider: str = "openai",
 ) -> tuple[str, dict[str, Any]]:
     url = base_url.rstrip("/") + "/chat/completions"
-    payload: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-    }
-    if _direct_agent_json_object_enabled(provider):
-        payload["response_format"] = {"type": "json_object"}
     # Avoid default Python-urllib User-Agent; some CDNs (e.g. Cloudflare) return 403/1010 for it.
     _ua = (os.environ.get("PF_LLM_HTTP_USER_AGENT") or "").strip()
     if not _ua:
@@ -321,16 +337,35 @@ def _call_openai_compatible_chat(
                 % (len(raw_inner), raw_inner[:400])
             ) from e
 
-    try:
-        data = _post(payload)
-    except urllib.error.HTTPError as e:
-        code = int(getattr(e, "code", 0) or 0)
-        # Some gateways reject json_object with 400; others use 422 for "unsupported field".
-        if code in (400, 422) and payload.pop("response_format", None) is not None:
-            data = _post(payload)
-        else:
+    def _one_round_trip() -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        if _direct_agent_json_object_enabled(provider):
+            payload["response_format"] = {"type": "json_object"}
+        try:
+            return _post(payload)
+        except urllib.error.HTTPError as e:
+            code = int(getattr(e, "code", 0) or 0)
+            # Some gateways reject json_object with 400; others use 422 for "unsupported field".
+            if code in (400, 422) and payload.pop("response_format", None) is not None:
+                return _post(payload)
             raise
-    return _assistant_text_from_completion(data), data
+
+    max_attempts = max(1, int(os.environ.get("PF_DIRECT_AGENT_HTTP_RETRIES", "3") or "3"))
+    for attempt in range(max_attempts):
+        try:
+            data = _one_round_trip()
+            return _assistant_text_from_completion(data), data
+        except urllib.error.HTTPError:
+            raise
+        except Exception as e:
+            if not _is_transient_llm_transport_error(e) or attempt >= max_attempts - 1:
+                raise
+            time.sleep(min(8.0, 1.5 * (2**attempt)))
+    raise RuntimeError("direct_agent: chat completion retries exhausted")
 
 
 def _strip_optional_markdown_fence(text: str) -> str:
