@@ -602,7 +602,15 @@ except ImportError:
         )
 
 
-_PRIME_PROXY_UPSTREAM_TIMEOUT_S = int(os.environ.get("PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S", "180"))
+# Upstream read timeout for each forwarded /chat/completions to Prime. SWE-bench + Gemini often
+# exceeds 180s; too low yields "Remote end closed connection without response" in direct_agent.
+def _prime_proxy_upstream_timeout_s() -> int:
+    raw = (os.environ.get("PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S") or "1200").strip()
+    try:
+        v = int(raw)
+    except ValueError:
+        v = 1200
+    return min(3600, max(60, v))
 
 
 def _normalize_openai_payload_for_strict_servers(payload: Any) -> Any:
@@ -688,7 +696,7 @@ class _PrimeStrictCompatProxy:
 
                 req = urllib.request.Request(url=url, data=body, headers=fwd_headers, method=self.command)
                 try:
-                    with urllib.request.urlopen(req, timeout=_PRIME_PROXY_UPSTREAM_TIMEOUT_S) as resp:
+                    with urllib.request.urlopen(req, timeout=_prime_proxy_upstream_timeout_s()) as resp:
                         status = int(resp.status)
                         resp_body = resp.read()
                         resp_headers = dict(resp.headers.items())
