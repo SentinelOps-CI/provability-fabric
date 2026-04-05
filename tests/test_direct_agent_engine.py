@@ -289,6 +289,69 @@ def test_direct_agent_prime_uses_openhands_litellm_model_for_chat_body():
     assert res.success is True
 
 
+def test_direct_agent_applies_edit_when_finish_listed_first_in_actions():
+    """finish before edit_file in the same response must not skip the edit."""
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    class _FakeProxy:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def start(self) -> str:
+            return "https://local-prime/v1"
+
+        def close(self) -> None:
+            pass
+
+    fake_content = json.dumps(
+        {
+            "actions": [
+                {"type": "finish", "summary": "done"},
+                {
+                    "type": "edit_file",
+                    "path": "a.txt",
+                    "old_string": "hello\n",
+                    "new_string": "hello world\n",
+                },
+            ]
+        }
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        ws = Path(td)
+        repo = ws / "repo"
+        scratch = ws / "scratch"
+        repo.mkdir()
+        scratch.mkdir()
+        _init_repo(repo)
+
+        with (
+            mock.patch.object(
+                dae,
+                "_llm_credentials",
+                return_value=("k", "https://api.pinference.ai/api/v1", "prime_intellect"),
+            ),
+            mock.patch.object(dae, "_PrimeStrictCompatProxy", _FakeProxy),
+            mock.patch.object(
+                dae,
+                "_call_openai_compatible_chat",
+                return_value=(fake_content, {}),
+            ),
+        ):
+            res = dae.solve(
+                workspace_path=ws,
+                task_text="fix",
+                config=dae.DirectAgentConfig(
+                    model_name="google/gemini-2.5-flash",
+                    max_iterations=2,
+                    timeout_seconds=60,
+                ),
+            )
+
+        assert res.success is True
+        assert "hello world" in (repo / "a.txt").read_text(encoding="utf-8")
+
+
 def test_call_openai_compatible_chat_response_format_opt_in():
     from bench.swebench.engines import direct_agent_engine as dae
 

@@ -40,6 +40,8 @@ if [ -f "$REPO_ROOT/.env" ]; then
   . <(tr -d '\r' < "$REPO_ROOT/.env")
   set +a
 fi
+# Subprocesses (pf, python) only see exported variables; default avoids silent openai routing.
+export OPENHANDS_PROVIDER="${OPENHANDS_PROVIDER:-openai}"
 
 # Prefer repo venv (WSL often has externally-managed system Python; venv avoids pip errors)
 if [ -x "$REPO_ROOT/.venv-wsl/bin/python" ]; then
