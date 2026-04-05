@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
+import urllib.request
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 
@@ -218,4 +221,145 @@ def test_direct_agent_patch_failure_type_empty():
         _init_repo(repo)
         ft = dae._classify_patch_failure("", "empty patch", [], repo)
         assert ft == "empty_patch"
+
+
+def test_direct_agent_prime_uses_openhands_litellm_model_for_chat_body():
+    """Prime + vendor models must use the same id shape as OpenHands (openai/google/...)."""
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    class _FakeProxy:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def start(self) -> str:
+            return "https://local-prime/v1"
+
+        def close(self) -> None:
+            pass
+
+    fake_content = json.dumps(
+        {
+            "actions": [
+                {
+                    "type": "edit_file",
+                    "path": "a.txt",
+                    "old_string": "hello\n",
+                    "new_string": "hello world\n",
+                },
+                {"type": "finish", "summary": "done"},
+            ]
+        }
+    )
+    captured: dict[str, str] = {}
+
+    def _capture_chat(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+        captured["model"] = str(kwargs.get("model") or "")
+        return fake_content, {}
+
+    with tempfile.TemporaryDirectory() as td:
+        ws = Path(td)
+        repo = ws / "repo"
+        scratch = ws / "scratch"
+        repo.mkdir()
+        scratch.mkdir()
+        _init_repo(repo)
+
+        with (
+            mock.patch.object(
+                dae,
+                "_llm_credentials",
+                return_value=("k", "https://api.pinference.ai/api/v1", "prime_intellect"),
+            ),
+            mock.patch.object(dae, "_PrimeStrictCompatProxy", _FakeProxy),
+            mock.patch.object(dae, "_call_openai_compatible_chat", side_effect=_capture_chat),
+        ):
+            res = dae.solve(
+                workspace_path=ws,
+                task_text="fix",
+                config=dae.DirectAgentConfig(
+                    model_name="google/gemini-2.5-flash",
+                    max_iterations=2,
+                    timeout_seconds=60,
+                ),
+            )
+
+    assert captured["model"] == "openai/google/gemini-2.5-flash"
+    starts = [e for e in res.trace.raw_events if e.get("kind") == "DirectAgentStartEvent"]
+    assert starts and starts[0].get("llm_model_request") == "openai/google/gemini-2.5-flash"
+    assert res.success is True
+
+
+def test_call_openai_compatible_chat_response_format_opt_in():
+    from bench.swebench.engines import direct_agent_engine as dae
+
+    class _FakeResp:
+        def read(self) -> bytes:
+            return (
+                b'{"choices":[{"message":{"content":"{\\"actions\\":[{\\"type\\":\\"finish\\",'
+                b'\\"summary\\":\\"x\\"}]}"}}]}'
+            )
+
+        def __enter__(self) -> "_FakeResp":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    bodies: list[dict[str, Any]] = []
+
+    def _fake_urlopen(req: urllib.request.Request, timeout: int = 0) -> _FakeResp:
+        bodies.append(json.loads(req.data.decode("utf-8")))
+        return _FakeResp()
+
+    with mock.patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        with mock.patch.dict(os.environ, {"PF_DIRECT_AGENT_JSON_OBJECT": "0"}):
+            dae._call_openai_compatible_chat(
+                base_url="https://example/v1",
+                api_key="secret",
+                model="openai/google/gemini-2.5-flash",
+                messages=[{"role": "user", "content": "x"}],
+                timeout_s=60,
+                provider="prime_intellect",
+            )
+    assert bodies and "response_format" not in bodies[-1]
+
+    with mock.patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        with mock.patch.dict(os.environ, {"PF_DIRECT_AGENT_JSON_OBJECT": "1"}):
+            dae._call_openai_compatible_chat(
+                base_url="https://example/v1",
+                api_key="secret",
+                model="openai/google/gemini-2.5-flash",
+                messages=[{"role": "user", "content": "x"}],
+                timeout_s=60,
+                provider="prime_intellect",
+            )
+    assert bodies[-1].get("response_format") == {"type": "json_object"}
+
+    with mock.patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        _saved = os.environ.pop("PF_DIRECT_AGENT_JSON_OBJECT", None)
+        try:
+            dae._call_openai_compatible_chat(
+                base_url="https://example/v1",
+                api_key="secret",
+                model="openai/google/gemini-2.5-flash",
+                messages=[{"role": "user", "content": "x"}],
+                timeout_s=60,
+                provider="prime_intellect",
+            )
+        finally:
+            if _saved is not None:
+                os.environ["PF_DIRECT_AGENT_JSON_OBJECT"] = _saved
+    assert bodies[-1].get("response_format") == {"type": "json_object"}
+
+    with mock.patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        with mock.patch.dict(os.environ, {"PF_DIRECT_AGENT_JSON_OBJECT": ""}, clear=False):
+            dae._call_openai_compatible_chat(
+                base_url="https://example/v1",
+                api_key="secret",
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "x"}],
+                timeout_s=60,
+                provider="openai",
+            )
+    assert "response_format" not in bodies[-1]
 

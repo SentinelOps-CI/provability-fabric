@@ -51,6 +51,7 @@ try:
         effective_llm_model as _effective_llm_model,
         llm_credentials as _llm_credentials,
         normalize_openhands_provider as _normalize_provider,
+        openhands_litellm_model as _openhands_litellm_model,
         prime_team_id as _prime_team_id,
     )
 except ImportError:
@@ -59,6 +60,7 @@ except ImportError:
             effective_llm_model as _effective_llm_model,
             llm_credentials as _llm_credentials,
             normalize_openhands_provider as _normalize_provider,
+            openhands_litellm_model as _openhands_litellm_model,
             prime_team_id as _prime_team_id,
         )
     except ImportError:
@@ -66,6 +68,7 @@ except ImportError:
             effective_llm_model as _effective_llm_model,
             llm_credentials as _llm_credentials,
             normalize_openhands_provider as _normalize_provider,
+            openhands_litellm_model as _openhands_litellm_model,
             prime_team_id as _prime_team_id,
         )
 
@@ -258,6 +261,22 @@ def _completion_debug_excerpt(raw_resp: dict[str, Any], max_len: int = 4000) -> 
     return out
 
 
+def _direct_agent_json_object_enabled(provider: str) -> bool:
+    """
+    Whether to send OpenAI-style response_format=json_object.
+
+    Prime (Gemini, etc.) often returns markdown or prose without this flag, which breaks the
+    strict JSON action protocol. Default ON for prime_intellect; opt out with
+    PF_DIRECT_AGENT_JSON_OBJECT=0|false|off. Other providers default OFF; opt in with =1|true|on.
+    """
+    flag = (os.environ.get("PF_DIRECT_AGENT_JSON_OBJECT") or "").strip().lower()
+    if flag in ("0", "false", "no", "off"):
+        return False
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    return provider == "prime_intellect"
+
+
 def _call_openai_compatible_chat(
     *,
     base_url: str,
@@ -274,14 +293,7 @@ def _call_openai_compatible_chat(
         "messages": messages,
         "temperature": temperature,
     }
-    # OpenAI-compatible JSON mode (helps Gemini-style models return parseable objects).
-    # Prime Inference: on by default; disable with PF_DIRECT_AGENT_JSON_OBJECT=0 if the API returns 400.
-    # Other providers: opt-in with PF_DIRECT_AGENT_JSON_OBJECT=1.
-    _jo = (os.environ.get("PF_DIRECT_AGENT_JSON_OBJECT") or "").strip().lower()
-    if provider == "prime_intellect":
-        if _jo not in ("0", "false", "no", "off"):
-            payload["response_format"] = {"type": "json_object"}
-    elif _jo in ("1", "true", "yes", "on"):
+    if _direct_agent_json_object_enabled(provider):
         payload["response_format"] = {"type": "json_object"}
     # Avoid default Python-urllib User-Agent; some CDNs (e.g. Cloudflare) return 403/1010 for it.
     _ua = (os.environ.get("PF_LLM_HTTP_USER_AGENT") or "").strip()
@@ -556,7 +568,20 @@ def solve(
             success=False,
             error="Missing base URL for direct_agent provider routing",
         )
-    model = _effective_llm_model(provider, model_raw)
+    # Prime HTTP path uses the same LiteLLM-style model id as OpenHands (e.g. openai/google/...).
+    if provider == "prime_intellect":
+        model = _openhands_litellm_model(provider, model_raw)
+    else:
+        model = _effective_llm_model(provider, model_raw)
+    trace.raw_events.append(
+        {
+            "kind": "DirectAgentStartEvent",
+            "timestamp": time.time(),
+            "provider": provider,
+            "llm_model_request": model,
+            "llm_model_config_raw": model_raw,
+        }
+    )
 
     # Prime: use the same local strict-compat proxy as OpenHands subprocess path.
     # Personal accounts do not require PRIME_TEAM_ID; optional header is only added when set.
