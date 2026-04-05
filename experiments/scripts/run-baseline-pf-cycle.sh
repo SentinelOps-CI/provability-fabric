@@ -18,6 +18,17 @@ set -e
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Preflight: small GCP/VM root disks often hit ENOSPC; git then leaves index.lock and pull fails.
+if [ -f "$REPO_ROOT/.git/index.lock" ]; then
+  echo "Warning: removing stale $REPO_ROOT/.git/index.lock (safe if no other git process is running)." >&2
+  rm -f "$REPO_ROOT/.git/index.lock"
+fi
+avail_kb=$(df -k "$REPO_ROOT" 2>/dev/null | awk 'NR==2 {print $4}') || avail_kb=""
+if [ -n "$avail_kb" ] && [ "$avail_kb" -lt 524288 ] 2>/dev/null; then
+  echo "Warning: less than 512 MiB free on the repo filesystem. git pull/Docker may fail; run: docker system prune -af, sudo journalctl --vacuum-size=100M, or grow the disk." >&2
+  df -h "$REPO_ROOT" 2>/dev/null | head -5 >&2 || true
+fi
+
 # Load .env if present (OPENAI_API_KEY, ANTHROPIC_API_KEY, PRIME_INTELLECT_API_KEY, etc.) for the LLM.
 # Strip CRLF (Windows line endings) so keys are not invalidated by trailing \r.
 if [ -f "$REPO_ROOT/.env" ]; then
