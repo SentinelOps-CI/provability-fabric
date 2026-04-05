@@ -1119,6 +1119,10 @@ def _execute_run(config: RunConfig) -> int:
                             engine_success = False
                             engine_error = (engine_trace.get("error") if engine_trace else None) or "empty patch"
                             _log("  engine: empty patch (recording engine_error)")
+                        elif config.engine == "direct_agent" and not (model_patch or "").strip():
+                            engine_success = False
+                            engine_error = (engine_trace.get("error") if engine_trace else None) or "empty patch"
+                            _log("  engine: direct_agent empty patch (engine_error=%s)" % (engine_error or "")[:240])
                         elif config.engine == "openhands" and not _openhands_trace_has_content(engine_trace):
                             model_patch = ""
                             engine_success = False
