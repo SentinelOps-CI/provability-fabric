@@ -6,6 +6,7 @@
 # Default agent engine: direct_agent (native OpenAI-compatible loop). Override: --engine openhands or PF_CYCLE_ENGINE=openhands.
 # Model: OPENHANDS_MODEL overrides manifest model.id; both required to resolve (manifest after Phase 1.2).
 # Provider: OPENHANDS_PROVIDER=openai|anthropic|prime_intellect (default openai). See env-checklist.md.
+# Command-line OPENHANDS_PROVIDER / OPENHANDS_MODEL override values from .env.
 # Options: --engine NAME   openhands | direct_agent | mock (default direct_agent)
 #          --update-run-ids  after compare passes, update run-ids.md via update_run_ids_if_green.py
 #          --triage         after compare, run list_delta_cases + extract_case_bundle (and optionally export_publish_artifacts)
@@ -33,6 +34,9 @@ fi
 
 # Load .env if present (OPENAI_API_KEY, ANTHROPIC_API_KEY, PRIME_INTELLECT_API_KEY, etc.) for the LLM.
 # Strip CRLF (Windows line endings) so keys are not invalidated by trailing \r.
+# Parent-shell OPENHANDS_* (e.g. OPENHANDS_PROVIDER=openai bash this script) wins over .env.
+_cli_openhands_provider="${OPENHANDS_PROVIDER-}"
+_cli_openhands_model="${OPENHANDS_MODEL-}"
 if [ -f "$REPO_ROOT/.env" ]; then
   set -a
   # Strip CRLF so API keys from Windows-edited .env are valid
@@ -40,6 +44,8 @@ if [ -f "$REPO_ROOT/.env" ]; then
   . <(tr -d '\r' < "$REPO_ROOT/.env")
   set +a
 fi
+if [ -n "$_cli_openhands_provider" ]; then export OPENHANDS_PROVIDER="$_cli_openhands_provider"; fi
+if [ -n "$_cli_openhands_model" ]; then export OPENHANDS_MODEL="$_cli_openhands_model"; fi
 # Subprocesses (pf, python) only see exported variables; default avoids silent openai routing.
 export OPENHANDS_PROVIDER="${OPENHANDS_PROVIDER:-openai}"
 
