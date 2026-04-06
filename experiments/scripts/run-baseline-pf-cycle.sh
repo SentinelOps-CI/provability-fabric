@@ -100,6 +100,9 @@ esac
 if [ "$ENGINE" = "direct_agent" ]; then
   export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-0}"
   echo "[cycle] PF_DIRECT_AGENT_FALLBACK_OPENHANDS=$PF_DIRECT_AGENT_FALLBACK_OPENHANDS (set to 1 to retry failures via OpenHands subprocess)"
+  if [ "$PF_DIRECT_AGENT_FALLBACK_OPENHANDS" = "0" ]; then
+    echo "[cycle] Note: smoke_direct_agent_one.sh leaves fallback at runner default (on) unless you export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0 — for gpt-5.4-style runs that need the OpenHands CLI path, set PF_DIRECT_AGENT_FALLBACK_OPENHANDS=1 here too."
+  fi
 fi
 
 EXP=runs/exp-step2-lite-smoke
