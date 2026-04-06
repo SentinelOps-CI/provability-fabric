@@ -95,14 +95,17 @@ case "$ENGINE" in
     exit 1 ;;
 esac
 
-# direct_agent + default fallback hides failures behind OpenHands CLI and used a tiny task budget (see PF_OPENHANDS_MAX_TASK_CHARS).
-# For this canonical cycle, stay on direct_agent unless you explicitly export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=1.
+# direct_agent: default OpenHands subprocess fallback matches bench/swebench/runner.py and smoke_direct_agent_one.sh.
+# Many models (e.g. gpt-5.x) need the OpenHands CLI path after direct_agent; turning fallback off caused empty
+# predictions.jsonl and harness "No instances to run." Strict direct_agent-only: PF_CYCLE_STRICT_DIRECT_AGENT=1
+# or export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0 before this script.
 if [ "$ENGINE" = "direct_agent" ]; then
-  export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-0}"
-  echo "[cycle] PF_DIRECT_AGENT_FALLBACK_OPENHANDS=$PF_DIRECT_AGENT_FALLBACK_OPENHANDS (set to 1 to retry failures via OpenHands subprocess)"
-  if [ "$PF_DIRECT_AGENT_FALLBACK_OPENHANDS" = "0" ]; then
-    echo "[cycle] Note: smoke_direct_agent_one.sh leaves fallback at runner default (on) unless you export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0 — for gpt-5.4-style runs that need the OpenHands CLI path, set PF_DIRECT_AGENT_FALLBACK_OPENHANDS=1 here too."
+  if [ "${PF_CYCLE_STRICT_DIRECT_AGENT:-0}" = "1" ]; then
+    export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-0}"
+  else
+    export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-1}"
   fi
+  echo "[cycle] PF_DIRECT_AGENT_FALLBACK_OPENHANDS=$PF_DIRECT_AGENT_FALLBACK_OPENHANDS (PF_CYCLE_STRICT_DIRECT_AGENT=1 or PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0 for direct_agent-only)"
 fi
 
 EXP=runs/exp-step2-lite-smoke

@@ -23,6 +23,34 @@ CANDIDATE_DATASET_IDS = [
 ]
 
 
+def count_nonempty_prediction_patches(predictions_path: Path) -> tuple[int, int]:
+    """
+    Return (nonempty_patch_rows, total_jsonl_rows) for a SWE-bench predictions.jsonl.
+    Harness skips Docker eval for rows with empty model_patch/patch, which yields 'No instances to run.'
+    """
+    total = 0
+    nonempty = 0
+    try:
+        text = predictions_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0, 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        total += 1
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        mp = obj.get("model_patch")
+        if mp is None:
+            mp = obj.get("patch")
+        if isinstance(mp, str) and mp.strip():
+            nonempty += 1
+    return nonempty, total
+
+
 def docker_rm_stale_eval_containers(run_id: str) -> None:
     """
     Remove SWE-bench harness eval containers for a specific run_id only.
@@ -225,6 +253,14 @@ def main() -> int:
         if not predictions_path.exists():
             print(f"Predictions file not found: {predictions_path}", file=sys.stderr)
             return 1
+        ne, nt = count_nonempty_prediction_patches(predictions_path)
+        if nt > 0 and ne == 0:
+            print(
+                "Warning: %s has %d prediction row(s) but none have a non-empty model_patch/patch. "
+                "SWE-bench harness will print 'No instances to run.' and skip Docker eval for this file."
+                % (predictions_path, nt),
+                file=sys.stderr,
+            )
         output_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
             sys.executable,

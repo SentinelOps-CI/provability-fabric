@@ -37,6 +37,8 @@ fi
 if [ -n "$_cli_openhands_provider" ]; then export OPENHANDS_PROVIDER="$_cli_openhands_provider"; fi
 if [ -n "$_cli_openhands_model" ]; then export OPENHANDS_MODEL="$_cli_openhands_model"; fi
 export OPENHANDS_PROVIDER="${OPENHANDS_PROVIDER:-openai}"
+# Align with run-baseline-pf-cycle.sh + runner default: allow OpenHands CLI after direct_agent when eligible.
+export PF_DIRECT_AGENT_FALLBACK_OPENHANDS="${PF_DIRECT_AGENT_FALLBACK_OPENHANDS:-1}"
 
 if [ -x "$REPO_ROOT/.venv-wsl/bin/python" ]; then
   PYTHON="$REPO_ROOT/.venv-wsl/bin/python"

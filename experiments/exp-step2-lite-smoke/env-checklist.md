@@ -8,6 +8,13 @@ The **real run + harness** loop (Step 2: agent runs and SWE-bench harness evalua
 
 **Run baseline, PF-guarded, and harness evaluation inside WSL (Ubuntu recommended) or on Linux.**
 
+## Debian/Ubuntu cloud VM (GCP and similar)
+
+1. **Repository path:** Docs may show a placeholder like `/path/to/provability-fabric`. Use your real clone, e.g. `cd ~/provability-fabric`, and run every script from that directory.
+2. **`python: command not found`:** Minimal Debian images often install only **`python3`**. After **`setup_swebench_venv.sh`**, **`python3 experiments/scripts/check_wsl_env.py`** re-executes into **`.venv-wsl/bin/python`** when that venv exists (system **`python3`** has no **`datasets`**/**`openhands`**). Alternatively: **`./.venv-wsl/bin/python experiments/scripts/check_wsl_env.py`** or **`source .venv-wsl/bin/activate`** then **`python ...`**.
+3. **`smoke_direct_agent_one.sh: No such file or directory`:** The clone on the VM is older than the commit that added the script. Run **`git fetch`** and **`git pull`** on the branch you use for Step-2 (or merge from **`main`**), then check **`test -f experiments/scripts/smoke_direct_agent_one.sh`**.
+4. **Disk almost full (`df -h /` shows ~98% or &lt;1 GiB free):** Long runs and Docker layers will fail unpredictably. Before smoke or the full cycle: **`docker system prune -af`** (removes unused images), remove stale **`runs/`** and **`workspaces/`** trees you no longer need, and consider **`HF_HOME`** on a larger disk or **resize the GCP boot/data disk** (10 GiB boot disks are usually too small for this workflow).
+
 ## Credentials (one-time in WSL)
 
 **Provider:** Set **`OPENHANDS_PROVIDER`** to `openai` (default), `anthropic`, or `prime_intellect`. The cycle script validates the matching key before baseline/PF runs.
@@ -47,21 +54,34 @@ If `pf` is not on PATH, `run-baseline-pf-cycle.sh` falls back to calling `python
 Inside Windows Subsystem for Linux, verify the following **before** proceeding to runs. If any check fails, do not proceed.
 
 ```bash
-python -c "import resource; print('resource ok')"
-python -c "import fcntl; print('fcntl ok')"
+# On bare Debian/GCP without a `python` symlink, use python3 here, or: source .venv-wsl/bin/activate
+python3 -c "import resource; print('resource ok')"
+python3 -c "import fcntl; print('fcntl ok')"
 docker info
-python -c "import datasets, swebench; print('datasets+swebench ok')"
-python -c "import openhands; print('openhands ok')"
+python3 -c "import datasets, swebench; print('datasets+swebench ok')"
+python3 -c "import openhands; print('openhands ok')"
 ```
 
 **Reproducibility (version pinning):** For golden or comparable runs, pin `datasets`, `swebench`, and `openhands` to the same versions for baseline and PF (e.g. `pip install -r bench/swebench/requirements-swebench.txt` with pinned versions, or `pip install datasets==X.Y.Z swebench==A.B.C`). The runner records versions in `runs/<run_id>/env.json`; compare reports **env_drift** when they differ. See bench/swebench/README.md "Reproducibility" and `bench/swebench/requirements-swebench.txt`.
 
 **LLM routing audit (Prime vs OpenAI):** OpenHands runs also record **`openhands_provider`**, **`llm_base_url_source`**, **`llm_base_url_effective`**, and **`prime_team_id_set`** in **`env.json`** (no secrets). Logic is centralized in **`bench/swebench/provider_env.py`**. For a full pytest list and WSL smoke checklist, see **`docs/internal/swebench-stabilization-regression-matrix.md`**.
 
+## GCP / overnight runs (Prime + `direct_agent`)
+
+Before a long **`run-baseline-pf-cycle.sh`** or **`run_gcp_vm_swebench_baseline_pf_compare.sh`**:
+
+1. **`git rev-parse HEAD`** — include fixes for Prime + `direct_agent` (vendor model ids on raw HTTP, proxy upstream timeout, HTTP retries). The cycle exports **`PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S`** to match **`OPENHANDS_TIMEOUT`** (default 1200s); do not leave an old **`180`** override unless you intend short timeouts.
+2. **Disk** — keep **≥1–2 GiB** free on `/` (`df -h`); prune Docker and journals if needed.
+3. **Quick smoke** — **`bash experiments/scripts/smoke_direct_agent_one.sh`** (one Lite instance, `direct_agent`). Expect **`patch_len > 0`** in the script output; if zero, fix API/model/env before a 20×2 run.
+4. **After a run** — **`compare.json`** includes **`meta.generated_at`** and **`meta.*_run_dir`** when produced by **`compare_runs.py`**. Re-run compare with explicit **`--baseline-run-dir`** / **`--pf-run-dir`** for the run pair you mean to grade; do not rely on an old **`compare.json`** mtime. Inspect artifacts with **`python3 experiments/scripts/run_health_snapshot.py`** (or **`./.venv-wsl/bin/python`** / activated venv) **`--run-dir runs/.../<run_id>`**.
+
+**Optional env (Prime / robustness):** **`PF_DIRECT_AGENT_HTTP_RETRIES`** (default 3), **`HF_TOKEN`** (Hub rate limits). **`PF_DIRECT_AGENT_FALLBACK_OPENHANDS`** defaults to **`1`** in **`run-baseline-pf-cycle.sh`** (OpenHands subprocess after eligible `direct_agent` failures; matches smoke). Set **`PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0`** or **`PF_CYCLE_STRICT_DIRECT_AGENT=1`** for strict direct_agent-only runs (higher risk of empty patches with frontier models).
+
 Or run the preflight script from the repository root (exits non-zero if any check fails):
 
 ```bash
-python experiments/scripts/check_wsl_env.py
+python3 experiments/scripts/check_wsl_env.py
+# Or: source .venv-wsl/bin/activate && python experiments/scripts/check_wsl_env.py
 ```
 
 ## Dedicated venv (avoid OpenHands conflicts)
