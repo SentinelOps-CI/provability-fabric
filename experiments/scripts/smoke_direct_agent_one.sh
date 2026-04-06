@@ -45,6 +45,13 @@ elif [ -x "$REPO_ROOT/.venv/bin/python" ]; then
 else
   PYTHON=python3
 fi
+echo "[smoke] PYTHON=$PYTHON"
+if ! "$PYTHON" -c "import datasets, swebench" 2>/dev/null; then
+  echo "Error: this interpreter does not have HuggingFace datasets + swebench (required to load SWE-bench)." >&2
+  echo "  From repo root run: bash experiments/scripts/setup_swebench_venv.sh" >&2
+  echo "  Then use: $REPO_ROOT/.venv-wsl/bin/python (or activate .venv-wsl) — not bare system python3." >&2
+  exit 1
+fi
 
 MANIFEST_JSON="${SMOKE_MANIFEST:-experiments/exp-step2-lite-smoke/manifest.json}"
 OPENHANDS_TIMEOUT="${OPENHANDS_TIMEOUT:-1200}"
