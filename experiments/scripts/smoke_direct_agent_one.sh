@@ -8,6 +8,9 @@
 # Usage (repo root):
 #   bash experiments/scripts/smoke_direct_agent_one.sh
 #   OPENHANDS_PROVIDER=prime_intellect bash experiments/scripts/smoke_direct_agent_one.sh
+#   OPENHANDS_PROVIDER=openai OPENHANDS_MODEL=gpt-4o-mini bash experiments/scripts/smoke_direct_agent_one.sh
+# Command-line OPENHANDS_* overrides .env. Default runner is .venv-wsl/bin/python (not `pf`) so
+# OpenHands CLI is found for Prime subprocess fallback; set SMOKE_USE_PF=1 to force `pf bench`.
 #
 set -euo pipefail
 
@@ -22,12 +25,17 @@ case "$(uname -s 2>/dev/null)" in
     ;;
 esac
 
+# Parent-shell overrides (e.g. OPENHANDS_PROVIDER=openai bash this script) must win over .env.
+_cli_openhands_provider="${OPENHANDS_PROVIDER-}"
+_cli_openhands_model="${OPENHANDS_MODEL-}"
 if [ -f "$REPO_ROOT/.env" ]; then
   set -a
   # shellcheck source=/dev/null
   . <(tr -d '\r' < "$REPO_ROOT/.env")
   set +a
 fi
+if [ -n "$_cli_openhands_provider" ]; then export OPENHANDS_PROVIDER="$_cli_openhands_provider"; fi
+if [ -n "$_cli_openhands_model" ]; then export OPENHANDS_MODEL="$_cli_openhands_model"; fi
 export OPENHANDS_PROVIDER="${OPENHANDS_PROVIDER:-openai}"
 
 if [ -x "$REPO_ROOT/.venv-wsl/bin/python" ]; then
@@ -46,7 +54,9 @@ EFFECTIVE_MODEL="$($PYTHON experiments/scripts/resolve_cycle_llm.py "$MANIFEST_J
 export OPENHANDS_MODEL="$EFFECTIVE_MODEL"
 echo "[smoke] OPENHANDS_PROVIDER=$OPENHANDS_PROVIDER OPENHANDS_MODEL=$OPENHANDS_MODEL"
 
-if command -v pf >/dev/null 2>&1; then
+# Prefer venv Python for the runner so OpenHands subprocess finds .venv-wsl/bin/openhands.
+# `pf bench` often uses a different interpreter and breaks Prime's subprocess path.
+if [ "${SMOKE_USE_PF:-0}" = "1" ] && command -v pf >/dev/null 2>&1; then
   RUN_CMD="pf bench swebench run"
 else
   RUN_CMD="$PYTHON bench/swebench/runner.py"
