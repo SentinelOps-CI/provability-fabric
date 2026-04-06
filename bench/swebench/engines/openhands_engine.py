@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -66,6 +67,41 @@ def _log_engine(msg: str) -> None:
     if os.environ.get("PF_SWEBENCH_QUIET", "").lower() in ("1", "true", "yes"):
         return
     print(f"{_ENGINE_LOG_PREFIX} {msg}", file=sys.stderr, flush=True)
+
+
+def _bench_repo_root() -> Path:
+    """Repository root (parent of bench/); contains .venv-wsl for SWE-bench runs."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _openhands_cli_executable() -> str:
+    """
+    Resolve the OpenHands console script.
+
+    When the runner is started via system ``python3`` or a Go ``pf`` binary, ``sys.executable``
+    may be outside the project venv; the ``openhands`` entrypoint then lives only under
+    ``.venv-wsl/bin`` or ``.venv/bin``.
+    """
+    candidates: list[Path] = []
+    candidates.append(Path(sys.executable).resolve().parent / "openhands")
+    if sys.platform == "win32":
+        candidates.append(Path(sys.executable).resolve().parent / "openhands.exe")
+    root = _bench_repo_root()
+    for vdir in (".venv-wsl", ".venv"):
+        b = root / vdir / "bin"
+        candidates.append(b / "openhands")
+        if sys.platform == "win32":
+            candidates.append(b / "openhands.exe")
+    for p in candidates:
+        try:
+            if p.is_file():
+                return str(p.resolve())
+        except OSError:
+            continue
+    w = shutil.which("openhands")
+    if w:
+        return w
+    return "openhands"
 
 
 @dataclass
@@ -947,9 +983,17 @@ def _run_openhands_subprocess(
     )
     env = {k: os.environ[k] for k in passthrough_keys if os.environ.get(k) is not None}
     env["RUNTIME"] = "process"
-    # Prepend this interpreter's bin (venv) to PATH so "openhands" CLI is found when run via venv Python
+    # Prepend project venvs + this interpreter's bin so "openhands" resolves when the runner
+    # was started with system python or `pf` (sys.executable not under .venv-wsl).
+    _path_prefix: list[str] = []
+    _root = _bench_repo_root()
+    for vdir in (".venv-wsl", ".venv"):
+        vb = _root / vdir / "bin"
+        if vb.is_dir():
+            _path_prefix.append(str(vb.resolve()))
     _bin = str(Path(sys.executable).resolve().parent)
-    env["PATH"] = _bin + os.pathsep + env.get("PATH", "")
+    _path_prefix.append(_bin)
+    env["PATH"] = os.pathsep.join(_path_prefix + [env.get("PATH", "")])
     # Force OpenHands terminal backend to subprocess by shadowing `tmux -V` probe.
     # The current OpenHands CLI stack can fail in tmux with "set-environment ... command too long".
     # A shim that returns non-zero makes auto-detection choose subprocess terminal.
@@ -1082,15 +1126,19 @@ def _run_openhands_subprocess(
         return "", EngineTrace(), False, "Failed to write task file", "", ""
 
     # --override-with-envs: use LLM_API_KEY/LLM_MODEL so headless runs without "existing settings" or GUI.
+    oh_cli = _openhands_cli_executable()
     cmd = [
-        "openhands",
+        oh_cli,
         "--headless",
         "--override-with-envs",
         "--json",
         "--file", str(task_file.resolve()),
     ]
     timeout_s = config.timeout_seconds or 3600
-    _log_engine("subprocess: openhands --headless --file <task> (timeout=%ds cwd=%s)" % (timeout_s, repo_dir.name))
+    _log_engine(
+        "subprocess: %s --headless --file <task> (timeout=%ds cwd=%s)"
+        % (oh_cli if len(oh_cli) < 120 else oh_cli[:117] + "...", timeout_s, repo_dir.name)
+    )
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(
@@ -1110,9 +1158,17 @@ def _run_openhands_subprocess(
             except OSError:
                 pass
     except FileNotFoundError:
-        _log_engine("subprocess: OpenHands CLI not found")
+        _log_engine("subprocess: OpenHands CLI not found (tried %s)" % oh_cli)
         _cleanup_proxy()
-        return "", EngineTrace(), False, "OpenHands CLI not found (install openhands package)", "", ""
+        return (
+            "",
+            EngineTrace(),
+            False,
+            "OpenHands CLI not found (install openhands in .venv-wsl: bash experiments/scripts/setup_swebench_venv.sh; "
+            "or run the runner with that venv's python instead of system python3 / pf)",
+            "",
+            "",
+        )
     except subprocess.TimeoutExpired as e:
         _log_engine("subprocess: timed out after %.1fs" % (time.perf_counter() - t0))
         timeout_stdout = ""
