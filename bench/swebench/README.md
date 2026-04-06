@@ -100,6 +100,30 @@ Default **10 GB** boot disks on cloud VMs are easy to exhaust when you run SWE-b
 
 If jobs start failing mysteriously mid-run, check disk **before** chasing network or API issues.
 
+## `compare.json` inspection (avoid stale files)
+
+`experiments/scripts/compare_runs.py` writes **`meta`** on each run: **`compare_report_schema_version`**, **`generated_at`**, **`experiment_dir`**, **`baseline_eval_dir`**, **`pf_eval_dir`**, **`baseline_run_dir`**, **`pf_run_dir`**. Use this to confirm you are reading the report for the run pair you intend (not an older **`compare.json`** left in the experiment dir).
+
+There is **no** top-level **`summary`** or **`harness`** key. Useful **`jq`** paths:
+
+```bash
+jq '.meta, .patch_apply, .baseline.solve_rate, .pf.solve_rate' runs/exp-step2-lite-smoke/compare.json
+```
+
+After baseline + PF + harness, re-run **`compare_runs.py`** with explicit **`--baseline-run-dir`** and **`--pf-run-dir`** matching those runs. **`collect_eval_results.py`** buckets harness **`empty_patch`** when **`predictions.jsonl`** had empty **`model_patch`** lines (agent/runner), not because the harness mis-read the dataset.
+
+**Run dir health (one command):** `python experiments/scripts/run_health_snapshot.py --run-dir runs/<exp>/<run_id>` — patch_apply pass rate, **`empty_patch_reason`** counts, sample **`engine_error`** / **`AgentErrorEvent`**.
+
+**One-instance `direct_agent` smoke:** `bash experiments/scripts/smoke_direct_agent_one.sh` (same model resolution as the Step-2 cycle). Expect non-zero **`patch_len`** before kicking off a full 20×2 job.
+
+**Full cycle vs smoke (OpenHands fallback):** `experiments/scripts/run-baseline-pf-cycle.sh` defaults **`PF_DIRECT_AGENT_FALLBACK_OPENHANDS=1`** (same as `bench/swebench/runner.py` and the smoke script): after `direct_agent`, eligible failures use the OpenHands CLI subprocess. Without that, frontier models often emit empty **`predictions.jsonl`**, the harness prints **`No instances to run.`** (nothing to run in Docker), and **`compare_runs --require-patch-apply`** fails. For **strict direct_agent-only** experiments, set **`PF_CYCLE_STRICT_DIRECT_AGENT=1`** or **`export PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0`** before the cycle. **`run_swebench_eval.py`** warns if a predictions file has rows but no non-empty patches.
+
+## Prime Inference: `direct_agent` vs OpenHands (model id shape)
+
+**OpenHands** (LiteLLM) uses vendor models with an **`openai/`** prefix (e.g. **`openai/google/gemini-2.5-flash`**) when talking to Prime’s OpenAI-compatible entrypoint. **`direct_agent`** posts raw **`/chat/completions`** to Prime and must use **vendor-qualified ids** without that extra prefix (e.g. **`google/gemini-2.5-flash`**) — see **`effective_llm_model`** in **`bench/swebench/provider_env.py`**.
+
+**Timeouts:** the local Prime compat proxy forwards upstream with **`PF_PRIME_PROXY_UPSTREAM_TIMEOUT_S`** (default **1200** seconds in code; **`run-baseline-pf-cycle.sh`** exports it from **`OPENHANDS_TIMEOUT`**). Values near **180** seconds cause mid-generation **`Remote end closed connection`** on slow models. **`PF_DIRECT_AGENT_HTTP_RETRIES`** (default **3**) retries transient transport errors in **`direct_agent`**.
+
 ## Direct-agent A/B gate (Prime Intellect)
 
 `experiments/scripts/run_direct_agent_ab_gate.py` runs a **strict** comparison: by default the baseline uses **`--engine direct_agent`** (the same custom OpenAI-compatible loop as the candidate, no OpenHands package/CLI). The candidate always uses **`--engine direct_agent`**. For a classic A/B against the OpenHands runtime, pass **`--baseline-engine openhands`**. Env names like **`OPENHANDS_*`** still configure LLM routing for both engines where applicable. To drive phases through **Prime Intellect** Inference, set:
@@ -139,6 +163,7 @@ Use `--count 1` and a fresh `--out-dir` for a short smoke. For **`pit_*`** keys,
 | Harness **409** / container name in use | Stale **`sweb.eval.*.<run_id>`** after crash | Re-run **`run_swebench_eval.py`** with **`--rm-stale-eval-containers`**, or remove matching containers (see **experiments/exp-step2-lite-smoke/troubleshooting-compare-results.md**). |
 | **`compare_runs --require-harness`** fails on **`run_id` mismatch** | **`eval_metadata.json`** or **`run_status.json`** from an older harness | Re-run harness for the current predictions or align **`run_id`** fields. |
 | **`--require-priced-models`** fails | Model string in **`cost_report.json`** not in **`model_pricing.py`** | Add pricing or use a known **`OPENHANDS_MODEL`** id. |
+| **`patch_apply.applies_false`** equals 2× submitted instances, **`stderr`** **`empty patch`** | Every **`model_patch`** in **`predictions.jsonl`** was empty (agent error, timeout, or apply-check stripped patch) | Run **`run_health_snapshot.py`** on each **`runs/<run_id>`**; fix Prime/model/proxy timeout; see **`smoke_direct_agent_one.sh`**. |
 
 Shared provider resolution (keys, base URL fallbacks, model normalization for Prime) lives in **`bench/swebench/provider_env.py`** and is used by the OpenHands engine, **`ensure_openhands_config.py`**, and the runner **`env.json`** fields above. For **`prime_intellect`**, the engine uses the **subprocess** OpenHands path so the local compatibility proxy and **`LLM_*`** env wiring always apply.
 

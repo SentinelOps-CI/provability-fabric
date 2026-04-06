@@ -28,6 +28,9 @@ from experiments.harness_report import (  # noqa: E402
     find_run_report,
     load_run_report,
 )
+
+# Bumped when compare.json shape changes (e.g. new meta block).
+COMPARE_REPORT_SCHEMA_VERSION = "1.1"
 from experiments.run_evidence import (  # noqa: E402
     load_compliance,
     load_cost_report,
@@ -686,6 +689,16 @@ def main() -> int:
 
     report = aggregate(baseline_eval, pf_eval, baseline_run, pf_run)
 
+    report["meta"] = {
+        "compare_report_schema_version": COMPARE_REPORT_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "experiment_dir": str(exp_dir.resolve()),
+        "baseline_eval_dir": str(baseline_eval.resolve()),
+        "pf_eval_dir": str(pf_eval.resolve()),
+        "baseline_run_dir": str(baseline_run.resolve()) if baseline_run else None,
+        "pf_run_dir": str(pf_run.resolve()) if pf_run else None,
+    }
+
     # Replay section: merge replay_summary.json if present (from run_replay_sample.py)
     replay_summary_path = out_dir / "replay_summary.json"
     if replay_summary_path.exists():
@@ -851,6 +864,12 @@ def main() -> int:
                 "Hint: compare.json is still written for diagnosis. Non-strict gate: "
                 "PF_AB_GATE_ALLOW_EXPLORE=1 and run_direct_agent_ab_gate.py --explore-compare "
                 "(see bench/swebench/README.md).",
+                file=sys.stderr,
+            )
+            print(
+                "Hint: many empty or non-applying patches come from direct_agent-only runs "
+                "(PF_DIRECT_AGENT_FALLBACK_OPENHANDS=0). The Step-2 cycle defaults fallback on; "
+                "for strict direct_agent-only use PF_CYCLE_STRICT_DIRECT_AGENT=1 or see bench/swebench/README.md.",
                 file=sys.stderr,
             )
             exit_code = 1
