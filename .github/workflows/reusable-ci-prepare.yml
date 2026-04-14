@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+on:
+  workflow_call:
+    outputs:
+      impacted_targets:
+        description: Space-separated impacted Lean bundle targets
+        value: ${{ jobs.prepare.outputs.impacted_targets }}
+      impacted_tests:
+        description: Space-separated impacted test paths
+        value: ${{ jobs.prepare.outputs.impacted_tests }}
+      allowlist_needs_update:
+        description: Whether allowlist must match generated output
+        value: ${{ jobs.prepare.outputs.allowlist_needs_update }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      impacted_targets: ${{ steps.impacted.outputs.impacted_targets }}
+      impacted_tests: ${{ steps.impacted.outputs.impacted_tests }}
+      allowlist_needs_update: ${{ steps.impacted.outputs.allowlist_needs_update }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest kubernetes requests pyyaml psutil flake8-breakpoint
+
+      - name: No runtime placeholders (P1 gate)
+        run: make no-runtime-placeholders
+
+      - name: Placeholder proof tests (summarizer, SWE-bench, impacted_only)
+        run: |
+          python -m pytest tools/results/test_summarize.py -v
+          cd bench/swebench && python -m pytest test_runner.py -v && cd ../..
+          python -m pytest tools/ci/test_impacted_only.py -v
+
+      - name: Evidence-service DSSE fixture test (P2/P3 proof)
+        run: |
+          cd services/evidence-service && go test -run TestDSSEFixtureVerify -v -count=1 ./... && cd ../..
+
+      - name: Determine impacted targets
+        id: impacted
+        run: |
+          echo "Determining impacted targets based on changes..."
+          python tools/select_impacted.py --root . --output /tmp/impacted.json
+
+          IMPACTED_TARGETS=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              targets = data.get('impacted_targets', [])
+              print(' '.join(targets))
+          ")
+
+          IMPACTED_TESTS=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              tests = data.get('impacted_tests', [])
+              print(' '.join(tests))
+          ")
+
+          ALLOWLIST_NEEDS_UPDATE=$(python -c "
+          import json
+          with open('/tmp/impacted.json', 'r') as f:
+              data = json.load(f)
+              print('true' if data.get('allowlist_needs_update', False) else 'false')
+          ")
+
+          echo "impacted_targets=$IMPACTED_TARGETS" >> $GITHUB_OUTPUT
+          echo "impacted_tests=$IMPACTED_TESTS" >> $GITHUB_OUTPUT
+          echo "allowlist_needs_update=$ALLOWLIST_NEEDS_UPDATE" >> $GITHUB_OUTPUT
+
+          echo "Impacted targets: $IMPACTED_TARGETS"
+          echo "Impacted tests: $IMPACTED_TESTS"
+          echo "Allowlist needs update: $ALLOWLIST_NEEDS_UPDATE"

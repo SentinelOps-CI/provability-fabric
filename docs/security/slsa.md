@@ -39,7 +39,7 @@ Download the provenance files from the GitHub release and verify them:
 
 ```bash
 # Download provenance files
-wget https://github.com/provability-fabric/provability-fabric/releases/latest/download/slsa-provenance.intoto.jsonl
+wget https://github.com/SentinelOps-CI/provability-fabric/releases/latest/download/slsa-provenance.intoto.jsonl
 
 # Verify each provenance file
 cosign verify-attestation --type slsaprovenance sidecar-watcher_provenance.intoto.jsonl
@@ -85,9 +85,9 @@ Each provenance file contains:
   "predicateType": "https://slsa.dev/provenance/v1",
   "predicate": {
     "buildDefinition": {
-      "buildType": "https://github.com/provability-fabric/provability-fabric/actions/runs/{run_id}",
+      "buildType": "https://github.com/SentinelOps-CI/provability-fabric/actions/runs/{run_id}",
       "externalParameters": {
-        "repository": "github.com/provability-fabric/provability-fabric",
+        "repository": "github.com/SentinelOps-CI/provability-fabric",
         "ref": "refs/tags/v1.0.0",
         "sha1": "commit_hash"
       },
@@ -97,7 +97,7 @@ Each provenance file contains:
       },
       "resolvedDependencies": [
         {
-          "uri": "git+https://github.com/provability-fabric/provability-fabric",
+          "uri": "git+https://github.com/SentinelOps-CI/provability-fabric",
           "digest": {
             "sha1": "commit_hash"
           }
@@ -106,7 +106,7 @@ Each provenance file contains:
     },
     "runDetails": {
       "builder": {
-        "id": "github.com/provability-fabric/provability-fabric/actions/runs/{run_id}"
+        "id": "github.com/SentinelOps-CI/provability-fabric/actions/runs/{run_id}"
       },
       "metadata": {
         "invocationId": "run_id",

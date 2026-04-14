@@ -231,7 +231,8 @@ impl RevocationManager {
             reason: args.reason.clone(),
             epoch,
             expires_at,
-            revoked_by: "cli-user".to_string(), // TODO: Get from auth context
+            revoked_by: std::env::var("PF_REVOKED_BY")
+                .unwrap_or_else(|_| std::env::var("USER").unwrap_or_else(|_| "local-identity".to_string())),
             status: RevocationStatus::Active,
             metadata: HashMap::new(),
         };

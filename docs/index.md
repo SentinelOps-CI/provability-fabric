@@ -49,20 +49,11 @@ flowchart TD
 
     BB[Performance Benchmarks] --> CC[WASM Pool]
     CC --> DD[Batch Crypto]
-
-    style A fill:#e1f5fe
-    style C fill:#f3e5f5
-    style F fill:#fff3e0
-    style O fill:#e8f5e8
-    style Q fill:#ffebee
-    style U fill:#e3f2fd
-    style Y fill:#f1f8e9
-    style BB fill:#fff8e1
 ```
 
 ## Quick Start
 
-For a comprehensive introduction to Provability-Fabric, start with our [Getting Started Guide](getting-started.md).
+For a comprehensive introduction to Provability-Fabric, start with our [Getting Started Guide](guides/getting-started.md).
 
 ### Core Services
 ```bash
@@ -93,38 +84,50 @@ cargo add provability-fabric-core-sdk-rust
 # Run performance benchmarks
 cargo bench
 
-# WASM worker pool testing
-cargo test --package wasm-sandbox
+# WASM sandbox tests
+cargo test -p wasm-sandbox
 
-# Batch signature verification
-cargo test --package crypto
+# All workspace tests (from repo root)
+cargo test --workspace
 ```
 
 ## Documentation
 
-### Core Documentation
-- **[Getting Started](getting-started.md)** - Quick start guide and basic concepts
-- **[Architecture Overview](architecture.md)** - System architecture and design principles
-- **[Developer Guide](developer-guide.md)** - Development setup and contribution guidelines
-- **[API Reference](api-reference.md)** - Complete API documentation
-- **[Examples](examples.md)** - Practical examples and use cases
+### Core
+- **[Getting Started](guides/getting-started.md)** - Quick start guide and basic concepts
+- **[Architecture Overview](architecture/overview.md)** - System architecture and design principles
+- **[Developer Guide](guides/developer-guide.md)** - Development setup and contribution guidelines
+- **[API Reference](reference/api-reference.md)** - Complete API documentation
+- **[Examples](guides/examples.md)** - Practical examples and use cases
 
-### New Features (2025)
-- **[Model Context Protocol (MCP) Integration](mcp-integration.md)** - Complete MCP implementation guide
-- **[MCP Quick Reference](mcp-quick-reference.md)** - Developer quick reference for MCP APIs
-- **[MCP Migration Guide](mcp-migration-guide.md)** - Migration guide for existing MCP implementations
+### Integrations
+- **[MCP Integration](integrations/mcp/integration.md)** - Complete MCP implementation guide
+- **[MCP Quick Reference](integrations/mcp/quick-reference.md)** - Developer quick reference for MCP APIs
+- **[MCP Migration](integrations/mcp/migration-guide.md)** - Migration guide for existing MCP implementations
 
 ### Deployment & Operations
-- **[Deployment Guide](deployment-guide.md)** - Production deployment instructions
-- **[Testing Guide](testing-guide.md)** - Testing strategies and best practices
-- **[Security](security/README.md)** - Security architecture and best practices
+- **[Deployment Guide](guides/deployment-guide.md)** - Production deployment instructions
+- **[Testing Guide](guides/testing-guide.md)** - Testing strategies and best practices
+- **[Security](security/README.md)** - Security architecture, supply-chain automation, and best practices
 - **[Runbooks](runbooks/README.md)** - Operational procedures and troubleshooting
 
 ### Reference
-- **[CLI Reference](cli-reference.md)** - Command-line interface reference
-- **[Configuration](configuration.md)** - Configuration options and management
+- **[Evidence & CERTs](evidence/overview.md)** - Where evidence and CERTs live and how to validate them
+- **[Replay](evidence/replay.md)** - Replay and TRACE-REPLAY-KIT
+- **[CLI Reference](reference/cli-reference.md)** - Command-line interface reference
+- **[CI Reference](reference/ci-reference.md)** - Main `ci.yml`, reusable Rust/Lean/Node jobs, supply-chain gates (Dependency review, cargo-deny, actionlint, SBOM, Scorecard), PF CI / TRUST-FIRE, Bench SWE-bench
+- **[Configuration](reference/configuration.md)** - Configuration options and management
+- **[Versioning](reference/versioning.md)** - Platform version and crate/package versions
 - **[Glossary](glossary.md)** - Terms and definitions
-- **[Standards](standards.md)** - Framework standards and specifications
+- **[Standards](specs/standards.md)** - Framework standards and specifications
+
+**Bench / SWE-bench:** See `bench/swebench/README.md`, `experiments/README.md`, and `experiments/exp-step2-lite-smoke/commands.md` for entry points, experiment flow, compare gates, and verification. The SWE-bench pipeline is modular: `bench/swebench/run_config.py` (`RunConfig`, `build_argument_parser`), `runner.py` (`main()` validates config then calls `_execute_run`), `runner_core.py` (`run_swebench(config)` for programmatic runs), plus `workspace_manager.py`, `instance_processor.py`, `evidence_writer.py`, `predictions_writer.py`, `summary_writer.py`, `cost_reporter.py`, and `engines/` (OpenHands, mock, adapters). **LLM provider resolution** (OpenAI / Anthropic / Prime Intellect keys, base URL fallbacks, Prime model prefixing) is centralized in **`bench/swebench/provider_env.py`** and shared with `engines/openhands_engine.py`, `experiments/scripts/ensure_openhands_config.py`, and runner `env.json` diagnostics. **Verification checklist and pytest command list:** [internal/swebench-stabilization-regression-matrix.md](internal/swebench-stabilization-regression-matrix.md).
+
+**Bench pipeline status (exp-step2-lite-smoke):** For the current golden baseline/PF run IDs, harness/compare outputs, and publish bundle location, see `experiments/exp-step2-lite-smoke/run-ids.md` and (when present) `runs/exp-step2-lite-smoke/publish/`. The root `README.md` repository structure line may record a snapshot date for the last verified green cycle.
+
+**Contributor tracking:** Placeholder inventory and v1 burn-down are under [internal/placeholders](internal/placeholders/inventory.md).
+
+For the current repository layout (Rust workspace, optional crates, toolchain), see the [repository README](../README.md) "Rust workspace" and "Repository Structure" sections.
 
 ## License
 

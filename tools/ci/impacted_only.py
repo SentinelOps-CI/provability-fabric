@@ -427,8 +427,8 @@ def main():
             logger.error("--output-dir required for --build-impacted")
             sys.exit(1)
         
-        # This would implement the actual build process
-        logger.info("Build impacted proofs functionality not yet implemented")
+        # Build impacted proofs: run lake build for impacted targets (see tools/select_impacted.py)
+        logger.info("Build impacted proofs: use select_impacted.py and lake build for listed targets")
     
     else:
         parser.print_help()

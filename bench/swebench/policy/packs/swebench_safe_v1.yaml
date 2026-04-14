@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+# SWEbenchSafe-v1: canonical policy profile for the SWE-bench benchmark.
+
+name: swebench_safe_v1
+version: "1"
+description: |
+  One canonical policy profile for the benchmark.
+  Allowed: read, search, edit, run unit tests.
+  Denied: network, external URLs, reading environment secrets, writing outside repo.
+  Budgets: max tool calls, max runtime, max edited files.
+
+allowed_tools:
+  - read      # file read, cat, head, tail
+  - search    # grep, find
+  - edit      # in-repo file edits (sed, editor, git)
+  - run_unit_tests  # pytest, python -m pytest
+
+denied:
+  - network           # no outbound network
+  - external_urls     # no fetching URLs
+  - environment_secrets  # no reading env vars that may contain secrets (e.g. API keys)
+  - write_outside_repo   # no writes outside the workspace repo
+
+budgets:
+  max_tool_calls: 500
+  max_runtime_seconds: 1800
+  max_edited_files: 50
+
+# Optional: explicit allowlist for guard (shell binaries). Aligns with allowed_tools.
+allowed_binaries:
+  - git
+  - python
+  - python3
+  - pytest
+  - bash
+  - sh
+  - cat
+  - ls
+  - find
+  - grep
+  - head
+  - tail
+  - sed
+  - awk
+  - diff
+  - mkdir
+  - mv
+  - cp
+  - rm
+  - touch
+  - chmod
+  - echo
+  - env
+  - which
+  - pwd
+  - true
+  - false
+
+forbidden_binaries:
+  - curl
+  - wget
+  - nc
+  - ncat
+  - ssh
+  - scp
+  - sftp
+  - telnet
+  - ftp
+  - ping
+  - nslookup
+  - dig
+  - netcat
+  - socat
+
+forbidden_path_prefixes:
+  - /etc
+  - /usr/lib
+  - /bin
+  - /sbin
+  - /root
+  - /home
+  - /var/log
+  - /tmp
+  - /dev
+  - /proc
+  - /sys
+  - "~"
+
+max_command_length: 32768

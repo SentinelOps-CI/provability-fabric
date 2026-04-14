@@ -22,7 +22,7 @@ use std::time::{Duration, Instant, SystemTime};
 /// Custom serialization for std::time::Instant
 mod instant_serde {
     use super::*;
-    use serde::de::Error;
+    
 
     pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -165,7 +165,7 @@ impl SGEQScheduler {
         let session_id = event.session_id.clone();
         session_events
             .entry(session_id.clone())
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(event);
 
         // Mark session as active
@@ -264,7 +264,7 @@ impl TwoQueueScheduler {
         let session_id = event.session_id.clone();
         session_events
             .entry(session_id.clone())
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(event);
 
         // Mark session as active
@@ -481,9 +481,6 @@ impl EventBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
-    use std::collections::HashSet;
-    use std::time::Duration;
 
     #[test]
     fn test_sgeq_scheduler_basic() {

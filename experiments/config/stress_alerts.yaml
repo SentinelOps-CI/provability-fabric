@@ -1,0 +1,7 @@
+# Stress regression alert thresholds (roadmap-tuned for smoke-scale parity).
+# Used by experiments/scripts/check_stress_alerts.py.
+
+parity_threshold: 0.01
+timeout_delta_threshold: 0.25
+empty_patch_rate_threshold: 0.45
+guard_overhead_s_threshold: 180.0

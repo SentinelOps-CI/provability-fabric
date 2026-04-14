@@ -46,7 +46,7 @@ pub struct MorphInfo {
 }
 
 pub fn validate_cert(cert: &CertV1) -> Result<()> {
-    let compiled = jsonschema::JSONSchema::compile(&*CERT_SCHEMA)?;
+    let compiled = jsonschema::JSONSchema::compile(&CERT_SCHEMA)?;
     let data = serde_json::to_value(cert)?;
     let result = compiled.validate(&data);
     if let Err(errors) = result {

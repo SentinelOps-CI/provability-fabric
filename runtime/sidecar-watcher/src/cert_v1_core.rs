@@ -62,6 +62,7 @@ pub struct CertV1Core {
 
 impl CertV1Core {
     /// Create a new core certificate
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bundle_id: String,
         seq: u64,

@@ -9,6 +9,8 @@ on:
     paths:
       - "bundles/**/spec.yaml"
       - "docs/**"
+      - "mkdocs.yml"
+      - ".markdown-link-check.json"
       - "cmd/specdoc/**"
   workflow_dispatch:
 
@@ -24,9 +26,14 @@ jobs:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,12 +43,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install markdownlint
           npm install -g markdownlint-cli
-
-          # Install Python dependencies for MkDocs
           python -m pip install --upgrade pip
-          pip install mkdocs-material
+          pip install -r docs/requirements.txt
 
       - name: Generate documentation
         run: |
@@ -63,8 +67,11 @@ jobs:
 
       - name: Lint generated documentation
         run: |
-          # Run markdownlint on generated files
-          markdownlint docs/generated/*.md
+          if compgen -G "docs/generated/*.md" > /dev/null; then
+            markdownlint docs/generated/*.md
+          else
+            echo "No docs/generated/*.md to lint"
+          fi
 
       - name: Build MkDocs site
         run: |
@@ -72,18 +79,15 @@ jobs:
 
       - name: Check for broken links
         run: |
-          # Install markdown-link-check
           npm install -g markdown-link-check
-
-          # Check all markdown files for broken links
-          find docs -name "*.md" -exec markdown-link-check {} \;
+          find docs -name "*.md" -exec markdown-link-check -c .markdown-link-check.json -q {} \;
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./build
           force_orphan: true
 
       - name: Commit generated docs

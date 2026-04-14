@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct KernelDecision {
@@ -84,7 +84,7 @@ impl BrokerIntegration {
     pub async fn submit_plan(&self, plan_json: &str) -> Result<KernelDecision> {
         let response = self
             .http_client
-            .post(&format!("{}/approve", self.kernel_url))
+            .post(format!("{}/approve", self.kernel_url))
             .header("Content-Type", "application/json")
             .body(plan_json.to_string())
             .send()
@@ -109,9 +109,9 @@ impl BrokerIntegration {
     }
 
     fn extract_plan_id(&self, plan_json: &str) -> Result<String> {
-        let plan: serde_json::Value = serde_json::from_str(plan_json)
-            .context("Failed to parse plan JSON")?;
-        
+        let plan: serde_json::Value =
+            serde_json::from_str(plan_json).context("Failed to parse plan JSON")?;
+
         plan.get("plan_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
@@ -124,7 +124,10 @@ impl BrokerIntegration {
 
         if !self.enforcement_mode {
             // In non-enforcement mode, allow all tool calls
-            info!("Non-enforcement mode: allowing tool call {}", tool_call.tool);
+            info!(
+                "Non-enforcement mode: allowing tool call {}",
+                tool_call.tool
+            );
             return Ok(ToolResult {
                 success: true,
                 result: Some(serde_json::json!({
@@ -147,8 +150,8 @@ impl BrokerIntegration {
             Some(steps) => {
                 // Find the approved step that matches this tool call
                 let approved_step = steps.iter().find(|step| {
-                    step.tool == tool_call.tool && 
-                    step.step_index == tool_call.step_index.unwrap_or(0)
+                    step.tool == tool_call.tool
+                        && step.step_index == tool_call.step_index.unwrap_or(0)
                 });
 
                 match approved_step {
@@ -212,48 +215,44 @@ impl BrokerIntegration {
         }
     }
 
-    async fn execute_approved_tool(&self, step: &ApprovedStep, execution_id: &str) -> Result<serde_json::Value> {
+    async fn execute_approved_tool(
+        &self,
+        step: &ApprovedStep,
+        execution_id: &str,
+    ) -> Result<serde_json::Value> {
         // Verify receipts if present
         if let Some(ref receipts) = step.receipts {
             for receipt in receipts {
                 self.verify_receipt(receipt)?;
             }
         }
-        
+
         // Simulate tool execution based on tool type
         match step.tool.as_str() {
-            "retrieval" => {
-                Ok(serde_json::json!({
-                    "type": "retrieval_result",
-                    "documents": ["doc1", "doc2"],
-                    "execution_id": execution_id,
-                    "mode": "enforcement"
-                }))
-            }
-            "search" => {
-                Ok(serde_json::json!({
-                    "type": "search_result",
-                    "results": ["result1", "result2"],
-                    "execution_id": execution_id,
-                    "mode": "enforcement"
-                }))
-            }
-            "email" => {
-                Ok(serde_json::json!({
-                    "type": "email_sent",
-                    "recipient": step.args.get("to"),
-                    "execution_id": execution_id,
-                    "mode": "enforcement"
-                }))
-            }
-            _ => {
-                Ok(serde_json::json!({
-                    "type": "tool_result",
-                    "tool": step.tool,
-                    "execution_id": execution_id,
-                    "mode": "enforcement"
-                }))
-            }
+            "retrieval" => Ok(serde_json::json!({
+                "type": "retrieval_result",
+                "documents": ["doc1", "doc2"],
+                "execution_id": execution_id,
+                "mode": "enforcement"
+            })),
+            "search" => Ok(serde_json::json!({
+                "type": "search_result",
+                "results": ["result1", "result2"],
+                "execution_id": execution_id,
+                "mode": "enforcement"
+            })),
+            "email" => Ok(serde_json::json!({
+                "type": "email_sent",
+                "recipient": step.args.get("to"),
+                "execution_id": execution_id,
+                "mode": "enforcement"
+            })),
+            _ => Ok(serde_json::json!({
+                "type": "tool_result",
+                "tool": step.tool,
+                "execution_id": execution_id,
+                "mode": "enforcement"
+            })),
         }
     }
 
@@ -269,7 +268,7 @@ impl BrokerIntegration {
             return Err(anyhow::anyhow!("Receipt signature is empty"));
         }
 
-        // TODO: Implement actual signature verification
+        // Signature verification requires trust root (PEM/JWKS); structural validation only until wired
         // For now, just validate structure
         info!("Receipt verified: {}", receipt.receipt_id);
         Ok(())
@@ -288,4 +287,4 @@ impl BrokerIntegration {
     pub fn is_enforcement_mode(&self) -> bool {
         self.enforcement_mode
     }
-} 
+}

@@ -171,3 +171,7 @@ The REPL expects DFA files in the following JSON format:
   "version": "1.0.0"
 }
 ```
+
+## Repository
+
+Part of **[SentinelOps-CI/provability-fabric](https://github.com/SentinelOps-CI/provability-fabric)** (`tools/explain-state-repl/`). Clone: `git clone https://github.com/SentinelOps-CI/provability-fabric.git`.

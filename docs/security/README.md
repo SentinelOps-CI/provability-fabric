@@ -44,6 +44,8 @@ Provability-Fabric implements a multi-layered security architecture that provide
 - **Attestation** - Cryptographic proof of component integrity
 - **Verification** - Automated validation of all components
 
+**Automation in this repository (non-exhaustive):** OpenSSF Scorecard (`.github/workflows/scorecards.yml`), SBOM on releases and diff jobs (`release-sbom.yml`, `sbom-diff.yaml`), **Dependency review** for vulnerable and disallowed-license changes on pull requests (`dependency-review.yml`), **cargo-deny** for Rust licenses and advisories (`cargo-deny.yml`, root `deny.toml`), and **actionlint** for workflow YAML (`actionlint.yml`). See [CI reference](../reference/ci-reference.md) and the [Security policy](https://github.com/SentinelOps-CI/provability-fabric/blob/main/SECURITY.md).
+
 ## Security Features
 
 ### Cryptographic Security

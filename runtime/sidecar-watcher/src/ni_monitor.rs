@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Non-interference monitor configuration
 ///
@@ -76,18 +77,19 @@ pub enum SecurityLabel {
     Custom(String),
 }
 
-impl SecurityLabel {
-    /// Convert to string representation
-    pub fn to_string(&self) -> String {
+impl fmt::Display for SecurityLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SecurityLabel::Public => "public".to_string(),
-            SecurityLabel::Internal => "internal".to_string(),
-            SecurityLabel::Confidential => "confidential".to_string(),
-            SecurityLabel::Secret => "secret".to_string(),
-            SecurityLabel::Custom(name) => format!("custom:{}", name),
+            SecurityLabel::Public => f.write_str("public"),
+            SecurityLabel::Internal => f.write_str("internal"),
+            SecurityLabel::Confidential => f.write_str("confidential"),
+            SecurityLabel::Secret => f.write_str("secret"),
+            SecurityLabel::Custom(name) => write!(f, "custom:{name}"),
         }
     }
+}
 
+impl SecurityLabel {
     /// Parse from string representation
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s {
@@ -245,6 +247,12 @@ pub struct ProofHashes {
     pub labeler_hash: String,      // SHA-256 of label derivation logic
     pub ni_bridge_hash: String,    // SHA-256 of ni_bridge theorem
     pub computed_at: u64,
+}
+
+impl Default for ProofHashes {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProofHashes {
@@ -446,9 +454,7 @@ impl NIMonitorState {
             if prefix.violates_ni() {
                 violations.push(format!(
                     "Prefix {} violates non-interference: input={}, output={}",
-                    prefix.prefix_id,
-                    prefix.input_label.to_string(),
-                    prefix.output_label.to_string()
+                    prefix.prefix_id, prefix.input_label, prefix.output_label
                 ));
             }
         }
@@ -505,7 +511,7 @@ impl NIMonitorState {
         let no_violations = self.violation_count == 0 || !self.config.strict_mode;
 
         // Condition 3: Monitor state is consistent
-        let state_consistent = self.last_audit > 0 && self.active_sessions.len() > 0;
+        let state_consistent = self.last_audit > 0 && !self.active_sessions.is_empty();
 
         // Condition 4: Proof hashes are available
         let proof_hashes_ok = !self.proof_hashes.policy_proof_hash.is_empty()
@@ -873,7 +879,7 @@ mod tests {
     #[test]
     fn test_prefix_integrity() {
         let config = NIMonitorConfig::default();
-        let monitor = NIMonitor::new(config);
+        let _monitor = NIMonitor::new(config);
 
         // Create a test prefix
         let prefix = NIPrefix::new(

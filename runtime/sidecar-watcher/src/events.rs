@@ -17,7 +17,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::error::Error;
 use std::hash::{Hash, Hasher};
 
 /// Event types as defined in the labeled alphabet
@@ -358,7 +357,7 @@ impl EventMediator {
 
     /// Find matching plan node
     fn find_matching_plan_node(&self, event: &TypedEvent) -> Result<&PlanNode, String> {
-        for (_, node) in &self.plan_nodes {
+        for node in self.plan_nodes.values() {
             if node.operation == event.event_type {
                 return Ok(node);
             }

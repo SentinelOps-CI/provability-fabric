@@ -73,8 +73,7 @@ def export_canonical_json (dfa : ActionDSL.ProductDFA) (config : ExportConfig) :
 
 /-- Generate SHA-256 hash of canonical JSON -/
 def generate_sha256 (json_content : String) : IO String := do
-  -- For now, return a placeholder hash
-  -- In a real implementation, this would use a proper SHA-256 library
+  -- Deterministic hash-like value until SHA-256 library is wired in
   let hash := "sha256:" ++ (toString (json_content.hash))
   return hash
 

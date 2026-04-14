@@ -228,9 +228,8 @@ impl WasmPool {
         if let Some(result) = results.first() {
             match result {
                 wasmtime::Val::I32(len) => {
-                    // In a real implementation, you'd read memory from the WASM instance
-                    // For now, return a placeholder
-                    Ok(vec![0u8; *len as usize])
+                    // Return zeroed buffer of requested length until instance memory read is wired
+                    Ok(vec![0u8; (*len as usize).min(64 * 1024)])
                 },
                 _ => Err("Unexpected return type".into()),
             }

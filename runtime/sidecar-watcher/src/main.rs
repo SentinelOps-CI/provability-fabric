@@ -33,14 +33,14 @@ mod ni_monitor;
 mod privacy;
 
 use dfa::DFAInterpreter;
-use egress_cert::{
-    BridgeGuarantee, EgressCertificate, PermissionEvidence, ProofHashes as CertProofHashes,
-};
 use ni_monitor::{
-    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus, ProofHashes, SecurityLabel,
+    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus, SecurityLabel,
 };
 use privacy::epsilon_guard::EpsilonGuard;
 use sidecar_watcher::assumption::{Assumption, AssumptionMonitor};
+use sidecar_watcher::egress_cert::{
+    BridgeGuarantee, EgressCertificate, PermissionEvidence, ProofHashes as CertProofHashes,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Action {
@@ -68,6 +68,7 @@ struct UsageEvent {
     ts: String,
 }
 
+#[allow(dead_code)]
 struct Metrics {
     total_actions: Counter,
     violations: Counter,
@@ -97,10 +98,10 @@ impl Metrics {
 
         // New telemetry metrics
         let time_to_first_cert =
-            Histogram::new(vec![0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]);
+            Histogram::new([0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0].into_iter());
         let replay_pass_rate = Gauge::default();
         let p95_latency =
-            Histogram::new(vec![0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]);
+            Histogram::new([0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0].into_iter());
         let cert_issuance_total = Counter::default();
         let cert_issuance_failures = Counter::default();
 
@@ -184,6 +185,7 @@ impl Metrics {
     }
 }
 
+#[allow(dead_code)]
 struct Watcher {
     // Shared Prometheus registry registered with our metrics
     registry: Arc<Registry>,
@@ -212,6 +214,7 @@ struct Watcher {
     signing_key_id: String,
 }
 
+#[allow(dead_code)]
 impl Watcher {
     async fn new() -> Result<Self> {
         // Build a single registry and register all metrics on it
@@ -484,17 +487,17 @@ impl Watcher {
     fn generate_egress_certificate(&self, action: &Action) -> EgressCertificate {
         let session_id = self.tenant_id.clone();
         let bundle_id = format!("bundle_{}", self.spec_sig);
-        let plan_hash = "plan_hash_placeholder".to_string(); // This would come from the actual plan
-        let policy_hash = "policy_hash_placeholder".to_string(); // This would come from the PAB
+        let plan_hash = std::env::var("PLAN_HASH").unwrap_or_else(|_| "test-plan-hash".to_string());
+        let policy_hash = std::env::var("POLICY_HASH").unwrap_or_else(|_| "test-policy-hash".to_string());
 
-        let mut cert = EgressCertificate::new(session_id, bundle_id, plan_hash, policy_hash);
+        let mut cert = EgressCertificate::new(session_id, bundle_id, plan_hash, policy_hash.clone());
 
         // Add proof hashes from PAB (these would be loaded from the PAB manifest)
         let proof_hashes = CertProofHashes {
-            automata_hash: "automata_hash_placeholder".to_string(),
-            labeler_hash: "labeler_hash_placeholder".to_string(),
-            policy_hash: "policy_hash_placeholder".to_string(),
-            ni_monitor_hash: "ni_monitor_hash_placeholder".to_string(),
+            automata_hash: std::env::var("AUTOMATA_HASH").unwrap_or_else(|_| "test-automata-hash".to_string()),
+            labeler_hash: std::env::var("LABELER_HASH").unwrap_or_else(|_| "test-labeler-hash".to_string()),
+            policy_hash,
+            ni_monitor_hash: std::env::var("NI_MONITOR_HASH").unwrap_or_else(|_| "test-ni-monitor-hash".to_string()),
         };
         cert.add_proof_hashes(proof_hashes);
 
@@ -506,7 +509,7 @@ impl Watcher {
             epoch: 1,
             principal_id: "system".to_string(),
             action_type: action.action_type.clone(),
-            resource_id: "resource_placeholder".to_string(),
+            resource_id: std::env::var("RESOURCE_ID").unwrap_or_else(|_| "test-resource-id".to_string()),
             field_path: None,
             abac_attributes: std::collections::HashMap::new(),
             session_attributes: std::collections::HashMap::new(),
@@ -564,17 +567,17 @@ impl Watcher {
             "key_id": self.signing_key_id,
             "data": data,
             "attestation_token": {
-                "token": "attestation_token_placeholder",
+                "token": std::env::var("ATTESTATION_TOKEN").unwrap_or_else(|_| "test-attestation-token".to_string()),
                 "pod_identity": self.tenant_id,
                 "policy_hash": self.spec_sig,
                 "timestamp": chrono::Utc::now(),
-                "signature": "attestation_sig_placeholder"
+                "signature": std::env::var("ATTESTATION_SIG").unwrap_or_else(|_| "test-attestation-sig".to_string())
             }
         });
 
         let response = self
             .http_client
-            .post(&format!("{}/kms/sign", self.kms_proxy_url))
+            .post(format!("{}/kms/sign", self.kms_proxy_url))
             .json(&request_body)
             .send()
             .await?;
@@ -637,19 +640,17 @@ impl Watcher {
             if let Ok(file) = File::open(&log_file) {
                 let reader = BufReader::new(file);
 
-                for line in reader.lines() {
-                    if let Ok(line) = line {
-                        if line.contains("\"action\"") {
-                            if let Ok(action) = serde_json::from_str::<Action>(&line) {
-                                if let Err(e) = self.process_action(&action) {
-                                    error!("Failed to process action: {}", e);
-                                }
+                for line in reader.lines().map_while(Result::ok) {
+                    if line.contains("\"action\"") {
+                        if let Ok(action) = serde_json::from_str::<Action>(&line) {
+                            if let Err(e) = self.process_action(&action) {
+                                error!("Failed to process action: {}", e);
                             }
-                        } else if line.contains("\"assumption\"") {
-                            if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
-                                if let Err(e) = self.process_assumption(assumption) {
-                                    error!("Failed to process assumption: {}", e);
-                                }
+                        }
+                    } else if line.contains("\"assumption\"") {
+                        if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
+                            if let Err(e) = self.process_assumption(assumption) {
+                                error!("Failed to process assumption: {}", e);
                             }
                         }
                     }

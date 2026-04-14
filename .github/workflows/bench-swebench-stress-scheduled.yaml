@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Scheduled run of exp-step2-lite-stress-large-repos (not gated in CI).
+# Stores empty_patch_reasons, timeout rate, patch_apply failure rate, wall-clock for trend analysis.
+
+name: Bench SWE-bench stress (scheduled)
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  stress-run:
+    name: Stress large repos
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runner deps
+        run: |
+          pip install pyyaml
+          pip install datasets swebench 2>/dev/null || true
+          pip install openhands 2>/dev/null || true
+
+      - name: Fill manifest
+        run: python experiments/scripts/fill_manifest_from_run.py experiments/exp-step2-lite-stress-large-repos/manifest.json
+
+      - name: Run stress baseline + PF (guarded)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          EXP=runs/exp-step2-lite-stress-large-repos
+          mkdir -p "$EXP/baseline" "$EXP/pf"
+          if command -v pf >/dev/null 2>&1; then RUN_CMD="pf bench swebench run"; else RUN_CMD="python bench/swebench/runner.py"; fi
+          echo "Baseline run..."
+          $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
+            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --seed 42 \
+            --out "$EXP/baseline/predictions.jsonl" --runs-dir "$EXP/baseline" 2>&1 | tee baseline.log || true
+          echo "PF run..."
+          $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
+            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --mode pf_guarded \
+            --seed 42 --policy swebench_safe_v1 --out "$EXP/pf/predictions.jsonl" --runs-dir "$EXP/pf" 2>&1 | tee pf.log || true
+
+      - name: Harness and compare
+        run: |
+          EXP=runs/exp-step2-lite-stress-large-repos
+          BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          if [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
+            python experiments/scripts/run_swebench_eval.py \
+              --baseline-predictions "$EXP/baseline/predictions.jsonl" --pf-predictions "$EXP/pf/predictions.jsonl" \
+              --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true
+            python experiments/scripts/compare_runs.py --experiment-dir "$EXP" \
+              --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" --pf-run-dir "$EXP/pf/$PF_RUN_ID" 2>/dev/null || true
+          fi
+
+      - name: Write stress summary
+        run: |
+          EXP=runs/exp-step2-lite-stress-large-repos
+          BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          PF_COMMIT=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
+          if [ -f "$EXP/compare.json" ] && [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
+            python experiments/scripts/summarize_stress_run.py \
+              --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" \
+              --pf-run-dir "$EXP/pf/$PF_RUN_ID" \
+              --compare-json "$EXP/compare.json" \
+              --out "$EXP/stress_summary.json" \
+              --pf-commit "$PF_COMMIT"
+          else
+            echo '{"schema_version":"1.0","message":"compare.json or run dirs not produced"}' > "$EXP/stress_summary.json"
+          fi
+
+      - name: Stress regression alerts
+        run: |
+          EXP=runs/exp-step2-lite-stress-large-repos
+          if [ ! -f "$EXP/stress_summary.json" ] || [ ! -f "$EXP/compare.json" ]; then
+            echo "Stress summary or compare.json missing; skipping alerts."
+            exit 0
+          fi
+          python experiments/scripts/check_stress_alerts.py \
+            --stress-summary "$EXP/stress_summary.json" \
+            --compare-json "$EXP/compare.json"
+
+      - name: Upload stress artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: swebench-stress-${{ github.run_number }}
+          path: |
+            runs/exp-step2-lite-stress-large-repos/compare.json
+            runs/exp-step2-lite-stress-large-repos/stress_summary.json
+            runs/exp-step2-lite-stress-large-repos/compare.csv
+
+      - name: Upload stress_summary.json (named artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-summary
+          path: runs/exp-step2-lite-stress-large-repos/stress_summary.json

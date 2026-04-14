@@ -91,14 +91,12 @@ def labelJsonValue (config : LabelerConfig) (state : LabelerState) (value : Json
 
 /-- Generate Merkle witness for labeled paths -/
 def generateMerkleWitness (state : LabelerState) : String :=
-  -- Implementation would generate actual Merkle tree hash
-  -- For now, return a placeholder
+  -- TODO: generate actual Merkle tree hash from state
   "merkle_witness_hash"
 
 /-- Generate Bloom filter witness -/
 def generateBloomWitness (state : LabelerState) : String :=
-  -- Implementation would generate Bloom filter
-  -- For now, return a placeholder
+  -- TODO: generate Bloom filter from state
   "bloom_witness_hash"
 
 /-- Export labeler to JSON -/

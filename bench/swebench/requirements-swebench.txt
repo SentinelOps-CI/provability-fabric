@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Recommended dependencies for SWE-bench runner and harness.
+# For golden runs, pin exact versions (e.g. datasets==X.Y.Z swebench==A.B.C)
+# and record the pip hash in the run README; check env_drift in compare.json after each run.
+#
+# Install in a dedicated venv to avoid conflicts with other projects (corridor-os, crewai,
+# guardrails-ai, etc.). From repo root: python -m venv .venv-wsl && . .venv-wsl/bin/activate
+# (WSL) or python -m venv .venv && .venv\Scripts\activate (Windows), then:
+#   pip install -r bench/swebench/requirements-swebench.txt
+#
+# Debian 12 (bookworm) VMs often have Python 3.11 only; apt may not ship python3.12. For OpenHands
+# (PyPI), use Python 3.12+: run experiments/scripts/setup_swebench_venv.sh after installing uv
+# (https://docs.astral.sh/uv/getting-started/installation/), or manually:
+#   source "$HOME/.local/bin/env"   # put uv on PATH after install
+#   uv python install 3.12 && uv venv --python 3.12 --seed .venv-wsl && . .venv-wsl/bin/activate
+#   python -m pip install -U pip && pip install -r bench/swebench/requirements-swebench.txt
+# `uv venv` without --seed has no pip; then use: uv pip install --python .venv-wsl/bin/python -r ...
+# If you ever ran `pip install openhands` and got version 0.0.0, that is the wrong stub package:
+#   pip uninstall -y openhands
+#
+# --- Disk space (especially 10 GB GCP boot disks) ---
+# A small boot disk fills fast: Docker layers for the SWE-bench harness and base images; the
+# HuggingFace/datasets cache (~/.cache/huggingface, often GiB after first loads); per-instance git
+# clones under workspaces/; uv/Python wheels; apt and logs. Symptoms look like random I/O errors,
+# "no space left on device", failed docker pull, or broken pip installs—not always obvious.
+# Check often: df -h; du -sh ~/.cache/huggingface workspaces /var/lib/docker 2>/dev/null.
+# Mitigations: resize the boot disk or attach a data disk and set HF_HOME (and optionally
+# DOCKER_ROOT) there; docker image prune / docker system prune when safe; trim old workspaces/ and
+# run artifacts; avoid committing caches into the repo. Prefer at least ~50 GB for repeated
+# OpenHands + harness + dataset-heavy work. See bench/swebench/README.md "Disk space".
+#
+datasets
+swebench
+# Property-based tests (tests/test_evidence_bundle_properties.py, etc.)
+hypothesis>=6.0
+# OpenHands (PyPI): releases in the 1.11–1.13 range require Python >= 3.12. On 3.11 this line is
+# skipped automatically; use Python 3.12+ venv for --engine openhands, or install from the
+# upstream OpenHands repo / uv per their docs. Do not use the unrelated `openhands==0.0.0` stub on PyPI.
+openhands>=1.11,<1.14; python_version >= "3.12"

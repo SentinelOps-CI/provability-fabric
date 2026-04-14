@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BundleManifestV1",
+  "description": "v1 bundle manifest: expected policy/automata/labeler digests for sidecar and middlewares",
+  "type": "object",
+  "required": ["policy_hash", "automata_hash", "labeler_hash", "version"],
+  "properties": {
+    "version": { "type": "string", "const": "1" },
+    "policy_hash": { "type": "string", "description": "SHA-256 hex of policy specification" },
+    "automata_hash": { "type": "string", "description": "SHA-256 hex of generated DFA/automata" },
+    "labeler_hash": { "type": "string", "description": "SHA-256 hex of label derivation logic" },
+    "bundle_hash": { "type": "string", "description": "Optional: hash of bundle file bytes" }
+  },
+  "additionalProperties": false
+}

@@ -21,6 +21,7 @@
     "recharts": "^2.12.7"
   },
   "devDependencies": {
+    "eslint": "~8.57.0",
     "@tailwindcss/forms": "^0.5.10",
     "@types/prismjs": "^1.26.3",
     "@types/react": "^18.2.0",
@@ -35,7 +36,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "npx eslint src/ --ext .ts,.tsx"
   },
   "eslintConfig": {
     "extends": [

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable, Awaitable, Optional, Any
@@ -29,10 +30,10 @@ class CertMiddleware(BaseHTTPMiddleware):
 
         cert: dict[str, Any] = {
             "bundle_id": "standards-lane",
-            "policy_hash": "placeholder-policy-hash",
-            "proof_hash": "placeholder-proof-hash",
-            "automata_hash": "placeholder-automata-hash",
-            "labeler_hash": "placeholder-labeler-hash",
+            "policy_hash": os.environ.get("CERT_POLICY_HASH", "n/a"),
+            "proof_hash": os.environ.get("CERT_PROOF_HASH", "n/a"),
+            "automata_hash": os.environ.get("CERT_AUTOMATA_HASH", "n/a"),
+            "labeler_hash": os.environ.get("CERT_LABELER_HASH", "n/a"),
             "ni_claim": "global_non_interference",
             "ni_monitor": ("accept" if response.status_code < 400 else "reject"),
             "sidecar_build": "fastapi-mw@1.0.0",

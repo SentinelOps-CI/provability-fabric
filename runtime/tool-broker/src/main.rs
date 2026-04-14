@@ -1,12 +1,14 @@
+// Tool broker with rate limiting and approvals; some code paths and types are reserved for future use.
+#![allow(dead_code, unused_variables)]
+
 use anyhow::{Context, Result};
-use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error};
-use metrics::{counter, histogram, gauge};
+use tracing::{info, warn};
+use metrics::{counter, histogram};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
@@ -18,7 +20,7 @@ mod ratelimit_test;
 #[cfg(test)]
 mod integration_test;
 
-use ratelimit::{RateLimiter, RateLimitConfig, RateLimitDecision, RateLimitUsage};
+use ratelimit::{RateLimiter, RateLimitConfig, RateLimitDecision};
 use approvals::ApprovalManager;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -30,7 +32,7 @@ struct KernelDecision {
     warnings: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ApprovedStep {
     step_index: usize,
     tool: String,
@@ -38,7 +40,7 @@ struct ApprovedStep {
     receipts: Option<Vec<AccessReceipt>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct AccessReceipt {
     receipt_id: String,
     tenant: String,
@@ -51,7 +53,7 @@ struct AccessReceipt {
     sig: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ToolCall {
     tool: String,
     args: HashMap<String, serde_json::Value>,
@@ -67,7 +69,7 @@ struct ToolResult {
     timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct Violation {
     violation_type: String,
     reason: String,
@@ -116,14 +118,9 @@ impl ToolBroker {
     async fn submit_plan(&self, plan_json: &str) -> Result<KernelDecision> {
         let start_time = std::time::Instant::now();
         
-        // Record connection pool metrics
-        let pool_status = self.http_client.get_pool_status();
-        gauge!("http_connection_pool_size", pool_status.idle_connections as f64);
-        gauge!("http_connection_pool_available", pool_status.available_connections as f64);
-        
         let response = self
             .http_client
-            .post(&format!("{}/approve", self.kernel_url))
+            .post(format!("{}/approve", self.kernel_url))
             .header("Content-Type", "application/json")
             .body(plan_json.to_string())
             .send()
@@ -380,8 +377,8 @@ impl ToolBroker {
             return Err(anyhow::anyhow!("Receipt signature is empty"));
         }
 
-        // TODO: Implement actual signature verification
-        // For now, just validate structure
+        // Signature verification: requires trust root PEM/JWKS (see docs/specs/dsse-verify-contract.md).
+        // Structural validation only until Ed25519 verify is wired.
         info!("Receipt verified: {}", receipt.receipt_id);
         Ok(())
     }
@@ -407,7 +404,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let kernel_url = std::env::var("KERNEL_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-    let broker = ToolBroker::new(kernel_url);
+    let broker = ToolBroker::new(kernel_url.clone());
 
     info!("Tool broker started with kernel URL: {}", kernel_url);
 

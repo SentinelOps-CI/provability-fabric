@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
@@ -164,7 +164,7 @@ impl ApprovalManager {
         // Store the request
         {
             let mut requests = self.pending_requests.write().await;
-            requests.insert(request_id.clone(), approval_request);
+            requests.insert(request_id.clone(), approval_request.clone());
         }
 
         // Auto-approve low risk requests if configured

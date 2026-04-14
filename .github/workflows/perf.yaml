@@ -31,10 +31,9 @@ jobs:
           pip install psutil
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          override: true
 
       - name: Build sidecar watcher
         run: |

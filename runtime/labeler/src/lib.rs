@@ -18,6 +18,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt;
 use std::fs;
 use std::path::Path;
 
@@ -29,20 +30,17 @@ pub enum JsonPath {
     Index { parent: Box<JsonPath>, idx: usize },
 }
 
-impl JsonPath {
-    /// Convert path to string representation
-    pub fn to_string(&self) -> String {
+impl fmt::Display for JsonPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            JsonPath::Root => "$".to_string(),
-            JsonPath::Field { parent, name } => {
-                format!("{}.{}", parent.to_string(), name)
-            }
-            JsonPath::Index { parent, idx } => {
-                format!("{}[{}]", parent.to_string(), idx)
-            }
+            JsonPath::Root => write!(f, "$"),
+            JsonPath::Field { parent, name } => write!(f, "{}.{}", parent, name),
+            JsonPath::Index { parent, idx } => write!(f, "{}[{}]", parent, idx),
         }
     }
+}
 
+impl JsonPath {
     /// Parse string representation to JsonPath
     pub fn from_string(s: &str) -> Result<Self, String> {
         if s == "$" {
@@ -50,11 +48,11 @@ impl JsonPath {
         }
 
         // Simple parser for basic paths like $.field[0].subfield
-        let mut parts = s.split('.');
+        let parts = s.split('.');
         let mut current = JsonPath::Root;
 
-        while let Some(part) = parts.next() {
-            if part.is_empty() {
+        for part in parts {
+            if part.is_empty() || part == "$" {
                 continue;
             }
 
@@ -115,6 +113,12 @@ pub struct LabelerState {
     pub labels: HashMap<String, String>,
     pub witnesses: Vec<String>,
     pub processed_paths: HashMap<String, String>,
+}
+
+impl Default for LabelerState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LabelerState {
@@ -185,32 +189,38 @@ impl Labeler {
         match value {
             serde_json::Value::Null => {
                 let label = self.config.default_label.clone();
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
             serde_json::Value::Bool(_) => {
                 let label = self.config.default_label.clone();
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
             serde_json::Value::Number(_) => {
                 let label = self.config.default_label.clone();
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
             serde_json::Value::String(s) => {
                 let label = self.label_string_value(s, state)?;
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
             serde_json::Value::Array(arr) => {
                 let label = self.label_array_value(arr, state)?;
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
             serde_json::Value::Object(obj) => {
                 let label = self.label_object_value(obj, state)?;
-                state.add_label(&state.current_path, &label);
+                let path = state.current_path.clone();
+                state.add_label(&path, &label);
                 Ok(label)
             }
         }
@@ -286,7 +296,7 @@ impl Labeler {
 
         // Sort paths for deterministic hashing
         let mut paths: Vec<_> = state.processed_paths.iter().collect();
-        paths.sort_by_key(|(path, _)| path);
+        paths.sort_by(|a, b| a.0.cmp(b.0));
 
         for (path, label) in paths {
             hasher.update(path.as_bytes());
@@ -317,7 +327,7 @@ impl Labeler {
 
         for rule in &self.config.rules {
             if rule.path.is_empty() {
-                errors.push(format!("Rule has empty path"));
+                errors.push("Rule has empty path".to_string());
             }
             if rule.label.is_empty() {
                 errors.push(format!("Rule for path '{}' has empty label", rule.path));
@@ -346,7 +356,7 @@ impl Labeler {
 }
 
 /// Generate labeler from schema and taint rules
-pub fn generate_labeler(schema: &serde_json::Value, rules: &[TaintRule]) -> LabelerConfig {
+pub fn generate_labeler(_schema: &serde_json::Value, rules: &[TaintRule]) -> LabelerConfig {
     LabelerConfig {
         rules: rules.to_vec(),
         default_label: "untrusted".to_string(),
@@ -387,7 +397,7 @@ mod tests {
         let mut state = LabelerState::new();
 
         // Test JSON-in-string detection
-        let json_string = json!("{\"key\": \"value\"}");
+        let _json_string = json!("{\"key\": \"value\"}");
         let label = labeler
             .label_string_value("{\"key\": \"value\"}", &mut state)
             .unwrap();

@@ -94,7 +94,7 @@ Provability Fabric is a zero-trust, enclave-based system that provides cryptogra
 - **Network Security**: Firewalls, IDS/IPS, DDoS protection
 - **Code Security**: Static analysis, dynamic testing, code reviews
 - **Access Control**: Multi-factor authentication, least privilege
-- **Supply Chain**: Dependency scanning, package verification
+- **Supply Chain**: Dependency scanning (GitHub **Dependency review** on PRs, **cargo-deny** with root `deny.toml`, SBOM diff / Grype in CI), signed releases where applicable, and workflow linting (**actionlint**) when `.github/workflows/**` changes. See [CI reference](../reference/ci-reference.md), [SECURITY.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/SECURITY.md), and [AGENTS.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/AGENTS.md).
 - **Physical Security**: Secure facilities, hardware security modules
 
 ## Compliance & Auditing

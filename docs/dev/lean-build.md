@@ -47,7 +47,7 @@ require mathlib from "../../../vendor/mathlib"
 
 1. **Clone the repository**:
    ```bash
-   git clone --recursive https://github.com/your-org/provability-fabric.git
+   git clone --recursive https://github.com/SentinelOps-CI/provability-fabric.git
    cd provability-fabric
    ```
 

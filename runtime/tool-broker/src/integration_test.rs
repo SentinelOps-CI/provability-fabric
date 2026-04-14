@@ -2,6 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 use super::*;
+use super::ratelimit::{RateLimitUsage, ToolRateLimit};
 use std::collections::HashMap;
 
 #[tokio::test]
@@ -55,12 +56,12 @@ async fn test_tool_broker_integration() {
     
     // Verify broker components are properly initialized
     assert!(broker.rate_limiter.usage_tracker.read().await.tool_usage.is_empty());
-    assert!(broker.approval_manager.pending_requests.read().await.is_empty());
+    assert!(broker.approval_manager.get_pending_requests().await.is_empty());
 }
 
 #[tokio::test]
 async fn test_rate_limiting_integration() {
-    let broker = ToolBroker::new("http://localhost:8080".to_string());
+    let mut broker = ToolBroker::new("http://localhost:8080".to_string());
     
     // Test that rate limiting is properly integrated
     let stats = broker.get_rate_limit_stats().await.unwrap();
@@ -89,12 +90,12 @@ async fn test_approval_integration() {
     let broker = ToolBroker::new("http://localhost:8080".to_string());
     
     // Test that approval manager is properly integrated
-    let pending_requests = broker.approval_manager.pending_requests.read().await;
+    let pending_requests = broker.approval_manager.get_pending_requests().await;
     assert!(pending_requests.is_empty());
     
     // Test approval workflow (this would require a real approval request in a real scenario)
     // For now, we just verify the component is accessible
-    assert!(broker.approval_manager.approvers.read().await.is_empty());
+    assert!(broker.approval_manager.get_approvers().await.is_empty());
 }
 
 #[tokio::test]

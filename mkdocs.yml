@@ -5,8 +5,8 @@ site_description: Open-source framework for AI agent behavioral guarantees
 site_author: Provability-Fabric Contributors
 site_url: https://provability-fabric.org/
 
-repo_name: provability-fabric/provability-fabric
-repo_url: https://github.com/provability-fabric/provability-fabric
+repo_name: SentinelOps-CI/provability-fabric
+repo_url: https://github.com/SentinelOps-CI/provability-fabric
 edit_uri: edit/main/docs/
 
 docs_dir: docs

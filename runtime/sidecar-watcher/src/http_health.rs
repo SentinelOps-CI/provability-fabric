@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Minimal HTTP health endpoint for the runtime-sidecar.
 
-use axum::{routing::get, Json, Router};
+use anyhow::Result;
 use axum::http::StatusCode;
+use axum::{routing::get, Json, Router};
 use serde::Serialize;
 use std::{net::SocketAddr, time::SystemTime};
-use anyhow::Result;
 
 #[derive(Serialize)]
 struct Health {
