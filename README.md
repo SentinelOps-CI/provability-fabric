@@ -1,365 +1,295 @@
+<div align="center">
+
+<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="220"/>
+
 # Provability Fabric
 
-<!-- Badges -->
-[![PR Comments](https://img.shields.io/badge/PR%20Comments-Enabled-blue.svg)](#)
+**Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://provability-fabric.org)
-[![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Lean%20Proofs%20Complete-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
-[![Lean on Morph](https://img.shields.io/badge/Lean%20on%20Morph-Sharded%20CI-blue)](.github/workflows/lean-morph.yml)
+[![Documentation](https://img.shields.io/badge/docs-site-brightgreen.svg)](https://provability-fabric.org)
+[![Formal verification](https://img.shields.io/badge/verification-Lean-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
+[![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
+[![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
 
-An open-source framework that enforces provable behavioral guarantees through formal verification, runtime security mechanisms, and comprehensive audit trails.
+<br/>
 
-<p align="center">
-  <img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric Logo" width="200"/>
-</p>
+[Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Agent & CI guide](AGENTS.md)
 
-## Repository Structure
+</div>
+
+---
+
+## Why this project
+
+Provability Fabric ties **specifications and proofs** to **what actually runs**. You get Lean-backed bundles, sidecars and admission control that enforce policy, and trails you can replay and verify — not only “best effort” logging.
+
+| Pillar | What it gives you |
+| :--- | :--- |
+| **Prove** | Specifications and Lean proofs live next to agent bundles so claims are checkable, not hand-wavy. |
+| **Enforce** | Rust and Go runtimes, WASM sandboxing, and tooling brokers limit what agents can do at execution time. |
+| **Audit** | Evidence formats, ledgers, and replay-oriented workflows support end-to-end accountability. |
+
+---
+
+## Repository map
+
+The tree is large; use this as a compass. For CI, supply chain, and local commands, see [**AGENTS.md**](AGENTS.md).
+
+| Area | Path | Notes |
+|------|------|--------|
+| **CLI & core** | [`core/`](core/) | `core/cli/pf` — Go CLI; specs, bundles, SDKs |
+| **Proofs & templates** | [`spec-templates/v1`](spec-templates/v1), [`lakefile.lean`](lakefile.lean) | Lean 4; `lake build` from proof dirs |
+| **Runtime** | [`runtime/`](runtime/) | Rust: attestor, KMS proxy, tool-broker, sidecar-watcher, labeler, wasm-sandbox; Node ledger; Go admission-controller |
+| **Adapters** | [`adapters/`](adapters/) | HTTP/file and framework adapters (Rust, Node, Python, Go) |
+| **Platform & UI** | [`services/`](services/), [`console/`](console/), [`marketplace/`](marketplace/) | APIs, console, marketplace |
+| **Config & schemas** | [`config/`](config/) | JSON schemas and specification assets |
+| **Benchmarks** | [`bench/swebench/`](bench/swebench/README.md) | SWE-bench runner; Linux/WSL for real runs; details in package README |
+| **Experiments** | [`experiments/`](experiments/README.md) | Eval manifests, compare/replay tooling |
+| **Docs** | [`docs/`](docs/) | MkDocs site; build with `pip install -r docs/requirements.txt` then `mkdocs build` |
+| **Tests** | [`tests/`](tests/) | Unit, integration, replay, privacy suites |
+
+<details>
+<summary><strong>Full top-level layout</strong> (click to expand)</summary>
 
 ```
 provability-fabric/
-├── README.md                 # Project documentation
-├── LICENSE                   # Apache 2.0 license
-├── VERSION                   # Current version
-├── Makefile                  # Build system
-├── lakefile.lean            # Lean build configuration
-├── lean-toolchain           # Lean version specification
-├── .gitignore               # Version control exclusions
-├── config/                  # Configuration files
-│   ├── schemas/            # JSON schemas (e.g., aispec-schema.json)
-│   └── specifications/     # Specification documents
-├── scripts/                 # Utility scripts
-│   └── setup/              # Infrastructure setup scripts
-├── tests/                   # Test suites
-│   ├── integration/        # Integration tests
-│   ├── unit/               # Unit tests
-│   ├── privacy/            # Privacy tests
-│   ├── replay/             # Replay tests
-│   └── debugging/          # Debugging tests
-├── core/                    # Core framework
-├── runtime/                 # Runtime components
-├── bundles/                 # Agent bundles
-├── tools/                   # Development tools
-├── docs/                    # Documentation
-└── [other directories...]
+├── core/              # CLI, SDKs, bundles
+├── runtime/           # Rust / Go / Node services
+├── adapters/          # Integration adapters
+├── config/            # Schemas and specs
+├── bench/             # Benchmarks (see bench/swebench/README.md)
+├── experiments/       # Research / eval harness (see experiments/README.md)
+├── tests/             # Test suites
+├── docs/              # Documentation source
+├── tools/             # Dev and compliance tooling
+├── Cargo.toml         # Rust workspace
+├── Makefile           # Compose and convenience targets
+└── lean-toolchain     # Pinned Lean version
 ```
 
-## Quick Start
-## Standards & Replays
+</details>
 
-Adopt the ecosystem standards and end-to-end evidence loop:
+### Rust workspace
 
-- CERT-V1 (schema + verifiers): https://github.com/verifiable-ai-ci/CERT-V1
-- TRACE-REPLAY-KIT (runner + oracles): https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT
-- morph-lean-ci (sharded Lean): https://github.com/SentinelOps-CI/morph-lean-ci
-- morph-replay-runner (branch-N replays): https://github.com/SentinelOps-CI/morph-replay-runner
-- mcp-sidecar-demo (permissions/epochs/IFC): https://github.com/SentinelOps-CI/mcp-sidecar-demo
-
-See `docs/standards.md`, `docs/Evidence.md`, and `docs/Replay.md` for usage.
-
-### Option 1: Automated Installation (Recommended)
+Toolchain: [`rust-toolchain.toml`](rust-toolchain.toml) (stable, clippy, rustfmt).
 
 ```bash
-# Clone the repository
+cargo build
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+```
+
+**Members include:** `runtime/attestor`, `runtime/kms-proxy`, `runtime/tool-broker`, `runtime/sidecar-watcher`, `runtime/labeler`, `runtime/wasm-sandbox`, `adapters/http-get`, `adapters/file-read`. Optional or standalone crates (Hyperscan, protoc, fuzz, etc.) are documented in the root [`Cargo.toml`](Cargo.toml) and per-crate READMEs.
+
+### How pieces fit together
+
+- **Minimal (CLI + bundles):** [`core/cli/pf`](core/cli/pf), [`bundles/`](bundles/), [`config/`](config/). See [Reuse and extend](docs/guides/reuse-and-extend.md).
+- **Full platform:** Go services, console, ledger, gateway — use Docker Compose or the launch scripts below.
+- **Optional:** `bench/`, `experiments/`, `console/`, `marketplace/`, `demos/` are not required for a CLI-only or forked minimal setup.
+
+---
+
+## Ecosystem standards
+
+Adopt shared schemas, replay tooling, and CI patterns alongside this repo:
+
+- [CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) — schema and verifiers  
+- [TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) — runner and oracles  
+- [morph-lean-ci](https://github.com/SentinelOps-CI/morph-lean-ci) — sharded Lean CI  
+- [morph-replay-runner](https://github.com/SentinelOps-CI/morph-replay-runner) — branch replays  
+- [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) — permissions, epochs, IFC  
+
+In-repo: [`docs/specs/standards.md`](docs/specs/standards.md), [`docs/evidence/overview.md`](docs/evidence/overview.md), [`docs/evidence/replay.md`](docs/evidence/replay.md).
+
+---
+
+## Quick start
+
+### Option 1 — Install script (recommended)
+
+```bash
 git clone https://github.com/SentinelOps-CI/provability-fabric
+cd provability-fabric
 
-# Run the installation script
-./scripts/install.sh           # For Linux/macOS
-scripts/install.bat            # For Windows Command Prompt (RECOMMENDED for Windows)
-# Note: Git Bash on Windows may have execution issues
+# Linux / macOS
+./scripts/install.sh
+./scripts/test-new-user.sh
 
-# Test the installation
-./scripts/test-new-user.sh     # For Linux/macOS
-scripts/test-new-user.bat      # For Windows Command Prompt (RECOMMENDED for Windows)
-
-# Troubleshoot Windows Git Bash issues (if needed)
-bash scripts/windows-troubleshoot.sh  # For Windows Git Bash troubleshooting
+# Windows (Command Prompt is recommended for install scripts)
+scripts\install.bat
+scripts\test-new-user.bat
 ```
 
-### Option 2: Launch the Production Web Interface
+Git Bash on Windows can mis-handle paths and execution; prefer **cmd** or **PowerShell** for `install.bat` / `test-new-user.bat`. For Git Bash issues: `bash scripts/windows-troubleshoot.sh`.
 
-The project includes a comprehensive web ecosystem with real-time capabilities, advanced search, and secure authentication:
+### Option 2 — Web stack (Docker or scripts)
+
+Full stack is optional; for CLI-only workflows see [Reuse and extend](docs/guides/reuse-and-extend.md).
+
+- **Services only:** `docker compose up`  
+- **Console and demos:** `docker compose --profile full up`  
+- **Convenience:** `./launch-web-interfaces.sh` (Unix) or `launch-web-interfaces.bat` (Windows)
+
+**Manual pieces (examples):**
 
 ```bash
-# Quick launch all services (Recommended)
-./launch-web-interfaces.bat     # Windows
-./launch-web-interfaces.sh      # Linux/macOS
-
-# Or launch services individually:
-
-# 1. Start the Ledger API with WebSocket and Authentication
+# Ledger API (example)
 cd runtime/ledger && node minimal-server.js
-# Available at: http://localhost:8080
+# → http://localhost:8080
 
-# 2. Start the Console UI
+# Console
 cd console && npm install && npm start
-# Available at: http://localhost:3000
+# → http://localhost:3000
 
-# 4. Start the Documentation Site
+# Docs (from repo root, after pip install -r docs/requirements.txt)
 mkdocs serve --dev-addr=127.0.0.1:8002
-# Available at: http://127.0.0.1:8002
+# → http://127.0.0.1:8002
+```
 
-### Option 3: Manual Installation
+### Option 3 — Build the CLI from source
 
 ```bash
-# Clone the repository
 git clone https://github.com/SentinelOps-CI/provability-fabric
+cd provability-fabric
 
-# Build the CLI from source
 cd core/cli/pf
-go build -o pf .  # On Windows, output is pf.exe
+go build -o pf .    # Windows: pf.exe
+export PATH="$PATH:$(pwd)"          # Linux / macOS
+# Windows (cmd):  set PATH=%PATH%;%CD%
+# Windows (PS):   $env:PATH += ";$PWD"
 
-# Add to PATH (Important for Windows users)
-# Linux/macOS
-export PATH=$PATH:$(pwd)
+cd ../../..
+./pf init my-agent                  # Windows: pf.exe init my-agent
 
-# Windows (Command Prompt) - RECOMMENDED
-set PATH=%PATH%;%CD%
-
-# Windows (PowerShell)
-$env:PATH += ";$PWD"
-
-# Go back to repository root
+cd spec-templates/v1/proofs
+lake build                          # requires Lean 4
 cd ../../..
 
-# Initialize a new agent specification
-./pf init my-agent           # Linux/macOS
-pf.exe init my-agent         # Windows CMD or PowerShell (RECOMMENDED for Windows)
-
-# Create and verify proofs (must be run from the correct directory)
-cd spec-templates/v1/proofs
-lake build                   # Requires Lean 4 to be installed
-cd ../../../
-
-# Run TRUST-FIRE GA test suite (must be run from repository root)
 python tests/trust_fire_orchestrator.py
-
-# Deploy with runtime monitoring (Kubernetes)
-# Note: The deployment files are Helm templates and require proper setup
-# For testing, you can use the inline deployments from the GitHub workflows:
-kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: attestor
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: attestor
-  template:
-    metadata:
-      labels:
-        app: attestor
-    spec:
-      containers:
-      - name: attestor
-        image: provability-fabric/attestor:test
-        ports:
-        - containerPort: 8080
-        env:
-        - name: REDIS_URL
-          value: "redis://redis-master:6379"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: attestor-service
-spec:
-  selector:
-    app: attestor
-  ports:
-  - protocol: TCP
-    port: 8080
-    targetPort: 8080
-EOF
 ```
+
+**Kubernetes:** use Helm charts under [`charts/`](charts/) and [`runtime/admission-controller/deploy/`](runtime/admission-controller/deploy/) with values suited to your cluster.
+
+---
 
 ## Prerequisites
 
-Before running the installation, ensure you have:
+| Profile | You need |
+|---------|-----------|
+| **Minimal** | [Go 1.23+](https://go.dev/dl/) (`core/cli/pf/go.mod`). Lean optional for proofs. No Docker/Node/Rust required for bare CLI. |
+| **CLI + Rust runtime** | Go + [Rust](https://rustup.rs/) (see `rust-toolchain.toml`). Docker/Node optional. |
+| **Full stack** | Go, Python 3.8+, Node 18+, Rust, Docker; Lean and kubectl optional. |
 
-- **Go 1.21+** - For building CLI tools
-- **Python 3.8+** - For running tests and scripts
-- **Node.js 18+** - For UI components (optional)
-- **Lean 4** - For formal proofs (optional, see [Lean installation guide](https://leanprover.github.io/lean4/doc/quickstart.html))
-- **kubectl** - For Kubernetes deployment (optional)
-- **Rust** - For runtime components (optional)
-
-**For Data Retention Manager:**
-
-- **PostgreSQL** - For hot storage (7-day retention)
-- **AWS S3** - For warm storage (compressed Parquet)
-- **Google BigQuery** - For cold storage analytics
-- **Python packages**: `psycopg2-binary`, `boto3`, `google-cloud-bigquery`, `pandas`, `pyarrow`, `pyyaml`
-
-## Architecture
-
-Provability-Fabric consists of six core components with comprehensive security and real-time capabilities:
-
-1. **Specification Bundles** - YAML specifications with Lean proofs
-2. **Runtime Guards** - Sidecar containers that monitor execution
-3. **Solver Adapters** - Verification engines for neural networks and hybrid systems
-4. **Marketplace UI** - React-based dashboard with advanced search and real-time updates
-5. **WebSocket Real-Time System** - Live communication for monitoring and notifications
-6. **Authentication & User Management** - JWT-based security with role-based access control
-
-### Architecture
-
-```mermaid
-flowchart TD
-    A[Agent Specification] --> B[Lean Proof Generation]
-    B --> C[Specification Bundle]
-    C --> D[Admission Controller]
-    D --> E[Container Deployment]
-    E --> F[Sidecar Watcher]
-    F --> G[Runtime Monitoring]
-    G --> H[Constraint Enforcement]
-
-    I[Neural Network] --> J[Marabou Adapter]
-    J --> K[Verification Proof]
-    K --> C
-
-    L[Hybrid System] --> M[DryVR Adapter]
-    M --> N[Reach Set]
-    N --> C
-
-    O[GPU Neural Network] --> P[α-β-CROWN Adapter]
-    P --> Q[GPU Verification Proof]
-    Q --> C
-
-    C --> O[Transparency Ledger]
-    O --> P[GraphQL API]
-
-    style A fill:#e1f5fe
-    style C fill:#f3e5f5
-    style F fill:#fff3e0
-    style O fill:#e8f5e8
-```
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](docs/community/governance.md) for details.
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/SentinelOps-CI/provability-fabric
-
-# Build CLI tools from source
-cd core/cli/pf && go build -o pf.exe . && cd ../..
-cd cmd/specdoc && go build -o specdoc.exe . && cd ../..
-
-# Install Python dependencies for testing (if requirements.txt files exist)
-if [ -f "tests/integration/requirements.txt" ]; then pip install -r tests/integration/requirements.txt; fi
-if [ -f "tests/proof-fuzz/requirements.txt" ]; then pip install -r tests/proof-fuzz/requirements.txt; fi
-if [ -f "tools/compliance/requirements.txt" ]; then pip install -r tools/compliance/requirements.txt; fi
-if [ -f "tools/insure/requirements.txt" ]; then pip install -r tools/insure/requirements.txt; fi
-if [ -f "tools/proofbot/requirements.txt" ]; then pip install -r tools/proofbot/requirements.txt; fi
-
-# Install Node.js dependencies for Console UI
-cd console && npm install && cd ..
-
-# Start the Console UI development server (optional)
-cd console && npm start
-# The UI will be available at http://localhost:3000
-
-# Run tests (from repository root)
-python tests/trust_fire_orchestrator.py
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **`pf` command not found**: Make sure you've built the CLI and added it to your PATH
-2. **`lake build` fails**: Ensure you're in the `spec-templates/v1/proofs` directory and have Lean 4 installed
-3. **Python script errors**: Make sure you're running scripts from the repository root
-4. **`deployment.yaml` not found**: The deployment files are Helm templates, not plain Kubernetes YAML. Use the inline examples from the README or set up Helm properly
-5. **Kubernetes deployment fails**: Requires a running Kubernetes cluster (Docker Desktop, Minikube, or cloud cluster)
-6. **Git Bash path issues**: Use forward slashes (`/`) instead of backslashes (`\`) in Git Bash
-7. **Windows file removal issues**: Use the updated scripts with Windows-compatible file removal methods
-8. **"Device or resource busy" errors**: Close any applications accessing the files and try again
-9. **UI module resolution errors**: Ensure TypeScript configuration is properly set up in `marketplace/ui/tsconfig.json`
-10. **Heroicons import errors**: Use the correct icon names (e.g., `CubeIcon` instead of `PackageIcon`, `ArrowDownTrayIcon` instead of `DownloadIcon`)
-
-### Platform-Specific Notes
-
-- **Windows**: Use `pf.exe` instead of `pf` and ensure proper PATH setup. **Use Windows Command Prompt instead of Git Bash for running installation scripts**
-- **Git Bash/WSL**: Use `bash scripts/install.sh` for installation and forward slashes for paths
-- **Lean 4**: May require network access for dependency downloads
-- **Kubernetes**: Install Docker Desktop with Kubernetes enabled, or use Minikube for local development
-
-### Windows Git Bash Path Issues
-
-If you encounter path-related errors in Git Bash on Windows:
-
-1. **Use forward slashes**: Always use `/` instead of `\` in paths
-
-   ```bash
-   # Correct
-   bash scripts/install.sh
-   cd core/cli/pf
-
-   # Incorrect
-   bash scripts\install.sh
-   cd core\cli\pf
-   ```
-
-2. **File removal issues**: If you get "Device or resource busy" errors:
-
-   - Close any file explorers or text editors accessing the files
-   - Use the updated scripts which handle Windows file removal properly
-   - Try running the script again after closing applications
-
-3. **Command interpretation**: Git Bash interprets backslashes as escape characters:
-
-   ```bash
-   # Correct
-   export PATH=$PATH:$(pwd)/core/cli/pf
-
-   # Incorrect
-   export PATH=$PATH:$(pwd)\core\cli\pf
-   ```
-
-4. **Troubleshooting**: If you're still having issues, run the troubleshooting script:
-   ```bash
-   bash scripts/windows-troubleshoot.sh
-   ```
-
-### Lean 4 Setup
-
-For Lean 4 formal proofs:
-
-1. **Install Lean 4**: Follow the [official installation guide](https://leanprover.github.io/lean4/doc/quickstart.html)
-2. **Build proofs**: Run `cd spec-templates/v1/proofs && lake build`
-3. **Network issues**: If you encounter certificate errors, try using a VPN or check your network settings
-
-### Git Bash Specific Issues
-
-If you're using Git Bash on Windows and encounter issues:
-
-1. **Path separators**: Use forward slashes (`/`) instead of backslashes (`\`)
-2. **Command execution**: Use `bash scripts/install.sh` instead of `scripts\install.bat`
-3. **File permissions**: Some file operations may require different permissions in Git Bash
-4. **Line endings**: Ensure files use Unix line endings (LF) instead of Windows line endings (CRLF)
-5. **"Device or resource busy" errors**: Close any applications (file explorers, editors) that might be accessing the files
-6. **File removal issues**: The scripts now use Windows-compatible file removal methods
-7. **Backslash interpretation**: Git Bash interprets backslashes as escape characters, so always use forward slashes
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Lean 4](https://leanprover.github.io/) - Formal proof system
-- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) - Neural network verification
-- [DryVR](https://github.com/verivital/dryvr) - Hybrid system verification
-- [α-β-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) - GPU-accelerated neural network verification
-- [Sigstore](https://sigstore.dev/) - Cryptographic signing
-- [Memurai](https://docs.memurai.com/) - Redis-compatible server for Windows
+**Data retention manager (if used):** PostgreSQL, S3, BigQuery, and Python deps (`psycopg2-binary`, `boto3`, `google-cloud-bigquery`, `pandas`, `pyarrow`, `pyyaml`) as required by your deployment.
 
 ---
 
-**Provability-Fabric** - Trust in AI through formal verification and comprehensive security mechanisms with advanced multi-channel security and performance guarantees.
+## Architecture
+
+High-level flow: specifications and external verifiers feed **bundles**; admission and sidecars enforce policy at runtime; the ledger and APIs expose state for operators and integrators.
+
+```mermaid
+flowchart TD
+    A[Agent specification] --> B[Lean proof generation]
+    B --> C[Specification bundle]
+    C --> D[Admission controller]
+    D --> E[Container deployment]
+    E --> F[Sidecar watcher]
+    F --> G[Runtime monitoring]
+    G --> H[Constraint enforcement]
+
+    I[Neural network] --> J[Marabou adapter]
+    J --> K[Verification proof]
+    K --> C
+
+    L[Hybrid system] --> M[DryVR adapter]
+    M --> N[Reach set]
+    N --> C
+
+    GNN[GPU neural network] --> ABC["α-β-CROWN adapter"]
+    ABC --> GPUP[GPU verification proof]
+    GPUP --> C
+
+    C --> TL[Transparency ledger]
+    TL --> GQL[GraphQL API]
+```
+
+**Major surfaces:** specification bundles (YAML + proofs), runtime guards (sidecars), solver adapters (e.g. Marabou, DryVR, α-β-CROWN), marketplace/console UIs, WebSocket updates, and JWT-based auth where enabled.
+
+---
+
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [Community governance](docs/community/governance.md).
+
+**Typical dev loop:**
+
+```bash
+git clone https://github.com/SentinelOps-CI/provability-fabric
+cd provability-fabric
+
+cd core/cli/pf && go build -o pf . && cd ../..
+# Optional: cmd/specdoc and other Go tools as needed
+
+# Python test deps (install where requirements.txt exists), for example:
+#   pip install -r tests/integration/requirements.txt
+#   pip install -r tests/proof-fuzz/requirements.txt
+#   pip install -r tools/compliance/requirements.txt
+#   pip install -r tools/insure/requirements.txt
+#   pip install -r tools/proofbot/requirements.txt
+
+cd console && npm install && npm start   # optional UI at http://localhost:3000
+cd ..
+
+python tests/trust_fire_orchestrator.py
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | What to check |
+|--------|----------------|
+| `pf` not found | Build `core/cli/pf` and add it to `PATH` (`pf.exe` on Windows). |
+| `lake build` fails | Run from the correct `proofs` directory; install [Lean 4](https://leanprover.github.io/lean4/doc/quickstart.html). |
+| Python errors | Run scripts from the **repository root** unless a doc says otherwise. |
+| K8s YAML / Helm | Many deployables are Helm templates, not raw `kubectl apply` files. |
+| Windows paths | Prefer **forward slashes** in Git Bash; use **cmd** for `.bat` installers. |
+| “Device or resource busy” | Close editors/explorers holding files; retry. |
+| UI / Heroicons | Match icon names to your `package.json` / TypeScript setup (see `marketplace/ui/tsconfig.json`). |
+
+**Windows:** Use `pf.exe` and Command Prompt for install scripts when Git Bash misbehaves. More detail: `bash scripts/windows-troubleshoot.sh`.
+
+---
+
+## Security
+
+Report vulnerabilities per [SECURITY.md](SECURITY.md).
+
+The default branch is protected by workflows including dependency review (PRs), **cargo-deny** ([`deny.toml`](deny.toml)), **actionlint**, SBOM jobs, and OpenSSF Scorecard. Enable the [dependency graph](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-the-dependency-graph) where GitHub features require it. Overview: [AGENTS.md](AGENTS.md), [.github/WORKFLOWS.md](.github/WORKFLOWS.md), [docs/reference/ci-reference.md](docs/reference/ci-reference.md).
+
+---
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE).
+
+---
+
+## Acknowledgments
+
+- [Lean 4](https://leanprover.github.io/) — interactive theorem proving  
+- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) — neural network verification  
+- [DryVR](https://github.com/verivital/dryvr) — hybrid systems  
+- [α-β-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) — GPU-accelerated NN verification  
+- [Sigstore](https://sigstore.dev/) — signing and transparency  
+- [Memurai](https://docs.memurai.com/) — Redis-compatible server for Windows  
+
+---
+
+<div align="center">
+
+<sub>Provability Fabric — specifications, enforcement, and evidence for trustworthy agents.</sub>
+
+</div>

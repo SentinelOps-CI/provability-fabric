@@ -1,7 +1,7 @@
 # SOC 2 / ISO 42001 Compliance Report
 
 Generated: 2025-01-27 10:00:00 UTC  
-Repository: provability-fabric/provability-fabric  
+Repository: SentinelOps-CI/provability-fabric  
 Run ID: 123456789
 
 ## Overview

@@ -5,7 +5,85 @@ All notable changes to Provability-Fabric are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - 2025-01-09 - "Model Context Protocol Integration"
+## [Unreleased] - Bench / eval pipeline hardening
+
+### Changed
+
+- **Documentation refresh:** Canonical clone and release URLs under `docs/**` now point to **`SentinelOps-CI/provability-fabric`** where appropriate; [docs/README.md](README.md) documents MkDocs via `docs/requirements.txt`, root `mkdocs.yml`, and output directory **`build/`**. [reference/ci-reference.md](reference/ci-reference.md) documents main `ci.yml`, reusable workflows, and supply-chain jobs (**dependency-review**, **cargo-deny**, **actionlint**, SBOM, Scorecard). [guides/developer-guide.md](guides/developer-guide.md), [guides/getting-started.md](guides/getting-started.md), [guides/testing-guide.md](guides/testing-guide.md), [security/overview.md](security/overview.md), [security/README.md](security/README.md), root [README.md](../README.md), [CONTRIBUTING.md](../CONTRIBUTING.md), and [SECURITY.md](../SECURITY.md) updated for Go **1.23+**, per-package Node installs, `cargo deny`, and CI automation cross-links.
+- **SWE-bench runner documentation** aligned with the modular layout: `RunConfig` and `_execute_run` in `bench/swebench/runner.py`, programmatic `bench/swebench/runner_core.run_swebench`, and supporting modules (`workspace_manager`, `instance_processor`, `evidence_writer`, `predictions_writer`, `summary_writer`, `cost_reporter`, `engines/`). Updates in root `README.md`, `docs/index.md`, `docs/README.md`, `docs/guides/developer-guide.md`, `docs/guides/testing-guide.md`, `docs/reference/cli-reference.md`, `docs/reference/ci-reference.md`, `docs/architecture/overview.md`, and `docs/internal/audit-swebench-experiments.md` (remove stale `runner.py` line pointers where applicable).
+
+### Added
+
+- **SWE-bench stabilization verification:** `docs/internal/swebench-stabilization-regression-matrix.md` documents the pytest gate command, budget alignment (`timeout_sec` / `openhands_timeout` / `OPENHANDS_TIMEOUT` = **1200**), Prime smoke checks on `env.json`, eval stale-container cleanup contract, and strict compare flags. Targeted tests: `tests/test_provider_env.py`, `tests/test_openhands_provider_env.py`, `tests/test_run_swebench_eval_cleanup.py`, `tests/test_experiments_compare_runs.py` (including all strict gates on a healthy fixture), `tests/test_run_config.py`.
+- **`bench/swebench/provider_env.py`:** shared normalization for `OPENHANDS_PROVIDER`, API keys, Prime default inference base URL, model ID prefixing for Prime, `llm_env_diagnostics()` for `env.json`, and `openhands_preflight_log_line()` for provider-aware preflight logs.
+- **OpenHands subprocess env (Prime routing):** `openhands_engine` forwards **`OPENHANDS_PROVIDER`**, **`OPENHANDS_MODEL`**, **`PRIME_TEAM_ID`** into the CLI child and sets **`OPENHANDS_PROVIDER`** to the normalized provider string; authentication error hints treat **`pit_*`** keys and OpenAI-upstream errors as Prime-routing issues when applicable.
+- **Harness eval cleanup:** `experiments/scripts/run_swebench_eval.py --rm-stale-eval-containers` removes only Docker containers matching **`name=sweb.eval`** whose final name segment equals the harness **`run_id`** (avoids broad `name=<run_id>` matches).
+- **Pipeline relaunch hardening:** `run-baseline-pf-cycle.sh` / `wsl-baseline-pf-cycle.sh`: Linux-only guard, `check_wsl_env.py --strict-linux`, **`resolve_cycle_llm.py`** (model from `OPENHANDS_MODEL` or manifest; **`OPENHANDS_PROVIDER`** openai|anthropic|prime_intellect with **`PRIME_INTELLECT_API_KEY`**; base URL optional for Prime), explicit **`--openhands-model`** on all runs; **`compare_runs.py --require-priced-models`**; **`update_run_ids_if_green.py`** writes compare under **`runs/<id>/`**, passes **`--require-priced-models`**, optional **`maybe_gpg_detach_sign_manifest`** after **MANIFEST.sha256**; publish bundle requires **`metrics_full.json`**; **`runner.py`** defaults **`--openhands-model`** from manifest **`model.id`**; **`openhands_engine` / `ensure_openhands_config`**: provider-aware **LLM_*** env; **`env.json`**: **openhands_provider**, **llm_base_url_source**.
+- **`harness_eval`** in **compare.json**: per-instance **harness_seconds_per_instance** from SWE-bench **`run_instance.log`** (`Test runtime: N seconds`), with median/p95 summary; **`metrics_full.json`** written next to compare (run card). **`env.json`** now records **openhands_model**, optional **openhands_model_env**, and **engine**. **publish_manifest.py**: optional **`PF_GPG_SIGN_MANIFEST`** / **`PF_GPG_KEY_ID`** for detached GPG signature of **MANIFEST.sha256**. Smoke manifest model default **gpt-4o**; **model_pricing.py** extended (gpt-4.1, o3-mini, haiku, DeepSeek, etc.).
+- **Bench metrics (pre-launch):** `compare_runs.py` now emits **cost_per_attempt**,
+  **latency_per_attempt**, **tokens_per_attempt**, **tool_calls_per_attempt**,
+  **iterations_per_attempt**, **termination_mix**, and **estimated_cost_usd** (via
+  **experiments/scripts/model_pricing.py**). **summarize_stress_run.py** adds token and
+  tool-call medians/p95 to **stress_summary.json**. **publish_docs** RESULTS.md section
+  for per-attempt cost/latency and indicative USD.
+- **SWE-bench roadmap (smoke product):** `experiments/exp-step2-lite-smoke/diagnosis-roadmap.md`,
+  `replay-verification.md`, `experiments/scripts/check_golden_solve_rates.py` (optional
+  `--require-nonzero`), `experiments/scripts/publish_manifest.py` (`MANIFEST.sha256` for
+  `publish/`), `tests/test_publish_manifest.py`. Guarded runs set `TMPDIR`/`TMP`/`TEMP` under
+  `workspace/scratch/.pf_tmp`; task prompt includes `GUARDED_SHELL_APPENDIX` (denial recovery).
+  `check_wsl_env.py`: `--docker-pull`, negative returncode hint for Docker CLI crash.
+  `commands.md`: Docker WSL stable setup (native `dockerd`). Stress defaults aligned in
+  `stress_alerts.yaml` and `check_stress_alerts.py` DEFAULT_THRESHOLDS.
+- `run-baseline-pf-cycle.sh`: if `PF_REQUIRE_NONZERO_SOLVE=1`, runs check_golden_solve_rates.py with `--require-nonzero` after Phase 7. **Phase 5a** now passes **`--allow-empty-patch`** to `update_run_ids_if_green.py` so runs with some empty-patch instances (e.g. OpenHands produced no diff) can still update run-ids.md when other gates pass.
+- `experiments/scripts/update_run_ids_if_green.py`: new `--allow-empty-patch` flag propagated
+  to `validate_predictions` so runs with some empty-patch instances can still pass the gate.
+- **Prime Intellect:** `resolve_cycle_llm.py` and engine support **key-only** use: `PRIME_INTELLECT_API_KEY` is required; `PRIME_INTELLECT_BASE_URL` (or `OPENAI_BASE_URL`) is optional. When unset, **`openhands_engine`** and **`ensure_openhands_config`** default to Prime Inference **`https://api.pinference.ai/api/v1`** so LiteLLM does not send `pit_*` keys to OpenAI's platform API.
+- **Prime compatibility proxy** (`openhands_engine._PrimeStrictCompatProxy`): when client closes the connection (e.g. OpenHands timeout), the proxy catches `BrokenPipeError` and `ConnectionResetError` so no traceback is logged.
+- `experiments/scripts/update_run_ids_if_green.py`: explicit `--baseline-eval-dir` and
+  `--pf-eval-dir` are now passed to the internal `compare_runs` call so the script works
+  correctly when `--experiment-dir` points to `experiments/` rather than `runs/`.
+- `experiments/scripts/compare_runs.py` (`--require-harness`): `baseline_pred_dir` and
+  `pf_pred_dir` are now derived from `baseline_run.parent` / `pf_run.parent` when a run dir
+  is provided, rather than always being `exp_dir / "baseline"` — makes the check portable
+  regardless of where `--experiment-dir` points.
+- `experiments/harness_report.find_run_report`: now returns the **newest** harness report by
+  mtime when multiple reports accumulate in an eval dir across re-runs, preventing stale-eval
+  false-positives.
+- `experiments/exp-step2-lite-smoke/run-ids.md`: updated to record the completed
+  `exp-step2-lite-smoke` smoke run (baseline `20260317-120041-1badcd73`, PF
+  `20260317-143046-340fb140`) with repo-relative paths.
+
+### Changed
+
+- **Bench agent / guard:** `bench/swebench/engines/openhands_engine.py`: non-zero OpenHands CLI
+  exit with a non-empty git patch is treated as success so patches are not discarded.
+  `bench/swebench/guard/policy.py`: `/tmp` removed from `DEFAULT_FORBIDDEN_PREFIXES` (pip/pytest
+  temp; guarded runs still use workspace-scoped `TMPDIR`).
+- **Smoke manifest / cycle timeouts:** `experiments/exp-step2-lite-smoke/manifest.json` **`budgets.timeout_sec`** is **1200** (aligned with `RunConfig.openhands_timeout` default and `run-baseline-pf-cycle.sh` **`OPENHANDS_TIMEOUT`** default **1200**). Earlier iterations used 600/750/900s; docs and `bench/swebench/README.md` now state **1200s** as the current default unless overridden.
+- **Publish bundle:** `PUBLISH_BUNDLE_REQUIRED_FILES` includes `MANIFEST.sha256`; existing
+  `publish/` dirs can run `python experiments/scripts/publish_manifest.py <publish-dir>` to add it.
+
+### Fixed
+
+- `experiments/scripts/update_run_ids_if_green.py`: generated `run-ids.md` now contains
+  repo-relative paths rather than absolute WSL paths, making the file portable across
+  machines and operating systems.
+- `experiments/harness_report.find_run_report`: fixed non-deterministic report selection
+  that caused a stale Mar-16 report to be picked instead of the current Mar-18 report when
+  both existed in the same eval dir, triggering a false stale-eval error on `--require-harness`.
+
+### Completed experiments
+
+- **exp-step2-lite-smoke** end-to-end run completed (WSL, native `dockerd`):
+  - Baseline: 20 instances submitted, 12 completed, 0 resolved, 5 errors.
+  - PF-guarded: 20 instances submitted, 12 completed, 0 resolved, 1 error.
+  - Parity gate: passed (`pf.solve_rate >= baseline.solve_rate - 0.01`; both 0.0).
+  - No policy denials or violations recorded.
+  - Publish artifacts written to `runs/exp-step2-lite-smoke/publish/`
+    (PUBLISH.md, GOLDEN.ok, RESULTS.md, VERIFY.md).
+  - Scale results ledger appended.
+
+
 
 ### Major New Features
 

@@ -397,4 +397,4 @@ wscat -c "ws://localhost:8081?token=<your-jwt-token>"
 
 ## API Reference
 
-For complete API documentation, see [WebSocket API Reference](../api/websocket-api.md).
+For complete API documentation, see [WebSocket API Reference](../reference/api/websocket-api.md).
