@@ -15,7 +15,7 @@ on:
       - "tests/test_swebench_runner_smoke.py"
       - ".github/workflows/bench-swebench-smoke.yaml"
   pull_request:
-    # Lightweight PR gate: run on any PR (bench-smoke is fast; rust-tests optional)
+    branches: [main, master]
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
@@ -55,7 +55,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
 
       - name: Cache cargo
         uses: ./.github/actions/cache-cargo
@@ -67,8 +66,8 @@ jobs:
     name: Nightly (model calls, gated)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && secrets.BENCH_SWEBENCH_NIGHTLY_TOKEN != '' }}
-    needs: []
+    # secrets are not allowed in job-level `if:`; gate nightly job on schedule/manual only.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -54,8 +54,8 @@ jobs:
       - name: Harness and compare
         run: |
           EXP=runs/exp-step2-lite-stress-large-repos
-          BASELINE_RUN_ID=$(ls -1 "$EXP/baseline" 2>/dev/null | grep -E '^[0-9a-f]' | head -1)
-          PF_RUN_ID=$(ls -1 "$EXP/pf" 2>/dev/null | grep -E '^[0-9a-f]' | head -1)
+          BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           if [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
             python experiments/scripts/run_swebench_eval.py \
               --baseline-predictions "$EXP/baseline/predictions.jsonl" --pf-predictions "$EXP/pf/predictions.jsonl" \
@@ -67,8 +67,8 @@ jobs:
       - name: Write stress summary
         run: |
           EXP=runs/exp-step2-lite-stress-large-repos
-          BASELINE_RUN_ID=$(ls -1 "$EXP/baseline" 2>/dev/null | grep -E '^[0-9a-f]' | head -1)
-          PF_RUN_ID=$(ls -1 "$EXP/pf" 2>/dev/null | grep -E '^[0-9a-f]' | head -1)
+          BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
+          PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           PF_COMMIT=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
           if [ -f "$EXP/compare.json" ] && [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
             python experiments/scripts/summarize_stress_run.py \
