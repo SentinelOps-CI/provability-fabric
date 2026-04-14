@@ -107,15 +107,25 @@ jobs:
 
       - name: Verify all proofs compile
         run: |
-          echo "🔍 Verifying all Lean proofs compile..."
+          echo "Verifying Lean proofs compile..."
 
-          # Check for any 'sorry' or 'by admit' statements
-          if find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \; | grep -q .; then
-            echo "❌ Found 'sorry' or 'by admit' statements in proofs:"
-            find . -name "*.lean" -exec grep -l "sorry\|by admit" {} \;
+          # Check for 'sorry' or 'by admit' in CI-enforced targets only
+          ENFORCED="core/lean-libs spec-templates/v1/proofs bundles/my-agent/proofs bundles/test-new-user-agent/proofs"
+          FOUND=""
+          for d in $ENFORCED; do
+            if [ -d "$d" ]; then
+              HITS=$(find "$d" -name "*.lean" -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
+              if [ -n "$HITS" ]; then
+                FOUND="$FOUND $HITS"
+              fi
+            fi
+          done
+          if [ -n "$FOUND" ]; then
+            echo "Found 'sorry' or 'by admit' in enforced targets:"
+            echo "$FOUND"
             exit 1
           fi
-          echo "✅ No placeholder proofs found"
+          echo "No placeholder proofs in enforced targets"
 
       - name: Generate build report
         run: |

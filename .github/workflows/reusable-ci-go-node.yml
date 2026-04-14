@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+on:
+  workflow_call:
+
+jobs:
+  go-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache Node.js dependencies
+        id: cache-node
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            runtime/ledger/node_modules
+            marketplace/ui/node_modules
+            core/sdk/typescript/node_modules
+          key: node-${{ hashFiles('runtime/ledger/package-lock.json', 'marketplace/ui/package-lock.json', 'core/sdk/typescript/package-lock.json') }}
+          restore-keys: |
+            node-
+
+      - name: Install Node.js tools
+        run: npm install -g @stoplight/spectral-cli
+
+      - name: Install Node.js dependencies
+        run: |
+          cd runtime/ledger && npm ci && npm run prisma:generate
+          cd ../../marketplace/ui && npm ci
+          cd ../../core/sdk/typescript && npm ci
+
+      - name: Run spectral lint
+        run: spectral lint **/spec.yaml --ruleset config/schemas/aispec-schema.json
+
+      - name: Test Go CLI
+        run: |
+          cd core/cli/pf
+          if ls *_test.go >/dev/null 2>&1; then
+            go test -v -coverprofile=coverage.out ./...
+            COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+            echo "Coverage: $COVERAGE%"
+            if awk "BEGIN {exit !($COVERAGE < 90)}"; then
+              echo "Coverage below 90% threshold"
+              exit 1
+            fi
+          else
+            go build -v ./...
+          fi
+
+      - name: Test Go admission controller
+        run: |
+          cd runtime/admission-controller
+          if ls *_test.go >/dev/null 2>&1; then
+            go test -v ./...
+          else
+            go build -v ./...
+          fi
+
+      - name: Test Node.js ledger
+        run: |
+          cd runtime/ledger
+          npm run test
+
+      - name: Test Node.js core SDK (TypeScript)
+        run: |
+          cd core/sdk/typescript
+          npm run test
+
+      - name: Verify Go services build
+        run: |
+          for d in services/*; do
+            if [ -f "$d/go.mod" ]; then
+              (cd "$d" && go mod tidy && go build ./...)
+            fi
+          done
+
+      - name: Verify console and demo builds
+        run: |
+          (cd console && npm ci --no-audit --no-fund && npm run build)
+          (cd demos/verifiable-mcp-fraud && npm ci --no-audit --no-fund && npm run build)

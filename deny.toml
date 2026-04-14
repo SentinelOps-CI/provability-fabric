@@ -1,0 +1,39 @@
+# cargo-deny: https://embarkstudios.github.io/cargo-deny/
+# Run: cargo install cargo-deny && cargo deny check
+# CI: .github/workflows/cargo-deny.yml (passes --all-features; matches a full workspace check)
+
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+
+[licenses]
+version = 2
+confidence-threshold = 0.85
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Zlib",
+    "BSL-1.0",
+    "0BSD",
+    "OpenSSL",
+    "NCSA",
+    "LGPL-3.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+
+[sources]
+# Sparse + git deps vary by Cargo version; warn first, tighten after inventory.
+unknown-registry = "warn"
+unknown-git = "warn"

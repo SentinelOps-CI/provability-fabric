@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E501, E128, E203, E712, E722, W291, W293, W391, F401, F841, F541
+exclude = .git,__pycache__,.lake,build,dist,node_modules

@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+on:
+  workflow_call:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build and test Rust workspace
+        run: |
+          cargo build --workspace
+          cargo test --workspace --exclude sidecar-watcher --no-fail-fast
+          # sidecar-watcher: lib unit tests + explicit integration targets (autotests = false; see tests/README.md)
+          cargo test -p sidecar-watcher --lib --no-fail-fast
+          cargo test -p sidecar-watcher --tests --no-fail-fast
+
+      - name: Clippy (workspace)
+        run: cargo clippy --workspace -- -D warnings
