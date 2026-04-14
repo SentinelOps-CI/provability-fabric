@@ -37,7 +37,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
       - name: Cache cargo
         uses: ./.github/actions/cache-cargo
         with:
@@ -60,7 +59,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
 
       - name: Cache cargo registry and deps
         uses: ./.github/actions/cache-cargo
@@ -94,7 +92,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
 
       - name: Cache cargo registry and deps
         uses: ./.github/actions/cache-cargo
