@@ -20,4 +20,4 @@ base64 = "0.21"
 hex = "0.4"
 
 [dev-dependencies]
-axum-test = "14"
+axum-test = "20"
