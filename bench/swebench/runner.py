@@ -573,10 +573,14 @@ def run_engine_for_instance(
         )
         if any(tok in low for tok in provider_tokens):
             return True, "provider_error"
-        # Structural runtime fault: no trace and no patch (engine likely failed before actioning).
-        if (not trace_val or not _openhands_trace_has_content(trace_val)) and not (model_patch_val or "").strip():
-            return True, "runtime_fault"
-        # Do not fallback for quality-only failures (e.g., empty/weak patch) here.
+        # Empty patch: fall back when direct_agent never attempted a file edit. Using
+        # _openhands_trace_has_content alone is wrong here: direct_agent appends MessageEvent every
+        # turn and DirectAgentStartEvent at boot, so "has raw_events" was almost always true and
+        # OpenHands fallback never ran (empty predictions.jsonl / harness "No instances to run.").
+        if not (model_patch_val or "").strip():
+            if not _trace_has_edit_attempts_for_fallback(trace_val):
+                return True, "runtime_fault"
+        # Had edit_file/write_file attempts but patch still empty or bad: quality-only, no fallback.
         return False, ""
     if engine == "mock":
         try:
@@ -710,6 +714,36 @@ def _openhands_trace_has_content(engine_trace: Optional[dict]) -> bool:
         or len(files_modified) > 0
         or len(raw_events) > 0
     )
+
+
+def _is_edit_or_write_tool_name(name: Optional[str]) -> bool:
+    n = (name or "").strip().lower()
+    if not n:
+        return False
+    return "edit" in n or "write" in n or n in ("file_editor", "fileeditor", "str_replace_editor")
+
+
+def _trace_has_edit_attempts_for_fallback(engine_trace: Optional[dict]) -> bool:
+    """True if trace shows at least one edit_file/write_file style attempt (for direct_agent empty-patch fallback)."""
+    if not engine_trace:
+        return False
+    for tc in engine_trace.get("tool_calls") or []:
+        if not isinstance(tc, dict):
+            continue
+        if _is_edit_or_write_tool_name(tc.get("name")):
+            return True
+    for p in engine_trace.get("files_modified") or []:
+        if (p or "").strip():
+            return True
+    for ev in engine_trace.get("raw_events") or []:
+        if not isinstance(ev, dict):
+            continue
+        kind = str(ev.get("kind") or ev.get("type") or "").strip()
+        if kind == "ActionEvent" or ev.get("type") == "action":
+            tn = str(ev.get("tool_name") or ev.get("name") or "").strip()
+            if _is_edit_or_write_tool_name(tn):
+                return True
+    return False
 
 
 def _sha256_canonical_json(obj: Any) -> str:

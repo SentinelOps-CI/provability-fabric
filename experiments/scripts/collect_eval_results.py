@@ -5,6 +5,9 @@
 # Collect SWE-bench harness results: pass/fail per instance and failure reason buckets
 # (patch didn't apply, tests fail, timeout, empty patch, other error).
 # Reads run report JSON and optionally per-instance report.json / instance.log.
+#
+# If the harness buckets almost everything as empty_patch, predictions.jsonl likely had empty
+# model_patch lines (agent/runner), not a misconfigured harness.
 
 from __future__ import annotations
 

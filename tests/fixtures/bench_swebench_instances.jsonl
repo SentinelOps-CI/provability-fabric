@@ -1,0 +1,3 @@
+{"instance_id": "smoke-inst-1", "repo": "org/repo1", "base_commit": "a000000000000000000000000000000000000001", "problem_statement": "Smoke test issue one.", "hints_text": ""}
+{"instance_id": "smoke-inst-2", "repo": "org/repo2", "base_commit": "b000000000000000000000000000000000000002", "problem_statement": "Smoke test issue two.", "hints_text": ""}
+{"instance_id": "smoke-inst-3", "repo": "org/repo3", "base_commit": "c000000000000000000000000000000000000003", "problem_statement": "Smoke test issue three.", "hints_text": ""}

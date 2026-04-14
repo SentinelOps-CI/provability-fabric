@@ -8,7 +8,10 @@
 # On native Windows (PowerShell + Windows Python), Linux-only modules are skipped; the script
 # still checks requests and Docker, prints where to run the full preflight, and exits 0 unless
 # requests fails. Use --strict-linux from Linux CI to keep hard failures on missing deps.
-# Run from repository root: python experiments/scripts/check_wsl_env.py
+# Run from repository root: python3 experiments/scripts/check_wsl_env.py
+# If .venv-wsl exists, this script re-executes itself with .venv-wsl/bin/python so
+# datasets/openhands checks use the same env as setup_swebench_venv.sh (Debian "python3"
+# often has no project packages). After `source .venv-wsl/bin/activate`, `python` works too.
 
 from __future__ import annotations
 
@@ -17,6 +20,30 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+
+def _maybe_reexec_with_repo_venv_python() -> None:
+    """Use repo .venv-wsl when present so bare system python3 passes import checks."""
+    if os.environ.get("PF_CHECK_WSL_VENV_REEXEC") == "1":
+        return
+    if sys.platform == "win32":
+        return
+    try:
+        script = Path(__file__).resolve()
+        repo_root = script.parents[2]
+    except (OSError, IndexError):
+        return
+    venv_python = repo_root / ".venv-wsl" / "bin" / "python"
+    if not venv_python.is_file():
+        return
+    try:
+        if Path(sys.executable).resolve() == venv_python.resolve():
+            return
+    except OSError:
+        return
+    os.environ["PF_CHECK_WSL_VENV_REEXEC"] = "1"
+    os.execv(str(venv_python), [str(venv_python), str(script), *sys.argv[1:]])
 
 
 def _is_docker_failure(message: str) -> bool:
@@ -199,7 +226,9 @@ def main() -> int:
             print("  bash experiments/scripts/setup_swebench_venv.sh", file=sys.stderr)
             print("Or manually: python3 -m venv .venv-wsl && . .venv-wsl/bin/activate", file=sys.stderr)
             print("  pip install -r bench/swebench/requirements-swebench.txt", file=sys.stderr)
-            print("Then re-run this script (or run-baseline-pf-cycle.sh; it will use .venv-wsl if present).", file=sys.stderr)
+            print("Then re-run this script, or use the venv interpreter directly:", file=sys.stderr)
+            print("  ./.venv-wsl/bin/python experiments/scripts/check_wsl_env.py", file=sys.stderr)
+            print("(run-baseline-pf-cycle.sh uses .venv-wsl/bin/python automatically when present.)", file=sys.stderr)
         return 1
 
     if relaxed_win:
@@ -218,4 +247,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    _maybe_reexec_with_repo_venv_python()
     sys.exit(main())

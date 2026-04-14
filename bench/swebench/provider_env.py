@@ -104,13 +104,15 @@ def effective_llm_model(provider: str, model_name: str) -> str:
 
 def openhands_litellm_model(provider: str, model_name: str) -> str:
     """
-    Model string for OpenHands + LiteLLM (subprocess / config.toml).
+    Model string for OpenHands + LiteLLM and for ``direct_agent`` HTTP to Prime Inference.
 
     LiteLLM rejects bare vendor ids like ``google/gemini-2.5-flash`` when using an OpenAI-compatible
     base URL (``LLM Provider NOT provided``). Prefix with ``openai/`` so routing uses the OpenAI
     adapter; the PF strict-compat proxy still forwards to Prime Inference.
 
-    For native HTTP to Prime (e.g. ``direct_agent``), use :func:`effective_llm_model` instead.
+    :func:`effective_llm_model` remains the vendor-normalized id (no ``openai/`` prefix on
+    ``google/...``); use this function for any client that shares the same OpenAI-compatible
+    entrypoint as OpenHands.
     """
     api = effective_llm_model(provider, model_name)
     if provider != "prime_intellect":

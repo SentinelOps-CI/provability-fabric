@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Instant;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use sidecar_watcher::{
     dfa::{OptimizedDFA, Event, EventKind, DFATable, Transition, RateLimit},
     ifc_labels::OptimizedIFCManager,
-    ratelimit::{OptimizedRateLimiter, RateLimitConfig, BucketedRateLimiter},
+    ratelimit::{OptimizedRateLimiter, RateLimitConfig},
     crypto::{AsyncSigningPipeline, SigningWorkerConfig, CertCore, SigningRequest},
-    concurrency::{LockFreeRingBuffer, EpochPolicyManager, EventIngress},
+    concurrency::{LockFreeRingBuffer, EpochPolicyManager},
 };
-use ed25519_dalek::{SigningKey, Signer};
+use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 
 /// Performance benchmarks for Provability Fabric Core
@@ -414,52 +414,53 @@ fn create_large_dfa_table() -> DFATable {
         rate_limits: vec![],
     }
 }
-    
+
+/// Core performance benchmarks (signature, policy, content, db, network).
+pub fn core_performance_benchmarks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("core_performance");
+    group.sample_size(100);
+    group.measurement_time(std::time::Duration::from_secs(10));
+
     // Benchmark 1: Signature Verification Performance
     group.bench_function("ed25519_batch_verification", |b| {
         b.iter(|| {
-            // Simulate batch signature verification
             let signatures = generate_test_signatures(1000);
             verify_signatures_batch(&signatures)
         });
     });
-    
+
     // Benchmark 2: Policy Evaluation Performance
     group.bench_function("policy_evaluation", |b| {
         b.iter(|| {
-            // Simulate policy evaluation
             let policies = generate_test_policies(100);
             evaluate_policies(&policies)
         });
     });
-    
+
     // Benchmark 3: Content Scanning Performance
     group.bench_function("content_scanning", |b| {
         b.iter(|| {
-            // Simulate content scanning
             let content = generate_test_content(1024 * 1024); // 1MB
             scan_content(&content)
         });
     });
-    
+
     // Benchmark 4: Database Query Performance
     group.bench_function("database_queries", |b| {
         b.iter(|| {
-            // Simulate database operations
             let queries = generate_test_queries(100);
             execute_queries(&queries)
         });
     });
-    
+
     // Benchmark 5: Network I/O Performance
     group.bench_function("network_io", |b| {
         b.iter(|| {
-            // Simulate network operations
             let requests = generate_test_requests(50);
             process_requests(&requests)
         });
     });
-    
+
     group.finish();
 }
 
@@ -895,6 +896,7 @@ criterion_group!(
     sub_millisecond_benchmarks,
     memory_efficiency_benchmarks,
     concurrency_benchmarks,
+    core_performance_benchmarks,
     wasm_benchmarks,
     crypto_benchmarks,
     resource_benchmarks,
