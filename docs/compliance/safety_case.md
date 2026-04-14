@@ -286,4 +286,4 @@ jobs:
 - [Compliance Monitoring](/tools/compliance/monitor_compliance.py)
 - [Lean Proofs](/core/lean-libs/)
 - [Policy Kernel](/core/policy-kernel/engine.go)
-- [Egress Certificates](/docs/spec/egress-certificate.md) 
+- [Egress Certificates](../specs/egress-certificate.md) 
