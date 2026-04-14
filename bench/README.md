@@ -1,23 +1,27 @@
 # Performance Benchmarks
 
+**Notice:** All numeric thresholds and "Key metrics" cited below are **targets** until baseline files are checked in and date + machine are recorded. Run `make bench-save-baseline` (or `cargo bench -p provability-fabric-bench -- --save-baseline main`) and document the result in `bench/BASELINE.md` to establish measured baselines. Do not treat unmeasured numbers as verified performance.
+
 *This directory contains comprehensive performance benchmarks for the Provability Fabric Core, ensuring consistent performance characteristics and detecting regressions automatically.*
 
 ## Overview
 
 The performance benchmarking system provides automated testing of core components to ensure optimal performance characteristics and detect any performance regressions before they reach production. All benchmarks use the [Criterion](https://github.com/bheisler/criterion.rs) benchmarking harness for reliable and statistically significant results.
 
+**SWE-bench agent bench** (Python, predictions and PF evidence) lives in **`swebench/`** (`runner.py`, `run_config.py`, `runner_core.py`, engines, guard, replay). It is documented in **`swebench/README.md`**, not in this Criterion-focused document.
+
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Benchmark     │    │   Criterion      │    ┌   Performance   │
+┌─────────────────┐     ┌──────────────────┐    ┌─────────────────┐
+│   Benchmark     │     │   Criterion      │    ┌   Performance   │
 │   Suites        │───▶│   Harness        │───▶│   Reports       │
-│                 │    │                  │    │                 │
-│ - Core          │    │ - Statistical    │    │ - HTML Reports  │
-│ - Crypto        │    │   Analysis       │    │ - CSV Data      │
-│ - WASM          │    │ - Regression     │    │ - Trend Charts  │
-│ - Network       │    │   Detection      │    │ - Alerting      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+│                 │     │                  │    │                 │
+│ - Core          │     │ - Statistical    │    │ - HTML Reports  │
+│ - Crypto        │     │   Analysis       │    │ - CSV Data      │
+│ - WASM          │     │ - Regression     │    │ - Trend Charts  │
+│ - Network       │     │   Detection      │    │ - Alerting      │
+└─────────────────┘     └──────────────────┘    └─────────────────┘
 ```
 
 ## Benchmark Categories
@@ -78,9 +82,22 @@ cargo bench resource_performance
 # Run with specific configuration
 cargo bench -- --measurement-time 30 --sample-size 200
 
-# Generate HTML reports
-cargo criterion --output-format html
+# Generate HTML reports (written to target/criterion/ by the criterion crate)
+cargo bench
+# View: open target/criterion/report/index.html (or browse target/criterion/)
 ```
+
+### Saving a baseline (local)
+
+To record a Criterion baseline and machine/date/git SHA for future comparison:
+
+```bash
+make bench-save-baseline
+```
+
+This runs `cargo bench -p provability-fabric-bench -- --save-baseline main` and writes **`bench/BASELINE.md`** with date (UTC), git_sha, and machine (platform.uname). Baselines are stored under `target/criterion/`. CI runs a **smoke-bench** job on push/PR (compile and run benches with `cargo criterion -p provability-fabric-bench -- --sample-size 5 --noplot`); the full save/compare Criterion jobs run on push to main or on schedule (see `docs/reference/ci-reference.md`).
+
+**Note (cargo bench vs cargo criterion):** Baseline save/compare and HTML reports require running the Criterion benchmark binary directly. Use `cargo bench -p provability-fabric-bench -- ...` for `--save-baseline main`, `--baseline main`, or to generate HTML under `target/criterion/` (the crate enables the `html_reports` feature). Use `cargo criterion` for quick runs without baseline (e.g. smoke: `--sample-size 5 --noplot`); cargo-criterion does not support baseline or HTML output options.
 
 ### Benchmark Configuration
 
@@ -213,38 +230,40 @@ pub fn crypto_benchmarks(c: &mut Criterion) {
 - **AES Encryption**: 500MB/second throughput
 - **Ed25519 Signing**: 10,000+ operations/second
 
-## Performance Targets
+## Performance Targets (unmeasured)
+
+The following are **targets** for Criterion suites. Numbers are not yet backed by stored Criterion baselines; run `cargo bench -p provability-fabric-bench -- --save-baseline main` and document date and machine in this section to convert to measured baselines.
 
 ### Latency Targets (95th Percentile)
 
-| Component | Target | Current | Status |
-|-----------|--------|---------|---------|
-| Signature Verification | <10ms | 5ms | ✅ |
-| Policy Evaluation | <50ms | 25ms | ✅ |
-| Content Scanning | <100ms | 75ms | ✅ |
-| Database Queries | <10ms | 8ms | ✅ |
-| Network I/O | <50ms | 30ms | ✅ |
-| WASM Execution | <1ms | 0.8ms | ✅ |
+| Component | Target |
+|-----------|--------|
+| Signature Verification | <10ms |
+| Policy Evaluation | <50ms |
+| Content Scanning | <100ms |
+| Database Queries | <10ms |
+| Network I/O | <50ms |
+| WASM Execution | <1ms |
 
 ### Throughput Targets
 
-| Component | Target | Current | Status |
-|-----------|--------|---------|---------|
-| Signature Verification | 10,000/sec | 12,000/sec | ✅ |
-| Policy Evaluation | 1,000/sec | 1,200/sec | ✅ |
-| Content Scanning | 100MB/sec | 125MB/sec | ✅ |
-| Database Queries | 5,000/sec | 6,000/sec | ✅ |
-| Network I/O | 5,000/sec | 5,500/sec | ✅ |
-| WASM Operations | 1,000/sec | 1,100/sec | ✅ |
+| Component | Target |
+|-----------|--------|
+| Signature Verification | 10,000/sec |
+| Policy Evaluation | 1,000/sec |
+| Content Scanning | 100MB/sec |
+| Database Queries | 5,000/sec |
+| Network I/O | 5,000/sec |
+| WASM Operations | 1,000/sec |
 
 ### Resource Utilization Targets
 
-| Resource | Target | Current | Status |
-|----------|--------|---------|---------|
-| CPU Usage | <80% | 65% | ✅ |
-| Memory Usage | <64MB/worker | 48MB/worker | ✅ |
-| Network I/O | <1Gbps | 800Mbps | ✅ |
-| Disk I/O | <100MB/sec | 75MB/sec | ✅ |
+| Resource | Target |
+|----------|--------|
+| CPU Usage | <80% |
+| Memory Usage | <64MB/worker |
+| Network I/O | <1Gbps |
+| Disk I/O | <100MB/sec |
 
 ## Regression Detection
 
@@ -271,14 +290,14 @@ group.bench_function("signature_verification", |b| {
 ### Historical Tracking
 
 ```bash
-# View performance trends
-cargo criterion --output-format html --save-baseline main
+# Save baseline and generate HTML under target/criterion/ (cargo-criterion does not support baselines; use cargo bench)
+cargo bench -p provability-fabric-bench -- --save-baseline main
 
 # Compare against baseline
-cargo criterion --baseline main
+cargo bench -p provability-fabric-bench -- --baseline main
 
-# Generate trend reports
-cargo criterion --output-format html --baseline main
+# Regenerate HTML trend reports
+cargo bench
 ```
 
 ## Benchmark Configuration
@@ -325,11 +344,13 @@ Criterion provides statistically significant results with:
 
 ### Performance Reports
 
-```bash
-# Generate HTML reports
-cargo criterion --output-format html
+HTML reports are produced by the Criterion crate when the benchmark binary runs (e.g. via `cargo bench`). The bench crate enables the `html_reports` feature; cargo-criterion does not support HTML output.
 
-# View in browser
+```bash
+# Generate HTML reports (written to target/criterion/)
+cargo bench -p provability-fabric-bench
+
+# View in browser (Windows: start target/criterion/report/index.html)
 open target/criterion/report/index.html
 ```
 
@@ -346,7 +367,7 @@ open target/criterion/report/index.html
 # GitHub Actions integration
 - name: Performance Regression Check
   run: |
-    if cargo criterion --baseline main | grep -q "Performance regression detected"; then
+    if cargo bench -p provability-fabric-bench -- --baseline main 2>&1 | grep -q "Performance regression detected"; then
       echo "❌ Performance regression detected"
       exit 1
     fi
@@ -389,7 +410,7 @@ cargo test --test performance
 cargo test --test performance -- --nocapture
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 

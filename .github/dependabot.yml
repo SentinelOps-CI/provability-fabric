@@ -1,0 +1,122 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      cargo-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /runtime/ledger
+    schedule:
+      interval: weekly
+    groups:
+      ledger-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /core/sdk/typescript
+    schedule:
+      interval: weekly
+    groups:
+      sdk-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /marketplace/ui
+    schedule:
+      interval: weekly
+    groups:
+      marketplace-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /console
+    schedule:
+      interval: weekly
+    groups:
+      console-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /demos/verifiable-mcp-fraud
+    schedule:
+      interval: weekly
+    groups:
+      demo-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
+    directory: /core/cli/pf
+    schedule:
+      interval: weekly
+    groups:
+      pf-cli-go:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
+    directory: /runtime/admission-controller
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/api-gateway
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/evidence-service
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/spec-service
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/replay-service
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/proof-service
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/build-orchestrator
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gomod
+    directory: /services/policy-diff-service
+    schedule:
+      interval: weekly

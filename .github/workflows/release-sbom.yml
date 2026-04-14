@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+# Attach a CycloneDX SBOM to published GitHub Releases (no curl|sh installers).
+name: Release SBOM
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  SYFT_VERSION: "1.19.0"
+
+jobs:
+  cyclonedx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/syft.tgz \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/syft.tgz -C /tmp
+          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
+          syft version
+
+      - name: Generate CycloneDX SBOM
+        run: syft dir:. -o cyclonedx-json=sbom.cyclonedx.json
+
+      - name: Upload SBOM to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" sbom.cyclonedx.json --clobber

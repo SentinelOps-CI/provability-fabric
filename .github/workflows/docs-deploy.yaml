@@ -8,6 +8,7 @@ on:
     branches: [ main ]
     paths:
       - 'docs/**'
+      - 'mkdocs.yml'
       - '.github/workflows/docs-deploy.yaml'
 
 permissions:
@@ -27,14 +28,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs-material
+          pip install -r docs/requirements.txt
 
       - name: Build documentation
         run: mkdocs build
@@ -45,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site
+          path: ./build
 
   deploy:
     environment:

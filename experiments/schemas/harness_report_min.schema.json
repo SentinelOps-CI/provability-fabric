@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Harness report minimum",
+  "description": "Minimum supported harness run report (eval dir JSON): resolved_ids or resolved_instances, total_instances.",
+  "type": "object",
+  "oneOf": [
+    { "required": ["resolved_ids"] },
+    { "required": ["resolved_instances"] }
+  ],
+  "properties": {
+    "resolved_ids": { "type": "array", "items": { "type": "string" } },
+    "resolved_instances": { "type": "array", "items": { "type": "string" } },
+    "total_instances": { "type": "integer" },
+    "unresolved_ids": { "type": "array", "items": { "type": "string" } },
+    "unresolved_instances": { "type": "array", "items": { "type": "string" } },
+    "error_ids": { "type": "array", "items": { "type": "string" } },
+    "error_instances": { "type": "array", "items": { "type": "string" } },
+    "empty_patch_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}

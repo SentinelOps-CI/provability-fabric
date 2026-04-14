@@ -1,6 +1,10 @@
 # Normalize line endings
 * text=auto eol=lf
 
+# WSL/bash and shebang scripts must stay LF (avoid "python3\r" from CRLF)
+experiments/scripts/*.py text eol=lf
+experiments/scripts/*.sh text eol=lf
+
 # Treat binaries correctly
 *.png binary
 *.jpg binary

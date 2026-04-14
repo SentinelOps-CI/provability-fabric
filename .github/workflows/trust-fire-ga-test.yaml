@@ -22,8 +22,8 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  GO_VERSION: "1.21"
-  RUST_VERSION: "1.75"
+  GO_VERSION: "1.23"
+  RUST_VERSION: "stable"
   KIND_CLUSTER_NAME: "trust-fire-test"
 
 jobs:

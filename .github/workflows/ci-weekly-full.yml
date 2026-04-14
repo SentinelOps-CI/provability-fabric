@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Scheduled full CI (ignores path filters) to catch drift when PRs used docs-only skips.
+
+name: CI weekly full
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  protobuf-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+      - run: buf lint
+        working-directory: api
+
+  prepare:
+    uses: ./.github/workflows/reusable-ci-prepare.yml
+    secrets: inherit
+
+  ci-lean:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-lean.yml
+    with:
+      impacted_targets: ${{ needs.prepare.outputs.impacted_targets }}
+      impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
+      allowlist_needs_update: ${{ needs.prepare.outputs.allowlist_needs_update }}
+    secrets: inherit
+
+  ci-rust:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-rust.yml
+    secrets: inherit
+
+  ci-go-node:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-go-node.yml
+    secrets: inherit
+
+  ci-extended:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-extended.yml
+    with:
+      impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
+    secrets: inherit
+
+  ci-weekly-success:
+    name: CI weekly required checks
+    needs: [protobuf-lint, prepare, ci-lean, ci-rust, ci-go-node, ci-extended]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify outcomes
+        run: |
+          set -e
+          fail=0
+          if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
+            echo "protobuf-lint: ${{ needs.protobuf-lint.result }}"
+            fail=1
+          fi
+          for j in prepare ci-lean ci-rust ci-go-node ci-extended; do
+            case "$j" in
+              prepare) r="${{ needs.prepare.result }}" ;;
+              ci-lean) r="${{ needs.ci-lean.result }}" ;;
+              ci-rust) r="${{ needs.ci-rust.result }}" ;;
+              ci-go-node) r="${{ needs.ci-go-node.result }}" ;;
+              ci-extended) r="${{ needs.ci-extended.result }}" ;;
+            esac
+            if [ "$r" != "success" ]; then
+              echo "Job $j result: $r (expected success)"
+              fail=1
+            fi
+          done
+          exit "$fail"

@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Restore (and at job end save) cargo registry, git checkouts, and target dir.
+# Use key-suffix to separate caches (e.g. "" for general, "-criterion-deps" for Criterion runs).
+
+name: Cache Cargo
+description: Restore/save cargo registry, git, and target with configurable key suffix.
+
+inputs:
+  key-suffix:
+    description: "Suffix for cache key (e.g. '' or '-criterion-deps'). No leading hyphen if empty."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo${{ inputs.key-suffix }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo${{ inputs.key-suffix }}-

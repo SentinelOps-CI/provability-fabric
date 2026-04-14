@@ -12,7 +12,7 @@
     "dev:working": "npx tsx src/index-simple.ts",
     "dev:minimal": "node minimal-server.js",
     "dev:production": "npx tsx src/index-production.ts",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"

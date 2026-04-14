@@ -19,7 +19,7 @@ class PlatformIntegrationTester:
     """Platform integration test suite"""
 
     def __init__(self):
-        self.test_workspace = Path("test_workspace")
+        self.test_workspace = Path("test-workspace")
         self.test_results = {}
         self.test_workspace.mkdir(exist_ok=True)
 

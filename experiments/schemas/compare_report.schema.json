@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Compare report",
+  "description": "Output of compare_runs aggregate()",
+  "type": "object",
+  "required": ["baseline", "pf", "delta", "patch_apply", "violation_reasons_top10"],
+  "properties": {
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "solve_rate": { "type": ["number", "null"] },
+        "cost_per_solved": { "type": ["object", "null"] },
+        "cost_per_attempt": { "type": ["object", "null"] },
+        "latency_per_attempt": { "type": ["object", "null"] },
+        "tokens_per_attempt": { "type": ["object", "null"] },
+        "tool_calls_per_attempt": { "type": ["object", "null"] },
+        "iterations_per_attempt": { "type": ["object", "null"] },
+        "termination_mix": { "type": ["object", "null"] },
+        "model_name_observed": { "type": ["string", "null"] }
+      }
+    },
+    "pf": {
+      "type": "object",
+      "properties": {
+        "solve_rate": { "type": ["number", "null"] },
+        "cost_per_solved": { "type": ["object", "null"] },
+        "policy_violation_rate_all": { "type": ["number", "null"] },
+        "policy_violation_rate_final": { "type": ["number", "null"] },
+        "replay_available": { "type": ["boolean", "null"] },
+        "replay_success_rate": { "type": ["number", "null"] },
+        "denials_total_pf": { "type": ["integer", "null"] },
+        "episodes_aborted_after_denial_pf": { "type": ["integer", "null"] },
+        "recovered_after_denial_pf_rate": { "type": ["number", "null"] },
+        "cost_per_attempt": { "type": ["object", "null"] },
+        "latency_per_attempt": { "type": ["object", "null"] },
+        "tokens_per_attempt": { "type": ["object", "null"] },
+        "tool_calls_per_attempt": { "type": ["object", "null"] },
+        "iterations_per_attempt": { "type": ["object", "null"] },
+        "termination_mix": { "type": ["object", "null"] },
+        "model_name_observed": { "type": ["string", "null"] }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "properties": {
+        "solve_rate": { "type": ["number", "null"] }
+      }
+    },
+    "patch_apply": {
+      "type": "object",
+      "required": ["total", "applies_true", "applies_false", "errors_topN"],
+      "properties": {
+        "total": { "type": "integer" },
+        "applies_true": { "type": "integer" },
+        "applies_false": { "type": "integer" },
+        "errors_topN": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "stderr": { "type": "string" },
+              "count": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "violation_reasons_top10": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reason_code": { "type": "string" },
+          "count": { "type": "integer" }
+        }
+      }
+    },
+    "replay_success_rate": { "type": ["number", "null"] },
+    "env_drift": { "type": "object" },
+    "dataset_name": { "type": ["string", "null"] },
+    "split": { "type": ["string", "null"] },
+    "datasets_version": { "type": ["string", "null"] },
+    "swebench_version": { "type": ["string", "null"] },
+    "harness_dataset_id": { "type": ["string", "null"] },
+    "openhands_version": { "type": ["string", "null"] },
+    "empty_patch_reasons_topN": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": { "reason": { "type": "string" }, "count": { "type": "integer" } }
+      }
+    },
+    "budget_drift": {
+      "type": "object",
+      "description": "Baseline vs PF run config drift (timeout_sec, max_steps, max_tool_calls, model, model_params)"
+    },
+    "replay": {
+      "type": "object",
+      "description": "Replay sample summary (from run_replay_sample.py)",
+      "properties": {
+        "sample_size": { "type": "integer" },
+        "success_rate": { "type": ["number", "null"] },
+        "mismatch_count": { "type": "integer" },
+        "replay_fail_reasons_topN": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "reason": { "type": "string" }, "count": { "type": "integer" } } }
+        }
+      }
+    },
+    "estimated_cost_usd": {
+      "type": ["object", "null"],
+      "description": "Indicative USD from model_pricing table"
+    },
+    "harness_eval": {
+      "type": "object",
+      "description": "Per-instance harness test runtime from eval logs/run_evaluation/**/run_instance.log",
+      "properties": {
+        "baseline": { "type": "object" },
+        "pf": { "type": "object" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "description": "Policy coverage: reason_codes, denied_commands, commands_seen (from PF run compliance)",
+      "properties": {
+        "reason_codes_topN": { "type": "array", "items": { "type": "object", "properties": { "reason_code": { "type": "string" }, "count": { "type": "integer" } } } },
+        "denied_commands_topN": { "type": "array", "items": { "type": "object", "properties": { "command_snippet": { "type": "string" }, "count": { "type": "integer" } } } },
+        "commands_seen_topN": { "type": "array" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Provenance for compare.json (written by compare_runs.py main, not aggregate())",
+      "properties": {
+        "compare_report_schema_version": { "type": "string" },
+        "generated_at": { "type": "string" },
+        "experiment_dir": { "type": "string" },
+        "baseline_eval_dir": { "type": "string" },
+        "pf_eval_dir": { "type": "string" },
+        "baseline_run_dir": { "type": ["string", "null"] },
+        "pf_run_dir": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

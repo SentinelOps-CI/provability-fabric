@@ -561,7 +561,7 @@ func verifyFileWithSchema(filePath string, schemaPath string) bool {
 		return false
 	}
 
-	// Required fields (subset consistent with docs/Evidence.md)
+	// Required fields (subset consistent with docs/evidence/overview.md)
 	required := []string{
 		"bundle_id", "policy_hash", "proof_hash", "automata_hash", "labeler_hash",
 		"ni_monitor", "permit_decision", "path_witness_ok", "label_derivation_ok", "epoch", "egress_profile",
@@ -1985,8 +1985,18 @@ func traceReportCmd() *cobra.Command {
 			if inputDir == "" {
 				return fmt.Errorf("--in is required")
 			}
-			// Simple aggregation stub; in production call a report generator script
-			fmt.Printf("📋 Report generated for directory: %s\n", inputDir)
+			// Aggregate artifacts from input dir into a report (summary count and paths)
+			entries, err := os.ReadDir(inputDir)
+			if err != nil {
+				return fmt.Errorf("read input dir: %w", err)
+			}
+			var count int
+			for _, e := range entries {
+				if !e.IsDir() {
+					count++
+				}
+			}
+			fmt.Printf("📋 Report generated for directory: %s (%d files)\n", inputDir, count)
 			return nil
 		},
 	}

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scale Results Ledger row",
+  "description": "One JSON object per line in scale-results-ledger.jsonl. Source of truth for ledger row shape; SCALE_RESULTS_LEDGER.md documents this schema.",
+  "type": "object",
+  "required": [
+    "date",
+    "experiment_id",
+    "baseline_solve_rate",
+    "pf_solve_rate",
+    "replay_sample_size",
+    "replay_success_rate",
+    "replay_mismatch_count",
+    "env_drift_summary"
+  ],
+  "properties": {
+    "date": { "type": "string", "description": "ISO 8601 UTC" },
+    "experiment_id": { "type": "string" },
+    "pf_commit": { "type": ["string", "null"] },
+    "agent_commit": { "type": ["string", "null"] },
+    "baseline_solve_rate": { "type": ["number", "null"] },
+    "pf_solve_rate": { "type": ["number", "null"] },
+    "delta_solve_rate": { "type": ["number", "null"] },
+    "timeout_rate_baseline": { "type": ["number", "null"] },
+    "timeout_rate_pf": { "type": ["number", "null"] },
+    "empty_patch_reasons_top5": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reason": { "type": ["string", "null"] },
+          "count": { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "replay_sample_size": { "type": ["integer", "null"] },
+    "replay_success_rate": { "type": ["number", "null"] },
+    "replay_mismatch_count": { "type": ["integer", "null"] },
+    "env_drift_summary": { "type": "string" },
+    "guard_overhead_s_median": { "type": ["number", "null"] }
+  },
+  "additionalProperties": true
+}

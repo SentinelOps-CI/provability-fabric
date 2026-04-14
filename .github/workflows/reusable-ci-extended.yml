@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+on:
+  workflow_call:
+    inputs:
+      impacted_tests:
+        type: string
+        required: false
+        default: ""
+
+jobs:
+  extended:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run red-team tests (impacted only)
+        env:
+          IMPACTED_TESTS: ${{ inputs.impacted_tests }}
+        run: |
+          pip install -r tests/redteam/requirements.txt
+          if [ -n "$IMPACTED_TESTS" ]; then
+            echo "Running impacted red-team tests: $IMPACTED_TESTS"
+            for test in $IMPACTED_TESTS; do
+              if [[ "$test" == *"redteam"* ]]; then
+                python "$test"
+              fi
+            done
+          else
+            python tests/redteam/injection_runner.py
+            python tests/redteam/abac_fuzz.py
+          fi
+
+      - name: Run performance tests (impacted only)
+        env:
+          IMPACTED_TESTS: ${{ inputs.impacted_tests }}
+        run: |
+          K6_VERSION="v0.47.0"
+          curl -fsSL "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-amd64.tar.gz" | tar -xz
+          sudo cp "k6-${K6_VERSION}-linux-amd64/k6" /usr/local/bin/k6
+
+          if [ -n "$IMPACTED_TESTS" ]; then
+            for test in $IMPACTED_TESTS; do
+              if [[ "$test" == *"perf"* ]]; then
+                k6 run "$test"
+              fi
+            done
+          else
+            k6 run tests/perf/latency_k6.js --stage 60s:1000
+          fi
+
+      - name: Run integration tests (impacted only)
+        env:
+          IMPACTED_TESTS: ${{ inputs.impacted_tests }}
+        run: |
+          pip install -r tests/integration/requirements.txt
+          if [ -n "$IMPACTED_TESTS" ]; then
+            timeout 20m pytest $IMPACTED_TESTS -v
+          else
+            timeout 20m pytest tests/integration/ -v
+          fi
+
+      - name: Sign spec bundles
+        if: github.event_name == 'push'
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+        run: |
+          COSIGN_VERSION="v2.4.0"
+          curl -fsSL -o cosign-bin "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+          chmod +x cosign-bin
+          sudo mv cosign-bin /usr/local/bin/cosign
+
+          if [ -d "bundles" ]; then
+            SIG_FILES=$(find bundles -name "spec.sig" 2>/dev/null || true)
+            if [ -n "$SIG_FILES" ]; then
+              find bundles -name "spec.sig" -exec cosign sign-blob --bundle {}.bundle {} \;
+            fi
+          fi

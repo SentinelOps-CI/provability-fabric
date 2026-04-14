@@ -93,6 +93,7 @@ pub struct PermissionEvidence {
 
 /// NEW: Proof hashes for verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ProofHashes {
     pub automata_hash: String,   // Hash of proof/Automata
     pub labeler_hash: String,    // Hash of proof/Automata/Labeler
@@ -177,6 +178,7 @@ pub struct EffectEntry {
 
 /// Witness verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct WitnessVerification {
     pub merkle_path_valid: bool,
     pub field_commit_valid: bool,
@@ -366,17 +368,6 @@ impl Default for RateLimitStatus {
     }
 }
 
-impl Default for WitnessVerification {
-    fn default() -> Self {
-        Self {
-            merkle_path_valid: false,
-            field_commit_valid: false,
-            label_derivation_valid: false,
-            witness_hash: String::new(),
-            verification_time_ms: 0,
-        }
-    }
-}
 
 impl Default for PermissionEvidence {
     fn default() -> Self {
@@ -398,16 +389,6 @@ impl Default for PermissionEvidence {
     }
 }
 
-impl Default for ProofHashes {
-    fn default() -> Self {
-        Self {
-            automata_hash: String::new(),
-            labeler_hash: String::new(),
-            policy_hash: String::new(),
-            ni_monitor_hash: String::new(),
-        }
-    }
-}
 
 impl Default for BridgeGuarantee {
     fn default() -> Self {

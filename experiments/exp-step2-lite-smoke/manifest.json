@@ -1,0 +1,31 @@
+{
+  "experiment_id": "exp-step2-lite-smoke",
+  "description": "First-pass SWE-bench Lite smoke: baseline vs PF-guarded, fixed config for attribution.",
+  "pf_commit": "dc5f81da270cef428122cdc16acd23ec6ce7b5a7",
+  "agent_framework": "openhands",
+  "agent_commit": "",
+  "agent_image_tag": "",
+  "model": {
+    "id": "gpt-4o",
+    "provider": "openai"
+  },
+  "dataset": "swebench_lite",
+  "dataset_split": "test",
+  "policy_pack": "swebench_safe_v1",
+  "budgets": {
+    "max_steps": 35,
+    "max_tool_calls": 500,
+    "timeout_sec": 1200
+  },
+  "model_params": {
+    "temperature": 0,
+    "top_p": null
+  },
+  "seed": 42,
+  "run_modes": [
+    "baseline",
+    "pf_guarded"
+  ],
+  "created_at": "2026-02-13T15:22:55.364904+00:00",
+  "notes": "Serious smoke: OPENHANDS_MODEL=gpt-4o (manifest default). Cost-sensitive runs may use gpt-4o-mini; solve rate is not guaranteed. Pin pf_commit and agent_commit via fill_manifest_from_run.py. Budgets: max_steps 35, timeout_sec 1200 (raise OPENHANDS_TIMEOUT in the cycle script if you override). Default PF_OPENHANDS_MAX_TASK_CHARS in the engine is 12000 so full SWE-bench problem text reaches OpenHands. After a green run, pin versions from env.json into this manifest (openhands_version, pip_freeze_hash)."
+}

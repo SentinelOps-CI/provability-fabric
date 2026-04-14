@@ -1,0 +1,4 @@
+# Red-team test dependencies (abac_fuzz, injection_runner, pii_leak, etc.)
+# Install after tests/integration/requirements.txt for full test env.
+aiohttp>=3.8.0
+requests>=2.31.0

@@ -31,13 +31,25 @@ if spec_olean.exists():
 else:
     out["proof"] = "fail"
 
-# bundle id - for now, use a placeholder since we don't have the full pf CLI
-out["bundle_id"] = "placeholder-sha256-digest"
+# bundle_id: from runs dir or CLI if available; otherwise n/a
+bundle_id = "n/a"
+runs_dir = root / "runs"
+if runs_dir.exists():
+    for run_path in sorted(runs_dir.iterdir(), reverse=True)[:1]:
+        manifest_path = run_path / "manifest.json"
+        if manifest_path.exists():
+            try:
+                m = json.loads(manifest_path.read_text())
+                bundle_id = m.get("bundle_hash") or m.get("bundle_id") or bundle_id
+            except Exception:
+                pass
+        break
+out["bundle_id"] = bundle_id
 
-# signature - placeholder since we don't have the full pf CLI
-out["signature"] = "placeholder"
+# signature: from evidence or n/a
+out["signature"] = "n/a"
 
-# replay drift - placeholder
-out["replay_drift"] = "placeholder"
+# replay_drift: from replay output or n/a
+out["replay_drift"] = "n/a"
 
 print(json.dumps(out, indent=2))

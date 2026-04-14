@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 mod attest;
@@ -61,8 +60,8 @@ async fn main() -> anyhow::Result<()> {
     let redis_client = redis::Client::open(redis_url)?;
     
     // Test Redis connection
-    let mut conn = redis_client.get_async_connection().await?;
-    conn.ping().await?;
+    let mut conn = redis_client.get_multiplexed_async_connection().await?;
+    redis::cmd("PING").query_async::<String>(&mut conn).await?;
     info!("Connected to Redis");
 
     let state = Arc::new(AppState { redis_client });
@@ -78,9 +77,8 @@ async fn main() -> anyhow::Result<()> {
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 8080));
     info!("Attestor service listening on {}", addr);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -93,7 +91,7 @@ async fn handle_heartbeat(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Json(heartbeat): Json<Heartbeat>,
 ) -> StatusCode {
-    let mut conn = match state.redis_client.get_async_connection().await {
+    let mut conn = match state.redis_client.get_multiplexed_async_connection().await {
         Ok(conn) => conn,
         Err(e) => {
             warn!("Failed to get Redis connection: {}", e);
@@ -105,7 +103,7 @@ async fn handle_heartbeat(
     let key = format!("heartbeat:{}", heartbeat.capsule_hash);
     let value = serde_json::to_string(&heartbeat).unwrap();
     
-    if let Err(e) = conn.set_ex(&key, value, 30).await {
+    if let Err(e) = conn.set_ex::<_, _, ()>(&key, value, 30u64).await {
         warn!("Failed to store heartbeat: {}", e);
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
@@ -118,7 +116,7 @@ async fn handle_terminate(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Json(terminate): Json<TerminateFrame>,
 ) -> StatusCode {
-    let mut conn = match state.redis_client.get_async_connection().await {
+    let mut conn = match state.redis_client.get_multiplexed_async_connection().await {
         Ok(conn) => conn,
         Err(e) => {
             warn!("Failed to get Redis connection: {}", e);
@@ -130,7 +128,7 @@ async fn handle_terminate(
     let key = format!("terminate:{}", terminate.capsule_hash);
     let value = serde_json::to_string(&terminate).unwrap();
     
-    if let Err(e) = conn.set_ex(&key, value, 3600).await {
+    if let Err(e) = conn.set_ex::<_, _, ()>(&key, value, 3600u64).await {
         warn!("Failed to store termination: {}", e);
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
@@ -143,7 +141,7 @@ async fn handle_liveness(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     Path(hash): Path<String>,
 ) -> Json<LivenessResponse> {
-    let mut conn = match state.redis_client.get_async_connection().await {
+    let mut conn = match state.redis_client.get_multiplexed_async_connection().await {
         Ok(conn) => conn,
         Err(e) => {
             warn!("Failed to get Redis connection: {}", e);
@@ -163,7 +161,7 @@ async fn handle_liveness(
             if let Ok(heartbeat) = serde_json::from_str::<Heartbeat>(&data) {
                 let now = Utc::now();
                 let heartbeat_time = DateTime::from_timestamp(heartbeat.timestamp, 0).unwrap_or(now);
-                let age_seconds = (now - heartbeat_time).num_seconds();
+                let age_seconds = now.signed_duration_since(heartbeat_time).num_seconds();
                 
                 // Consider alive if heartbeat is less than 15 seconds old
                 let alive = age_seconds < 15;

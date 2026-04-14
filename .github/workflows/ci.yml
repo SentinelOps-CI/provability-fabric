@@ -1,3 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Single CI entry: protobuf lint always; full matrix runs on push to main or when non-doc paths change.
+
 name: CI
 
 on:
@@ -5,61 +10,100 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build-test:
+  changes:
     runs-on: ubuntu-latest
-    env:
-      CARGO_TERM_COLOR: always
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          node-version: "20"
-          cache: "npm"
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!figs/**'
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.21"
-          cache: true
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
-      - name: Cache Cargo registry and target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Verify Go builds
-        run: |
-          for d in services/*; do
-            if [ -f "$d/go.mod" ]; then
-              (cd "$d" && go mod tidy && go build ./...)
-            fi
-          done
-
-      - name: Verify Rust workspace builds
-        run: |
-          cargo build -q
-
-      - name: Verify Node builds (console + demos)
-        run: |
-          (cd console && npm ci --no-audit --no-fund && npm run build)
-          (cd demos/verifiable-mcp-fraud && npm ci --no-audit --no-fund && npm run build)
-
-      - name: Buf lint
-        uses: bufbuild/buf-setup-action@v1
+  protobuf-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
       - run: buf lint
         working-directory: api
+
+  prepare:
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    uses: ./.github/workflows/reusable-ci-prepare.yml
+    secrets: inherit
+
+  ci-lean:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-lean.yml
+    with:
+      impacted_targets: ${{ needs.prepare.outputs.impacted_targets }}
+      impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
+      allowlist_needs_update: ${{ needs.prepare.outputs.allowlist_needs_update }}
+    secrets: inherit
+
+  ci-rust:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-rust.yml
+    secrets: inherit
+
+  ci-go-node:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-go-node.yml
+    secrets: inherit
+
+  ci-extended:
+    needs: [prepare]
+    uses: ./.github/workflows/reusable-ci-extended.yml
+    with:
+      impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
+    secrets: inherit
+
+  ci-success:
+    name: CI required checks
+    needs:
+      - changes
+      - protobuf-lint
+      - prepare
+      - ci-lean
+      - ci-rust
+      - ci-go-node
+      - ci-extended
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify outcomes
+        run: |
+          set -e
+          if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
+            echo "protobuf-lint did not succeed: ${{ needs.protobuf-lint.result }}"
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.changes.outputs.code }}" != "true" ]; then
+            echo "Documentation-only PR: full CI skipped intentionally."
+            exit 0
+          fi
+          fail=0
+          for j in prepare ci-lean ci-rust ci-go-node ci-extended; do
+            case "$j" in
+              prepare) r="${{ needs.prepare.result }}" ;;
+              ci-lean) r="${{ needs.ci-lean.result }}" ;;
+              ci-rust) r="${{ needs.ci-rust.result }}" ;;
+              ci-go-node) r="${{ needs.ci-go-node.result }}" ;;
+              ci-extended) r="${{ needs.ci-extended.result }}" ;;
+            esac
+            if [ "$r" != "success" ]; then
+              echo "Job $j result: $r (expected success)"
+              fail=1
+            fi
+          done
+          exit "$fail"

@@ -1,0 +1,10 @@
+# Optional Python dependencies for full development and tooling.
+# Minimal install does not need these. For full dev: pip install -r requirements-optional.txt
+# See docs/guides/reuse-and-extend.md for install modes.
+
+-r tests/integration/requirements.txt
+-r tests/proof-fuzz/requirements.txt
+-r tools/compliance/requirements.txt
+-r tools/insure/requirements.txt
+-r tools/proofbot/requirements.txt
+-r tools/cert-validate/requirements.txt

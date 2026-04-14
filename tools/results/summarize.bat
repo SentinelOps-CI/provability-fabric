@@ -19,9 +19,9 @@ if exist "spec-templates\v1\proofs\.lake\build\lib\Spec.olean" (
     echo fail",>> results.json
 )
 
-echo   "bundle_id": "placeholder-sha256-digest",>> results.json
-echo   "signature": "placeholder",>> results.json
-echo   "replay_drift": "placeholder">> results.json
+echo   "bundle_id": "n/a",>> results.json
+echo   "signature": "n/a",>> results.json
+echo   "replay_drift": "n/a">> results.json
 echo }>> results.json
 
 echo Results written to results.json

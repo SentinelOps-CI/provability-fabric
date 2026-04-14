@@ -1,0 +1,6 @@
+apiVersion: v2
+name: admission
+description: Provability-Fabric admission controller (standalone chart for integration tests)
+version: 0.1.0
+appVersion: "0.1.0"
+type: application

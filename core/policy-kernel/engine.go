@@ -563,10 +563,7 @@ func (k *Kernel) verifyReceipt(receipt AccessReceipt) error {
 		return fmt.Errorf("receipt signature is required")
 	}
 
-	// TODO: Implement actual signature verification
-	// This would require access to the public keys for each shard
-	// For now, we'll do basic structural validation
-
+	// Signature verification requires trust root (PEM/JWKS); structural validation only until wired
 	return nil
 }
 

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
+// Nitro attestation types and verifier; some are not yet used at runtime.
+#![allow(dead_code)]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::{info, warn, error};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{info, warn};
 use sha2::{Sha256, Digest};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -186,7 +188,7 @@ impl NitroVerifier {
         }
 
         // Verify the certificate is properly formatted (base64)
-        if let Err(_) = BASE64.decode(&doc.certificate) {
+        if BASE64.decode(&doc.certificate).is_err() {
             return Ok(false);
         }
 
@@ -291,6 +293,18 @@ mod tests {
         }
     }
 
+    fn sign_doc(verifier: &NitroVerifier, doc: &mut NitroAttestationDoc) {
+        let signature_data = format!(
+            "{}{}{}{}{}",
+            doc.module_id,
+            doc.digest,
+            doc.timestamp,
+            doc.validity.not_before,
+            doc.validity.not_after
+        );
+        doc.signature = verifier.generate_expected_signature(&signature_data);
+    }
+
     fn create_valid_attestation_doc() -> NitroAttestationDoc {
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -322,17 +336,7 @@ mod tests {
         let measurements = create_test_measurements();
         let verifier = NitroVerifier::new(measurements, vec![]);
         let mut doc = create_valid_attestation_doc();
-        
-        // Generate expected signature
-        let signature_data = format!(
-            "{}{}{}{}{}",
-            doc.module_id,
-            doc.digest,
-            doc.timestamp,
-            doc.validity.not_before,
-            doc.validity.not_after
-        );
-        doc.signature = verifier.generate_expected_signature(&signature_data);
+        sign_doc(&verifier, &mut doc);
 
         let result = verifier.verify_attestation(&doc).await.unwrap();
         
@@ -378,8 +382,9 @@ mod tests {
     async fn test_generate_kms_token() {
         let measurements = create_test_measurements();
         let verifier = NitroVerifier::new(measurements, vec![]);
-        let doc = create_valid_attestation_doc();
-        
+        let mut doc = create_valid_attestation_doc();
+        sign_doc(&verifier, &mut doc);
+
         let attestation_result = verifier.verify_attestation(&doc).await.unwrap();
         let kms_config = KmsConfig::default();
         

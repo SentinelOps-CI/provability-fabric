@@ -17,7 +17,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::error::Error;
 
 /// Merkle tree node for witness verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +58,12 @@ pub struct LabelWitnessVerifier {
     merkle_root: Option<String>,
     bloom_witness: Option<BloomWitness>,
     strict_mode: bool,
+}
+
+impl Default for LabelWitnessVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LabelWitnessVerifier {
@@ -348,7 +353,7 @@ pub fn generate_merkle_tree(labeled_paths: &HashMap<String, String>) -> Result<M
 
             let mut hasher = Sha256::new();
             hasher.update(path.as_bytes());
-            hasher.update(&value_hash.as_bytes());
+            hasher.update(value_hash.as_bytes());
             let hash = format!("{:x}", hasher.finalize());
 
             MerkleNode::Leaf {

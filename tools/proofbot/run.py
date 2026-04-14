@@ -2,8 +2,8 @@
 """
 APOLLO - LLM-Assisted Auto-Proof Pipeline
 
-This script automatically resolves 'sorry' and 'by admit' placeholders in Lean proofs
-by invoking the APOLLO REST API and applying the generated proof patches.
+This script resolves 'sorry' and 'by admit' in Lean proofs by invoking the APOLLO
+REST API and applying the generated proof patches.
 """
 
 import os

@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-use blake3::Hasher as Blake3Hasher;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 /// Merkle proof for a single field
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +71,7 @@ impl JCSCanonicalizer {
                 serde_json::Value::Object(sorted_map)
             }
             serde_json::Value::Array(arr) => {
-                let sorted_arr: Vec<_> = arr.iter().map(|v| Self::sort_json_keys(v)).collect();
+                let sorted_arr: Vec<_> = arr.iter().map(Self::sort_json_keys).collect();
                 serde_json::Value::Array(sorted_arr)
             }
             _ => value.clone(),
@@ -160,7 +159,7 @@ struct BloomFilter {
 impl BloomFilter {
     fn new(size: usize, hash_count: usize) -> Self {
         Self {
-            bits: vec![0; (size + 7) / 8], // Round up to byte boundary
+            bits: vec![0; size.div_ceil(8)],
             hash_count,
             size,
         }
@@ -385,6 +384,7 @@ impl OptimizedWitnessChecker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn test_jcs_canonicalization() {

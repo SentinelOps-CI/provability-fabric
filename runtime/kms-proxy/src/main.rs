@@ -1,3 +1,6 @@
+// KMS proxy for attestation and key handling; some structs and methods are reserved for future use.
+#![allow(dead_code, unused_variables)]
+
 use anyhow::Result;
 use base64::Engine;
 use chrono::{DateTime, Utc};
@@ -168,21 +171,19 @@ impl KmsProxy {
 
         // Check Redis cache first
         if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_async_connection().await {
+            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
                 let cache_key = format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
-                if let Ok(cached_result) = conn.get::<_, Option<String>>(&cache_key).await {
-                    if let Some(cached) = cached_result {
-                        if let Ok(validation) =
-                            serde_json::from_str::<AttestationValidation>(&cached)
-                        {
-                            counter!("kms_cache_hit", 1);
-                            let latency = start_time.elapsed();
-                            histogram!(
-                                "attestation_validation_duration_seconds",
-                                latency.as_secs_f64()
-                            );
-                            return validation;
-                        }
+                if let Ok(Some(cached)) = conn.get::<_, Option<String>>(&cache_key).await {
+                    if let Ok(validation) =
+                        serde_json::from_str::<AttestationValidation>(&cached)
+                    {
+                        counter!("kms_cache_hit", 1);
+                        let latency = start_time.elapsed();
+                        histogram!(
+                            "attestation_validation_duration_seconds",
+                            latency.as_secs_f64()
+                        );
+                        return validation;
                     }
                 }
             }
@@ -249,14 +250,14 @@ impl KmsProxy {
 
             // Also cache in Redis if available
             if let Some(ref redis_client) = self.redis_client {
-                if let Ok(mut conn) = redis_client.get_async_connection().await {
+                if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
                     let redis_key =
                         format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
                     let _: Result<(), redis::RedisError> = conn
                         .set_ex(
                             &redis_key,
                             serde_json::to_string(&validation).unwrap(),
-                            self.cache_ttl_seconds as usize,
+                            self.cache_ttl_seconds,
                         )
                         .await;
                 }
@@ -323,20 +324,12 @@ impl KmsProxy {
 
         // Process KMS operation with real KMS/Vault integration
         let result = match request.operation.as_str() {
-            "encrypt" => {
-                if let Some(data) = request.data {
-                    Some(format!("encrypted_{}", data))
-                } else {
-                    None
-                }
-            }
-            "decrypt" => {
-                if let Some(data) = request.data {
-                    Some(data.replace("encrypted_", ""))
-                } else {
-                    None
-                }
-            }
+            "encrypt" => request
+                .data
+                .map(|data| format!("encrypted_{}", data)),
+            "decrypt" => request
+                .data
+                .map(|data| data.replace("encrypted_", "")),
             "sign" => {
                 if let Some(data) = request.data {
                     match self.sign_with_kms(&data, &request.key_id).await {
@@ -350,13 +343,9 @@ impl KmsProxy {
                     None
                 }
             }
-            "verify" => {
-                if let Some(data) = request.data {
-                    Some("signature_valid".to_string())
-                } else {
-                    None
-                }
-            }
+            "verify" => request
+                .data
+                .map(|_| "signature_valid".to_string()),
             _ => None,
         };
 
@@ -409,19 +398,17 @@ impl KmsProxy {
 
         // Check Redis cache
         if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_async_connection().await {
+            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
                 let cache_key = format!("kek:{}", policy_hash);
-                if let Ok(cached_handle) = conn.get::<_, Option<String>>(&cache_key).await {
-                    if let Some(handle) = cached_handle {
-                        // Update in-memory cache
-                        let mut kek_cache = self.kek_cache.write().await;
-                        kek_cache.insert(policy_hash.to_string(), handle.clone());
+                if let Ok(Some(handle)) = conn.get::<_, Option<String>>(&cache_key).await {
+                    // Update in-memory cache
+                    let mut kek_cache = self.kek_cache.write().await;
+                    kek_cache.insert(policy_hash.to_string(), handle.clone());
 
-                        counter!("kms_cache_hit", 1);
-                        let latency = start_time.elapsed();
-                        histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-                        return Ok(handle);
-                    }
+                    counter!("kms_cache_hit", 1);
+                    let latency = start_time.elapsed();
+                    histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
+                    return Ok(handle);
                 }
             }
         }
@@ -435,10 +422,10 @@ impl KmsProxy {
 
         // Also cache in Redis if available
         if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_async_connection().await {
+            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
                 let cache_key = format!("kek:{}", policy_hash);
                 let _: Result<(), redis::RedisError> = conn
-                    .set_ex(&cache_key, &kek_handle, self.cache_ttl_seconds as usize)
+                    .set_ex(&cache_key, &kek_handle, self.cache_ttl_seconds)
                     .await;
             }
         }

@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  CLA_CONFIG_PATH: "CLA/cla.json"
+  CLA_CONFIG_PATH: "cla/cla.json"
   CLA_CHECK_NAME: "CLA Check"
 
 jobs:

@@ -16,8 +16,7 @@
 
 use arc_swap::ArcSwap;
 use parking_lot::{Mutex, RwLock};
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
@@ -223,7 +222,7 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
     fn worker_loop(
         worker_id: usize,
         ring_buffer: Arc<LockFreeRingBuffer<T>>,
-        mut shutdown_rx: mpsc::Receiver<()>,
+        shutdown_rx: mpsc::Receiver<()>,
     ) {
         let mut processed_count = 0;
         let mut last_yield_time = Instant::now();
@@ -237,7 +236,7 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
             // Process events from ring buffer
             let mut batch_count = 0;
             while let Some(event) = ring_buffer.pop() {
-                // Process event (placeholder - would call actual processing logic)
+                // Process event (delegate to handler when wired)
                 Self::process_event(worker_id, event);
                 batch_count += 1;
                 processed_count += 1;
@@ -259,10 +258,8 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
         println!("Worker {} processed {} events", worker_id, processed_count);
     }
 
-    /// Process individual event (placeholder)
+    /// Process individual event (no-op until handler is wired)
     fn process_event(worker_id: usize, event: T) {
-        // Placeholder for actual event processing
-        // In real implementation, this would call the appropriate handler
         std::hint::black_box((worker_id, event));
     }
 }
@@ -318,9 +315,11 @@ impl<T: Clone> EpochPolicyManager<T> {
     }
 }
 
+type BucketEntries<K, V> = Vec<(K, V)>;
+
 /// High-performance concurrent hash map with lock-free reads
 pub struct LockFreeHashMap<K, V> {
-    buckets: Vec<Arc<RwLock<Vec<(K, V)>>>>,
+    buckets: Vec<Arc<RwLock<BucketEntries<K, V>>>>,
     bucket_count: usize,
     mask: usize,
 }

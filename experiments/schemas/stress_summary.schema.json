@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stress summary",
+  "description": "Output of summarize_stress_run.py for regression detection. Schema versioned for comparable artifacts across time.",
+  "type": "object",
+  "properties": {
+    "schema_version": { "type": "string", "description": "Schema version (e.g. 1.0)" },
+    "pf_commit": { "type": ["string", "null"], "description": "PF repo commit at run time" },
+    "agent_commit": { "type": ["string", "null"], "description": "Agent/image version" },
+    "dataset_id": { "type": ["string", "null"], "description": "Dataset name/id" },
+    "dataset_version": { "type": ["string", "null"], "description": "datasets version" },
+    "harness_id": { "type": ["string", "null"], "description": "Harness dataset id or version" },
+    "timeout_rate_baseline": { "type": ["number", "null"] },
+    "timeout_rate_pf": { "type": ["number", "null"] },
+    "wall_clock_s_median_baseline": { "type": ["number", "null"] },
+    "wall_clock_s_median_pf": { "type": ["number", "null"] },
+    "wall_clock_s_p95_baseline": { "type": ["number", "null"] },
+    "wall_clock_s_p95_pf": { "type": ["number", "null"] },
+    "guard_overhead_s_median": { "type": ["number", "null"] },
+    "tokens_median_baseline": { "type": ["number", "null"] },
+    "tokens_median_pf": { "type": ["number", "null"] },
+    "tokens_p95_baseline": { "type": ["number", "null"] },
+    "tokens_p95_pf": { "type": ["number", "null"] },
+    "tool_calls_median_baseline": { "type": ["number", "null"] },
+    "tool_calls_median_pf": { "type": ["number", "null"] },
+    "tool_calls_p95_baseline": { "type": ["number", "null"] },
+    "tool_calls_p95_pf": { "type": ["number", "null"] },
+    "empty_patch_reasons_topN": {
+      "type": "array",
+      "items": { "type": "object", "properties": { "reason": { "type": "string" }, "count": { "type": "integer" } } }
+    },
+    "patch_apply_total": { "type": ["integer", "null"] },
+    "patch_apply_applies_false": { "type": ["integer", "null"] },
+    "baseline_solve_rate": { "type": ["number", "null"] },
+    "pf_solve_rate": { "type": ["number", "null"] },
+    "n_instances_baseline": { "type": ["integer", "null"] },
+    "n_instances_pf": { "type": ["integer", "null"] },
+    "message": { "type": "string" }
+  }
+}

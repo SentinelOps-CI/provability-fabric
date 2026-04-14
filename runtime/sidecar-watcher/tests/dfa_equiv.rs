@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-use crate::dfa::{DFAInterpreter, DFATable, RateLimit, Transition};
 use serde_json;
-use std::collections::HashMap;
+use sidecar_watcher::dfa::{DFAInterpreter, DFATable, RateLimit, Transition};
 use std::fs;
 use std::path::Path;
 
@@ -269,12 +268,12 @@ fn test_round_trip_equivalence_5k() {
 
     // Generate 5000 test traces for comprehensive testing
     let traces = generate_seeded_traces(42, 5000);
-    let mut mismatches = 0;
+    let mismatches = 0;
     let mut total_traces = 0;
 
     for (i, trace) in traces.iter().enumerate() {
         total_traces += 1;
-        let (final_state, accepted, violations) = run_rust_interpreter(&table, trace);
+        let (final_state, _accepted, violations) = run_rust_interpreter(&table, trace);
 
         // Verify basic properties
         assert!(final_state < 5, "Invalid final state: {}", final_state);
@@ -348,7 +347,7 @@ fn test_round_trip_equivalence_100() {
 
     // Generate 100 test traces
     let traces = generate_seeded_traces(42, 100);
-    let mut mismatches = 0;
+    let mismatches = 0;
 
     for (i, trace) in traces.iter().enumerate() {
         let (final_state, accepted, violations) = run_rust_interpreter(&table, trace);

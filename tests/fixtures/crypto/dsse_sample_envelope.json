@@ -1,0 +1,11 @@
+{
+  "payloadType": "application/vnd.provability-fabric.access-receipt",
+  "payload": "eyJpbmRleF9zaGFyZCI6IjAiLCJxdWVyeV9oYXNoIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInF1ZXJ5X3RpbWVfbXMiOjEwLCJyZWNlaXB0X2lkIjoiZml4dHVyZS1yZWNlaXB0LTEiLCJyZXN1bHRfY291bnQiOjEsInJlc3VsdF9oYXNoIjoiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInNpZ25hdHVyZSI6IiIsInN1YmplY3RfaWQiOiJzdWJqZWN0LTEiLCJ0ZW5hbnQiOiJ0ZXN0IiwidGltZXN0YW1wIjoxMDAwMDAwfQ==",
+  "signatures": [
+    {
+      "keyid": "receipt_signer_v1",
+      "sig": "FmpDnJfew17EUKQSacrJFqkaKWJlVTXHgj3ecxfMLsnBQdbzqlGR1mAWOu+jRnj7kvI0SpDmFSYVVdS0gJECAA==",
+      "alg": "ed25519"
+    }
+  ]
+}

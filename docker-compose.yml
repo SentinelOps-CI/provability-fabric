@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
+#
+# Profiles: default (no profile) = platform only (postgres, redis, api-gateway, spec, proof, build, evidence, replay, runtime-sidecar).
+#   docker compose up
+# Full stack (adds console, demos, monitoring):
+#   docker compose --profile full up
 
 services:
   # Database services
@@ -175,8 +180,9 @@ services:
       timeout: 10s
       retries: 3
 
-  # Console Web UI
+  # Console Web UI (full stack only)
   console:
+    profiles: ["full"]
     build:
       context: ./console
       dockerfile: Dockerfile
@@ -192,8 +198,9 @@ services:
       timeout: 10s
       retries: 3
 
-  # Demo application
+  # Demo application (full stack only)
   verifiable-mcp-fraud:
+    profiles: ["full"]
     build:
       context: .
       dockerfile: demos/verifiable-mcp-fraud/Dockerfile
@@ -207,8 +214,9 @@ services:
       - api-gateway
       - runtime-sidecar
 
-  # Monitoring
+  # Monitoring (full stack only)
   grafana:
+    profiles: ["full"]
     image: grafana/grafana:latest
     ports:
       - "3003:3000"
@@ -222,6 +230,7 @@ services:
       - prometheus
 
   prometheus:
+    profiles: ["full"]
     image: prom/prometheus:latest
     ports:
       - "9091:9090"

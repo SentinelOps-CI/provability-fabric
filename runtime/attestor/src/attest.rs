@@ -1,7 +1,8 @@
+// Attestation types for Nitro/SEV and runtime policy; some are not yet used at runtime.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RuntimeAttestation {
     pub timestamp: DateTime<Utc>,
@@ -12,6 +13,7 @@ pub struct RuntimeAttestation {
     pub signature: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PolicyConfig {
     pub policy_hash: String,
@@ -20,6 +22,7 @@ pub struct PolicyConfig {
     pub capability_enforcement: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EpsilonLimits {
     pub max_epsilon: f64,
@@ -27,12 +30,14 @@ pub struct EpsilonLimits {
     pub max_delta: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BudgetLimits {
     pub max_budget: f64,
     pub remaining_budget: f64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RetentionStatus {
     pub zero_retention_enabled: bool,
@@ -43,6 +48,7 @@ pub struct RetentionStatus {
     pub compliance_status: bool,
 }
 
+#[allow(dead_code)]
 impl RuntimeAttestation {
     pub fn new(capsule_hash: String) -> Self {
         Self {
@@ -85,6 +91,7 @@ impl RuntimeAttestation {
     }
 }
 
+#[allow(dead_code)]
 impl Default for PolicyConfig {
     fn default() -> Self {
         Self {
@@ -96,6 +103,7 @@ impl Default for PolicyConfig {
     }
 }
 
+#[allow(dead_code)]
 impl Default for EpsilonLimits {
     fn default() -> Self {
         Self {
@@ -106,6 +114,7 @@ impl Default for EpsilonLimits {
     }
 }
 
+#[allow(dead_code)]
 impl Default for BudgetLimits {
     fn default() -> Self {
         Self {
@@ -115,6 +124,7 @@ impl Default for BudgetLimits {
     }
 }
 
+#[allow(dead_code)]
 impl Default for RetentionStatus {
     fn default() -> Self {
         Self {

@@ -29,11 +29,10 @@ jobs:
           fetch-depth: 0  # Full history for baseline comparison
 
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust-version }}
           profile: minimal
-          override: true
 
       - name: Cache dependencies
         uses: actions/cache@v3

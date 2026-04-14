@@ -151,6 +151,12 @@ struct EffectUsage {
     duration_ms: u64,
 }
 
+impl Default for EffectsAllowList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EffectsAllowList {
     /// Create new effects allow-list
     pub fn new() -> Self {
@@ -246,7 +252,7 @@ impl EffectsAllowList {
 
         self.effect_usage
             .entry(effect_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(usage);
 
         // Cleanup old usage records periodically

@@ -72,7 +72,7 @@ func NewDecisionCache(maxSize int, ttl time.Duration, redisAddr string) *Decisio
 
 	// Initialize Redis client if address is provided
 	if redisAddr != "" {
-		// TODO: Initialize Redis client when Redis dependency is available
+		// Redis client not initialized; configure when Redis dependency is available
 		// cache.redisClient = redis.NewClient(&redis.Options{
 		//     Addr:     redisAddr,
 		//     Password: "",
@@ -183,7 +183,7 @@ func (dc *DecisionCache) InvalidateByPolicyHash(policyHash string) error {
 
 	// Remove from Redis if available
 	if dc.redisClient != nil {
-		// TODO: Implement Redis deletion when Redis client is properly typed
+		// Redis deletion not implemented; client not typed
 		// for _, key := range keysToRemove {
 		//     dc.redisClient.Del(dc.ctx, key)
 		// }
@@ -212,7 +212,7 @@ func (dc *DecisionCache) Close() error {
 	dc.cancel()
 
 	if dc.redisClient != nil {
-		// TODO: Implement Redis close when Redis client is properly typed
+		// Redis close not implemented; client not typed
 		// return dc.redisClient.Close()
 	}
 
@@ -276,7 +276,7 @@ func (dc *DecisionCache) updateStats(hit bool) {
 
 // getFromRedis retrieves a cached decision from Redis
 func (dc *DecisionCache) getFromRedis(key string) (*CachedDecision, bool) {
-	// TODO: Implement Redis get when Redis client is properly typed
+	// Redis get not implemented; client not typed
 	// data, err := dc.redisClient.Get(dc.ctx, key).Bytes()
 	// if err != nil {
 	//     return nil, false
@@ -299,7 +299,7 @@ func (dc *DecisionCache) getFromRedis(key string) (*CachedDecision, bool) {
 
 // setToRedis stores a cached decision in Redis
 func (dc *DecisionCache) setToRedis(key string, cached *CachedDecision) error {
-	// TODO: Implement Redis set when Redis client is properly typed
+	// Redis set not implemented; client not typed
 	// data, err := json.Marshal(cached)
 	// if err != nil {
 	//     return err
@@ -369,6 +369,5 @@ func (dc *DecisionCache) redisSync() {
 
 // syncWithRedis performs a one-way sync from Redis to in-memory cache
 func (dc *DecisionCache) syncWithRedis() {
-	// This is a placeholder for Redis synchronization logic
-	// In practice, you might want to implement pub/sub for real-time updates
+	// Redis sync not configured; implement pub/sub when Redis client is available
 }

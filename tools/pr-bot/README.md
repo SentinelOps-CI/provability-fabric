@@ -2,6 +2,18 @@
 
 Automated GitHub PR bot that posts comprehensive analysis comments including proof compilation, automata information, epoch status, and sample replay statistics.
 
+## Repository
+
+Sources live in the upstream monorepo **[SentinelOps-CI/provability-fabric](https://github.com/SentinelOps-CI/provability-fabric)** under `tools/pr-bot/`.
+
+```bash
+git clone https://github.com/SentinelOps-CI/provability-fabric.git
+cd provability-fabric/tools/pr-bot
+go install .
+```
+
+The Go **module path** in `go.mod` is `github.com/provability-fabric/tools/pr-bot` (legacy import path). After cloning the SentinelOps-CI repo, use `go install .` from this directory. A remote `go install github.com/provability-fabric/tools/pr-bot@latest` only works if that module path is reachable as a Go package from your environment.
+
 ## Features
 
 - **Proof Analysis**: Compiles policies and reports compilation status, timing, and hashes
@@ -25,11 +37,11 @@ go run main.go owner repo pr-number
 ### Examples
 
 ```bash
-# Analyze PR #123 in provability-fabric/provability-fabric
-go run main.go provability-fabric provability-fabric 123
+# Analyze PR #123 in SentinelOps-CI/provability-fabric
+go run main.go SentinelOps-CI provability-fabric 123
 
 # With explicit token
-go run main.go provability-fabric provability-fabric 123 ghp_xxxxxxxxxxxx
+go run main.go SentinelOps-CI provability-fabric 123 ghp_xxxxxxxxxxxx
 ```
 
 ### CI Integration
@@ -46,16 +58,16 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Go
-        uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: 1.21
-          
+          go-version-file: tools/pr-bot/go.mod
+
       - name: Install PR Bot
-        run: go install github.com/provability-fabric/tools/pr-bot@latest
-        
+        working-directory: tools/pr-bot
+        run: go install .
+
       - name: Run PR Analysis
         run: pr-bot ${{ github.repository_owner }} ${{ github.event.repository.name }} ${{ github.event.pull_request.number }}
         env:

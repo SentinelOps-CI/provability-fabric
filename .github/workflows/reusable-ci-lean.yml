@@ -1,0 +1,174 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+on:
+  workflow_call:
+    inputs:
+      impacted_targets:
+        type: string
+        required: false
+        default: ""
+      impacted_tests:
+        type: string
+        required: false
+        default: ""
+      allowlist_needs_update:
+        type: string
+        required: false
+        default: "false"
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python (Lean gates)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies for Lean tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml requests
+
+      - name: Install Elan
+        env:
+          ELAN_INIT_REF: v4.2.1
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/leanprover/elan/${ELAN_INIT_REF}/elan-init.sh" | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Activate Lean from lean-toolchain
+        run: |
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          elan toolchain install "$TOOLCHAIN"
+          elan override set "$TOOLCHAIN"
+          lean --version
+
+      - name: Cache Lean artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cache/lean
+            core/lean-libs/.lake
+            spec-templates/v1/proofs/.lake
+            .lake
+            vendor/mathlib
+          key: ${{ runner.os }}-lean-${{ hashFiles('lean-toolchain', '**/lakefile.lean') }}
+          restore-keys: |
+            ${{ runner.os }}-lean-
+
+      - name: Vendor mathlib (if missing)
+        run: |
+          if [ ! -d vendor/mathlib/.git ]; then
+            echo "Vendoring mathlib for Lean builds..."
+            chmod +x scripts/vendor-mathlib.sh
+            ./scripts/vendor-mathlib.sh
+          else
+            echo "vendor/mathlib already present (from cache or repo)"
+          fi
+
+      - name: Build Lean proofs (impacted only)
+        env:
+          IMPACTED_TARGETS: ${{ inputs.impacted_targets }}
+        run: |
+          cd core/lean-libs
+          lake build
+
+          cd ../../spec-templates/v1/proofs
+          lake build
+
+          cd ../../..
+          if [ -n "$IMPACTED_TARGETS" ]; then
+            echo "Building impacted bundles: $IMPACTED_TARGETS"
+            for target in $IMPACTED_TARGETS; do
+              if [ -d "bundles/$target/proofs" ]; then
+                echo "Building proofs for $target..."
+                (cd "bundles/$target/proofs" && lake build)
+              fi
+            done
+          else
+            echo "No specific impacted targets identified, building all bundles"
+            for bundle in bundles/*/proofs; do
+              if [ -d "$bundle" ]; then
+                echo "Building $bundle..."
+                (cd "$bundle" && lake build)
+              fi
+            done
+          fi
+
+      - name: Lean proof quality gate
+        run: python tools/lean_gate.py --root . --config tools/lean_gate_config.yaml
+
+      - name: Lean build time budget check
+        run: |
+          chmod +x scripts/lean_time_budget.sh
+          ./scripts/lean_time_budget.sh
+
+      - name: Check for duplicate Lean definitions
+        run: make lean-check-duplicates
+
+      - name: Check for forbidden shadowing
+        run: make lean-forbid-shadowing
+
+      - name: Generate allowlist from Lean proofs (if needed)
+        if: inputs.allowlist_needs_update == 'true'
+        run: |
+          python tools/gen_allowlist_from_lean.py . /tmp/generated_allowlist.json
+
+      - name: Compare generated allowlist with runtime (if needed)
+        if: inputs.allowlist_needs_update == 'true'
+        run: |
+          if [ -f "runtime/sidecar-watcher/policy/allowlist.json" ]; then
+            if diff /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json > /dev/null; then
+              echo "Generated allowlist matches runtime allowlist"
+            else
+              echo "Generated allowlist differs from runtime allowlist"
+              diff /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json || true
+              exit 1
+            fi
+          else
+            mkdir -p runtime/sidecar-watcher/policy/
+            cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
+          fi
+
+      - name: Update runtime allowlist (if needed)
+        if: inputs.allowlist_needs_update == 'true'
+        run: |
+          mkdir -p runtime/sidecar-watcher/policy/
+          cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
+
+      - name: Time-to-fail check
+        run: |
+          LEAN_FILES=$(find . -name "*.lean" -not -path "./.lake/*" -not -path "./vendor/*" | head -10)
+          for file in $LEAN_FILES; do
+            echo "Testing $file..."
+            start_time=$(date +%s)
+            if timeout 20s lean --make "$file" >/dev/null 2>&1; then
+              end_time=$(date +%s)
+              duration=$((end_time - start_time))
+              echo "$file compiled in ${duration}s"
+            else
+              end_time=$(date +%s)
+              duration=$((end_time - start_time))
+              if [ $duration -gt 20 ]; then
+                echo "$file exceeded 20s TTF limit"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run proofbench
+        run: |
+          cd core/lean-libs
+          lake build
+          cd ../..
+          lake exe proofbench

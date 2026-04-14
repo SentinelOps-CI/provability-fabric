@@ -20,8 +20,8 @@ on:
     - cron: "0 2 * * 0"
 
 env:
-  GO_VERSION: "1.21"
-  RUST_VERSION: "1.75"
+  GO_VERSION: "1.23"
+  RUST_VERSION: "stable"
 
 jobs:
   test-epsilon-guard:

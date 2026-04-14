@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# PR gate: bench-smoke (pytest) + optional rust unit tests. No network, no model keys, no Docker.
+# Optional nightly: SWE-bench with model gated by secret.
+
+name: Bench SWE-bench Smoke
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "bench/swebench/**"
+      - "bench/fixtures/**"
+      - "tests/test_swebench_runner_smoke.py"
+      - ".github/workflows/bench-swebench-smoke.yaml"
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  bench-smoke:
+    name: bench-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run SWE-bench runner smoke tests
+        run: pytest tests/test_swebench_runner_smoke.py -q --tb=short
+        env:
+          NO_PROXY: "*"
+
+  rust-tests:
+    name: rust-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true  # optional gate; bench-smoke is the required PR gate
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: ./.github/actions/cache-cargo
+
+      - name: Run Rust unit tests
+        run: cargo test -q --workspace --no-fail-fast
+
+  nightly-with-model:
+    name: Nightly (model calls, gated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # secrets are not allowed in job-level `if:`; gate nightly job on schedule/manual only.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip pytest
+          pip install datasets
+
+      - name: Run smoke then optional full bench
+        run: |
+          python -m pytest tests/test_swebench_runner_smoke.py -q --tb=short
+        env:
+          BENCH_SWEBENCH_NIGHTLY_TOKEN: ${{ secrets.BENCH_SWEBENCH_NIGHTLY_TOKEN }}

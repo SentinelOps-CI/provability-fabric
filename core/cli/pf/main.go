@@ -37,18 +37,17 @@ import (
 )
 
 var (
-	dryRun bool
-)
-
-func main() {
-	var rootCmd = &cobra.Command{
+	dryRun  bool
+	rootCmd = &cobra.Command{
 		Use:     "so",
 		Aliases: []string{"pf"},
 		Short:   "Provability-Fabric CLI tool",
 		Long: `Provability-Fabric (pf) is a command-line tool for managing AI agent specifications
 with provable behavioral guarantees through formal verification.`,
 	}
+)
 
+func init() {
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview changes without making them")
 
 	rootCmd.AddCommand(initCmd())
@@ -78,7 +77,10 @@ with provable behavioral guarantees through formal verification.`,
 	// Enhanced unified commands for developer workflow
 	rootCmd.AddCommand(explainStateCmd())
 	rootCmd.AddCommand(unifiedCommands())
+	rootCmd.AddCommand(benchCmd())
+}
 
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -158,7 +160,7 @@ func lintCmd() *cobra.Command {
 
 			// Run spectral lint
 			fmt.Println("Running spectral lint...")
-			if err := runCommand("spectral", "lint", "--ruleset", "core/schema/aispec-schema.json", "**/spec.yaml"); err != nil {
+			if err := runCommand("spectral", "lint", "--ruleset", "config/schemas/aispec-schema.json", "**/spec.yaml"); err != nil {
 				return fmt.Errorf("spectral lint failed: %w", err)
 			}
 
@@ -438,7 +440,7 @@ func runLint(dir string) error {
 	}
 
 	for _, file := range specFiles {
-		if err := runCommand("spectral", "lint", "--ruleset", "core/schema/aispec-schema.json", file); err != nil {
+		if err := runCommand("spectral", "lint", "--ruleset", "config/schemas/aispec-schema.json", file); err != nil {
 			return fmt.Errorf("spectral lint failed on %s: %w", file, err)
 		}
 	}
@@ -1250,7 +1252,7 @@ func executeBundle(bundlePath string, seed int64, recordFixtures bool) error {
 
 	// Record fixtures if requested
 	if recordFixtures {
-		if err := recordExecutionFixtures(executionResult, seed); err != nil {
+		if err := recordExecutionFixtures(executionResult, seed, bundlePath); err != nil {
 			return fmt.Errorf("failed to record fixtures: %w", err)
 		}
 		fmt.Println("📝 Fixtures recorded successfully")
@@ -1463,7 +1465,7 @@ func executeTool(ctx context.Context, tool Tool) error {
 	return nil
 }
 
-func recordExecutionFixtures(result *ExecutionResult, seed int64) error {
+func recordExecutionFixtures(result *ExecutionResult, seed int64, bundlePath string) error {
 	// Create fixtures directory
 	fixturesDir := "fixtures"
 	if err := os.MkdirAll(fixturesDir, 0755); err != nil {
@@ -1471,6 +1473,12 @@ func recordExecutionFixtures(result *ExecutionResult, seed int64) error {
 	}
 
 	// Create fixture data
+	bundleHash := ""
+	if bundlePath != "" {
+		if h, err := calculateBundleHash(bundlePath); err == nil {
+			bundleHash = h
+		}
+	}
 	fixture := &ExecutionFixture{
 		ExecutionID:   result.ExecutionID,
 		Seed:          result.Seed,
@@ -1480,7 +1488,7 @@ func recordExecutionFixtures(result *ExecutionResult, seed int64) error {
 		ToolsExecuted: result.ToolsExecuted,
 		BudgetUsed:    result.BudgetUsed,
 		Logs:          result.Logs,
-		BundleHash:    "placeholder-hash", // Would be calculated from actual bundle
+		BundleHash:    bundleHash,
 		Environment: Environment{
 			GoVersion:    runtime.Version(),
 			OS:           runtime.GOOS,
@@ -2374,5 +2382,192 @@ func perfSmokeCmd() *cobra.Command {
 	cmd.Flags().IntVar(&duration, "duration", 60, "Test duration in seconds (default 60)")
 	cmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of concurrent requests")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output machine-readable JSON")
+	return cmd
+}
+
+// benchCmd returns the top-level bench command (SWE-bench and other bench runners).
+func benchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bench",
+		Short: "Run benchmark suites",
+		Long:  `Run benchmark suites such as SWE-bench; emits predictions and PF evidence bundles.`,
+	}
+	cmd.AddCommand(swebenchCmd())
+	return cmd
+}
+
+// swebenchCmd returns the SWE-bench subcommand (run, replay, etc.).
+func swebenchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "swebench",
+		Short: "SWE-bench benchmark runner",
+		Long:  `Run SWE-bench instances; emits predictions.jsonl and PF evidence bundles.`,
+	}
+	cmd.AddCommand(swebenchRunCmd())
+	cmd.AddCommand(swebenchReplayCmd())
+	return cmd
+}
+
+// swebenchRunCmd runs the SWE-bench bench runner (Python); produces predictions.jsonl and runs/<run_id>/<instance_id>/ evidence.
+func swebenchRunCmd() *cobra.Command {
+	var dataset, split, instanceIDs, instanceIDsFile, out, engine, runsDir, instancesFile, workspacesDir, proofsDir, mode, policy, experimentDir, openhandsModel string
+	var maxInstances, openhandsTimeout, openhandsMaxIterations int
+	var seed int
+	var noWorkspace, prove, preflight bool
+
+	cmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run SWE-bench instances and emit predictions.jsonl + PF evidence",
+		Long: `Run SWE-bench instances and emit predictions.jsonl (SWE-bench format) and PF evidence
+under runs/<run_id>/<instance_id>/ (logs + patch). Supports --instance_ids and --max_instances.
+Run from repository root.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if dryRun {
+				fmt.Printf("DRY RUN: Would run SWE-bench (dataset=%s split=%s out=%s engine=%s)\n", dataset, split, out, engine)
+				return nil
+			}
+			if !preflight && runtime.GOOS == "windows" && engine != "mock" && mode != "deterministic" {
+				return fmt.Errorf("OpenHands requires fcntl; run inside WSL/Linux")
+			}
+
+			interp := "python3"
+			if _, err := exec.LookPath(interp); err != nil {
+				interp = "python"
+			}
+			runnerPath := "bench/swebench/runner.py"
+			if _, err := os.Stat(runnerPath); err != nil {
+				return fmt.Errorf("runner not found at %s (run from repository root): %w", runnerPath, err)
+			}
+
+			pyArgs := []string{runnerPath, "--dataset", dataset, "--split", split, "--out", out, "--engine", engine, "--runs-dir", runsDir, "--workspaces-dir", workspacesDir}
+			if instanceIDs != "" {
+				pyArgs = append(pyArgs, "--instance_ids", instanceIDs)
+			}
+			if maxInstances > 0 {
+				pyArgs = append(pyArgs, "--max_instances", fmt.Sprintf("%d", maxInstances))
+			}
+			if instancesFile != "" {
+				pyArgs = append(pyArgs, "--instances-file", instancesFile)
+			}
+			if instanceIDsFile != "" {
+				pyArgs = append(pyArgs, "--instance-ids-file", instanceIDsFile)
+			}
+			if experimentDir != "" {
+				pyArgs = append(pyArgs, "--experiment-dir", experimentDir)
+			}
+			if mode != "" && mode != "default" {
+				pyArgs = append(pyArgs, "--mode", mode)
+			}
+			if seed != 0 {
+				pyArgs = append(pyArgs, "--seed", fmt.Sprintf("%d", seed))
+			}
+			if openhandsTimeout > 0 {
+				pyArgs = append(pyArgs, "--openhands-timeout", fmt.Sprintf("%d", openhandsTimeout))
+			}
+			if openhandsMaxIterations > 0 {
+				pyArgs = append(pyArgs, "--openhands-max-iterations", fmt.Sprintf("%d", openhandsMaxIterations))
+			}
+			if policy != "" && policy != "none" {
+				pyArgs = append(pyArgs, "--policy", policy)
+			}
+			if noWorkspace {
+				pyArgs = append(pyArgs, "--no-workspace")
+			}
+			if prove {
+				pyArgs = append(pyArgs, "--prove")
+			}
+			if proofsDir != "" {
+				pyArgs = append(pyArgs, "--proofs-dir", proofsDir)
+			}
+			if preflight {
+				pyArgs = append(pyArgs, "--preflight")
+			}
+			if v := strings.TrimSpace(openhandsModel); v != "" {
+				pyArgs = append(pyArgs, "--openhands-model", v)
+			} else if v := strings.TrimSpace(os.Getenv("OPENHANDS_MODEL")); v != "" {
+				pyArgs = append(pyArgs, "--openhands-model", v)
+			}
+
+			c := exec.Command(interp, pyArgs...)
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return fmt.Errorf("swebench run failed: %w", err)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&dataset, "dataset", "Lite", "SWE-bench dataset: Lite, Verified, or Full")
+	cmd.Flags().StringVar(&split, "split", "test", "Dataset split (e.g. test, dev)")
+	cmd.Flags().StringVar(&instanceIDs, "instance_ids", "", "Comma-separated instance IDs to run (optional)")
+	cmd.Flags().IntVar(&maxInstances, "max_instances", 0, "Maximum number of instances to run (0 = no cap)")
+	cmd.Flags().StringVar(&out, "out", "predictions.jsonl", "Output path for predictions.jsonl")
+	cmd.Flags().StringVar(&engine, "engine", "openhands", "Engine name (e.g. openhands)")
+	cmd.Flags().StringVar(&runsDir, "runs-dir", "runs", "Base directory for PF evidence runs/<run_id>/<instance_id>/")
+	cmd.Flags().StringVar(&instancesFile, "instances-file", "", "Load instances from local JSON/JSONL file instead of HuggingFace")
+	cmd.Flags().StringVar(&instanceIDsFile, "instance-ids-file", "", "Path to file with one instance_id per line (filter with dataset)")
+	cmd.Flags().StringVar(&experimentDir, "experiment-dir", "", "Experiment directory containing manifest.json; runner uses manifest budgets as defaults for openhands-max-iterations and openhands-timeout when not set")
+	cmd.Flags().StringVar(&mode, "mode", "default", "Run mode: default, baseline (no PF enforcement), deterministic (gold patch only), or pf_guarded (PF policy + sidecar enforcement)")
+	cmd.Flags().IntVar(&seed, "seed", 0, "Random seed for reproducibility (e.g. 42)")
+	cmd.Flags().StringVar(&policy, "policy", "", "Policy pack name when guarded (e.g. swebench_safe_v1); use none for baseline")
+	cmd.Flags().IntVar(&openhandsTimeout, "openhands-timeout", 0, "OpenHands timeout in seconds (0 = runner default)")
+	cmd.Flags().IntVar(&openhandsMaxIterations, "openhands-max-iterations", 0, "Max iterations for OpenHands (0 = use manifest or runner default)")
+	cmd.Flags().StringVar(&openhandsModel, "openhands-model", "", "LLM model id for OpenHands/direct_agent (default: env OPENHANDS_MODEL or runner default)")
+	cmd.Flags().StringVar(&workspacesDir, "workspaces-dir", "workspaces", "Base directory for materialized workspaces")
+	cmd.Flags().BoolVar(&noWorkspace, "no-workspace", false, "Skip workspace materialization (no clone/checkout)")
+	cmd.Flags().BoolVar(&prove, "prove", false, "Run proof step: build policy-trace Lean proof; write proof.ok + proof_artifact_hash on success")
+	cmd.Flags().StringVar(&proofsDir, "proofs-dir", "", "Path to Lean proofs dir (default: spec-templates/v1/proofs). Used when --prove is set.")
+	cmd.Flags().BoolVar(&preflight, "preflight", false, "Only materialize workspaces, ensure clean, and report repo stats (no OpenHands run); use before long runs")
+	return cmd
+}
+
+// swebenchReplayCmd replays a SWE-bench run: replays tool trace, reconstitutes patch, verifies hash match.
+func swebenchReplayCmd() *cobra.Command {
+	var runID, instanceID, instanceIDs, runsDir, workspacesDir string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "replay",
+		Short: "Replay SWE-bench run and verify patch hash",
+		Long: `Replay a run by run_id: replay tool trace, reconstitute final patch, and verify
+the reconstituted patch hash matches the original. See docs/evidence/replay.md.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			interp := "python3"
+			if _, err := exec.LookPath(interp); err != nil {
+				interp = "python"
+			}
+			scriptPath := "bench/swebench/run_replay.py"
+			if _, err := os.Stat(scriptPath); err != nil {
+				return fmt.Errorf("replay script not found at %s (run from repository root): %w", scriptPath, err)
+			}
+			pyArgs := []string{scriptPath, "--run-id", runID, "--runs-dir", runsDir}
+			if instanceIDs != "" {
+				pyArgs = append(pyArgs, "--instance-ids", instanceIDs)
+			} else if instanceID != "" {
+				pyArgs = append(pyArgs, "--instance-id", instanceID)
+			}
+			if workspacesDir != "" {
+				pyArgs = append(pyArgs, "--workspaces-dir", workspacesDir)
+			}
+			if jsonOut {
+				pyArgs = append(pyArgs, "--json")
+			}
+			c := exec.Command(interp, pyArgs...)
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				return fmt.Errorf("swebench replay failed: %w", err)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&runID, "run_id", "", "Run ID to replay (required)")
+	cmd.MarkFlagRequired("run_id")
+	cmd.Flags().StringVar(&instanceID, "instance_id", "", "Optional: replay only this instance")
+	cmd.Flags().StringVar(&instanceIDs, "instance_ids", "", "Optional: comma-separated instance IDs to replay (e.g. id1,id2,id3)")
+	cmd.Flags().StringVar(&runsDir, "runs-dir", "runs", "Base directory for runs")
+	cmd.Flags().StringVar(&workspacesDir, "workspaces-dir", "", "Optional: workspaces base for resolving repo path")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output results as JSON")
 	return cmd
 }

@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# Rust: license policy, advisory DB, duplicate crate warnings (see deny.toml).
+name: Cargo deny
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "deny.toml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "deny.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          # Match CI Rust (Embark default was historically old); empty = runner toolchain only.
+          rust-version: stable

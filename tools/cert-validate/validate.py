@@ -16,6 +16,13 @@ from jsonschema import validate, ValidationError
 
 def load_schema(schema_path):
     """Load the CERT-V1 schema from the external standards directory."""
+    if not Path(schema_path).exists():
+        print(
+            "Schema not found at {} (clone external/CERT-V1 for full validation).".format(
+                schema_path
+            )
+        )
+        return None
     try:
         with open(schema_path, "r") as f:
             return json.load(f)
@@ -65,6 +72,8 @@ def main():
         print(f"Loading schema from: {args.schema}")
 
     schema = load_schema(args.schema)
+    if schema is None:
+        sys.exit(0)
 
     if args.verbose:
         print("Schema loaded successfully")

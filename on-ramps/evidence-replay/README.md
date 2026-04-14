@@ -264,7 +264,7 @@ From Evidence + Replay, teams can adopt:
 
 ## Support
 
-- Documentation: [docs/Evidence.md](../../docs/Evidence.md)
+- Documentation: [docs/evidence/overview.md](../../docs/evidence/overview.md)
 - TRACE-REPLAY-KIT: [external/TRACE-REPLAY-KIT/](../../external/TRACE-REPLAY-KIT/)
 - Examples: [examples/evidence-replay/](../examples/)
 - CLI Reference: [docs/cli-reference.md](../../docs/cli-reference.md)

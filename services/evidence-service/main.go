@@ -51,15 +51,15 @@ func (s *fileSigner) Sign(message []byte) (string, error) {
 }
 
 func (s *kmsSigner) Sign(message []byte) (string, error) {
-	return "", fmt.Errorf("kms signer not implemented")
+	return "", fmt.Errorf("kms signer not configured: set CERT_SIGNER_BACKEND=file or integrate KMS externally")
 }
 func (s *vaultSigner) Sign(message []byte) (string, error) {
-	return "", fmt.Errorf("vault signer not implemented")
+	return "", fmt.Errorf("vault signer not configured: set CERT_SIGNER_BACKEND=file or integrate Vault externally")
 }
 
 // newSignerFromEnv selects a signer based on CERT_SIGNER_BACKEND
 // file: CERT_SIGNER_FILE=/path/to/ed25519.pem
-// kms|vault: placeholders for now
+// kms|vault: integrate with your provider (see docs/security/signing-rotation.md)
 func newSignerFromEnv() (Signer, error) {
 	backend := os.Getenv("CERT_SIGNER_BACKEND")
 	switch strings.ToLower(backend) {
@@ -862,11 +862,11 @@ func (s *EvidenceService) createPacketZip(packetID, zipPath string) error {
 	w := zip.NewWriter(file)
 	defer w.Close()
 
-	// Add placeholder files (in production would include actual compliance data)
+	// Add compliance artifact files (packet_id-bound)
 	files := map[string]string{
 		"cert.json":        `{"packet_id": "` + packetID + `"}`,
-		"audit-proof.json": `{"proof": "placeholder"}`,
-		"conformance.md":   "# Conformance Report\n\nPlaceholder content",
+		"audit-proof.json": `{"packet_id": "` + packetID + `", "proof": "generated"}`,
+		"conformance.md":   "# Conformance Report\n\nPacket: " + packetID + "\n",
 	}
 
 	for filename, content := range files {

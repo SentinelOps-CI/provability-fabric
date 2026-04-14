@@ -176,8 +176,12 @@ tmp/
 *.tar
 *.zip
 
-# Prisma
+# Prisma (generated client lives under node_modules/@prisma/client after npm ci + prisma generate)
 prisma/migrations/
+
+# SWE-bench / local experiment checkouts (never commit)
+/workspaces/
+bench/swebench/workspaces/
 
 # Specific to this project
 malicious_adapter_test.log
@@ -210,3 +214,26 @@ pf.tar
 .cursor/rules/todo2.mdc
 .cursor/mcp.json
 .todo2/
+
+# Local Python venvs (common names; never commit)
+.venv/
+.venv-wsl/
+
+# SWE-bench / Step-2 harness outputs (predictions, eval JSON, logs)
+runs/
+
+# Local SWE-bench smoke checkouts (not bench/swebench/workspaces/)
+workspaces_verify_preflight_smoke/
+
+# Hypothesis (pytest) local DB
+.hypothesis/
+
+# Mistaken empty files from pasted CLI flags at repo root (e.g. --baseline-eval-dir)
+/--*
+
+# Repo-root prediction artifacts from local bench runs
+/predictions*.jsonl
+/*.pfmeta.jsonl
+/predictions.sha256
+/run_status.json
+/python
