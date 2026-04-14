@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Cheap sanity check: run verify_publish_bundle.py on the in-repo fixture (no network, no Docker).
+# When a job produces and uploads a real publish dir artifact, add a step there to run this verifier on it.
+
+name: Verify publish bundle
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "experiments/scripts/verify_publish_bundle.py"
+      - "experiments/scripts/publish_docs.py"
+      - "experiments/scripts/publish_bundle.py"
+      - "experiments/scripts/export_publish_artifacts.py"
+      - "experiments/scripts/update_run_ids_if_green.py"
+      - "experiments/scripts/publish_manifest.py"
+      - "experiments/fixtures/verify_publish_bundle/**"
+      - "experiments/schemas/compare_report.schema.json"
+      - "tests/test_publish_docs.py"
+      - "tests/test_verify_publish_bundle_fixture.py"
+      - ".github/workflows/verify-publish-bundle.yaml"
+  pull_request:
+    paths:
+      - "experiments/scripts/verify_publish_bundle.py"
+      - "experiments/scripts/publish_docs.py"
+      - "experiments/scripts/publish_bundle.py"
+      - "experiments/scripts/export_publish_artifacts.py"
+      - "experiments/scripts/update_run_ids_if_green.py"
+      - "experiments/scripts/publish_manifest.py"
+      - "experiments/fixtures/verify_publish_bundle/**"
+      - "experiments/schemas/compare_report.schema.json"
+      - "tests/test_publish_docs.py"
+      - "tests/test_verify_publish_bundle_fixture.py"
+      - ".github/workflows/verify-publish-bundle.yaml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: verify-publish-bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run publish_docs and verifier tests
+        run: |
+          pytest tests/test_publish_docs.py tests/test_verify_publish_bundle_fixture.py -v
+
+      - name: Verify publish bundle (fixture)
+        run: |
+          python experiments/scripts/verify_publish_bundle.py \
+            --publish-dir experiments/fixtures/verify_publish_bundle/publish \
+            --compare-json experiments/fixtures/verify_publish_bundle/compare.json \
+            --skip-run-dir-check

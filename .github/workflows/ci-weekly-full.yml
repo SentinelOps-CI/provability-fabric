@@ -1,33 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 #
-# Single CI entry: protobuf lint always; full matrix runs on push to main or when non-doc paths change.
+# Scheduled full CI (ignores path filters) to catch drift when PRs used docs-only skips.
 
-name: CI
+name: CI weekly full
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            code:
-              - '**'
-              - '!docs/**'
-              - '!figs/**'
-
   protobuf-lint:
     runs-on: ubuntu-latest
     steps:
@@ -37,8 +20,6 @@ jobs:
         working-directory: api
 
   prepare:
-    needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/reusable-ci-prepare.yml
     secrets: inherit
 
@@ -68,31 +49,20 @@ jobs:
       impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
     secrets: inherit
 
-  ci-success:
-    name: CI required checks
-    needs:
-      - changes
-      - protobuf-lint
-      - prepare
-      - ci-lean
-      - ci-rust
-      - ci-go-node
-      - ci-extended
+  ci-weekly-success:
+    name: CI weekly required checks
+    needs: [protobuf-lint, prepare, ci-lean, ci-rust, ci-go-node, ci-extended]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Verify outcomes
         run: |
           set -e
-          if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
-            echo "protobuf-lint did not succeed: ${{ needs.protobuf-lint.result }}"
-            exit 1
-          fi
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.changes.outputs.code }}" != "true" ]; then
-            echo "Documentation-only PR: full CI skipped intentionally."
-            exit 0
-          fi
           fail=0
+          if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
+            echo "protobuf-lint: ${{ needs.protobuf-lint.result }}"
+            fail=1
+          fi
           for j in prepare ci-lean ci-rust ci-go-node ci-extended; do
             case "$j" in
               prepare) r="${{ needs.prepare.result }}" ;;

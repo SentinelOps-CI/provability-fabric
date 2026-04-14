@@ -1,5 +1,9 @@
 name: SBOM Security Gate
 
+env:
+  SYFT_VERSION: "1.19.0"
+  GRYPE_VERSION: "0.87.0"
+
 on:
   push:
     branches: [main, develop]
@@ -23,7 +27,13 @@ jobs:
 
       - name: Install Syft
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.0.0
+          set -euo pipefail
+          curl -sSL -o /tmp/syft.tgz \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/syft.tgz -C /tmp
+          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
+          syft version
 
       - name: Generate SBOM
         id: sbom
@@ -55,7 +65,13 @@ jobs:
 
       - name: Install Grype
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin v0.74.0
+          set -euo pipefail
+          curl -sSL -o /tmp/grype.tgz \
+            "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/grype.tgz -C /tmp
+          GRYPE_BIN="$(find /tmp -maxdepth 3 -type f -name grype | head -1)"
+          sudo install -m 0755 "$GRYPE_BIN" /usr/local/bin/grype
+          grype version
 
       - name: Scan for vulnerabilities
         run: |
@@ -109,7 +125,7 @@ jobs:
       - name: Check for other restricted licenses
         run: |
           # Check for other potentially problematic licenses
-          RESTRICTED_LICENSES=$(cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | grep -i -E "(agpl|lgpl|mpl|epl|cddl|apache.*2\.0)" || true)
+          RESTRICTED_LICENSES=$(cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | grep -i -E "(agpl|lgpl|mpl|epl|cddl)" || true)
 
           if [ -n "$RESTRICTED_LICENSES" ]; then
             echo "⚠️  Potentially restricted licenses found:"
@@ -128,6 +144,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/syft.tgz \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/syft.tgz -C /tmp
+          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
 
       - name: Download current SBOM
         uses: actions/download-artifact@v4

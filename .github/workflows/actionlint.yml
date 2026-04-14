@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+# Validates workflow YAML (expressions, permissions, runner labels).
+name: Actionlint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned image tag (not :latest) for reproducible lint runs.
+      - name: Check workflows
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/workspace" \
+            -w /workspace \
+            rhysd/actionlint:1.7.12 \
+            -color

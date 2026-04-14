@@ -1,0 +1,119 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Nightly Criterion benchmarks (aligned with bench/README.md):
+# - On push to main: save baseline so next run can compare.
+# - On schedule: compare against saved baseline; fail if regression exceeds threshold.
+
+name: Bench Nightly Criterion
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "bench/**"
+      - "runtime/sidecar-watcher/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/bench-nightly-criterion.yaml"
+  pull_request:
+    paths:
+      - "bench/**"
+      - "runtime/sidecar-watcher/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  smoke-bench:
+    name: Smoke (compile + run benches)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          profile: minimal
+      - name: Cache cargo
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-criterion-deps"
+      - name: Install cargo-criterion
+        run: cargo install cargo-criterion
+      - name: Run benches (small sample, no regression gate)
+        run: cargo criterion -p provability-fabric-bench -- --sample-size 5 --noplot
+
+  save-baseline:
+    name: Save baseline (main)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Cache cargo registry and deps
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-criterion-deps"
+
+      - name: Install cargo-criterion
+        run: cargo install cargo-criterion
+
+      - name: Save Criterion baseline
+        run: cargo bench -p provability-fabric-bench -- --save-baseline main
+
+      - name: Cache Criterion baseline
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-main-${{ github.sha }}
+          restore-keys: |
+            criterion-main-
+
+  compare-baseline:
+    name: Compare to baseline (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Cache cargo registry and deps
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-criterion-deps"
+
+      - name: Restore Criterion baseline (from last main)
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-main-${{ github.sha }}
+          restore-keys: |
+            criterion-main-
+
+      - name: Install cargo-criterion
+        run: cargo install cargo-criterion
+
+      - name: Compare against baseline (fail on regression)
+        run: |
+          cargo bench -p provability-fabric-bench -- --baseline main || (echo "::error::Criterion regression detected (see bench/README.md thresholds)." && exit 1)
+        env:
+          CRITERION_NO_FAIL_FAST: "0"

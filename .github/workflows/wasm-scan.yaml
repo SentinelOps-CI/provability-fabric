@@ -14,7 +14,7 @@ on:
       - ".github/workflows/wasm-scan.yaml"
 
 env:
-  RUST_VERSION: "1.75"
+  RUST_VERSION: "stable"
 
 jobs:
   scan-wasm-modules:
