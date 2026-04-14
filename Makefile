@@ -10,7 +10,7 @@ dev-up:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild
+.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders
 
 # ---------- Cross-platform helpers ----------
 # Seconds to wait after starting containers (override with: make demo-up WAIT=10)
@@ -47,7 +47,10 @@ help:
 	@$(ECHOOK) "  make demo-setup      - Setup demo data and policies"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Platform:"
-	@$(ECHOOK) "  make install         - Install platform locally"
+	@$(ECHOOK) "  make install         - Install platform locally (full mode)"
+	@$(ECHOOK) "  make install-minimal - CLI + bundles only (Go required)"
+	@$(ECHOOK) "  make install-standard - CLI + Rust workspace"
+	@$(ECHOOK) "  make install-full    - Full install (all Python/Node deps)"
 	@$(ECHOOK) "  make validate-certs  - Validate all CERT-V1 certificates"
 	@$(ECHOOK) "  make lint            - Run linting on all code"
 	@$(ECHOOK) ""
@@ -127,34 +130,54 @@ demo-run:
 	$(DC) run --rm verifiable-mcp-fraud node dist/scripts/run-demo.js
 
 # ---------- Platform ----------
-install:
-	@$(ECHOOK) "📦 Installing SentinelOps Platform locally..."
-	./scripts/install.sh
-	@$(ECHOOK) "✅ Platform installed successfully"
+install: install-full
+
+install-minimal:
+	@$(ECHOOK) "Installing (minimal: CLI + bundles only)..."
+	./scripts/install.sh --minimal
+	@$(ECHOOK) "Minimal install completed. See docs/guides/reuse-and-extend.md"
+
+install-standard:
+	@$(ECHOOK) "Installing (standard: CLI + Rust workspace)..."
+	./scripts/install.sh --standard
+	@$(ECHOOK) "Standard install completed. See docs/guides/reuse-and-extend.md"
+
+install-full:
+	@$(ECHOOK) "Installing (full: all components)..."
+	./scripts/install.sh --full
+	@$(ECHOOK) "Platform installed successfully"
 
 validate-certs:
 	@$(ECHOOK) "🔍 Validating CERT-V1 certificates..."
-	python tools/cert-validate/validate.py evidence/egress_certs/*.json
-	python tools/cert-validate/validate.py evidence/certs/**/*.cert.json
+	python tools/cert-validate/validate.py evidence/egress_certs/*.json evidence/certs/*/*.cert.json
 	@$(ECHOOK) "✅ Certificate validation completed"
+
+lean-check-duplicates:
+	@$(ECHOOK) "🔍 Checking for duplicate Lean definitions..."
+	python tools/lean_ast_hash.py .
+
+lean-forbid-shadowing:
+	@$(ECHOOK) "🔍 Checking for forbidden shadowing..."
+	$(if $(filter Windows_NT,$(OS)),@$(ECHOOK) "Skipped on Windows (run scripts/forbid-shadowing.sh in Git Bash)" && exit 0,sh scripts/forbid-shadowing.sh)
+
+vendor-mathlib:
+	@$(ECHOOK) "📦 Vendoring mathlib for Lean..."
+	$(if $(filter Windows_NT,$(OS)),scripts\vendor-mathlib.bat,sh scripts/vendor-mathlib.sh)
+	@$(ECHOOK) "✅ vendor/mathlib ready"
 
 lint:
 	@$(ECHOOK) "🔍 Running linting on all code..."
-	# Go services
 	cd services/spec-service && go fmt ./... && go vet ./...
 	cd services/proof-service && go fmt ./... && go vet ./...
 	cd services/build-orchestrator && go fmt ./... && go vet ./...
 	cd services/evidence-service && go fmt ./... && go vet ./...
 	cd services/replay-service && go fmt ./... && go vet ./...
 	cd services/api-gateway && go fmt ./... && go vet ./...
-	# Rust sidecar
 	cd runtime/sidecar-watcher && cargo fmt && cargo clippy
-	# TypeScript
 	cd console && npm run lint
 	cd demos/verifiable-mcp-fraud && npm run lint
 	cd core/sdk/typescript && npm run lint
-	# Python
-	python -m flake8 tools/ tests/ --max-line-length=100
+	python -m flake8 tools/ tests/
 	@$(ECHOOK) "✅ Linting completed"
 
 bench:
@@ -162,6 +185,79 @@ bench:
 	cd demos/verifiable-mcp-fraud && npm run benchmark
 	python tests/performance/performance_benchmarks.py
 	@$(ECHOOK) "✅ Benchmarks completed"
+
+# Save Criterion baseline and record machine/date/SHA in bench/BASELINE.md (see bench/README.md).
+bench-save-baseline:
+	@$(ECHOOK) "Saving Criterion baseline (provability-fabric-bench)..."
+	cargo bench -p provability-fabric-bench -- --save-baseline main
+	@python -c "\
+import datetime, os, platform, subprocess; \
+d = datetime.datetime.now(datetime.timezone.utc).isoformat(); \
+sha = subprocess.run(['git','rev-parse','HEAD'], capture_output=True, text=True).stdout.strip() or 'unknown'; \
+m = platform.uname(); machine = f'{m.system} {m.release} {m.machine}'; \
+p = os.path.join('bench','BASELINE.md'); \
+open(p,'w').write(f'Criterion baseline: main\ndate: {d}\ngit_sha: {sha}\nmachine: {machine}\n'); \
+print('Wrote', p)"
+	@$(ECHOOK) "Baseline saved. See bench/BASELINE.md and target/criterion/"
+
+# ---------- SWE-bench Step-2 (WSL/Linux; see experiments/exp-step2-lite-smoke/commands.md) ----------
+# Run from repo root. For swebench-compare and swebench-triage, set BASELINE_RUN_DIR and PF_RUN_DIR
+# from experiments/exp-step2-lite-smoke/run-ids.md (e.g. runs/exp-step2-lite-smoke/baseline/<run_id>).
+EXP_DIR := runs/exp-step2-lite-smoke
+swebench-step2:
+	@$(ECHOOK) "Running Step-2 parity cycle (baseline + PF + harness + compare with gates)..."
+	$(if $(filter Windows_NT,$(OS)),@$(ECHOOK) "Run in WSL: bash experiments/scripts/run-baseline-pf-cycle.sh" && exit 1,bash experiments/scripts/run-baseline-pf-cycle.sh)
+	@$(ECHOOK) "Step-2 cycle done."
+
+swebench-compare:
+	@$(if $(and $(BASELINE_RUN_DIR),$(PF_RUN_DIR)),,\
+		$(ECHOOK) "Error: set BASELINE_RUN_DIR and PF_RUN_DIR (see run-ids.md). Example:";\
+		$(ECHOOK) "  make swebench-compare BASELINE_RUN_DIR=$(EXP_DIR)/baseline/<run_id> PF_RUN_DIR=$(EXP_DIR)/pf/<run_id>";\
+		exit 1)
+	@$(ECHOOK) "Comparing baseline vs PF with full golden gates (harness, compliance, patch-apply, priced-models)..."
+	@python experiments/scripts/compare_runs.py \
+		--experiment-dir $(EXP_DIR) \
+		--baseline-run-dir $(BASELINE_RUN_DIR) \
+		--pf-run-dir $(PF_RUN_DIR) \
+		--require-harness --require-compliance --require-patch-apply --require-priced-models
+	@$(ECHOOK) "compare.json and compare.csv written to $(EXP_DIR)."
+
+swebench-triage:
+	@$(if $(and $(BASELINE_RUN_DIR),$(PF_RUN_DIR)),,\
+		$(ECHOOK) "Error: set BASELINE_RUN_DIR and PF_RUN_DIR (see run-ids.md).";\
+		exit 1)
+	@$(ECHOOK) "Listing delta cases and extracting case bundles..."
+	@mkdir -p $(EXP_DIR)/analysis
+	@python experiments/scripts/list_delta_cases.py --compare-csv $(EXP_DIR)/compare.csv --out-dir $(EXP_DIR)/analysis
+	@python experiments/scripts/extract_case_bundle.py \
+		--instance-ids-file $(EXP_DIR)/analysis/baseline_solved_pf_failed.txt \
+		--baseline-run-dir $(BASELINE_RUN_DIR) \
+		--pf-run-dir $(PF_RUN_DIR) \
+		--baseline-eval-dir $(EXP_DIR)/baseline/eval \
+		--pf-eval-dir $(EXP_DIR)/pf/eval \
+		--out-dir $(EXP_DIR)/analysis/cases || true
+	@$(ECHOOK) "Triage done. See $(EXP_DIR)/analysis/"
+
+# Consume baseline_solved_pf_failed.txt: list deltas, extract case bundles, bucket PF failures. Use after a PF regression to prepare fix loop.
+swebench-regressions:
+	@$(if $(and $(BASELINE_RUN_DIR),$(PF_RUN_DIR)),,\
+		$(ECHOOK) "Error: set BASELINE_RUN_DIR and PF_RUN_DIR (see run-ids.md).";\
+		exit 1)
+	@$(ECHOOK) "Running regression triage (list_delta_cases + extract_case_bundle + bucket)..."
+	@mkdir -p $(EXP_DIR)/analysis
+	@python experiments/scripts/list_delta_cases.py --compare-csv $(EXP_DIR)/compare.csv --out-dir $(EXP_DIR)/analysis
+	@python experiments/scripts/extract_case_bundle.py \
+		--instance-ids-file $(EXP_DIR)/analysis/baseline_solved_pf_failed.txt \
+		--baseline-run-dir $(BASELINE_RUN_DIR) \
+		--pf-run-dir $(PF_RUN_DIR) \
+		--baseline-eval-dir $(EXP_DIR)/baseline/eval \
+		--pf-eval-dir $(EXP_DIR)/pf/eval \
+		--out-dir $(EXP_DIR)/analysis/cases || true
+	@python experiments/scripts/bucket_pf_failures_from_cases.py \
+		--compare-csv $(EXP_DIR)/compare.csv \
+		--cases-dir $(EXP_DIR)/analysis/cases \
+		--out-csv $(EXP_DIR)/analysis/pf_failure_buckets.csv 2>/dev/null || true
+	@$(ECHOOK) "Regressions: $(EXP_DIR)/analysis/baseline_solved_pf_failed.txt, $(EXP_DIR)/analysis/cases/, $(EXP_DIR)/analysis/pf_failure_buckets.csv. Rerun only regression slice then re-harness + make swebench-compare (includes --require-priced-models)."
 
 security:
 	@$(ECHOOK) "🔒 Running security tests..."
@@ -195,6 +291,13 @@ docs:
 docs-serve:
 	@$(ECHOOK) "📚 Serving documentation..."
 	mkdocs serve --dev-addr=127.0.0.1:8002
+
+# ---------- Placeholder burn-down (P1) ----------
+# Fails if forbidden placeholder/stub patterns exist outside allowlisted paths.
+# Allowlist: docs/placeholder-burn-down-allowlist.txt
+no-runtime-placeholders:
+	@$(ECHOOK) "Checking for forbidden placeholder/stub patterns..."
+	@python scripts/check_no_placeholder.py || (echo "no-runtime-placeholders: fix or allowlist entries (see docs/placeholder-burn-down.md)" && exit 1)
 
 # ---------- Convenience ----------
 logs:

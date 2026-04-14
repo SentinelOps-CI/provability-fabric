@@ -39,3 +39,7 @@ python validate.py -v evidence/**/*.json
 
 The tool uses the CERT-V1 schema from `external/CERT-V1/schema/cert-v1.schema.json`.
 This schema is maintained as an external standard and should not be modified in this repository.
+
+## Repository
+
+Part of **[SentinelOps-CI/provability-fabric](https://github.com/SentinelOps-CI/provability-fabric)** (`tools/cert-validate/`). Clone: `git clone https://github.com/SentinelOps-CI/provability-fabric.git`.

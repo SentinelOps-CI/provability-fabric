@@ -15,10 +15,10 @@
  */
 
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::hash::{Hash, Hasher};
+use std::fmt;
+use std::hash::Hash;
 
 /// Security label type
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -29,17 +29,18 @@ pub enum SecurityLabel {
     Custom(String),
 }
 
-impl SecurityLabel {
-    /// Convert to string representation
-    pub fn to_string(&self) -> String {
+impl fmt::Display for SecurityLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SecurityLabel::Public => "public".to_string(),
-            SecurityLabel::Confidential => "confidential".to_string(),
-            SecurityLabel::Secret => "secret".to_string(),
-            SecurityLabel::Custom(name) => format!("custom:{}", name),
+            SecurityLabel::Public => f.write_str("public"),
+            SecurityLabel::Confidential => f.write_str("confidential"),
+            SecurityLabel::Secret => f.write_str("secret"),
+            SecurityLabel::Custom(name) => write!(f, "custom:{name}"),
         }
     }
+}
 
+impl SecurityLabel {
     /// Parse from string representation
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s {
@@ -115,8 +116,7 @@ impl DeclassBlock {
             if !rule.to_label.le(&rule.from_label) {
                 return Err(format!(
                     "Declassification rule widens labels: {} -> {}",
-                    rule.from_label.to_string(),
-                    rule.to_label.to_string()
+                    rule.from_label, rule.to_label
                 ));
             }
         }
@@ -126,8 +126,7 @@ impl DeclassBlock {
             if rule.conditions.is_empty() {
                 return Err(format!(
                     "Declassification rule has no conditions: {} -> {}",
-                    rule.from_label.to_string(),
-                    rule.to_label.to_string()
+                    rule.from_label, rule.to_label
                 ));
             }
         }
@@ -137,8 +136,7 @@ impl DeclassBlock {
             if rule.derivation.is_empty() {
                 return Err(format!(
                     "Declassification rule has no derivation: {} -> {}",
-                    rule.from_label.to_string(),
-                    rule.to_label.to_string()
+                    rule.from_label, rule.to_label
                 ));
             }
         }
@@ -154,7 +152,7 @@ impl DeclassBlock {
         for rule in &self.rules {
             graph
                 .entry(rule.from_label.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(rule.to_label.clone());
         }
 
@@ -163,17 +161,17 @@ impl DeclassBlock {
         let mut rec_stack = HashSet::new();
 
         for node in graph.keys() {
-            if !visited.contains(node) {
-                if self.is_cyclic_util(node, &graph, &mut visited, &mut rec_stack)? {
+            if !visited.contains(node)
+                && self.is_cyclic_util(node, &graph, &mut visited, &mut rec_stack)? {
                     return Ok(true);
                 }
-            }
         }
 
         Ok(false)
     }
 
     /// DFS utility for cycle detection
+    #[allow(clippy::only_used_in_recursion)]
     fn is_cyclic_util(
         &self,
         node: &SecurityLabel,
@@ -302,8 +300,7 @@ impl DeclassEnforcer {
         if self.strict_mode && !self.declass_block.declass_allowed(from_label, to_label) {
             return Err(format!(
                 "Declassification not allowed: {} -> {}",
-                from_label.to_string(),
-                to_label.to_string()
+                from_label, to_label
             ));
         }
 

@@ -36,8 +36,9 @@ class ASTHashEnforcer:
 
     def is_allowlisted(self, file_path: str) -> bool:
         """Check if file is in allowlist (ignored for duplicate detection)."""
+        normalized = file_path.replace("\\", "/")
         for pattern in self.allowlist_patterns:
-            if re.search(pattern, file_path):
+            if re.search(pattern, normalized):
                 return True
         return False
 
@@ -197,9 +198,9 @@ class ASTHashEnforcer:
     def generate_report(self, duplicates: Dict[str, List[Definition]]) -> str:
         """Generate a human-readable report of duplicates."""
         if not duplicates:
-            return "✅ 0 functional duplicates found"
+            return "[OK] 0 functional duplicates found"
 
-        report = ["❌ Functional duplicates found:"]
+        report = ["[FAIL] Functional duplicates found:"]
 
         for ast_hash, definitions in duplicates.items():
             report.append(f"\nHash: {ast_hash[:8]}...")

@@ -422,7 +422,7 @@ impl PolicyKernel {
             return Err("receipt signature is required".to_string());
         }
         
-        // TODO: Implement actual signature verification
+        // Signature verification requires trust root; structural validation only until wired
         // This would require access to the public keys for each shard
         // For now, we'll do basic structural validation
         

@@ -27,10 +27,10 @@ use super::cert_v1_core::CertV1Core;
 pub struct SnapshotStorage {
     /// Storage directory
     storage_path: PathBuf,
-    
+
     /// Snapshot metadata cache
     metadata_cache: Arc<RwLock<HashMap<String, SnapshotMetadata>>>,
-    
+
     /// Maximum snapshots to keep per decision
     max_snapshots_per_decision: usize,
 }
@@ -40,34 +40,34 @@ pub struct SnapshotStorage {
 pub struct SnapshotMetadata {
     /// Snapshot identifier
     pub snapshot_id: String,
-    
+
     /// Decision identifier
     pub decision_id: String,
-    
+
     /// Bundle identifier
     pub bundle_id: String,
-    
+
     /// Session identifier
     pub session_id: String,
-    
+
     /// Tenant identifier
     pub tenant_id: String,
-    
+
     /// Snapshot type
     pub snapshot_type: SnapshotType,
-    
+
     /// Creation timestamp
     pub created_at: u64,
-    
+
     /// Snapshot size in bytes
     pub size_bytes: usize,
-    
+
     /// File path
     pub file_path: String,
-    
+
     /// Tags for categorization
     pub tags: Vec<String>,
-    
+
     /// Flags that triggered this snapshot
     pub triggered_by: Vec<String>,
 }
@@ -94,16 +94,16 @@ pub enum SnapshotType {
 pub struct DecisionSnapshot {
     /// Snapshot metadata
     pub metadata: SnapshotMetadata,
-    
+
     /// Core certificate
     pub core_cert: CertV1Core,
-    
+
     /// Decision context
     pub context: DecisionContext,
-    
+
     /// Prefix data
     pub prefix_data: PrefixData,
-    
+
     /// Additional metadata
     pub additional_data: HashMap<String, serde_json::Value>,
 }
@@ -113,19 +113,19 @@ pub struct DecisionSnapshot {
 pub struct DecisionContext {
     /// User making the decision
     pub user_id: String,
-    
+
     /// Decision timestamp
     pub decision_timestamp: u64,
-    
+
     /// Decision reason
     pub reason: String,
-    
+
     /// Policy version
     pub policy_version: String,
-    
+
     /// Environment information
     pub environment: HashMap<String, String>,
-    
+
     /// Request metadata
     pub request_metadata: HashMap<String, String>,
 }
@@ -135,16 +135,16 @@ pub struct DecisionContext {
 pub struct PrefixData {
     /// Prefix identifier
     pub prefix_id: String,
-    
+
     /// Prefix content
     pub content: String,
-    
+
     /// Prefix hash
     pub hash: String,
-    
+
     /// Prefix length
     pub length: usize,
-    
+
     /// Prefix metadata
     pub metadata: HashMap<String, String>,
 }
@@ -160,6 +160,7 @@ impl SnapshotStorage {
     }
 
     /// Store a decision snapshot
+    #[allow(clippy::too_many_arguments)]
     pub async fn store_snapshot(
         &self,
         decision_id: &str,
@@ -172,7 +173,7 @@ impl SnapshotStorage {
     ) -> Result<String, String> {
         // Generate snapshot ID
         let snapshot_id = self.generate_snapshot_id(decision_id);
-        
+
         // Create snapshot metadata
         let metadata = SnapshotMetadata {
             snapshot_id: snapshot_id.clone(),
@@ -185,7 +186,7 @@ impl SnapshotStorage {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            size_bytes: 0, // Will be updated after storage
+            size_bytes: 0,            // Will be updated after storage
             file_path: String::new(), // Will be set after file creation
             tags,
             triggered_by,
@@ -202,11 +203,12 @@ impl SnapshotStorage {
 
         // Store snapshot to disk
         let file_path = self.store_snapshot_to_disk(&snapshot).await?;
-        
+
         // Update metadata with file path and size
         let mut updated_metadata = metadata;
         updated_metadata.file_path = file_path.clone();
-        updated_metadata.size_bytes = fs::metadata(&file_path).await
+        updated_metadata.size_bytes = fs::metadata(&file_path)
+            .await
             .map_err(|e| format!("Failed to get file metadata: {}", e))?
             .len() as usize;
 
@@ -247,7 +249,10 @@ impl SnapshotStorage {
     }
 
     /// Search snapshots by criteria
-    pub async fn search_snapshots(&self, criteria: &SnapshotSearchCriteria) -> Vec<SnapshotMetadata> {
+    pub async fn search_snapshots(
+        &self,
+        criteria: &SnapshotSearchCriteria,
+    ) -> Vec<SnapshotMetadata> {
         let cache = self.metadata_cache.read().await;
         let mut results: Vec<SnapshotMetadata> = cache
             .values()
@@ -277,7 +282,10 @@ impl SnapshotStorage {
         if let Some(metadata) = metadata {
             // Delete file from disk
             if let Err(e) = fs::remove_file(&metadata.file_path).await {
-                eprintln!("Failed to delete snapshot file {}: {}", metadata.file_path, e);
+                eprintln!(
+                    "Failed to delete snapshot file {}: {}",
+                    metadata.file_path, e
+                );
             }
 
             // Remove from cache
@@ -295,7 +303,7 @@ impl SnapshotStorage {
         let cache = self.metadata_cache.read().await;
         let total_snapshots = cache.len();
         let total_size: usize = cache.values().map(|m| m.size_bytes).sum();
-        
+
         let mut snapshots_by_type: HashMap<String, usize> = HashMap::new();
         for metadata in cache.values() {
             let type_str = format!("{:?}", metadata.snapshot_type);
@@ -321,12 +329,14 @@ impl SnapshotStorage {
     /// Store snapshot to disk
     async fn store_snapshot_to_disk(&self, snapshot: &DecisionSnapshot) -> Result<String, String> {
         // Create directory structure: snapshots/{tenant_id}/{decision_id}/
-        let snapshot_dir = self.storage_path
+        let snapshot_dir = self
+            .storage_path
             .join("snapshots")
             .join(&snapshot.metadata.tenant_id)
             .join(&snapshot.metadata.decision_id);
 
-        fs::create_dir_all(&snapshot_dir).await
+        fs::create_dir_all(&snapshot_dir)
+            .await
             .map_err(|e| format!("Failed to create snapshot directory: {}", e))?;
 
         // Create file path
@@ -337,7 +347,8 @@ impl SnapshotStorage {
         let json = serde_json::to_string_pretty(snapshot)
             .map_err(|e| format!("Failed to serialize snapshot: {}", e))?;
 
-        fs::write(&file_path, json).await
+        fs::write(&file_path, json)
+            .await
             .map_err(|e| format!("Failed to write snapshot file: {}", e))?;
 
         Ok(file_path.to_string_lossy().to_string())
@@ -345,7 +356,8 @@ impl SnapshotStorage {
 
     /// Load snapshot from disk
     async fn load_snapshot_from_disk(&self, file_path: &str) -> Result<DecisionSnapshot, String> {
-        let content = fs::read_to_string(file_path).await
+        let content = fs::read_to_string(file_path)
+            .await
             .map_err(|e| format!("Failed to read snapshot file: {}", e))?;
 
         let snapshot: DecisionSnapshot = serde_json::from_str(&content)
@@ -357,7 +369,7 @@ impl SnapshotStorage {
     /// Clean up old snapshots for a decision
     async fn cleanup_old_snapshots(&self, decision_id: &str) -> Result<(), String> {
         let snapshots = self.list_snapshots_for_decision(decision_id).await;
-        
+
         if snapshots.len() <= self.max_snapshots_per_decision {
             return Ok(());
         }
@@ -376,7 +388,11 @@ impl SnapshotStorage {
     }
 
     /// Check if snapshot matches search criteria
-    fn matches_criteria(&self, metadata: &SnapshotMetadata, criteria: &SnapshotSearchCriteria) -> bool {
+    fn matches_criteria(
+        &self,
+        metadata: &SnapshotMetadata,
+        criteria: &SnapshotSearchCriteria,
+    ) -> bool {
         if let Some(ref tenant_id) = criteria.tenant_id {
             if metadata.tenant_id != *tenant_id {
                 return false;
@@ -442,14 +458,12 @@ pub struct StorageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Note: tempfile dependency would need to be added to Cargo.toml for this test
-    // use tempfile::TempDir;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_snapshot_storage() {
-        // Note: This test requires tempfile dependency
-        // let temp_dir = TempDir::new().unwrap();
-        // let storage = SnapshotStorage::new(temp_dir.path().to_path_buf());
+        let temp_dir = TempDir::new().unwrap();
+        let storage = SnapshotStorage::new(temp_dir.path().to_path_buf());
 
         let core_cert = CertV1Core::new(
             "bundle-123".to_string(),

@@ -46,4 +46,7 @@ Troubleshooting:
 - If compile fails, check the Output panel channel “sentinelops” for CLI stderr/stdout.
 - Ensure `so` commands run from your shell with the same environment as VS Code.
 
+## Repository
+
+Part of **[SentinelOps-CI/provability-fabric](https://github.com/SentinelOps-CI/provability-fabric)** (`tools/vscode-ext/`). Clone: `git clone https://github.com/SentinelOps-CI/provability-fabric.git`.
 

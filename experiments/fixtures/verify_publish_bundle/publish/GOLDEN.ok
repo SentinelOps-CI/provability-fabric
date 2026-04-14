@@ -1,0 +1,7 @@
+{
+  "baseline_run_id": "fixture-baseline",
+  "pf_run_id": "fixture-pf",
+  "pf_commit": "000000000000",
+  "timestamp_utc": "2025-01-01T00:00:00+00:00",
+  "parity_gate_passed": true
+}

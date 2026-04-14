@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
+// SEV attestation types and verifier; some are not yet used at runtime.
+#![allow(dead_code)]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::{info, warn, error};
-use sha2::{Sha256, Digest};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{info, warn};
 
 /// SEV attestation report structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,15 +26,20 @@ pub struct SevAttestationReport {
     pub platform_info: u64,
     pub flags: u32,
     pub reserved: u32,
+    #[serde(with = "BigArray")]
     pub report_data: [u8; 64],
+    #[serde(with = "BigArray")]
     pub measurement: [u8; 48],
     pub host_data: [u8; 32],
+    #[serde(with = "BigArray")]
     pub id_key_digest: [u8; 48],
+    #[serde(with = "BigArray")]
     pub author_key_digest: [u8; 48],
     pub report_id: [u8; 32],
     pub report_id_ma: [u8; 32],
     pub reported_tcb: SevTcbVersion,
     pub reserved2: [u8; 32],
+    #[serde(with = "BigArray")]
     pub chip_id: [u8; 64],
     pub committed_tcb: SevTcbVersion,
     pub current_build: u8,
@@ -43,7 +51,9 @@ pub struct SevAttestationReport {
     pub committed_major: u8,
     pub committed_build_id: u8,
     pub launch_tcb: SevTcbVersion,
+    #[serde(with = "BigArray")]
     pub reserved3: [u8; 168],
+    #[serde(with = "BigArray")]
     pub signature: [u8; 512],
 }
 
@@ -72,6 +82,7 @@ pub struct SevTcbVersion {
 /// Expected SEV measurements
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SevMeasurements {
+    #[serde(with = "BigArray")]
     pub expected_measurement: [u8; 48],
     pub expected_family_id: [u8; 16],
     pub expected_image_id: [u8; 16],

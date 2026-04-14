@@ -15,7 +15,7 @@ interface Transaction {
   tenant_id: string;
 }
 
-class TransactionSimulator {
+export class TransactionSimulator {
   private tenants: string[] = ['acme-corp', 'beta-inc', 'gamma-ltd'];
   private merchants: string[] = [
     'Coffee Shop', 'Gas Station', 'Grocery Store', 'Restaurant', 'Pharmacy',
@@ -105,7 +105,7 @@ class TransactionSimulator {
     return transactions;
   }
 
-  streamTransactions(callback: (transaction: Transaction) => void, intervalMs: number = 1000): () => void {
+  streamTransactions(callback: (_transaction: Transaction) => void, intervalMs: number = 1000): () => void {
     const interval = setInterval(() => {
       const transaction = this.generateTransaction();
       callback(transaction);

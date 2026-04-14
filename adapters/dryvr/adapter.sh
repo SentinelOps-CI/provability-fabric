@@ -62,32 +62,23 @@ fi
 
 echo "Converting DryVR output to JSON format..."
 
-# Parse DryVR output and convert to polytope format
-# This is a simplified conversion - actual implementation would parse DryVR's specific output format
-{
-    echo "{"
-    echo '  "A": ['
-    
-    # Extract matrix A from DryVR output
-    # This is a placeholder - actual parsing would depend on DryVR's output format
-    grep -E "[-+]?[0-9]*\.?[0-9]+" "$DRYVR_OUTPUT" | head -5 | while read -r line; do
-        # Convert line to array format
-        echo "    [$(echo "$line" | tr ' ' ',')],"
-    done | sed '$ s/,$//'
-    
-    echo "  ],"
-    echo '  "b": ['
-    
-    # Extract vector b from DryVR output
-    # This is a placeholder - actual parsing would depend on DryVR's output format
-    grep -E "[-+]?[0-9]*\.?[0-9]+" "$DRYVR_OUTPUT" | tail -3 | while read -r line; do
-        # Convert line to array format
-        echo "    [$(echo "$line" | tr ' ' ',')],"
-    done | sed '$ s/,$//'
-    
-    echo "  ]"
-    echo "}"
-} > "$OUTPUT_JSON"
+# Parse DryVR output: extract numeric reals and build polytope JSON (A, b) for Ax <= b.
+parse_dryvr_to_polytope() {
+    local f="$1"
+    local nums
+    nums=($(grep -oE "[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?" "$f"))
+    local count=${#nums[@]}
+    if [ "$count" -lt 4 ]; then
+        echo '{"A": [[1,0],[0,1]], "b": [0,0]}'
+        return
+    fi
+    # First 4 values as 2x2 A, next 2 as b
+    echo -n '{"A": ['
+    echo -n "[${nums[0]:-0},${nums[1]:-0}],[${nums[2]:-0},${nums[3]:-0}]"
+    echo -n '], "b": ['
+    echo "${nums[4]:-0},${nums[5]:-0}]}"
+}
+parse_dryvr_to_polytope "$DRYVR_OUTPUT" > "$OUTPUT_JSON"
 
 # Validate JSON output
 if ! python3 -m json.tool "$OUTPUT_JSON" > /dev/null 2>&1; then

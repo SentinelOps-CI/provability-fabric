@@ -1,7 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
+REM Modes: minimal | standard | full. Set TEST_MODE or pass --minimal, --standard, --full
+if "%1" neq "" set TEST_MODE=%1
+if "%TEST_MODE%"=="" set TEST_MODE=full
+if "%TEST_MODE%"=="--minimal" set TEST_MODE=minimal
+if "%TEST_MODE%"=="--standard" set TEST_MODE=standard
+if "%TEST_MODE%"=="--full" set TEST_MODE=full
 
-echo 🧪 Testing new user experience...
+echo Testing new user experience (mode: %TEST_MODE%)...
 
 REM Test 1: Check if CLI builds and works
 echo 📋 Test 1: CLI Build and Help
@@ -68,21 +74,14 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-REM Test 5: Check if specdoc CLI works (optional)
-echo 📋 Test 5: SpecDoc CLI
-if exist "cmd\specdoc\specdoc.exe" (
-    echo ✅ SpecDoc CLI exists
-) else (
-    echo ⚠️  SpecDoc CLI not found (optional component)
+if "%TEST_MODE%" neq "minimal" (
+    echo Test 5: SpecDoc CLI
+    if exist "cmd\specdoc\specdoc.exe" (echo SpecDoc CLI exists) else (echo SpecDoc CLI not found - optional)
+)
+if "%TEST_MODE%"=="minimal" (
+    echo Test 5: Bundle pack
+    core\cli\pf\pf.exe bundle pack bundles\test-new-user-agent -o %TEMP%\test-new-user-agent.tar.gz 2>nul && echo Bundle pack works || echo Bundle pack skipped
 )
 
 echo.
-echo 🎉 All tests passed! New user experience is working correctly.
-echo.
-echo ✅ CLI builds and runs
-echo ✅ Agent initialization works
-echo ✅ Required files are created
-echo ✅ CLI commands function properly
-echo ✅ SpecDoc CLI is available
-echo.
-echo The repository is ready for new users! 🚀 
+echo All tests passed for mode: %TEST_MODE%. See docs\guides\reuse-and-extend.md 

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{error, warn};
+use tracing::error;
 
 /// Assumption with expected value
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,14 +89,14 @@ mod tests {
     #[test]
     fn test_assumption_drift() {
         let mut monitor = AssumptionMonitor::new();
-        
+
         // Add initial assumption
         let assumption1 = Assumption {
             key: "test_key".to_string(),
             expected: "test_value".to_string(),
         };
         assert!(monitor.process_assumption(assumption1).unwrap());
-        
+
         // Add conflicting assumption
         let assumption2 = Assumption {
             key: "test_key".to_string(),
@@ -109,16 +109,16 @@ mod tests {
     #[test]
     fn test_same_assumption_no_drift() {
         let mut monitor = AssumptionMonitor::new();
-        
+
         let assumption = Assumption {
             key: "test_key".to_string(),
             expected: "test_value".to_string(),
         };
-        
+
         // Add same assumption twice
         assert!(monitor.process_assumption(assumption.clone()).unwrap());
         assert!(monitor.process_assumption(assumption).unwrap());
-        
+
         assert_eq!(monitor.violation_count(), 0);
     }
 }

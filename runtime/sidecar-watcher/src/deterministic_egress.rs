@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 SentinelOps Platform Contributors
+#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
-use tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EgressProfile {
@@ -66,7 +66,7 @@ impl EgressManager {
         // Set deterministic environment
         std::env::set_var("LC_ALL", &profile.locale);
         std::env::set_var("TZ", &profile.timezone);
-        
+
         Self {
             profile,
             buffer: VecDeque::new(),
@@ -80,16 +80,16 @@ impl EgressManager {
     pub async fn write_egress(&mut self, data: &[u8]) -> Result<Vec<EgressEvent>> {
         // Add data to buffer
         self.buffer.extend(data);
-        
+
         let mut events = Vec::new();
-        
+
         // Process complete chunks
         while self.buffer.len() >= self.profile.chunk_size {
             let chunk = self.extract_chunk();
             let event = self.create_egress_event(chunk)?;
             events.push(event);
         }
-        
+
         // Check if flush cadence requires flushing remaining data
         if self.should_flush() {
             if !self.buffer.is_empty() {
@@ -99,43 +99,43 @@ impl EgressManager {
             }
             self.last_flush = Instant::now();
         }
-        
+
         // Store pending events
         self.pending_events.extend(events.clone());
-        
+
         Ok(events)
     }
 
     pub async fn flush_all(&mut self) -> Result<Vec<EgressEvent>> {
         let mut events = Vec::new();
-        
+
         // Flush any remaining data
         if !self.buffer.is_empty() {
             let chunk = self.extract_remaining_chunk();
             let event = self.create_egress_event(chunk)?;
             events.push(event);
         }
-        
+
         // Return all pending events
-        events.extend(self.pending_events.drain(..));
-        
+        events.append(&mut self.pending_events);
+
         Ok(events)
     }
 
     fn extract_chunk(&mut self) -> Vec<u8> {
         let mut chunk = vec![0u8; self.profile.chunk_size];
-        for i in 0..self.profile.chunk_size {
+        for slot in &mut chunk {
             if let Some(byte) = self.buffer.pop_front() {
-                chunk[i] = byte;
+                *slot = byte;
             }
         }
         chunk
     }
 
     fn extract_remaining_chunk(&mut self) -> Vec<u8> {
-        let remaining_size = self.buffer.len();
+        let _remaining_size = self.buffer.len();
         let mut chunk: Vec<u8> = self.buffer.drain(..).collect();
-        
+
         // Apply padding policy
         match &self.profile.padding_policy {
             PaddingPolicy::Fixed { size } => {
@@ -144,7 +144,8 @@ impl EgressManager {
                 }
             }
             PaddingPolicy::Random { min, max } => {
-                let target_size = (*min + (*max - *min) * (self.profile.seed as usize % 100) / 100).max(chunk.len());
+                let target_size = (*min + (*max - *min) * (self.profile.seed as usize % 100) / 100)
+                    .max(chunk.len());
                 if chunk.len() < target_size {
                     chunk.resize(target_size, 0);
                 }
@@ -153,16 +154,16 @@ impl EgressManager {
                 // No padding
             }
         }
-        
+
         chunk
     }
 
     fn create_egress_event(&mut self, chunk: Vec<u8>) -> Result<EgressEvent> {
         self.sequence_counter += 1;
-        
+
         // Calculate deterministic chunk hash
         let chunk_hash = self.calculate_chunk_hash(&chunk);
-        
+
         let event = EgressEvent {
             session_id: self.session_id.clone(),
             sequence: self.sequence_counter,
@@ -173,10 +174,14 @@ impl EgressManager {
             chunk_hash,
             metadata: std::collections::HashMap::new(),
         };
-        
-        debug!("Created egress event: session={}, seq={}, size={}", 
-               event.session_id, event.sequence, event.data.len());
-        
+
+        debug!(
+            "Created egress event: session={}, seq={}, size={}",
+            event.session_id,
+            event.sequence,
+            event.data.len()
+        );
+
         Ok(event)
     }
 
@@ -186,13 +191,13 @@ impl EgressManager {
 
     fn calculate_chunk_hash(&self, chunk: &[u8]) -> String {
         // Deterministic hash calculation
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(chunk);
         hasher.update(self.session_id.as_bytes());
-        hasher.update(&self.sequence_counter.to_le_bytes());
-        hasher.update(&self.profile.seed.to_le_bytes());
-        
+        hasher.update(self.sequence_counter.to_le_bytes());
+        hasher.update(self.profile.seed.to_le_bytes());
+
         format!("{:x}", hasher.finalize())
     }
 

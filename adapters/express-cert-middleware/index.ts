@@ -23,10 +23,10 @@ export function createCertMiddleware(options: CertMiddlewareOptions = {}) {
         // Minimal CERT-V1 payload (simplified)
         const cert: any = {
           bundle_id: 'standards-lane',
-          policy_hash: 'placeholder-policy-hash',
-          proof_hash: 'placeholder-proof-hash',
-          automata_hash: 'placeholder-automata-hash',
-          labeler_hash: 'placeholder-labeler-hash',
+          policy_hash: process.env.CERT_POLICY_HASH ?? 'n/a',
+          proof_hash: process.env.CERT_PROOF_HASH ?? 'n/a',
+          automata_hash: process.env.CERT_AUTOMATA_HASH ?? 'n/a',
+          labeler_hash: process.env.CERT_LABELER_HASH ?? 'n/a',
           ni_claim: 'global_non_interference',
           ni_monitor: res.statusCode < 400 ? 'accept' : 'reject',
           sidecar_build: 'express-mw@1.0.0',

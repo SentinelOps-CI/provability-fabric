@@ -15,6 +15,7 @@
  */
 
 use labeler::{Labeler, LabelerConfig, LabelerState, TaintRule};
+use rand::Rng;
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -159,11 +160,11 @@ fn generate_mixed_types(rng: &mut impl Rng, index: usize) -> serde_json::Value {
         "number_field": rng.gen_range(-1000..1000),
         "boolean_field": rng.gen_bool(0.5),
         "null_field": null,
-        "array_field": vec![1, "string", true, null, {"nested": "value"}],
+        "array_field": json!([1, "string", true, null, {"nested": "value"}]),
         "object_field": {
             "nested_string": "nested_value",
             "nested_number": rng.gen_range(0..100),
-            "nested_array": vec![false, 42, "another_string"],
+            "nested_array": json!([false, 42, "another_string"]),
             "nested_object": {
                 "deep_string": "deep_value",
                 "deep_number": rng.gen_range(0..1000)
@@ -173,7 +174,7 @@ fn generate_mixed_types(rng: &mut impl Rng, index: usize) -> serde_json::Value {
 }
 
 /// Generate edge cases payload
-fn generate_edge_cases(rng: &mut impl Rng, index: usize) -> serde_json::Value {
+fn generate_edge_cases(rng: &mut impl Rng, _index: usize) -> serde_json::Value {
     json!({
         "empty_string": "",
         "empty_array": [],
@@ -184,7 +185,7 @@ fn generate_edge_cases(rng: &mut impl Rng, index: usize) -> serde_json::Value {
         "numbers": {
             "zero": 0,
             "negative": -1,
-            "large": 999999999999999999,
+            "large": 999999999999999999i64,
             "float": rng.gen_range(0.0..1.0),
             "scientific": 1.23e-45
         },
@@ -559,7 +560,7 @@ fn test_labeler_deep_nesting() {
 
 #[test]
 fn test_labeler_unknown_fields_rejection() {
-    let mut rules = create_comprehensive_taint_rules();
+    let rules = create_comprehensive_taint_rules();
     let config = LabelerConfig {
         rules: rules.clone(),
         default_label: "untrusted".to_string(),

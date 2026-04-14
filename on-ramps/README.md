@@ -187,7 +187,7 @@ so deploy --feature mpc-fintech --feature privacy --feature rag-guard
 - [Standards-Only Guide](./standards-only/)
 - [Evidence + Replay Guide](./evidence-replay/)
 - [Full Platform Guide](./full-platform/)
-- [CLI Reference](../../docs/cli-reference.md)
+- [CLI Reference](../../docs/reference/cli-reference.md)
 
 ### Examples
 - [Standards-Only Examples](../examples/standards-only/)
@@ -195,7 +195,7 @@ so deploy --feature mpc-fintech --feature privacy --feature rag-guard
 - [Full Platform Examples](../examples/full-platform/)
 
 ### Community
-- [GitHub Discussions](https://github.com/provability-fabric/provability-fabric/discussions)
+- [GitHub Discussions](https://github.com/SentinelOps-CI/provability-fabric/discussions)
 - [Discord Community](https://discord.gg/provability-fabric)
 - [Documentation Site](https://docs.provability-fabric.io)
 

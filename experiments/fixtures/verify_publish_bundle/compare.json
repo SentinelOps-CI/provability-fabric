@@ -1,0 +1,18 @@
+{
+  "baseline": { "solve_rate": 0.5 },
+  "pf": { "solve_rate": 0.5 },
+  "delta": { "solve_rate": 0 },
+  "patch_apply": {
+    "total": 2,
+    "applies_true": 2,
+    "applies_false": 0,
+    "errors_topN": []
+  },
+  "violation_reasons_top10": [],
+  "replay": {
+    "sample_size": 1,
+    "success_rate": 1.0,
+    "mismatch_count": 0
+  },
+  "policy": {}
+}

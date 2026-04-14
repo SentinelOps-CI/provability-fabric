@@ -3,4 +3,3 @@
 
 pub mod epsilon_guard;
 
-pub use epsilon_guard::{EpsilonGuard, MomentsAccountant, PrivacyConfig, PrivacyMetrics};

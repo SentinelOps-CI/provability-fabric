@@ -5,7 +5,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { SentinelOpsClient } from '@sentinelops/platform-sdk';
-import { spawn } from 'child_process';
 
 interface AgentConfig {
   tenant_id: string;
@@ -120,7 +119,7 @@ export class MCPClientAgent {
 
     // This should be ALLOWED by policy: "Only FraudService may call /score"
     try {
-      const result = await this.client.request(
+      await this.client.request(
         {
           method: 'tools/call',
           params: {
@@ -169,7 +168,7 @@ export class MCPClientAgent {
     
     try {
       // Get current epoch
-      const slo = await this.sentinelOps.getSLO();
+      await this.sentinelOps.getSLO();
       console.log('Current epoch: 42'); // Mock for demo
       
       // Rotate epoch and lower threshold to 0.90 for tenant ACME
@@ -177,7 +176,7 @@ export class MCPClientAgent {
       console.log('✅ Epoch rotated successfully');
       
       // Test with new policy
-      const result = await this.client.request(
+      await this.client.request(
         {
           method: 'tools/call',
           params: {

@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Break glass configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,7 +185,13 @@ impl BreakGlassManager {
         self.authorized_signers.remove(signer_id);
     }
 
+    /// Get current config
+    pub fn get_config(&self) -> &BreakGlassConfig {
+        &self.config
+    }
+
     /// Create break glass request
+    #[allow(clippy::too_many_arguments)]
     pub fn create_request(
         &mut self,
         session_id: String,
@@ -241,13 +247,13 @@ impl BreakGlassManager {
         // Track user requests
         self.user_requests
             .entry(user_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(request_id.clone());
 
         // Track session requests
         self.session_requests
             .entry(session_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(request_id.clone());
 
         // Audit logging
@@ -308,7 +314,7 @@ impl BreakGlassManager {
         let signature_count = request.signatures.len();
         let has_enough_signatures = signature_count >= m;
         let user_id = request.user_id.clone();
-        
+
         if has_enough_signatures {
             request.status = BreakGlassStatus::Approved;
 
@@ -435,6 +441,28 @@ impl BreakGlassManager {
     /// Get request by ID
     pub fn get_request(&self, request_id: &str) -> Option<&BreakGlassRequest> {
         self.active_requests.get(request_id)
+    }
+
+    /// Get request status by ID
+    pub fn get_request_status(&self, request_id: &str) -> Result<BreakGlassStatus, String> {
+        self.active_requests
+            .get(request_id)
+            .map(|r| r.status.clone())
+            .ok_or_else(|| format!("Request {} not found", request_id))
+    }
+
+    /// Set request status (for testing or admin).
+    pub fn set_request_status(
+        &mut self,
+        request_id: &str,
+        status: BreakGlassStatus,
+    ) -> Result<(), String> {
+        let request = self
+            .active_requests
+            .get_mut(request_id)
+            .ok_or_else(|| format!("Request {} not found", request_id))?;
+        request.status = status;
+        Ok(())
     }
 
     /// Get requests for user

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,8 +21,6 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
-use std::time::Instant;
 
 /// Event kind for fast dispatch
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -52,6 +51,7 @@ pub enum EventKind {
 
 impl EventKind {
     #[inline(always)]
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "call" => Some(EventKind::Call),
@@ -265,7 +265,7 @@ impl OptimizedDFA {
 
         // Initialize states with jump tables
         for &state_id in &table.states {
-            let mut dfa_state = DFAState {
+            let dfa_state = DFAState {
                 id: state_id,
                 is_accepting: table.accepting.contains(&state_id),
                 ..Default::default()
@@ -326,7 +326,7 @@ impl OptimizedDFA {
 
     /// Hot path: zero-allocation state transition
     #[inline(always)]
-    pub fn step(&self, mut state: StateId, event: &Event) -> StateId {
+    pub fn step(&self, state: StateId, event: &Event) -> StateId {
         match event.kind {
             EventKind::Call => {
                 if state < self.call_jump_table.len() as u32 {
@@ -369,11 +369,10 @@ impl OptimizedDFA {
     #[inline(always)]
     fn check_rate_limits(&mut self, event: &Event, current_time_ms: u32) -> bool {
         for (tool, limiter) in &mut self.rate_limiters {
-            if event.tool_name.contains(tool) {
-                if !limiter.check(current_time_ms) {
+            if event.tool_name.contains(tool)
+                && !limiter.check(current_time_ms) {
                     return false;
                 }
-            }
         }
         true
     }
@@ -527,7 +526,7 @@ impl OptimizedDFA {
             }
 
             // Split partitions based on transitions
-            for ((event_type, event_value, next_state), states) in transitions {
+            for ((_event_type, _event_value, _next_state), states) in transitions {
                 if states.len() < current_partition.len() {
                     // Split the partition
                     let mut new_partition = Vec::new();
@@ -632,7 +631,7 @@ impl OptimizedDFA {
             state_mapping.insert(representative, new_id as StateId);
 
             // Merge state properties
-            let mut merged_state = DFAState {
+            let merged_state = DFAState {
                 id: new_id as StateId,
                 is_accepting: partition.iter().any(|&state_id| {
                     self.states
@@ -720,12 +719,8 @@ impl LegacyRateLimiter {
         }
     }
 
-    fn check(&self, current_time: u64, event_hash: &str) -> bool {
-        let window_start = if current_time >= self.window_ms as u64 {
-            current_time - self.window_ms as u64
-        } else {
-            0
-        };
+    fn check(&self, current_time: u64, _event_hash: &str) -> bool {
+        let window_start = current_time.saturating_sub(self.window_ms as u64);
 
         let relevant_events = self
             .events
@@ -740,11 +735,7 @@ impl LegacyRateLimiter {
         self.events.push((current_time, event_hash));
 
         // Clean old events outside window
-        let window_start = if current_time >= self.window_ms as u64 {
-            current_time - self.window_ms as u64
-        } else {
-            0
-        };
+        let window_start = current_time.saturating_sub(self.window_ms as u64);
 
         self.events.retain(|(t, _)| *t >= window_start);
     }
@@ -824,11 +815,10 @@ impl DFAInterpreter {
     /// Check all applicable rate limits
     fn check_rate_limits(&self, event: &str, current_time: u64) -> bool {
         for (tool, limiter) in &self.rate_limiters {
-            if event.contains(tool) {
-                if !limiter.check(current_time, event) {
+            if event.contains(tool)
+                && !limiter.check(current_time, event) {
                     return false;
                 }
-            }
         }
         true
     }
@@ -887,7 +877,7 @@ impl DFAInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use std::time::Instant;
 
     #[test]
     fn test_optimized_dfa_creation() {
@@ -1102,7 +1092,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rate_limiting() {
+    fn test_rate_limiting_window() {
         let table = DFATable {
             states: vec![0, 1],
             start: 0,

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tracing::info;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
@@ -137,16 +137,17 @@ pub struct RateLimitInfo {
 /// Rate limiter implementation
 pub struct RateLimiter {
     config: RateLimitConfig,
-    usage_tracker: Arc<RwLock<UsageTracker>>,
+    /// Exposed for crate-internal tests that assert on usage state.
+    pub(crate) usage_tracker: Arc<RwLock<UsageTracker>>,
     violation_log: Arc<RwLock<Vec<RateLimitViolation>>>,
 }
 
-/// Tracks usage across different time windows
-struct UsageTracker {
-    tool_usage: HashMap<String, HashMap<String, VecDeque<Instant>>>, // tool -> tenant -> timestamps
-    tenant_usage: HashMap<String, VecDeque<Instant>>, // tenant -> timestamps
-    global_usage: VecDeque<Instant>,
-    budget_usage: HashMap<String, HashMap<String, f64>>, // tenant -> time_window -> amount
+/// Tracks usage across different time windows. Fields are pub(crate) for crate-internal tests.
+pub(crate) struct UsageTracker {
+    pub(crate) tool_usage: HashMap<String, HashMap<String, VecDeque<Instant>>>, // tool -> tenant -> timestamps
+    pub(crate) tenant_usage: HashMap<String, VecDeque<Instant>>, // tenant -> timestamps
+    pub(crate) global_usage: VecDeque<Instant>,
+    pub(crate) budget_usage: HashMap<String, HashMap<String, f64>>, // tenant -> time_window -> amount
 }
 
 impl RateLimiter {
@@ -302,7 +303,7 @@ impl RateLimiter {
     }
 
     /// Get current usage statistics
-    async fn get_current_usage(&self, tenant_id: &str, tool_name: &str) -> Result<RateLimitUsage> {
+    pub async fn get_current_usage(&self, tenant_id: &str, tool_name: &str) -> Result<RateLimitUsage> {
         let tracker = self.usage_tracker.read().await;
         let now = Instant::now();
         
@@ -396,8 +397,9 @@ impl RateLimiter {
         violations.push(violation);
         
         // Keep only last 1000 violations
-        if violations.len() > 1000 {
-            violations.drain(0..violations.len() - 1000);
+        let n = violations.len();
+        if n > 1000 {
+            violations.drain(0..n - 1000);
         }
         
         info!(
@@ -471,7 +473,6 @@ impl UsageTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     
     #[tokio::test]
     async fn test_rate_limiter_creation() {

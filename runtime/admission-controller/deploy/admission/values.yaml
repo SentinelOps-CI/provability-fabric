@@ -1,0 +1,16 @@
+nameOverride: "admission-controller"
+replicaCount: 1
+image:
+  repository: provability-fabric/admission-controller
+  tag: latest
+  pullPolicy: IfNotPresent
+leancheck:
+  url: "http://localhost:8080"
+enablePolicy: "true"
+ledger:
+  url: "http://ledger:4000/graphql"
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80

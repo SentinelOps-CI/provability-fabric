@@ -323,6 +323,24 @@ budget limit 1000 USD</textarea>
             <script>
                 const vscode = acquireVsCodeApi();
                 
+                window.addEventListener('message', (event) => {
+                    const msg = event.data;
+                    if (msg.command === 'showWarnings' && Array.isArray(msg.warnings)) {
+                        const el = document.getElementById('warnings');
+                        el.innerHTML = msg.warnings.map(w => 
+                            '<div class="' + (w.level || 'warning') + '">' + 
+                            (w.line ? 'L' + w.line + ': ' : '') + 
+                            (w.message || '') + '</div>'
+                        ).join('');
+                    }
+                    if (msg.command === 'updateResult' && msg.result) {
+                        const diags = (msg.result.diagnostics || []);
+                        if (diags.length > 0) {
+                            vscode.postMessage({ command: 'showWarnings', warnings: diags.map(d => ({ level: d.level, message: d.message, line: d.line })) });
+                        }
+                    }
+                });
+                
                 function validateDSL() {
                     const text = document.getElementById('dslEditor').value;
                     vscode.postMessage({
@@ -343,7 +361,6 @@ budget limit 1000 USD</textarea>
                     document.getElementById('warnings').innerHTML = '';
                 }
                 
-                // Auto-validate on input with debounce
                 let timeout;
                 document.getElementById('dslEditor').addEventListener('input', () => {
                     clearTimeout(timeout);
@@ -401,11 +418,12 @@ budget limit 1000 USD</textarea>
     }
 
     private showWarnings(warnings: DSLWarning[]) {
-        const warningsContainer = this._view?.webview.html.includes('warnings') ? 
-            this._view.webview.html : this._getHtmlForWebview(this._view!.webview);
-        
-        // This would need to be implemented with proper webview communication
-        console.log('Warnings:', warnings);
+        if (this._view?.webview) {
+            this._view.webview.postMessage({
+                command: 'showWarnings',
+                warnings: warnings.map(w => ({ level: w.level, message: w.message, line: w.line })),
+            });
+        }
     }
 
     public updateWithResult(result: PolicyCompileResponse) {

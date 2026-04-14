@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
+// Many types are used by tests or reserved for future use.
+#![allow(dead_code, unused_variables)]
 
 pub mod assumption;
 pub mod break_glass;
 pub mod broker;
+pub mod cert_resolver;
 pub mod cert_v1;
 pub mod cert_v1_core;
 pub mod cert_v1_extended;
-pub mod cert_resolver;
 pub mod codegen;
 pub mod concurrency;
 pub mod crypto;
@@ -25,6 +27,7 @@ pub mod queue_manager;
 pub mod ratelimit;
 pub mod replay;
 pub mod revocation;
+pub mod safety_case;
 pub mod scheduler;
 pub mod snapshot_storage;
 pub mod witness;

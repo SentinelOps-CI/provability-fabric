@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 SentinelOps Platform Contributors
+#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::RwLock;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Label ID for efficient bitset operations
 pub type LabelId = u32;
@@ -252,7 +251,7 @@ impl OptimizedIFCManager {
     pub fn check_declassify_limit(&self, label: LabelId, current_count: u32) -> bool {
         self.declassify_limits
             .get(&label)
-            .map_or(true, |&limit| current_count < limit)
+            .is_none_or(|&limit| current_count < limit)
     }
 
     /// Get allow bitset for debugging
@@ -534,7 +533,7 @@ impl LabelManager {
     pub fn get_label_stats(&self) -> HashMap<String, u32> {
         let mut stats = HashMap::new();
 
-        for (_, labeled_data) in &self.labeled_data {
+        for labeled_data in self.labeled_data.values() {
             let count = stats.entry(labeled_data.label.name.clone()).or_insert(0);
             *count += 1;
         }
@@ -634,7 +633,7 @@ mod tests {
 
         let secret_id = manager.get_label("secret").unwrap().id;
         let internal_id = manager.get_label("internal").unwrap().id;
-        let public_id = manager.get_label("public").unwrap().id;
+        let _public_id = manager.get_label("public").unwrap().id;
 
         // Benchmark declassify operations
         let start = std::time::Instant::now();
@@ -670,7 +669,7 @@ mod tests {
 
     #[test]
     fn test_legacy_compatibility() {
-        let mut legacy_manager = LabelManager::new().unwrap();
+        let legacy_manager = LabelManager::new().unwrap();
 
         // Test legacy functionality still works
         let public_label = legacy_manager.labels.get("public").unwrap();

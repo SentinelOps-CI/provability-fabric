@@ -1,6 +1,39 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+fn load_signing_key_from_env() -> Result<Vec<u8>> {
+    if let Ok(b64) = std::env::var("RECEIPT_SIGNING_KEY") {
+        let bytes = base64::decode(b64.trim()).context("RECEIPT_SIGNING_KEY: invalid base64")?;
+        if bytes.len() == 32 {
+            return Ok(bytes);
+        }
+        anyhow::bail!("RECEIPT_SIGNING_KEY must be 32 bytes (base64)");
+    }
+    if let Ok(path) = std::env::var("RECEIPT_SIGNING_KEY_PATH") {
+        let raw = fs::read(&path).context("RECEIPT_SIGNING_KEY_PATH: failed to read file")?;
+        if raw.len() == 32 {
+            return Ok(raw);
+        }
+        // PEM: look for PRIVATE KEY and decode (minimal: take first 32 bytes after header for raw key)
+        if raw.starts_with(b"-----BEGIN") {
+            let pem = String::from_utf8_lossy(&raw);
+            for line in pem.lines() {
+                if line.starts_with("-----") {
+                    continue;
+                }
+                if let Ok(decoded) = base64::decode(line.trim()) {
+                    if decoded.len() >= 32 {
+                        return Ok(decoded[..32].to_vec());
+                    }
+                }
+            }
+        }
+        anyhow::bail!("RECEIPT_SIGNING_KEY_PATH: file must be 32 raw bytes or PEM with 32-byte key");
+    }
+    anyhow::bail!("set RECEIPT_SIGNING_KEY (base64) or RECEIPT_SIGNING_KEY_PATH");
+}
 
 /// Access receipt for retrieval queries
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,11 +57,13 @@ pub struct ReceiptSigner {
 }
 
 impl ReceiptSigner {
-    /// Create new receipt signer
+    /// Create new receipt signer. Loads key from env:
+    /// - RECEIPT_SIGNING_KEY: base64-encoded 32-byte Ed25519 private key
+    /// - RECEIPT_SIGNING_KEY_PATH: path to file containing raw 32 bytes or PEM
     pub async fn new() -> Result<Self> {
-        // In real implementation, would load signing key from secure storage
-        let signing_key = vec![0u8; 32]; // Placeholder key
-        let key_id = "receipt_signer_v1".to_string();
+        let signing_key = load_signing_key_from_env()
+            .context("RECEIPT_SIGNING_KEY or RECEIPT_SIGNING_KEY_PATH must be set")?;
+        let key_id = std::env::var("RECEIPT_SIGNING_KEY_ID").unwrap_or_else(|_| "receipt_signer_v1".to_string());
 
         Ok(Self {
             signing_key,

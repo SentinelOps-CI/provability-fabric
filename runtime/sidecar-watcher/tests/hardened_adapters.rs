@@ -241,7 +241,7 @@ fn test_symlink_traversal_prevention() {
     ];
 
     for path in test_paths {
-        let result = test_symlink_traversal_prevention(path);
+        let result = check_symlink_traversal(path);
         assert!(
             result.is_blocked(),
             "Symlink traversal to {} should be blocked",
@@ -263,7 +263,7 @@ fn test_symlink_traversal_prevention() {
     ];
 
     for path in valid_paths {
-        let result = test_symlink_traversal_prevention(path);
+        let result = check_symlink_traversal(path);
         assert!(result.is_allowed(), "Valid path {} should be allowed", path);
     }
 }
@@ -320,7 +320,7 @@ fn test_content_length_enforcement() {
     ];
 
     for (header, expected_length, should_allow) in test_responses {
-        let result = test_content_length_enforcement(header, expected_length);
+        let result = check_content_length(header, expected_length);
 
         if should_allow {
             assert!(
@@ -484,7 +484,7 @@ fn test_http_redirect_prevention(url: &str) -> RedirectTestResult {
     }
 }
 
-fn test_symlink_traversal_prevention(path: &str) -> SymlinkTestResult {
+fn check_symlink_traversal(path: &str) -> SymlinkTestResult {
     // Mock implementation for testing symlink traversal prevention
     if path.contains("symlink") {
         SymlinkTestResult::Blocked {
@@ -520,9 +520,9 @@ fn cleanup_test_file(path: &str) {
     let _ = fs::remove_file(path);
 }
 
-fn test_content_length_enforcement(
+fn check_content_length(
     header: &str,
-    expected_length: usize,
+    _expected_length: usize,
 ) -> ContentLengthTestResult {
     // Mock implementation for testing content-length enforcement
     if header.is_empty()

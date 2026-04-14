@@ -1,0 +1,4 @@
+experiment_id: exp_step2_lite_smoke
+baseline_run_id: fixture-baseline
+pf_run_id: fixture-pf
+parity_gate_passed: true
