@@ -264,10 +264,10 @@ func (s *EnhancedReplayService) percentile(data []int64, p int) int64 {
 
 // updateJobWithMetrics updates the job with enhanced metrics
 func (s *EnhancedReplayService) updateJobWithMetrics(jobID string, metrics *ReplayMetrics) {
-	s.jobsMu.Lock()
-	defer s.jobsMu.Unlock()
+	s.ReplayService.jobsMu.Lock()
+	defer s.ReplayService.jobsMu.Unlock()
 
-	job, exists := s.jobs[jobID]
+	job, exists := s.ReplayService.jobs[jobID]
 	if !exists {
 		return
 	}
@@ -317,9 +317,9 @@ func (s *EnhancedReplayService) convertStepsToMaps(steps []ReplayStep) []map[str
 
 // getJob safely gets a job
 func (s *EnhancedReplayService) getJob(jobID string) *ReplayJob {
-	s.jobsMu.RLock()
-	defer s.jobsMu.RUnlock()
-	return s.jobs[jobID]
+	s.ReplayService.jobsMu.RLock()
+	defer s.ReplayService.jobsMu.RUnlock()
+	return s.ReplayService.jobs[jobID]
 }
 
 // GenerateMinimalCounterexample generates a minimal counterexample using greedy shrinking
@@ -396,7 +396,7 @@ func (cg *CounterexampleGenerator) stillHasMismatch(steps []ReplayStep, original
 
 // GetEnhancedReplayStatus returns the enhanced replay status
 func (s *EnhancedReplayService) GetEnhancedReplayStatus(jobID string) (*ReplayStatus, error) {
-	status, err := s.ReplayService.GetReplayStatus(jobID)
+	status, err := s.ReplayService.GetReplayStatus(context.Background(), jobID)
 	if err != nil {
 		return nil, err
 	}

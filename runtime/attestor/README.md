@@ -698,7 +698,7 @@ impl SGXVerifier {
 
 ```bash
 # Clone repository
-git clone https://github.com/provability-fabric/provability-fabric.git
+git clone https://github.com/SentinelOps-CI/provability-fabric.git
 cd provability-fabric
 
 # Install dependencies

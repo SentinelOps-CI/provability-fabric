@@ -70,6 +70,12 @@ pub struct PerformanceMetrics {
     pub memory_accesses: u64,
 }
 
+impl Default for HotRuleCodegen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HotRuleCodegen {
     /// Create new hot rule code generator
     pub fn new() -> Self {
@@ -148,13 +154,13 @@ impl HotRuleCodegen {
         ));
 
         // Generate hot path step function
-        code.push_str(&format!(
+        code.push_str(
             "    #[inline(always)]\n\
-            pub fn step(&mut self, event: &Event) -> StateId {{\n\
+            pub fn step(&mut self, event: &Event) -> StateId {\n\
                 self.state_count += 1;\n\
                 \n\
-                let next_state = match event.kind {{\n"
-        ));
+                let next_state = match event.kind {\n",
+        );
 
         // Generate match arms for each event pattern
         for pattern in &rule.event_patterns {
@@ -176,20 +182,20 @@ impl HotRuleCodegen {
         );
 
         // Generate utility methods
-        code.push_str(&format!(
-            "    pub fn current_state(&self) -> StateId {{\n\
+        code.push_str(
+            "    pub fn current_state(&self) -> StateId {\n\
                 self.current_state\n\
-            }}\n\n\
-            pub fn get_metrics(&self) -> (u64, u64) {{\n\
+            }\n\n\
+            pub fn get_metrics(&self) -> (u64, u64) {\n\
                 (self.state_count, self.transition_count)\n\
-            }}\n\n\
-            pub fn reset(&mut self) {{\n\
+            }\n\n\
+            pub fn reset(&mut self) {\n\
                 self.current_state = 0;\n\
                 self.state_count = 0;\n\
                 self.transition_count = 0;\n\
-            }}\n\
-        }}\n"
-        ));
+            }\n\
+        }\n",
+        );
 
         code
     }
@@ -261,7 +267,7 @@ impl HotRuleCodegen {
     /// Calculate performance metrics for generated code
     fn calculate_performance_metrics(&self, rule: &HotRule) -> PerformanceMetrics {
         let mut estimated_cycles = 1; // Base cycle for function call
-        let mut cache_misses = 0;
+        let cache_misses = 0;
         let mut branch_predictions = 0;
         let mut memory_accesses = 1; // Access to self.current_state
 

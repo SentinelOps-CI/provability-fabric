@@ -1,14 +1,13 @@
 use blake3::Hasher as Blake3Hasher;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
-use tokio::time::{sleep, timeout};
+use tokio::time::timeout;
 
 /// Compact certificate core for async signing
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,19 +95,9 @@ impl AsyncSigningPipeline {
         let metrics = Arc::new(SigningMetrics::default());
         let running = Arc::new(RwLock::new(true));
 
-        // Spawn worker tasks
-        for worker_id in 0..config.worker_count {
-            // Note: mpsc::Receiver cannot be cloned, so we'll handle this differently in production
-            // For now, we'll skip this worker
-            continue;
-            let result_tx = result_tx.clone();
-            let metrics = metrics.clone();
-            let running = running.clone();
-            let config = config.clone();
-
-            tokio::spawn(async move {
-                Self::worker_loop(worker_id, request_rx, result_tx, metrics, running, config).await;
-            });
+        // Spawn worker tasks (skipped: mpsc::Receiver cannot be cloned; handle differently in production)
+        for _ in 0..config.worker_count {
+            // no workers spawned yet
         }
 
         Self {
@@ -455,9 +444,9 @@ impl BatchVerifier {
         max_parallel: usize,
     ) -> Vec<VerificationResult> {
         let mut results = Vec::with_capacity(requests.len());
-        let mut chunks = requests.chunks(max_parallel);
+        let chunks = requests.chunks(max_parallel);
 
-        while let Some(chunk) = chunks.next() {
+        for chunk in chunks {
             let chunk_results = Self::process_batch_single(chunk).await;
             results.extend(chunk_results);
         }
@@ -488,7 +477,7 @@ impl BatchVerifier {
         // Perform batch verification
         // Note: ed25519_dalek doesn't have verify_batch, so we verify individually
         let mut all_valid = true;
-          for ((message, signature), public_key) in messages
+        for ((message, signature), public_key) in messages
             .iter()
             .zip(signatures.iter())
             .zip(public_keys.iter())
@@ -566,6 +555,12 @@ pub struct BatchVerifierMetrics {
     pub batch_success_rate: f64,
     pub average_batch_size: f64,
     pub total_processing_time: Duration,
+}
+
+impl Default for BatchVerifierMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BatchVerifierMetrics {
@@ -776,7 +771,7 @@ mod tests {
         );
 
         // Verify results
-        assert_eq!(results.len(), request_count);
+        assert_eq!(results.len(), request_count as usize);
         for result in &results {
             assert!(result.signature.is_some());
             assert!(result.error.is_none());
@@ -871,7 +866,7 @@ mod tests {
         )
         .unwrap();
         let ed25519_signature =
-            Signature::from_bytes(&signature.signature.try_into().unwrap()).unwrap();
+            Signature::from_bytes(&signature.signature.try_into().unwrap());
 
         let verification_result = verifying_key.verify(&signature_input, &ed25519_signature);
         assert!(verification_result.is_ok());

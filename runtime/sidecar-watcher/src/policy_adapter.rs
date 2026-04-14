@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Principal represents a user, service, or agent
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -93,6 +93,19 @@ pub struct PolicyConfig {
     pub witness_validation: bool,
     pub high_assurance_mode: bool,
     pub feature_flags: HashMap<String, bool>,
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        Self {
+            enforcement_mode: EnforcementMode::Enforce,
+            shadow_mode: false,
+            epoch_validation: false,
+            witness_validation: false,
+            high_assurance_mode: false,
+            feature_flags: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,17 +202,15 @@ impl LeanInterface {
     }
 
     /// Validate read witness for high assurance mode
-    fn validate_read_witness(&self, doc: &DocId, path: &[String], ctx: &Ctx) -> bool {
-        // This would validate the Merkle path witness and label derivation
-        // For now, return true as a placeholder
-        true
+    fn validate_read_witness(&self, _doc: &DocId, _path: &[String], _ctx: &Ctx) -> bool {
+        // Deny by default until Merkle path witness and label derivation are wired
+        false
     }
 
     /// Validate write witness for high assurance mode
-    fn validate_write_witness(&self, doc: &DocId, path: &[String], ctx: &Ctx) -> bool {
-        // This would validate the Merkle path witness and label derivation
-        // For now, return true as a placeholder
-        true
+    fn validate_write_witness(&self, _doc: &DocId, _path: &[String], _ctx: &Ctx) -> bool {
+        // Deny by default until Merkle path witness and label derivation are wired
+        false
     }
 }
 
@@ -207,6 +218,12 @@ impl LeanInterface {
 pub struct EpochManager {
     current_epoch: u64,
     revoked_principals: HashSet<String>,
+}
+
+impl Default for EpochManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EpochManager {
@@ -240,26 +257,30 @@ pub struct WitnessValidator {
     // This would validate Merkle path witnesses and label derivation
 }
 
+impl Default for WitnessValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WitnessValidator {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn validate_merkle_path(&self, path: &[String], witness: &str) -> bool {
-        // Validate Merkle path witness
-        // For now, return true as a placeholder
-        true
+    pub fn validate_merkle_path(&self, _path: &[String], witness: &str) -> bool {
+        // Deny by default until Merkle path witness is wired
+        !witness.is_empty()
     }
 
     pub fn validate_label_derivation(
         &self,
-        source_label: &str,
-        target_label: &str,
-        declass_rules: &[String],
+        _source_label: &str,
+        _target_label: &str,
+        _declass_rules: &[String],
     ) -> bool {
-        // Validate label derivation according to declassification rules
-        // For now, return true as a placeholder
-        true
+        // Deny by default until label derivation rules are wired
+        false
     }
 }
 
@@ -453,6 +474,7 @@ impl PolicyAdapter {
 
 /// Enforcement statistics for monitoring
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct EnforcementStats {
     pub total_requests: u64,
     pub allowed_requests: u64,
@@ -461,17 +483,6 @@ pub struct EnforcementStats {
     pub current_epoch: u64,
 }
 
-impl Default for EnforcementStats {
-    fn default() -> Self {
-        Self {
-            total_requests: 0,
-            allowed_requests: 0,
-            denied_requests: 0,
-            violations_recorded: 0,
-            current_epoch: 0,
-        }
-    }
-}
 
 /// World state for permission evaluation
 #[derive(Debug, Clone)]
@@ -574,9 +585,7 @@ mod tests {
             timestamp: 1234567890,
         };
 
-        let result = adapter
-            .evaluate_action(&principal, &action, &context)
-            .unwrap();
+        let result = adapter.evaluate_action(&principal, &action, &context);
         assert!(result.allowed);
         assert_eq!(result.permit_decision, "accept");
     }
@@ -606,9 +615,7 @@ mod tests {
             tool: Tool::SendEmail,
         };
 
-        let result = adapter
-            .evaluate_action(&principal, &action, &context)
-            .unwrap();
+        let result = adapter.evaluate_action(&principal, &action, &context);
         assert!(!result.allowed);
         assert_eq!(result.permit_decision, "reject");
     }
@@ -620,7 +627,7 @@ mod tests {
         config.witness_validation = true;
         let mut adapter = PolicyAdapter::new(config);
 
-        let mut world = WorldState::new(1);
+        let world = WorldState::new(1);
         let doc = DocId {
             uri: "test://doc1".to_string(),
             version: 1,
@@ -646,9 +653,7 @@ mod tests {
             path: vec!["field1".to_string()],
         };
 
-        let result = adapter
-            .evaluate_action(&principal, &action, &context)
-            .unwrap();
+        let result = adapter.evaluate_action(&principal, &action, &context);
         assert!(!result.allowed);
         assert_eq!(result.permit_decision, "reject");
         assert!(!result.path_witness_ok);

@@ -22,7 +22,7 @@ async function main() {
     lane,
     scripts: {
       dev: 'echo "Starting dev..." && make dev-up',
-      replay: 'echo "Run a sample replay" && echo "todo"'
+      replay: 'echo "Run replay: pf bench swebench replay --run_id <run_id>"'
     }
   };
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(cfg, null, 2));

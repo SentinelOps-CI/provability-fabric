@@ -22,7 +22,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 /// Custom serialization for std::time::Instant
 mod instant_serde {
     use super::*;
-    use serde::de::Error;
+    
 
     pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -30,7 +30,9 @@ mod instant_serde {
     {
         let system_now = SystemTime::now();
         let instant_now = Instant::now();
-        let duration_since_instant = instant_now.checked_duration_since(*instant).unwrap_or(Duration::ZERO);
+        let duration_since_instant = instant_now
+            .checked_duration_since(*instant)
+            .unwrap_or(Duration::ZERO);
         let approx_system_time = system_now - duration_since_instant;
         approx_system_time.serialize(serializer)
     }
@@ -42,7 +44,9 @@ mod instant_serde {
         let system_time = SystemTime::deserialize(deserializer)?;
         let system_now = SystemTime::now();
         let instant_now = Instant::now();
-        let duration_since_system_time = system_now.duration_since(system_time).unwrap_or(Duration::ZERO);
+        let duration_since_system_time = system_now
+            .duration_since(system_time)
+            .unwrap_or(Duration::ZERO);
         let approx_instant = instant_now - duration_since_system_time;
         Ok(approx_instant)
     }
@@ -175,11 +179,7 @@ impl ReplaySession {
             return false;
         }
 
-        let drift_ms = if actual_time > expected_time {
-            actual_time - expected_time
-        } else {
-            expected_time - actual_time
-        };
+        let drift_ms = actual_time.abs_diff(expected_time);
 
         let measurement = DriftMeasurement {
             sequence_number: self.sequence_number,
@@ -389,11 +389,7 @@ impl ReplayManager {
             session_id: session_id.to_string(),
             expected_time,
             actual_time,
-            drift_ms: if actual_time > expected_time {
-                actual_time - expected_time
-            } else {
-                expected_time - actual_time
-            },
+            drift_ms: actual_time.abs_diff(expected_time),
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -779,7 +775,7 @@ mod tests {
         let verifier = ReplayVerifier::new(config);
 
         // Create two replays with different timestamps (simulating drift)
-        let mut replay1 = ReplayExport {
+        let replay1 = ReplayExport {
             session_id: "session1".to_string(),
             config: ReplayConfig::default(),
             events: vec![ReplayEvent {
@@ -822,7 +818,7 @@ mod tests {
         let verifier = ReplayVerifier::new(config);
 
         // Create two replays with different timestamps but same structure
-        let mut replay1 = ReplayExport {
+        let replay1 = ReplayExport {
             session_id: "session1".to_string(),
             config: ReplayConfig::default(),
             events: vec![ReplayEvent {

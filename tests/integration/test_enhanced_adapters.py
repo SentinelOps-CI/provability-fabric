@@ -277,7 +277,7 @@ class EnhancedAdapterTester:
     def compile_httpget_adapter(self) -> bool:
         """Compile HTTP-GET adapter"""
         try:
-            adapter_dir = Path("adapters/httpget")
+            adapter_dir = Path("adapters/http-get")
             if not adapter_dir.exists():
                 print("      ❌ HTTP-GET adapter directory not found")
                 return False
@@ -315,7 +315,7 @@ class EnhancedAdapterTester:
     def compile_fileread_adapter(self) -> bool:
         """Compile File-Read adapter"""
         try:
-            adapter_dir = Path("adapters/fileread")
+            adapter_dir = Path("adapters/file-read")
             if not adapter_dir.exists():
                 print("      ❌ File-Read adapter directory not found")
                 return False
@@ -445,7 +445,7 @@ class EnhancedAdapterTester:
         """Test seccomp integration"""
         try:
             # Check if seccomp is available
-            seccomp_file = Path("adapters/httpget/seccomp.rs")
+            seccomp_file = Path("adapters/http-get/seccomp.rs")
             if not seccomp_file.exists():
                 print("      ⚠️  Seccomp configuration not found")
                 print("      📝 This is expected on Windows - continuing")

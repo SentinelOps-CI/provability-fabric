@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "pf_commit": "xyz789",
+  "agent_commit": null,
+  "dataset_id": null,
+  "dataset_version": null,
+  "harness_id": null,
+  "message": "no run summary (summary.json missing in both run dirs)",
+  "baseline_solve_rate": 0.5,
+  "pf_solve_rate": 0.5,
+  "patch_apply_total": 2,
+  "patch_apply_applies_false": 0,
+  "empty_patch_reasons_topN": [],
+  "timeout_rate_baseline": null,
+  "timeout_rate_pf": null,
+  "wall_clock_s_median_baseline": null,
+  "wall_clock_s_median_pf": null,
+  "wall_clock_s_p95_baseline": null,
+  "wall_clock_s_p95_pf": null,
+  "guard_overhead_s_median": null
+}

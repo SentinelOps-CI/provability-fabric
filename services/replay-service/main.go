@@ -82,6 +82,7 @@ type ReplayJob struct {
 // ReplayService handles deterministic replay execution
 type ReplayService struct {
 	jobs       map[string]*ReplayJob
+	jobsMu     sync.RWMutex
 	workingDir string
 	replayKit  string
 	// dev mode event hub (per job)
@@ -221,7 +222,9 @@ func (s *ReplayService) StartReplay(ctx context.Context, req ReplayRequest) (*Re
 	}
 
 	// Store job
+	s.jobsMu.Lock()
 	s.jobs[jobID] = job
+	s.jobsMu.Unlock()
 
 	// Start replay execution asynchronously
 	go s.executeReplay(job)
@@ -246,7 +249,9 @@ func (s *ReplayService) StartReplay(ctx context.Context, req ReplayRequest) (*Re
 
 // GetReplayStatus returns the status of a replay job
 func (s *ReplayService) GetReplayStatus(ctx context.Context, jobID string) (*ReplayStatus, error) {
+	s.jobsMu.RLock()
 	job, ok := s.jobs[jobID]
+	s.jobsMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("job not found")
 	}
@@ -527,9 +532,11 @@ func (s *ReplayService) getReplayStatusHandler(c *gin.Context) {
 
 func (s *ReplayService) listReplaysHandler(c *gin.Context) {
 	var jobs []ReplayStatus
+	s.jobsMu.RLock()
 	for _, job := range s.jobs {
 		jobs = append(jobs, job.Status)
 	}
+	s.jobsMu.RUnlock()
 
 	c.JSON(http.StatusOK, gin.H{
 		"jobs":  jobs,
@@ -541,7 +548,9 @@ func (s *ReplayService) downloadArtifactHandler(c *gin.Context) {
 	jobID := c.Param("jobId")
 	artifactName := c.Param("artifact")
 
+	s.jobsMu.RLock()
 	job, exists := s.jobs[jobID]
+	s.jobsMu.RUnlock()
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
 		return
@@ -630,12 +639,15 @@ func (s *ReplayService) healthHandler(c *gin.Context) {
 		replayKitStatus = "missing"
 	}
 
+	s.jobsMu.RLock()
+	activeJobs := len(s.jobs)
+	s.jobsMu.RUnlock()
 	c.JSON(http.StatusOK, gin.H{
 		"status":      "healthy",
 		"service":     "replay-service",
 		"version":     "1.0.0",
 		"timestamp":   time.Now(),
-		"active_jobs": len(s.jobs),
+		"active_jobs": activeJobs,
 		"replay_kit":  replayKitStatus,
 		"working_dir": s.workingDir,
 	})

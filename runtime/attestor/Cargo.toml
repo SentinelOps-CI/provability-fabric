@@ -9,11 +9,15 @@ axum = "0.7"
 tower = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde-big-array = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-redis = { version = "0.23", features = ["tokio-comp"] }
+redis = { version = "0.27", features = ["tokio-comp"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 anyhow = "1.0"
 sha2 = "0.10"
 base64 = "0.21"
 hex = "0.4"
+
+[dev-dependencies]
+axum-test = "14"

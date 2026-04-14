@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
+#![allow(dead_code)]
 
 use anyhow::{anyhow, Context, Result};
 use k8s_openapi::api::core::v1::ConfigMap;
@@ -209,10 +210,7 @@ impl EpsilonGuard {
         let default_accountant = MomentsAccountant::new(0.0, 0.0);
         let accountant = accountants.get(tenant_id).unwrap_or(&default_accountant);
 
-        Ok(accountant.remaining_budget(
-            config.epsilon_limit,
-            config.delta_limit,
-        ))
+        Ok(accountant.remaining_budget(config.epsilon_limit, config.delta_limit))
     }
 
     /// Reset budget for a tenant (called periodically)

@@ -101,7 +101,7 @@ This implementation demonstrates how MPC can be effectively deployed in high-sta
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric/provability-fabric
+git clone https://github.com/SentinelOps-CI/provability-fabric
 cd provability-fabric/runtime/mpc-fintech
 
 # Build the project

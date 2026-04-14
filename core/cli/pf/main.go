@@ -37,18 +37,17 @@ import (
 )
 
 var (
-	dryRun bool
-)
-
-func main() {
-	var rootCmd = &cobra.Command{
+	dryRun  bool
+	rootCmd = &cobra.Command{
 		Use:     "so",
 		Aliases: []string{"pf"},
 		Short:   "Provability-Fabric CLI tool",
 		Long: `Provability-Fabric (pf) is a command-line tool for managing AI agent specifications
 with provable behavioral guarantees through formal verification.`,
 	}
+)
 
+func init() {
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview changes without making them")
 
 	rootCmd.AddCommand(initCmd())
@@ -79,7 +78,9 @@ with provable behavioral guarantees through formal verification.`,
 	rootCmd.AddCommand(explainStateCmd())
 	rootCmd.AddCommand(unifiedCommands())
 	rootCmd.AddCommand(benchCmd())
+}
 
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -2409,7 +2410,7 @@ func swebenchCmd() *cobra.Command {
 
 // swebenchRunCmd runs the SWE-bench bench runner (Python); produces predictions.jsonl and runs/<run_id>/<instance_id>/ evidence.
 func swebenchRunCmd() *cobra.Command {
-	var dataset, split, instanceIDs, instanceIDsFile, out, engine, runsDir, instancesFile, workspacesDir, proofsDir, mode, policy, experimentDir string
+	var dataset, split, instanceIDs, instanceIDsFile, out, engine, runsDir, instancesFile, workspacesDir, proofsDir, mode, policy, experimentDir, openhandsModel string
 	var maxInstances, openhandsTimeout, openhandsMaxIterations int
 	var seed int
 	var noWorkspace, prove, preflight bool
@@ -2481,7 +2482,9 @@ Run from repository root.`,
 			if preflight {
 				pyArgs = append(pyArgs, "--preflight")
 			}
-			if v := strings.TrimSpace(os.Getenv("OPENHANDS_MODEL")); v != "" {
+			if v := strings.TrimSpace(openhandsModel); v != "" {
+				pyArgs = append(pyArgs, "--openhands-model", v)
+			} else if v := strings.TrimSpace(os.Getenv("OPENHANDS_MODEL")); v != "" {
 				pyArgs = append(pyArgs, "--openhands-model", v)
 			}
 
@@ -2510,6 +2513,7 @@ Run from repository root.`,
 	cmd.Flags().StringVar(&policy, "policy", "", "Policy pack name when guarded (e.g. swebench_safe_v1); use none for baseline")
 	cmd.Flags().IntVar(&openhandsTimeout, "openhands-timeout", 0, "OpenHands timeout in seconds (0 = runner default)")
 	cmd.Flags().IntVar(&openhandsMaxIterations, "openhands-max-iterations", 0, "Max iterations for OpenHands (0 = use manifest or runner default)")
+	cmd.Flags().StringVar(&openhandsModel, "openhands-model", "", "LLM model id for OpenHands/direct_agent (default: env OPENHANDS_MODEL or runner default)")
 	cmd.Flags().StringVar(&workspacesDir, "workspaces-dir", "workspaces", "Base directory for materialized workspaces")
 	cmd.Flags().BoolVar(&noWorkspace, "no-workspace", false, "Skip workspace materialization (no clone/checkout)")
 	cmd.Flags().BoolVar(&prove, "prove", false, "Run proof step: build policy-trace Lean proof; write proof.ok + proof_artifact_hash on success")

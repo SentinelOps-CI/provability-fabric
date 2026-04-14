@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tracing::{error, info, warn};
+use tracing::info;
 
-use crate::policy_adapter::{EnforcementMode, PolicyAdapter, PolicyConfig, Principal};
+use crate::policy_adapter::PolicyAdapter;
 
 /// Revocation manager for handling epoch-based permission revocation
 pub struct RevocationManager {
@@ -223,9 +223,9 @@ impl RevocationManager {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            policy_hash: "policy_hash_placeholder".to_string(), // Would be actual hash
-            dfa_hash: "dfa_hash_placeholder".to_string(),       // Would be actual hash
-            labeler_hash: "labeler_hash_placeholder".to_string(), // Would be actual hash
+            policy_hash: std::env::var("POLICY_HASH").unwrap_or_default(),
+            dfa_hash: std::env::var("DFA_HASH").unwrap_or_default(),
+            labeler_hash: std::env::var("LABELER_HASH").unwrap_or_default(),
             total_principals: 0,                                // Would be actual count
             revoked_principals: {
                 let revoked = self.revoked_principals.read().unwrap();
@@ -334,7 +334,7 @@ impl Default for RevocationStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy_adapter::{EnforcementMode, PolicyConfig};
+    use crate::policy_adapter::PolicyConfig;
 
     #[test]
     fn test_revocation_manager_creation() {

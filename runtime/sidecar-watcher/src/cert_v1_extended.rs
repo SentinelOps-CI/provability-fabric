@@ -148,6 +148,7 @@ pub struct BlockedSpan {
 
 /// Detector statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct DetectorStats {
     /// PII detection stats
     pub pii_stats: PIIStats,
@@ -346,17 +347,6 @@ impl Default for DecisionReasoning {
     }
 }
 
-impl Default for DetectorStats {
-    fn default() -> Self {
-        Self {
-            pii_stats: PIIStats::default(),
-            secret_stats: SecretStats::default(),
-            malicious_stats: MaliciousStats::default(),
-            policy_violation_stats: PolicyViolationStats::default(),
-            summary: DetectionSummary::default(),
-        }
-    }
-}
 
 impl Default for PIIStats {
     fn default() -> Self {

@@ -17,7 +17,7 @@ This on-ramp includes everything from previous on-ramps plus:
 
 ```bash
 # Clone the repository
-git clone https://github.com/provability-fabric/provability-fabric
+git clone https://github.com/SentinelOps-CI/provability-fabric
 cd provability-fabric
 
 # Deploy with Docker Compose

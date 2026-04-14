@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -218,13 +219,13 @@ func (s *PolicyDiffService) generateMockCertificates(policyHash string, count in
 // getRandomNIMonitor returns a random NI monitor value
 func (s *PolicyDiffService) getRandomNIMonitor() string {
 	values := []string{"accept", "reject", "inapplicable", "error"}
-	return values[i%len(values)]
+	return values[rand.Intn(len(values))]
 }
 
 // getRandomReasonCode returns a random reason code
 func (s *PolicyDiffService) getRandomReasonCode() string {
 	codes := []string{"PERMIT", "DENY", "ERROR", "TIMEOUT"}
-	return codes[i%len(codes)]
+	return codes[rand.Intn(len(codes))]
 }
 
 // Certificate represents a certificate for analysis

@@ -69,7 +69,7 @@ INSERT INTO "_prisma_migrations" (
     "applied_steps_count"
 ) VALUES (
     '20250101000000_optimize_performance_rollback',
-    'rollback_checksum_placeholder',
+    '20250101000000_optimize_performance_rollback_checksum',
     NOW(),
     '20250101000000_optimize_performance_rollback',
     '{"message": "Rolled back database performance optimizations", "timestamp": "' || NOW() || '"}',

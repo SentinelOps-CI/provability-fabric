@@ -66,10 +66,8 @@ def DFATable.toCanonicalJson (dfa : DFATable) : String :=
 
   json_obj.canonicalize
 
-/-- Simple SHA-256 implementation (placeholder for now) -/
+/-- Deterministic hash for canonical JSON (not cryptographically secure; replace with SHA-256 when available). -/
 def computeSha256 (input : String) : String :=
-  -- In a real implementation, this would use a proper SHA-256 implementation
-  -- For now, we'll use a deterministic hash-like function
   let bytes := input.toUTF8
   let hash := bytes.foldl (fun acc b => acc * 31 + b.toNat) 0
   s!"sha256:{hash.toHexString}"

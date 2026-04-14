@@ -1,0 +1,18 @@
+{
+  "experiment_id": "exp-step2-lite-stress-large-repos",
+  "description": "Stress slice: 5–10 known-heavy repos (django, astropy, sympy, etc.) for manual or scheduled runs. Use to validate that pipeline improvements reduce empty-patch rates. Not gated in CI.",
+  "pf_commit": "",
+  "agent_framework": "openhands",
+  "agent_commit": "",
+  "agent_image_tag": "",
+  "model": { "id": "gpt-4o-mini", "provider": "openai" },
+  "dataset": "swebench_lite",
+  "dataset_split": "test",
+  "policy_pack": "swebench_safe_v1",
+  "budgets": { "max_steps": 25, "max_tool_calls": 500, "timeout_sec": 600 },
+  "model_params": { "temperature": 0, "top_p": null },
+  "seed": 42,
+  "run_modes": ["baseline", "pf_guarded"],
+  "created_at": "",
+  "notes": "Heavy-repo stress slice. Run manually or on schedule. Compare empty_patch_reasons_topN across runs to measure improvements. Timeout_sec may be increased for large repos."
+}

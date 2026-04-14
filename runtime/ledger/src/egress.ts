@@ -328,10 +328,8 @@ export function verifyCertificateSignature(certificate: EgressCertificate): bool
     const certBytes = JSON.stringify(certData);
     const certHash = crypto.createHash('sha256').update(certBytes).digest();
     
-    // TODO: Implement actual signature verification
-    // This would require the public key for the signer
-    // For now, we'll do basic structural validation
-    
+    // Signature verification: requires trust root PEM/JWKS (see docs/specs/dsse-verify-contract.md).
+    // Structural validation only until Ed25519 verify is wired with public key from config.
     return certificate.text_hash.length === 64 && certificate.policy_hash.length === 64;
   } catch (error) {
     console.error('Error verifying certificate signature:', error);

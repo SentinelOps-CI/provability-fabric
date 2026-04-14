@@ -39,11 +39,11 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		cert := Cert{
-			"bundle_id":      "standards-lane",
-			"policy_hash":    "placeholder-policy-hash",
-			"proof_hash":     "placeholder-proof-hash",
-			"automata_hash":  "placeholder-automata-hash",
-			"labeler_hash":   "placeholder-labeler-hash",
+			"bundle_id":      getCertHash(r, "bundle_id", "standards-lane"),
+			"policy_hash":    getCertHash(r, "policy_hash", "n/a"),
+			"proof_hash":     getCertHash(r, "proof_hash", "n/a"),
+			"automata_hash":  getCertHash(r, "automata_hash", "n/a"),
+			"labeler_hash":   getCertHash(r, "labeler_hash", "n/a"),
 			"ni_claim":       "global_non_interference",
 			"ni_monitor":     ternary(rw.status < 400, "accept", "reject"),
 			"sidecar_build":  "go-chi-mw@1.0.0",
@@ -84,4 +84,11 @@ func ternary[T any](cond bool, a, b T) T {
 		return a
 	}
 	return b
+}
+
+func getCertHash(r *http.Request, key, defaultVal string) string {
+	if v := r.Header.Get("X-Cert-" + key); v != "" {
+		return v
+	}
+	return defaultVal
 }
