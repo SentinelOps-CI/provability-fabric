@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="220"/>
-
 # Provability Fabric
 
 **Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
@@ -11,6 +9,8 @@
 [![Formal verification](https://img.shields.io/badge/verification-Lean-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
 [![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
 [![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
+
+<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="220"/>
 
 <br/>
 
