@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ScienceClaimBundle.v0.schema.json",
+  "title": "ScienceClaimBundle.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "bundle_id",
+    "created_at",
+    "claim_artifact",
+    "assumption_set",
+    "runtime_receipt",
+    "trace_certificate",
+    "evidence_bundle"
+  ],
+  "properties": {
+    "schema_version": { "const": "ScienceClaimBundle.v0" },
+    "bundle_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "producer": { "type": "string" },
+    "producer_version": { "type": "string" },
+    "source_repo": { "type": "string" },
+    "source_commit": { "type": "string" },
+    "status": { "type": "string" },
+    "signature_or_digest": { "type": "string" },
+    "claim_artifact": { "$ref": "#/$defs/claim_artifact" },
+    "assumption_set": { "$ref": "#/$defs/assumption_set" },
+    "runtime_receipt": { "$ref": "#/$defs/runtime_receipt" },
+    "trace_certificate": { "$ref": "#/$defs/trace_certificate" },
+    "evidence_bundle": { "$ref": "#/$defs/evidence_bundle" }
+  },
+  "$defs": {
+    "major_meta": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "created_at",
+        "producer",
+        "producer_version",
+        "source_repo",
+        "source_commit",
+        "status",
+        "signature_or_digest"
+      ],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "artifact_id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "producer": { "type": "string" },
+        "producer_version": { "type": "string" },
+        "source_repo": { "type": "string", "minLength": 1 },
+        "source_commit": { "type": "string", "minLength": 1 },
+        "status": { "type": "string" },
+        "signature_or_digest": { "type": "string", "minLength": 1 }
+      }
+    },
+    "claim_artifact": {
+      "allOf": [
+        { "$ref": "#/$defs/major_meta" },
+        {
+          "type": "object",
+          "required": ["claim_id", "assumption_set_ref"],
+          "properties": {
+            "schema_version": { "const": "ClaimArtifact.v0" },
+            "claim_id": { "type": "string" },
+            "assumption_set_ref": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "assumption_set": {
+      "allOf": [
+        { "$ref": "#/$defs/major_meta" },
+        {
+          "type": "object",
+          "required": ["assumption_set_id"],
+          "properties": {
+            "schema_version": { "const": "AssumptionSet.v0" },
+            "assumption_set_id": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "runtime_receipt": {
+      "allOf": [
+        { "$ref": "#/$defs/major_meta" },
+        {
+          "type": "object",
+          "required": ["receipt_id", "trace_hash"],
+          "properties": {
+            "schema_version": { "const": "RuntimeReceipt.v0" },
+            "receipt_id": { "type": "string" },
+            "trace_hash": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "trace_certificate": {
+      "allOf": [
+        { "$ref": "#/$defs/major_meta" },
+        {
+          "type": "object",
+          "required": ["certificate_id", "trace_hash", "status"],
+          "properties": {
+            "schema_version": { "const": "TraceCertificate.v0" },
+            "certificate_id": { "type": "string" },
+            "trace_hash": { "type": "string" },
+            "status": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "evidence_bundle": {
+      "allOf": [
+        { "$ref": "#/$defs/major_meta" },
+        {
+          "type": "object",
+          "required": ["evidence_bundle_id", "artifact_refs"],
+          "properties": {
+            "schema_version": { "const": "EvidenceBundle.v0" },
+            "evidence_bundle_id": { "type": "string" },
+            "artifact_refs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}

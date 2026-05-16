@@ -72,6 +72,11 @@ build:
 	@$(ECHOOK) "🔨 Building all platform services..."
 	$(DC) build
 
+test-pcs:
+	@$(ECHOOK) "Running PCS science-claim tests..."
+	cd adapters/pcs && go test ./... -count=1
+	cd core/cli/pf && go test ./cmd/... -count=1
+
 test:
 	@$(ECHOOK) "🧪 Running platform tests..."
 	python tests/trust_fire_orchestrator.py

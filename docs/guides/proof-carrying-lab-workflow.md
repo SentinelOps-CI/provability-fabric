@@ -1,0 +1,55 @@
+# Proof-carrying lab workflow (v0.1)
+
+This guide describes the end-to-end Proof-Carrying Science demo for hospital QC release simulation. It is not clinical validation or production medical certification.
+
+## Flow
+
+```mermaid
+flowchart LR
+  LT[LabTrust-Gym] --> RR[RuntimeReceipt.v0]
+  LT --> B[ScienceClaimBundle.pending]
+  CE[CertifyEdge] --> TC[TraceCertificate.v0]
+  B --> CERT[science_claim_bundle.certified]
+  TC --> CERT
+  CERT --> PF[Provability Fabric]
+  PF --> SM[Scientific Memory]
+```
+
+1. **LabTrust-Gym** runs the `qc-release` demo, exports trace and runtime receipt, and builds a pending science claim bundle.
+2. **CertifyEdge** emits `TraceCertificate.v0` for the trace.
+3. LabTrust attaches the certificate to produce `science_claim_bundle.certified.json`.
+4. **Provability Fabric** verifies consistency and signs an importable result.
+5. **Scientific Memory** imports the signed bundle and renders the claim with guarantee-type separation.
+
+## Provability Fabric role
+
+Provability Fabric is the admission gate for PCS bundles:
+
+- It does not simulate LabTrust or perform temporal trace checking.
+- It checks internal consistency, provenance fields, certificate status, and trace-hash alignment.
+- It emits `VerificationResult.v0` and, when requested, `SignedScienceClaimBundle.v0`.
+
+```bash
+pf verify science-claim science_claim_bundle.certified.json
+pf sign science-claim science_claim_bundle.certified.json --out signed_science_claim_bundle.json
+pf inspect science-claim signed_science_claim_bundle.json
+```
+
+## Scientific Memory handoff
+
+Scientific Memory imports `signed_science_claim_bundle.json` and reads:
+
+- `verification_result.status`
+- `verification_result.checks`
+- `verification_result.signature_or_digest`
+- `signature_or_digest` on the signed wrapper
+
+No in-process Provability Fabric installation is required in Scientific Memory for import.
+
+## Canonical vocabulary
+
+Artifact schemas and status enums are defined in [pcs-core](https://github.com/SentinelOps-CI/pcs-core). Provability Fabric consumes those artifacts; it does not define competing types.
+
+## Related documentation
+
+- [Science claim verification](science-claim-verification.md)

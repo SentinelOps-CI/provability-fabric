@@ -1,0 +1,98 @@
+{
+  "verification_id": "00000000-0000-0000-0000-000000000001",
+  "schema_version": "VerificationResult.v0",
+  "bundle_id": "science-claim-bundle-qc-release-001",
+  "verifier": "Provability Fabric",
+  "verifier_version": "0.1.0",
+  "status": "passed",
+  "checks": [
+    {
+      "check_id": "pcs.schema.science_claim_bundle",
+      "description": "ScienceClaimBundle.v0 schema is valid",
+      "status": "passed",
+      "details": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"
+    },
+    {
+      "check_id": "pcs.presence.claim_artifact",
+      "description": "ClaimArtifact.v0 is present",
+      "status": "passed",
+      "details": "present"
+    },
+    {
+      "check_id": "pcs.presence.assumption_set",
+      "description": "AssumptionSet.v0 is present",
+      "status": "passed",
+      "details": "present"
+    },
+    {
+      "check_id": "pcs.presence.runtime_receipt",
+      "description": "RuntimeReceipt.v0 is present",
+      "status": "passed",
+      "details": "present"
+    },
+    {
+      "check_id": "pcs.presence.trace_certificate",
+      "description": "TraceCertificate.v0 is present",
+      "status": "passed",
+      "details": "present"
+    },
+    {
+      "check_id": "pcs.presence.evidence_bundle",
+      "description": "EvidenceBundle.v0 is present",
+      "status": "passed",
+      "details": "present"
+    },
+    {
+      "check_id": "pcs.claim.assumption_set_ref_match",
+      "description": "ClaimArtifact.assumption_set_ref matches included AssumptionSet",
+      "status": "passed",
+      "details": "assumption-set-qc-release-001"
+    },
+    {
+      "check_id": "pcs.runtime.trace_hash_present",
+      "description": "RuntimeReceipt.trace_hash is present",
+      "status": "passed",
+      "details": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "check_id": "pcs.certificate.trace_hash_match",
+      "description": "TraceCertificate.trace_hash matches RuntimeReceipt.trace_hash",
+      "status": "passed",
+      "details": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "check_id": "pcs.certificate.status_checked",
+      "description": "TraceCertificate.status is CertificateChecked",
+      "status": "passed",
+      "details": "CertificateChecked"
+    },
+    {
+      "check_id": "pcs.evidence.artifact_refs",
+      "description": "EvidenceBundle references included artifacts",
+      "status": "passed",
+      "details": "claim-qc-release-001, assumption-set-qc-release-001, runtime-receipt-qc-release-001, trace-cert-qc-release-001"
+    },
+    {
+      "check_id": "pcs.artifact.not_stale",
+      "description": "No required artifact has status Stale",
+      "status": "passed",
+      "details": "ok"
+    },
+    {
+      "check_id": "pcs.metadata.source_provenance",
+      "description": "source_repo and source_commit are present for all major artifacts",
+      "status": "passed",
+      "details": "ok"
+    },
+    {
+      "check_id": "pcs.metadata.signature_or_digest",
+      "description": "signature_or_digest is present for all major artifacts",
+      "status": "passed",
+      "details": "ok"
+    }
+  ],
+  "created_at": "2026-05-16T12:00:00Z",
+  "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+  "source_commit": "test-commit",
+  "signature_or_digest": "sha256:snapshot-digest"
+}

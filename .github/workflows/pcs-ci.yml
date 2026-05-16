@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: Apache-2.0
+# Proof-Carrying Science v0.1: science-claim verification, signing, and fixtures.
+
+name: PCS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'adapters/pcs/**'
+      - 'core/cli/pf/**'
+      - 'config/schemas/pcs/**'
+      - 'tests/pcs/**'
+      - 'docs/guides/science-claim-verification.md'
+      - 'docs/guides/proof-carrying-lab-workflow.md'
+      - '.github/workflows/pcs-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'adapters/pcs/**'
+      - 'core/cli/pf/**'
+      - 'config/schemas/pcs/**'
+      - 'tests/pcs/**'
+      - 'docs/guides/science-claim-verification.md'
+      - 'docs/guides/proof-carrying-lab-workflow.md'
+      - '.github/workflows/pcs-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pcs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pcs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: |
+            adapters/pcs/go.sum
+            core/cli/pf/go.sum
+
+      - name: Test PCS adapter
+        run: |
+          cd adapters/pcs
+          go test ./... -count=1 -race
+
+      - name: Test pf PCS CLI
+        run: |
+          cd core/cli/pf
+          go test ./cmd/... -count=1
+
+      - name: CLI smoke (verify, sign, inspect)
+        run: |
+          cd core/cli/pf
+          BUNDLE="$GITHUB_WORKSPACE/tests/pcs/valid_labtrust_bundle.json"
+          OUT="$RUNNER_TEMP/signed_science_claim_bundle.json"
+          go run . verify science-claim "$BUNDLE" --json | tee "$RUNNER_TEMP/verify.json"
+          go run . sign science-claim "$BUNDLE" --out "$OUT"
+          go run . inspect science-claim "$OUT" | tee "$RUNNER_TEMP/inspect.txt"
+          grep -q '"status": "passed"' "$RUNNER_TEMP/verify.json"
+          grep -q 'verification_status: passed' "$RUNNER_TEMP/inspect.txt"
+          grep -q 'pcs.schema.science_claim_bundle' "$RUNNER_TEMP/inspect.txt"
+
+      - name: Reject failed bundle sign
+        run: |
+          cd core/cli/pf
+          if go run . sign science-claim "$GITHUB_WORKSPACE/tests/pcs/invalid_missing_certificate.json" --out "$RUNNER_TEMP/bad.json"; then
+            echo "expected sign to fail"
+            exit 1
+          fi

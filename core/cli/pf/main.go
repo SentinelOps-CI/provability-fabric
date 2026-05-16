@@ -29,6 +29,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
+
+	pfcmd "pf/cmd"
 	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,7 +54,10 @@ func init() {
 
 	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(lintCmd())
-	rootCmd.AddCommand(signCmd())
+	sign := signCmd()
+	rootCmd.AddCommand(sign)
+	pfcmd.RegisterScienceClaimSign(sign)
+	pfcmd.RegisterPCSCommands(rootCmd)
 	rootCmd.AddCommand(checkTraceCmd())
 	rootCmd.AddCommand(watchCmd())
 	rootCmd.AddCommand(riskscoreCmd())
@@ -183,8 +188,8 @@ func signCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "sign",
-		Short: "Sign specification bundles with cosign",
-		Long:  `Sign specification bundles using cosign for cryptographic verification.`,
+		Short: "Sign specification bundles and PCS artifacts",
+		Long:  `Sign specification bundles with cosign, or emit signed PCS science claim bundles via "pf sign science-claim".`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRun {
 				fmt.Println("DRY RUN: Would sign bundles with cosign")
