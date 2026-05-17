@@ -52,6 +52,8 @@ func main() {
 	if *labtrust {
 		labtrustDir := filepath.Join(dir, "fixtures", "labtrust")
 		failed += validateLabtrustFixtures(labtrustDir, root, *localDev, &results)
+		releaseDir := filepath.Join(dir, "fixtures", "labtrust-release")
+		failed += validateLabtrustReleaseFixtures(releaseDir, root, *localDev, &results)
 	}
 
 	if *jsonOut {
@@ -97,6 +99,69 @@ func validateBundleFixtures(dir, root string, localDev bool, results *[]validate
 		}
 	}
 	return failed
+}
+
+func validateLabtrustReleaseFixtures(releaseDir, root string, localDev bool, results *[]validateResult) int {
+	if _, err := os.Stat(releaseDir); err != nil {
+		return 0
+	}
+	var failed int
+	certified := filepath.Join(releaseDir, "science_claim_bundle.certified.json")
+	if _, err := os.Stat(certified); err == nil {
+		label := "fixtures/labtrust-release/science_claim_bundle.certified.json"
+		if validateScienceClaimBundle(certified, label, root, localDev, false, results) {
+			failed++
+		}
+	}
+	vrPath := filepath.Join(releaseDir, "verification_result.json")
+	if _, err := os.Stat(vrPath); err == nil {
+		label := "fixtures/labtrust-release/verification_result.json"
+		if validateVerificationResultFile(vrPath, label, root, results) {
+			failed++
+		}
+	}
+	signed := filepath.Join(releaseDir, "signed_science_claim_bundle.json")
+	if _, err := os.Stat(signed); err == nil {
+		label := "fixtures/labtrust-release/signed_science_claim_bundle.json"
+		if validateSignedBundle(signed, label, root, results) {
+			failed++
+		}
+	}
+	entries, _ := os.ReadDir(releaseDir)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "invalid_") {
+			continue
+		}
+		path := filepath.Join(releaseDir, e.Name())
+		label := filepath.ToSlash(filepath.Join("fixtures", "labtrust-release", e.Name()))
+		if validateScienceClaimBundle(path, label, root, localDev, true, results) {
+			failed++
+		}
+	}
+	return failed
+}
+
+func validateVerificationResultFile(path, label, root string, results *[]validateResult) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+		return true
+	}
+	var result pcs.VerificationResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		*results = append(*results, validateResult{File: label, Status: "parse_error", Error: err.Error()})
+		return true
+	}
+	if err := pcs.ValidateVerificationResult(root, result); err != nil {
+		*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+		return true
+	}
+	if !pcs.VerificationPassed(result) {
+		*results = append(*results, validateResult{File: label, Status: "unexpected_status", Error: result.Status})
+		return true
+	}
+	*results = append(*results, validateResult{File: label, Status: result.Status})
+	return false
 }
 
 func validateLabtrustFixtures(labtrustDir, root string, localDev bool, results *[]validateResult) int {

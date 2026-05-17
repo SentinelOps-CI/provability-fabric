@@ -89,6 +89,25 @@ freeze-pcs-labtrust-signed:
 	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
 	bash scripts/pcs-freeze-labtrust-signed.sh
 
+freeze-pcs-labtrust-release:
+	@$(ECHOOK) "Freezing LabTrust-CertifyEdge release fixtures..."
+	bash scripts/pcs-freeze-labtrust-release.sh
+
+pcs-v01-pf-chain:
+	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
+	@PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
+
+pcs-v01-clean-chain:
+	@$(ECHOOK) "PCS v0.1 full clean-checkout chain..."
+	bash scripts/run-pcs-v01-clean-chain.sh
+
+demo-pcs-release:
+	@$(ECHOOK) "PCS LabTrust release verify / sign / inspect / validate..."
+	$(PF) verify science-claim tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json
+	$(PF) validate verification-result tests/pcs/fixtures/labtrust-release/verification_result.json
+	$(PF) validate signed-science-claim tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json
+	$(PF) inspect science-claim tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json --strict
+
 validate-pcs-schema-diff:
 	@$(ECHOOK) "Comparing config/schemas/pcs to pcs-core..."
 	bash scripts/pcs-schema-diff.sh $(PCS_CORE_PATH)

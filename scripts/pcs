@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pcs — delegate to pcs-core CLI (schema + semantic validation).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PCS_CORE="${PCS_CORE_PATH:-${ROOT}/../pcs-core}"
+PY="${PCS_CORE}/python"
+
+if [[ ! -d "${PY}" ]]; then
+  echo "pcs-core not found at ${PCS_CORE} (set PCS_CORE_PATH)" >&2
+  exit 2
+fi
+
+export PYTHONPATH="${PY}/pcs_core:${PY}:${PYTHONPATH:-}"
+exec python -m pcs_core.cli "$@"

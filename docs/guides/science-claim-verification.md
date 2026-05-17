@@ -123,6 +123,13 @@ make freeze-pcs-labtrust-signed   # rewrite PF signed fixture when verifier outp
 just pcs-schema-diff
 ```
 
+LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): real LabTrust + CertifyEdge `scb-qc-release-rc1` certified bundle from pcs-core, plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release`.
+
+```bash
+pf validate verification-result tests/pcs/fixtures/labtrust-release/verification_result.json
+pf validate signed-science-claim tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json
+```
+
 LabTrust freeze fixtures under `tests/pcs/fixtures/labtrust/`:
 
 | File | Role |

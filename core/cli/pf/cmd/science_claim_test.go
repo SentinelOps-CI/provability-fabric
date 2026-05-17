@@ -127,6 +127,25 @@ func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
 	}
 }
 
+func TestValidateLabtrustReleaseArtifactsCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	for _, args := range [][]string{
+		{"validate", "verification-result", filepath.Join(release, "verification_result.json")},
+		{"validate", "signed-science-claim", filepath.Join(release, "signed_science_claim_bundle.json")},
+	} {
+		cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
+		cmd.Dir = pfDir(t)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v failed: %v\n%s", args, err, out)
+		}
+		if !strings.Contains(string(out), "OK:") {
+			t.Fatalf("expected OK from validate %v: %s", args, out)
+		}
+	}
+}
+
 func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
 	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.labtrust-export.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")

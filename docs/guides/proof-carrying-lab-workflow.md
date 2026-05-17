@@ -65,6 +65,16 @@ cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
 
 Artifact schemas and status enums are defined in [pcs-core](https://github.com/SentinelOps-CI/pcs-core). Provability Fabric consumes those artifacts; it does not define competing types.
 
+## PCS v0.1 clean-checkout chain
+
+Full cross-repo release gate (LabTrust-Gym, CertifyEdge, Provability Fabric, Scientific Memory): [pcs-v01-clean-chain.md](pcs-v01-clean-chain.md).
+
+```bash
+export PCS_DETERMINISTIC=1
+just pcs-v01-clean-chain
+```
+
 ## Related documentation
 
 - [Science claim verification](science-claim-verification.md)
+- [PCS v0.1 clean-checkout chain](pcs-v01-clean-chain.md)

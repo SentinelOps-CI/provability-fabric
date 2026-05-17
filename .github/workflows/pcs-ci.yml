@@ -13,9 +13,12 @@ on:
       - 'tests/pcs/**'
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
+      - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
+      - 'docs/guides/pcs-v01-clean-chain.md'
       - '.github/workflows/pcs-ci.yml'
   pull_request:
     branches: [main]
@@ -26,9 +29,12 @@ on:
       - 'tests/pcs/**'
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
+      - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
+      - 'docs/guides/pcs-v01-clean-chain.md'
       - '.github/workflows/pcs-ci.yml'
   workflow_dispatch:
 
@@ -52,6 +58,7 @@ jobs:
           path: pcs-core
           sparse-checkout: |
             schemas
+            python
 
       - uses: actions/setup-go@v5
         with:
@@ -78,6 +85,20 @@ jobs:
         run: |
           cd core/cli/pf
           go test ./cmd/... -count=1
+
+      - name: PCS v0.1 PF clean-chain segment
+        run: |
+          export PCS_CORE_PATH="$GITHUB_WORKSPACE/../pcs-core"
+          pip install -q -e "$PCS_CORE_PATH/python"
+          export PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc
+          bash "$GITHUB_WORKSPACE/scripts/pcs-pf-clean-chain.sh" "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+
+      - name: pcs-core validate release artifacts
+        run: |
+          pip install -q -e pcs-core/python
+          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json"
+          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/verification_result.json"
+          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |
