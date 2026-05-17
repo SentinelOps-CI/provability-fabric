@@ -127,6 +127,24 @@ func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
 	}
 }
 
+func TestPFReleaseModeRejectsPlaceholderCommitCLI(t *testing.T) {
+	root := repoRoot(t)
+	bundle := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release", "science_claim_bundle.certified.json")
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle, "--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = append(os.Environ(),
+		"PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc",
+		"PF_RELEASE_MODE=0",
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected verify --release-mode to fail with placeholder commit: %s", out)
+	}
+	if !strings.Contains(string(out), "placeholder") && !strings.Contains(string(out), "release-mode") {
+		t.Fatalf("expected release-mode provenance error: %s", out)
+	}
+}
+
 func TestValidateLabtrustReleaseArtifactsCLI(t *testing.T) {
 	root := repoRoot(t)
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")

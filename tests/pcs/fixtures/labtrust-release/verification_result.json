@@ -104,7 +104,7 @@
           "as-pcs-qc-release-v0.1"
         ],
         "certificate_refs": [
-          "cert-trace-e6779edd-47fd-43e3-bfd1-dbd2a1b97dac"
+          "cert-trace-862f6bee-7179-49a5-b436-4aa18f4e010f"
         ],
         "claim_refs": [
           "claim-pcs-qc-release-v0.1"
@@ -141,6 +141,6 @@
   ],
   "created_at": "2026-01-15T11:00:00Z",
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-  "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
-  "signature_or_digest": "sha256:f3928e9a8f834cc748e55b805ace89001b2c8bfcb9fdcf334bb2484b8a8a735e"
+  "source_commit": "993a0e5d1214b7c1bd6e84475d771806950965dd",
+  "signature_or_digest": "sha256:274650d43f455fc1660f0fb4130c3d2881df33253fc7d2c15505089241f36e5b"
 }

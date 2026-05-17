@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -17,7 +18,7 @@ const (
 	ExitError              = 2
 )
 
-func resolvePCSOpts(bundlePath string, localDev bool) (pcs.ValidateOptions, error) {
+func resolvePCSOpts(bundlePath string, localDev, releaseMode bool) (pcs.ValidateOptions, error) {
 	repoRoot := ""
 	if wd, err := os.Getwd(); err == nil {
 		repoRoot, _ = pcs.FindRepoRoot(wd)
@@ -27,15 +28,26 @@ func resolvePCSOpts(bundlePath string, localDev bool) (pcs.ValidateOptions, erro
 			repoRoot, _ = pcs.FindRepoRoot(filepath.Dir(abs))
 		}
 	}
+	if releaseMode && localDev {
+		return pcs.ValidateOptions{}, fmt.Errorf("release-mode cannot be combined with local-dev")
+	}
+	if !releaseMode {
+		releaseMode = pcs.ReleaseModeFromEnv()
+	}
+	sourceCommit, err := pcs.ResolveSourceCommitForMode(releaseMode, localDev)
+	if err != nil {
+		return pcs.ValidateOptions{}, err
+	}
 	return pcs.ValidateOptions{
 		RepoRoot:        repoRoot,
 		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    pcs.ResolveSourceCommit(),
+		SourceCommit:    sourceCommit,
 		LocalDev:        localDev,
+		ReleaseMode:     releaseMode,
 	}, nil
 }
 
-func verifyBundle(bundlePath string, localDev bool) (pcs.VerificationResult, error) {
+func verifyBundle(bundlePath string, localDev, releaseMode bool) (pcs.VerificationResult, error) {
 	resolved, err := pcs.ResolveArtifactPath(bundlePath)
 	if err != nil {
 		return pcs.VerificationResult{}, err
@@ -44,11 +56,18 @@ func verifyBundle(bundlePath string, localDev bool) (pcs.VerificationResult, err
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
-	opts, err := resolvePCSOpts(resolved, localDev)
+	opts, err := resolvePCSOpts(resolved, localDev, releaseMode)
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
-	return pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
+	result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
+	if err != nil {
+		return result, err
+	}
+	if err := pcs.ValidatePFProvenanceCommit(result.SourceCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 func printVerificationFailures(result pcs.VerificationResult) {

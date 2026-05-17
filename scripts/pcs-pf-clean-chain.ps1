@@ -32,19 +32,19 @@ $Pcs = "python -m pcs_core.cli"
 if (-not (Test-Path $Certified)) { throw "missing certified bundle: $Certified" }
 if (-not $env:PF_SOURCE_COMMIT) {
     Push-Location $Root
-    try { $env:PF_SOURCE_COMMIT = (git rev-parse HEAD 2>$null) } catch { }
+    try { $env:PF_SOURCE_COMMIT = (git rev-parse HEAD 2>$null).Trim() } catch { }
     Pop-Location
-    if (-not $env:PF_SOURCE_COMMIT) { $env:PF_SOURCE_COMMIT = "cccccccccccccccccccccccccccccccccccccccc" }
 }
+if (-not $env:PF_RELEASE_MODE) { $env:PF_RELEASE_MODE = "1" }
 
 function Step([string]$Msg) { Write-Host "== $Msg ==" }
 
 Step "Provability Fabric: verify"
-& $Pf verify science-claim $Certified --out $VR
+& $Pf verify science-claim $Certified --release-mode --out $VR
 Step "pcs-core: validate verification_result"
 Invoke-Expression "$Pcs validate `"$VR`""
 Step "Provability Fabric: sign"
-& $Pf sign science-claim $Certified --out $Signed
+& $Pf sign science-claim $Certified --release-mode --out $Signed
 Step "pcs-core: validate signed bundle"
 Invoke-Expression "$Pcs validate `"$Signed`""
 Step "Provability Fabric: inspect"

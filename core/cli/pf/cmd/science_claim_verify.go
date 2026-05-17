@@ -27,6 +27,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	var jsonOut bool
 	var outPath string
 	var localDev bool
+	var releaseMode bool
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -35,7 +36,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bundlePath := args[0]
-			result, err := verifyBundle(bundlePath, localDev)
+			result, err := verifyBundle(bundlePath, localDev, releaseMode)
 			if err != nil {
 				return err
 			}
@@ -80,5 +81,6 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit VerificationResult as JSON on stdout")
 	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult to file")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
+	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")
 	return cmd
 }

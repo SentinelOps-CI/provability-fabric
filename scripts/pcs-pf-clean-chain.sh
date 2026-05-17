@@ -25,16 +25,17 @@ if [[ ! -f "${CERTIFIED}" ]]; then
   exit 1
 fi
 
-export PF_SOURCE_COMMIT="${PF_SOURCE_COMMIT:-$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null || echo cccccccccccccccccccccccccccccccccccccccc)}"
+export PF_SOURCE_COMMIT="${PF_SOURCE_COMMIT:-$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null)}"
+export PF_RELEASE_MODE="${PF_RELEASE_MODE:-1}"
 export PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}"
 export PCS_DETERMINISTIC="${PCS_DETERMINISTIC:-1}"
 
 echo "== Provability Fabric: verify =="
-run_pf verify science-claim "${CERTIFIED}" --out "${VR}"
+run_pf verify science-claim "${CERTIFIED}" --release-mode --out "${VR}"
 echo "== pcs-core: validate verification_result =="
 "${PCS}" validate "${VR}"
 echo "== Provability Fabric: sign =="
-run_pf sign science-claim "${CERTIFIED}" --out "${SIGNED}"
+run_pf sign science-claim "${CERTIFIED}" --release-mode --out "${SIGNED}"
 echo "== pcs-core: validate signed bundle =="
 "${PCS}" validate "${SIGNED}"
 echo "== Provability Fabric: inspect =="

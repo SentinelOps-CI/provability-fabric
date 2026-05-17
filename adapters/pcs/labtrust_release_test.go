@@ -32,14 +32,19 @@ func TestVerifyLabtrustReleaseCertifiedBundlePasses(t *testing.T) {
 	opts := pcs.ValidateOptions{
 		RepoRoot:        repoRoot(t),
 		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    "cccccccccccccccccccccccccccccccccccccccc",
+		ReleaseMode:     true,
 	}
+	manifest := loadReleaseManifest(t)
+	opts.SourceCommit = manifest.PFSourceCommit
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !pcs.VerificationPassed(result) {
 		t.Fatalf("expected ProofChecked, got %s", result.Status)
+	}
+	if pcs.IsForbiddenPlaceholderCommit(result.SourceCommit) {
+		t.Fatalf("PF verification_result must not use placeholder source_commit: %q", result.SourceCommit)
 	}
 }
 
@@ -105,18 +110,20 @@ func TestSignLabtrustReleaseBundleOutputsPCSCoreSignedBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	t.Setenv("PF_SOURCE_COMMIT", "cccccccccccccccccccccccccccccccccccccccc")
+	manifest := loadReleaseManifest(t)
+	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
 	t.Setenv("PF_DETERMINISTIC", "1")
 	opts := pcs.ValidateOptions{
 		RepoRoot:        root,
 		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    "cccccccccccccccccccccccccccccccccccccccc",
+		SourceCommit:    manifest.PFSourceCommit,
+		ReleaseMode:     true,
 	}
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify before sign: %v status=%s", err, result.Status)
 	}
-	signed, err := pcs.SignVerificationResult(root, bundle, result)
+	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{ReleaseMode: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +241,7 @@ func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
 	pcsCore := filepath.Join(filepath.Dir(root), "pcs-core")
 	env := append(os.Environ(),
-		"PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc",
+		"PF_RELEASE_MODE=1",
 		"PCS_CORE_PATH="+pcsCore,
 	)
 	var cmd *exec.Cmd

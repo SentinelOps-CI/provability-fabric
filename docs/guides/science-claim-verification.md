@@ -123,7 +123,7 @@ make freeze-pcs-labtrust-signed   # rewrite PF signed fixture (deterministic whe
 just pcs-schema-diff
 ```
 
-LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): certified bundle from `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` (`scb-pcs-qc-release-v0.1`), plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release` (requires LabTrust-Gym beside this repo). Freeze scripts set `PF_SOURCE_COMMIT`, `PF_DETERMINISTIC`, and `PCS_DETERMINISTIC` so verification/signed IDs and digests are reproducible in CI.
+LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): certified bundle from `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` (`scb-pcs-qc-release-v0.1`), plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release` (requires LabTrust-Gym beside this repo). Freeze scripts set `PF_SOURCE_COMMIT` to `git rev-parse HEAD`, enable `--release-mode`, and reject placeholder commits (`cccc…`, `aaaa…`, etc.) on PF outputs.
 
 ```bash
 pf validate verification-result tests/pcs/fixtures/labtrust-release/verification_result.json

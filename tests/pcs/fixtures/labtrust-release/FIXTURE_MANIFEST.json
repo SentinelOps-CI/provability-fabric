@@ -3,6 +3,7 @@
   "bundle_id": "scb-pcs-qc-release-v0.1",
   "claim_id": "claim-pcs-qc-release-v0.1",
   "certified_source": "LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json",
+  "pf_source_commit": "993a0e5d1214b7c1bd6e84475d771806950965dd",
   "pf_outputs": [
     "verification_result.json",
     "signed_science_claim_bundle.json"
@@ -16,10 +17,5 @@
     "invalid_rejected_certificate.json",
     "invalid_stale_artifact.json"
   ],
-  "regenerate": "make freeze-pcs-labtrust-release",
-  "deterministic_env": {
-    "PF_SOURCE_COMMIT": "cccccccccccccccccccccccccccccccccccccccc",
-    "PF_DETERMINISTIC": "1",
-    "PCS_DETERMINISTIC": "1"
-  }
+  "regenerate": "make freeze-pcs-labtrust-release"
 }

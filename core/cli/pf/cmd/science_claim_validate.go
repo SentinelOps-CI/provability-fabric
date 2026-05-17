@@ -38,7 +38,7 @@ func validateScienceClaimBundleCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts, err := resolvePCSOpts(resolved, false)
+			opts, err := resolvePCSOpts(resolved, false, false)
 			if err != nil {
 				return err
 			}
@@ -69,7 +69,7 @@ func validateVerificationResultCmd() *cobra.Command {
 			if err := json.Unmarshal(data, &result); err != nil {
 				return fmt.Errorf("parse: %w", err)
 			}
-			opts, err := resolvePCSOpts(resolved, false)
+			opts, err := resolvePCSOpts(resolved, false, false)
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func validateSignedScienceClaimCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts, err := resolvePCSOpts(resolved, false)
+			opts, err := resolvePCSOpts(resolved, false, false)
 			if err != nil {
 				return err
 			}

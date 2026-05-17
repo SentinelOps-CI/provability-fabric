@@ -1,53 +1,50 @@
-# Freeze LabTrust + CertifyEdge release fixtures (Windows / when bash has no go on PATH).
+# Freeze LabTrust + CertifyEdge release fixtures (Windows).
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Parent = Split-Path -Parent $Root
 $Release = Join-Path $Root "tests\pcs\fixtures\labtrust-release"
+$PcsCore = if ($env:PCS_CORE_PATH) { $env:PCS_CORE_PATH } else { Join-Path $Parent "pcs-core" }
 $Labtrust = if ($env:LABTRUST_GYM_ROOT) { $env:LABTRUST_GYM_ROOT } else { Join-Path $Parent "LabTrust-Gym" }
 $CertifiedSrc = Join-Path $Labtrust "examples\pcs_qc_release\release\science_claim_bundle.certified.json"
 $Certified = Join-Path $Release "science_claim_bundle.certified.json"
 $VR = Join-Path $Release "verification_result.json"
 $Signed = Join-Path $Release "signed_science_claim_bundle.json"
+$Manifest = Join-Path $Release "FIXTURE_MANIFEST.json"
 
-if (-not (Test-Path $CertifiedSrc)) {
-    throw "LabTrust release certified bundle not found: $CertifiedSrc"
+$Forbidden = @(
+    "0000000000000000000000000000000000000000",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccccccccccc",
+    "dddddddddddddddddddddddddddddddddddddddd",
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+)
+
+Push-Location $Root
+try { $env:PF_SOURCE_COMMIT = (git rev-parse HEAD).Trim() } finally { Pop-Location }
+if ($Forbidden -contains $env:PF_SOURCE_COMMIT) {
+    throw "PF_SOURCE_COMMIT is a forbidden placeholder: $($env:PF_SOURCE_COMMIT)"
 }
+$env:PF_RELEASE_MODE = "1"
+$env:PF_DETERMINISTIC = if ($env:PF_DETERMINISTIC) { $env:PF_DETERMINISTIC } else { "1" }
 
-New-Item -ItemType Directory -Force -Path $Release | Out-Null
 Copy-Item -Force $CertifiedSrc $Certified
-Write-Host "Copied certified bundle from LabTrust-Gym release"
-
-$py = Get-Command python -ErrorAction SilentlyContinue
-if (-not $py) { $py = Get-Command python3 -ErrorAction SilentlyContinue }
-if (-not $py) { throw "python required for invalid fixture generation" }
-& $py.Source (Join-Path $Root "scripts\pcs-freeze-labtrust-release-invalid.py") $Release
+python (Join-Path $Root "scripts\pcs-freeze-labtrust-release-invalid.py") $Release
 
 $PfRoot = Join-Path $Root "core\cli\pf"
-$PfExe = Join-Path $PfRoot "pf.exe"
-if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
-    throw "go required to build pf.exe for fixture freeze"
-}
-Push-Location $PfRoot
-try { go build -o pf.exe . | Out-Null } finally { Pop-Location }
-$Pf = $PfExe
+Push-Location $PfRoot; go build -o pf.exe .; Pop-Location
+$Pf = Join-Path $PfRoot "pf.exe"
 
-if (-not $env:PF_SOURCE_COMMIT) { $env:PF_SOURCE_COMMIT = "cccccccccccccccccccccccccccccccccccccccc" }
-$env:PF_DETERMINISTIC = if ($env:PF_DETERMINISTIC) { $env:PF_DETERMINISTIC } else { "1" }
-$env:PCS_DETERMINISTIC = if ($env:PCS_DETERMINISTIC) { $env:PCS_DETERMINISTIC } else { "1" }
-
-& $Pf verify science-claim $Certified --out $VR
-& $Pf sign science-claim $Certified --out $Signed
+& $Pf verify science-claim $Certified --release-mode --out $VR
+& $Pf sign science-claim $Certified --release-mode --out $Signed
 & $Pf inspect science-claim $Signed --strict
 & $Pf validate verification-result $VR
 & $Pf validate signed-science-claim $Signed
 
-$PcsCore = if ($env:PCS_CORE_PATH) { $env:PCS_CORE_PATH } else { Join-Path $Parent "pcs-core" }
-$PcsPy = Join-Path ([System.IO.Path]::GetFullPath($PcsCore)) "python"
-if (Test-Path $PcsPy) {
-    $env:PYTHONPATH = "$(Join-Path $PcsPy 'pcs_core');$PcsPy"
-    python -m pcs_core.cli validate $Certified
-    python -m pcs_core.cli validate $VR
-    python -m pcs_core.cli validate $Signed
-}
+python -c "import json,pathlib;p=pathlib.Path(r'$Manifest');m=json.loads(p.read_text(encoding='utf-8')) if p.exists() else {};m['pf_source_commit']='$($env:PF_SOURCE_COMMIT)';m['regenerate']='make freeze-pcs-labtrust-release';m.pop('deterministic_env',None);p.write_text(json.dumps(m,indent=2)+'\n',encoding='utf-8')"
 
-Write-Host "OK: labtrust-release fixtures frozen under $Release"
+$PcsCoreRelease = Join-Path $PcsCore "examples\labtrust-release"
+if (Test-Path $PcsCoreRelease) {
+    python (Join-Path $Root "scripts\pcs-sync-pcs-core-release.py") $Release $PcsCoreRelease $env:PF_SOURCE_COMMIT
+}
+Write-Host "OK: labtrust-release fixtures frozen (pf_source_commit=$($env:PF_SOURCE_COMMIT))"

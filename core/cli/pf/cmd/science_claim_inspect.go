@@ -41,7 +41,7 @@ alignment. Use --reverify to run the full 15-check PF verifier on the embedded s
 			if err != nil {
 				return err
 			}
-			opts, err := resolvePCSOpts(args[0], false)
+			opts, err := resolvePCSOpts(args[0], false, false)
 			if err != nil {
 				return err
 			}

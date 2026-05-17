@@ -96,7 +96,8 @@ jobs:
         run: |
           export PCS_CORE_PATH="$GITHUB_WORKSPACE/../pcs-core"
           pip install -q -e "$PCS_CORE_PATH/python"
-          export PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc
+          export PF_SOURCE_COMMIT="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          export PF_RELEASE_MODE=1
           export PF_DETERMINISTIC=1
           export PCS_DETERMINISTIC=1
           bash "$GITHUB_WORKSPACE/scripts/pcs-pf-clean-chain.sh" "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"

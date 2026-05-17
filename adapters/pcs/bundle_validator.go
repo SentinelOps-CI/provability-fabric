@@ -15,6 +15,7 @@ type ValidateOptions struct {
 	VerifierVersion    string
 	SourceCommit       string
 	LocalDev           bool
+	ReleaseMode        bool
 	SkipSchemaValidate bool
 }
 
@@ -65,7 +66,7 @@ func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptio
 		checkNotStale(bundle),
 		checkSourceProvenance(bundle),
 		checkSignaturesPresent(bundle),
-		checkSourceCommitNotPlaceholder(bundle, opts.LocalDev),
+		checkSourceCommitNotPlaceholder(bundle, opts.LocalDev, opts.ReleaseMode),
 	}
 	return NormalizeChecks(checks)
 }
@@ -241,7 +242,7 @@ func checkSignaturesPresent(bundle *ScienceClaimBundle) VerificationCheck {
 	return passCheck(id, "signature_or_digest is present", map[string]any{})
 }
 
-func checkSourceCommitNotPlaceholder(bundle *ScienceClaimBundle, localDev bool) VerificationCheck {
+func checkSourceCommitNotPlaceholder(bundle *ScienceClaimBundle, localDev, releaseMode bool) VerificationCheck {
 	const id = "source_commit_not_placeholder"
 	if localDev {
 		return passCheck(id, "source_commit is not the 40-zero placeholder (release mode)",
@@ -249,6 +250,12 @@ func checkSourceCommitNotPlaceholder(bundle *ScienceClaimBundle, localDev bool) 
 	}
 	var offenders []string
 	check := func(name, commit string) {
+		if releaseMode {
+			if IsForbiddenPlaceholderCommit(commit) {
+				offenders = append(offenders, name)
+			}
+			return
+		}
 		if strings.TrimSpace(commit) == ZeroSourceCommitPlaceholder {
 			offenders = append(offenders, name)
 		}

@@ -16,6 +16,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	var outPath string
 	var jsonOut bool
 	var localDev bool
+	var releaseMode bool
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -39,7 +40,7 @@ func scienceClaimSignCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts, err := resolvePCSOpts(resolved, localDev)
+			opts, err := resolvePCSOpts(resolved, localDev, releaseMode)
 			if err != nil {
 				return err
 			}
@@ -51,8 +52,14 @@ func scienceClaimSignCmd() *cobra.Command {
 				printVerificationFailures(result)
 				return cliExit(ExitVerificationFailed, fmt.Errorf("signing refused: verification status is %s", result.Status))
 			}
+			if err := pcs.ValidatePFProvenanceCommit(result.SourceCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
+				return err
+			}
 
-			signed, err := pcs.SignVerificationResult(opts.RepoRoot, bundle, result)
+			signed, err := pcs.SignVerificationResultWithOptions(opts.RepoRoot, bundle, result, pcs.SignOptions{
+				ReleaseMode: opts.ReleaseMode,
+				LocalDev:    opts.LocalDev,
+			})
 			if err != nil {
 				return err
 			}
@@ -82,6 +89,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	cmd.Flags().StringVar(&outPath, "out", "", "Output path for signed_science_claim_bundle.json")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Also print signed wrapper JSON to stdout")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
+	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }

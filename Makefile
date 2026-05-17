@@ -95,7 +95,7 @@ freeze-pcs-labtrust-release:
 
 pcs-v01-pf-chain:
 	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
-	@PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
+	@PF_RELEASE_MODE=1 PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
 
 pcs-v01-clean-chain:
 	@$(ECHOOK) "PCS v0.1 full clean-checkout chain..."

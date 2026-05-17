@@ -23,7 +23,7 @@ freeze-pcs-labtrust-release:
 
 pcs-v01-pf-chain:
     # bash when go is on PATH (CI/Linux); PowerShell fallback on Windows Git Bash without go
-    PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc bash "{{root}}/scripts/pcs-pf-clean-chain.sh" "{{root}}/tests/pcs/fixtures/labtrust-release" || powershell -NoProfile -ExecutionPolicy Bypass -File "{{root}}/scripts/pcs-pf-clean-chain.ps1" "{{root}}/tests/pcs/fixtures/labtrust-release"
+    PF_RELEASE_MODE=1 bash "{{root}}/scripts/pcs-pf-clean-chain.sh" "{{root}}/tests/pcs/fixtures/labtrust-release" || powershell -NoProfile -ExecutionPolicy Bypass -File "{{root}}/scripts/pcs-pf-clean-chain.ps1" "{{root}}/tests/pcs/fixtures/labtrust-release"
 
 pcs-v01-clean-chain:
     bash "{{root}}/scripts/run-pcs-v01-clean-chain.sh"

@@ -19,8 +19,26 @@ type IntegrityOptions struct {
 
 // SignVerificationResult builds SignedScienceClaimBundle.v0 for Scientific Memory import.
 func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result VerificationResult) (*SignedScienceClaimBundle, error) {
+	return SignVerificationResultWithOptions(repoRoot, bundle, result, SignOptions{})
+}
+
+// SignOptions configures signing provenance enforcement.
+type SignOptions struct {
+	ReleaseMode bool
+	LocalDev    bool
+}
+
+// SignVerificationResultWithOptions builds a signed wrapper with optional release-mode checks.
+func SignVerificationResultWithOptions(repoRoot string, bundle *ScienceClaimBundle, result VerificationResult, opts SignOptions) (*SignedScienceClaimBundle, error) {
 	if !VerificationPassed(result) {
 		return nil, fmt.Errorf("signing refused: verification status is %s", result.Status)
+	}
+	wrapperCommit := strings.TrimSpace(result.SourceCommit)
+	if wrapperCommit == "" {
+		wrapperCommit = ResolveSourceCommit()
+	}
+	if err := ValidatePFProvenanceCommit(wrapperCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
+		return nil, err
 	}
 	signedAt := time.Now().UTC().Format(time.RFC3339)
 	if DeterministicMode() {
@@ -34,7 +52,7 @@ func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result 
 		Signer:             VerifierName,
 		SignedAt:           signedAt,
 		SourceRepo:         VerifierSourceRepo,
-		SourceCommit:       ResolveSourceCommit(),
+		SourceCommit:       wrapperCommit,
 	}
 	signed.SignatureOrDigest = digestSignedBundle(signed)
 	if err := VerifySignedBundleIntegrity(signed, IntegrityOptions{VerifyPFDigests: true}); err != nil {

@@ -15,17 +15,14 @@ import (
 // uuidNew is isolated for tests that stub randomness later.
 var uuidNew = uuid.NewString
 
-const fixtureSourceCommit = "cccccccccccccccccccccccccccccccccccccccc"
-
-// DeterministicMode is true when fixture freeze / CI should emit stable IDs and timestamps.
+// DeterministicMode is true when fixture freeze should emit stable IDs and timestamps.
+// Does not depend on placeholder PF_SOURCE_COMMIT (release fixtures use real git SHAs).
 func DeterministicMode() bool {
 	if v := strings.TrimSpace(os.Getenv("PF_DETERMINISTIC")); v == "1" || strings.EqualFold(v, "true") {
 		return true
 	}
-	if v := strings.TrimSpace(os.Getenv("PCS_DETERMINISTIC")); v == "1" || strings.EqualFold(v, "true") {
-		return true
-	}
-	return strings.TrimSpace(os.Getenv("PF_SOURCE_COMMIT")) == fixtureSourceCommit
+	v := strings.TrimSpace(os.Getenv("PCS_DETERMINISTIC"))
+	return v == "1" || strings.EqualFold(v, "true")
 }
 
 func deterministicUUID(namespace, seed string) string {
