@@ -1,0 +1,80 @@
+{
+  "schema_version": "ScienceClaimBundle.v0",
+  "bundle_id": "science-claim-bundle-rejected-certificate",
+  "created_at": "2026-05-16T12:05:00Z",
+  "producer": "LabTrust-Gym",
+  "producer_version": "0.1.0",
+  "source_repo": "https://github.com/fraware/LabTrust-Gym",
+  "source_commit": "labtrust-demo-001",
+  "status": "RuntimeObserved",
+  "signature_or_digest": "sha256:labtrust-bundle-digest-invalid",
+  "claim_artifact": {
+    "schema_version": "ClaimArtifact.v0",
+    "artifact_id": "claim-qc-release-001",
+    "claim_id": "claim-qc-release-001",
+    "assumption_set_ref": "assumption-set-qc-release-001",
+    "created_at": "2026-05-16T12:00:00Z",
+    "producer": "LabTrust-Gym",
+    "producer_version": "0.1.0",
+    "source_repo": "https://github.com/fraware/LabTrust-Gym",
+    "source_commit": "labtrust-demo-001",
+    "status": "RuntimeObserved",
+    "signature_or_digest": "sha256:claim-artifact-digest-001"
+  },
+  "assumption_set": {
+    "schema_version": "AssumptionSet.v0",
+    "artifact_id": "assumption-set-qc-release-001",
+    "assumption_set_id": "assumption-set-qc-release-001",
+    "created_at": "2026-05-16T12:00:00Z",
+    "producer": "LabTrust-Gym",
+    "producer_version": "0.1.0",
+    "source_repo": "https://github.com/fraware/LabTrust-Gym",
+    "source_commit": "labtrust-demo-001",
+    "status": "HumanReviewed",
+    "signature_or_digest": "sha256:assumption-set-digest-001"
+  },
+  "runtime_receipt": {
+    "schema_version": "RuntimeReceipt.v0",
+    "artifact_id": "runtime-receipt-qc-release-001",
+    "receipt_id": "runtime-receipt-qc-release-001",
+    "trace_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "created_at": "2026-05-16T12:01:00Z",
+    "producer": "LabTrust-Gym",
+    "producer_version": "0.1.0",
+    "source_repo": "https://github.com/fraware/LabTrust-Gym",
+    "source_commit": "labtrust-demo-001",
+    "status": "RuntimeObserved",
+    "signature_or_digest": "sha256:runtime-receipt-digest-001"
+  },
+  "trace_certificate": {
+    "schema_version": "TraceCertificate.v0",
+    "artifact_id": "trace-cert-qc-release-001",
+    "certificate_id": "trace-cert-qc-release-001",
+    "trace_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "created_at": "2026-05-16T12:02:00Z",
+    "producer": "CertifyEdge",
+    "producer_version": "0.1.0",
+    "source_repo": "https://github.com/fraware/CertifyEdge",
+    "source_commit": "certifyedge-demo-001",
+    "status": "Rejected",
+    "signature_or_digest": "sha256:trace-certificate-digest-001"
+  },
+  "evidence_bundle": {
+    "schema_version": "EvidenceBundle.v0",
+    "artifact_id": "evidence-bundle-qc-release-001",
+    "evidence_bundle_id": "evidence-bundle-qc-release-001",
+    "artifact_refs": [
+      "claim-qc-release-001",
+      "assumption-set-qc-release-001",
+      "runtime-receipt-qc-release-001",
+      "trace-cert-qc-release-001"
+    ],
+    "created_at": "2026-05-16T12:03:00Z",
+    "producer": "LabTrust-Gym",
+    "producer_version": "0.1.0",
+    "source_repo": "https://github.com/fraware/LabTrust-Gym",
+    "source_commit": "labtrust-demo-001",
+    "status": "RuntimeObserved",
+    "signature_or_digest": "sha256:evidence-bundle-digest-001"
+  }
+}

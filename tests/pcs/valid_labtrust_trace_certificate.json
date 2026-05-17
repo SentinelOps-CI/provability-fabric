@@ -1,0 +1,13 @@
+{
+  "schema_version": "TraceCertificate.v0",
+  "artifact_id": "trace-cert-qc-release-001",
+  "certificate_id": "trace-cert-qc-release-001",
+  "created_at": "2026-05-16T12:00:00Z",
+  "producer": "CertifyEdge",
+  "producer_version": "0.1.0",
+  "source_repo": "https://github.com/fraware/CertifyEdge",
+  "source_commit": "certifyedge-demo-001",
+  "status": "CertificateChecked",
+  "signature_or_digest": "sha256:certifyedge-trace-cert-digest-001",
+  "trace_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

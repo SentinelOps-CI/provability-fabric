@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/SignedScienceClaimBundle.v0.schema.json",
+  "title": "SignedScienceClaimBundle.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "signed_bundle_id",
+    "science_claim_bundle",
+    "verification_result",
+    "signer",
+    "signed_at",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "v0" },
+    "signed_bundle_id": { "type": "string", "pattern": "^signed-" },
+    "science_claim_bundle": { "type": "object" },
+    "verification_result": { "type": "object" },
+    "signer": { "const": "Provability Fabric" },
+    "signed_at": { "type": "string" },
+    "source_repo": { "type": "string" },
+    "source_commit": { "type": "string" },
+    "signature_or_digest": { "type": "string", "pattern": "^sha256:" }
+  }
+}

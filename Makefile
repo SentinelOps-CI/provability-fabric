@@ -31,6 +31,9 @@ endif
 # Docker Compose wrapper
 DC := docker compose
 
+# PCS CLI from repo root (Go 1.20+ -C); or use ./pf / pf.cmd
+PF ?= go -C core/cli/pf run .
+
 # ---------- Default target ----------
 help:
 	@$(ECHOOK) "SentinelOps Platform - Available Commands:"
@@ -71,6 +74,21 @@ dev:
 build:
 	@$(ECHOOK) "🔨 Building all platform services..."
 	$(DC) build
+
+test-pcs:
+	@$(ECHOOK) "Running PCS science-claim tests..."
+	cd adapters/pcs && go test ./... -count=1
+	cd core/cli/pf && go test ./cmd/... -count=1
+
+validate-pcs-fixtures:
+	@$(ECHOOK) "Validating PCS fixtures..."
+	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
+
+demo-pcs:
+	@$(ECHOOK) "PCS verify / sign / inspect demo (run from repo root)..."
+	$(PF) verify science-claim tests/pcs/valid_labtrust_bundle.json
+	$(PF) sign science-claim tests/pcs/valid_labtrust_bundle.json --out tests/pcs/signed_science_claim_bundle.demo.json
+	$(PF) inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json
 
 test:
 	@$(ECHOOK) "🧪 Running platform tests..."
