@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 
 func scienceClaimSignCmd() *cobra.Command {
 	var outPath string
+	var handoffPath string
 	var jsonOut bool
 	var localDev bool
 	var releaseMode bool
@@ -56,11 +58,19 @@ func scienceClaimSignCmd() *cobra.Command {
 				return err
 			}
 
-			signed, err := pcs.SignVerificationResultWithOptions(opts.RepoRoot, bundle, result, pcs.SignOptions{
+			signOpts := pcs.SignOptions{
 				ReleaseMode: opts.ReleaseMode,
 				LocalDev:    opts.LocalDev,
 				BundlePath:  resolved,
-			})
+			}
+			if strings.TrimSpace(handoffPath) != "" {
+				handoff, err := pcs.LoadPFHandoff(handoffPath)
+				if err != nil {
+					return err
+				}
+				signOpts.Handoff = handoff
+			}
+			signed, err := pcs.SignVerificationResultWithOptions(opts.RepoRoot, bundle, result, signOpts)
 			if err != nil {
 				return err
 			}
@@ -88,6 +98,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&outPath, "out", "", "Output path for signed_science_claim_bundle.json")
+	cmd.Flags().StringVar(&handoffPath, "handoff", "", "LabTrust pf_handoff.json; bundle hash, certificate_id, and trace_hash must match before signing")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Also print signed wrapper JSON to stdout")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")

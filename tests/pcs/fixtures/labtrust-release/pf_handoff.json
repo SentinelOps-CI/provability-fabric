@@ -1,0 +1,7 @@
+{
+  "certificate_id": "cert-trace-cde5c89f-556c-4b12-8fc5-358418285d18",
+  "certified_bundle": "science_claim_bundle.certified.json",
+  "certified_bundle_hash": "sha256:c4efaa05cd8ace27ca9eae3bb4d167f08dda62f269379bc6c8b1eb7f8767302b",
+  "schema_version": "v0",
+  "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
+}
