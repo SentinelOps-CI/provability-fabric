@@ -69,15 +69,23 @@ alignment. Use --reverify to run the full 15-check PF verifier on the embedded s
 				enc := json.NewEncoder(os.Stdout)
 				enc.SetIndent("", "  ")
 				if fresh != nil {
-					return enc.Encode(map[string]any{
+					if err := enc.Encode(map[string]any{
 						"embedded":   signed.VerificationResult,
 						"reverified": fresh,
-					})
+					}); err != nil {
+						return err
+					}
+				} else if err := enc.Encode(signed.VerificationResult); err != nil {
+					return err
 				}
-				return enc.Encode(signed.VerificationResult)
+			} else {
+				fmt.Print(pcs.FormatInspectSummaryWithReverify(signed, fresh))
 			}
 
-			fmt.Print(pcs.FormatInspectSummaryWithReverify(signed, fresh))
+			if fresh != nil && !pcs.VerificationPassed(*fresh) {
+				printVerificationFailures(*fresh)
+				return cliExit(ExitVerificationFailed, fmt.Errorf("reverification failed: status %s", fresh.Status))
+			}
 			return nil
 		},
 	}

@@ -52,10 +52,10 @@ func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptio
 
 	checks := []VerificationCheck{
 		checkBundleSchema(bundlePath, bundle, opts),
-		presenceCheck("claim_artifact_present", "ClaimArtifact.v0 exists", "claim_artifact", bundle.ClaimArtifact != nil),
-		presenceCheck("assumption_set_present", "AssumptionSet.v0 exists", "assumption_set", bundle.AssumptionSet != nil),
-		presenceCheck("runtime_receipt_present", "RuntimeReceipt.v0 exists in runtime_receipts", "runtime_receipts", receipt != nil),
-		presenceCheck("trace_certificate_present", "At least one TraceCertificate.v0 exists in certificates", "certificates", len(certs) > 0),
+		presenceCheck("claim_artifact_present", "ClaimArtifact exists", "claim_artifact", bundle.ClaimArtifact != nil),
+		presenceCheck("assumption_set_present", "AssumptionSet exists", "assumption_set", bundle.AssumptionSet != nil),
+		checkRuntimeReceiptPresent(bundle),
+		checkTraceCertificatesPresent(bundle),
 		presenceCheck("evidence_bundle_present", "EvidenceBundle.v0 exists", "evidence_bundle", bundle.EvidenceBundle != nil),
 		CheckAssumptionSetRefMatch(bundle.ClaimArtifact, bundle.AssumptionSet),
 		CheckRuntimeTraceHashPresent(receipt),
@@ -73,7 +73,7 @@ func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptio
 func checkBundleSchema(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) VerificationCheck {
 	const id = "science_claim_bundle_schema"
 	if opts.SkipSchemaValidate {
-		return skipCheck(id, "ScienceClaimBundle.v0 schema is valid", detailMsg("schema validation skipped"))
+		return skipCheck(id, "Science claim bundle matches pcs-core JSON Schema (v0)", detailMsg("schema validation skipped"))
 	}
 	repoRoot := opts.RepoRoot
 	if repoRoot == "" {
@@ -86,13 +86,13 @@ func checkBundleSchema(bundlePath string, bundle *ScienceClaimBundle, opts Valid
 		schemaErr = ValidateScienceClaimBundleValue(repoRoot, bundle)
 	}
 	if schemaErr != nil {
-		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", ReasonSchemaInvalid, detailMsg(schemaErr.Error()))
+		return failCheck(id, "Science claim bundle matches pcs-core JSON Schema (v0)", ReasonSchemaInvalid, detailMsg(schemaErr.Error()))
 	}
 	if bundle != nil && bundle.SchemaVersion != "" && bundle.SchemaVersion != SchemaVersionV0 {
-		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", ReasonSchemaInvalid,
+		return failCheck(id, "Science claim bundle matches pcs-core JSON Schema (v0)", ReasonSchemaInvalid,
 			map[string]any{"schema_version": bundle.SchemaVersion, "expected": SchemaVersionV0})
 	}
-	return passCheck(id, "ScienceClaimBundle.v0 schema is valid",
+	return passCheck(id, "Science claim bundle matches pcs-core JSON Schema (v0)",
 		map[string]any{"schema": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"})
 }
 

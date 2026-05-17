@@ -64,17 +64,14 @@ func main() {
 		if e.Name() == "signed_science_claim_bundle.demo.json" {
 			continue
 		}
-		if strings.HasPrefix(e.Name(), "invalid_legacy") {
-			path := filepath.Join(dir, e.Name())
-			data, _ := os.ReadFile(path)
-			if keys, err := pcs.DetectLegacyBundleKeys(data); err == nil && len(keys) > 0 {
-				results = append(results, result{File: e.Name(), Status: "failed"})
-				continue
-			}
-		}
 		path := filepath.Join(dir, e.Name())
+		expectFail := strings.HasPrefix(e.Name(), "invalid_")
 		bundle, err := pcs.LoadScienceClaimBundle(path)
 		if err != nil {
+			if expectFail {
+				results = append(results, result{File: e.Name(), Status: "LoadRejected"})
+				continue
+			}
 			results = append(results, result{File: e.Name(), Status: "load_error", Error: err.Error()})
 			failed++
 			continue
@@ -92,7 +89,6 @@ func main() {
 			continue
 		}
 
-		expectFail := strings.HasPrefix(e.Name(), "invalid_")
 		if expectFail && pcs.VerificationPassed(vr) {
 			results = append(results, result{File: e.Name(), Status: "unexpected_pass"})
 			failed++
@@ -121,5 +117,16 @@ func main() {
 
 	if failed > 0 {
 		os.Exit(1)
+	}
+	if !*jsonOut {
+		var negative, positive int
+		for _, r := range results {
+			if strings.HasPrefix(r.File, "invalid_") {
+				negative++
+			} else {
+				positive++
+			}
+		}
+		fmt.Printf("OK: %d negative fixtures rejected, %d positive fixture passed\n", negative, positive)
 	}
 }

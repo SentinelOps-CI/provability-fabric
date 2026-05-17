@@ -61,9 +61,92 @@ func TestSignFailedBundleRefusesCLI(t *testing.T) {
 	}
 }
 
+func TestVerifyLegacySingularRuntimeReceiptFailsCLI(t *testing.T) {
+	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_legacy_singular_runtime_receipt.json")
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle)
+	cmd.Dir = pfDir(t)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected legacy verify to fail: %s", out)
+	}
+	if !strings.Contains(string(out), "legacy pcs bundle format") {
+		t.Fatalf("expected legacy error, got: %s", out)
+	}
+}
+
+func TestMigrateLegacyBundleCLI(t *testing.T) {
+	legacy := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_legacy_singular_runtime_receipt.json")
+	out := filepath.Join(t.TempDir(), "migrated.json")
+	cmd := exec.Command("go", "run", ".", "migrate", "science-claim", legacy, "--out", out)
+	cmd.Dir = pfDir(t)
+	if outBytes, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("migrate failed: %v\n%s", err, outBytes)
+	}
+	verify := exec.Command("go", "run", ".", "verify", "science-claim", out, "--json")
+	verify.Dir = pfDir(t)
+	verifyOut, err := verify.CombinedOutput()
+	if err != nil {
+		t.Fatalf("verify migrated bundle failed: %v\n%s", err, verifyOut)
+	}
+	if !strings.Contains(string(verifyOut), `"status": "ProofChecked"`) {
+		t.Fatalf("expected ProofChecked after migration: %s", verifyOut)
+	}
+}
+
+func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
+	root := repoRoot(t)
+	bundle := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust", "science_claim_bundle.certified.json")
+	signed := filepath.Join(t.TempDir(), "signed_corrupt.json")
+
+	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)
+	sign.Dir = pfDir(t)
+	if out, err := sign.CombinedOutput(); err != nil {
+		t.Fatalf("sign failed: %v\n%s", err, out)
+	}
+
+	raw, err := os.ReadFile(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupt := strings.Replace(string(raw),
+		"sha256:5555555555555555555555555555555555555555555555555555555555555555",
+		"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		1)
+	if err := os.WriteFile(signed, []byte(corrupt), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	inspect := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")
+	inspect.Dir = pfDir(t)
+	out, err := inspect.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected inspect --reverify to fail on corrupted bundle: %s", out)
+	}
+	if !strings.Contains(string(out), "reverification failed") {
+		t.Fatalf("expected reverification failed message: %s", out)
+	}
+}
+
+func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
+	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.json")
+	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")
+	cmd.Dir = pfDir(t)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("inspect failed: %v\n%s", err, out)
+	}
+	body := string(out)
+	if !strings.Contains(body, "PF re-verification (15):") {
+		t.Fatalf("expected 15 PF re-verification checks:\n%s", body)
+	}
+	if !strings.Contains(body, "pf_status:            ProofChecked") {
+		t.Fatalf("expected ProofChecked pf_status:\n%s", body)
+	}
+}
+
 func TestInspectPrintsCheckSummaryCLI(t *testing.T) {
 	root := repoRoot(t)
-	bundle := filepath.Join(root, "tests", "pcs", "valid_labtrust_bundle.json")
+	bundle := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust", "science_claim_bundle.certified.json")
 	signed := filepath.Join(t.TempDir(), "signed_science_claim_bundle.json")
 
 	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)

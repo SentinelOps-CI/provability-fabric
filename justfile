@@ -12,5 +12,8 @@ test-pcs:
 pcs-schema-diff:
     bash "{{root}}/scripts/pcs-schema-diff.sh" "{{pcs_core}}"
 
+pcs-schema-sync:
+    bash "{{root}}/scripts/pcs-schema-sync.sh" "{{pcs_core}}"
+
 demo-pcs:
     make demo-pcs

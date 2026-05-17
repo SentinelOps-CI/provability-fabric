@@ -219,11 +219,14 @@ func TestVerifyLegacySingularRuntimeReceiptFails(t *testing.T) {
 }
 
 func TestVerifySchemaVersionArtifactNameFails(t *testing.T) {
-	result := verifyFixture(t, "invalid_schema_version_artifact_name.json", false)
-	if pcs.VerificationPassed(result) {
-		t.Fatalf("expected Rejected, got %s", result.Status)
+	_, err := pcs.LoadScienceClaimBundle(fixturePath(t, "invalid_schema_version_artifact_name.json"))
+	if err == nil {
+		t.Fatal("expected legacy schema_version to fail at load")
 	}
-	assertAnyFailedCheck(t, result, "science_claim_bundle_schema")
+	var legacy *pcs.LegacyBundleError
+	if !errors.As(err, &legacy) {
+		t.Fatalf("expected LegacyBundleError, got %v", err)
+	}
 }
 
 func TestVerifyRuntimeReceiptsArrayRequired(t *testing.T) {
@@ -243,6 +246,15 @@ func TestVerifyCertificatesArrayRequiredForCertifiedBundle(t *testing.T) {
 		t.Fatalf("expected Rejected, got %s", result.Status)
 	}
 	assertFailedCheck(t, result, "trace_certificate_present")
+}
+
+func TestVerifyRuntimeReceiptCountExactlyOneFails(t *testing.T) {
+	result := verifyFixture(t, "invalid_multiple_runtime_receipts.json", false)
+	if pcs.VerificationPassed(result) {
+		t.Fatalf("expected Rejected, got %s", result.Status)
+	}
+	assertFailedCheck(t, result, "runtime_receipt_present")
+	assertCheckReasonCode(t, result, "runtime_receipt_present", pcs.ReasonRuntimeReceiptCount)
 }
 
 func TestSignOutputsPCSCoreSignedBundle(t *testing.T) {
@@ -286,6 +298,28 @@ func TestInspectAcceptsPCSCoreSignedBundle(t *testing.T) {
 	if !strings.Contains(summary, "signed-scb-qc-release-v0.1") || !strings.Contains(summary, "ProofChecked") {
 		t.Fatalf("inspect summary missing labtrust signed bundle fields: %s", summary)
 	}
+}
+
+func TestReverifyCorruptedBundleRejected(t *testing.T) {
+	path := labtrustFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bundle.Certificates) == 0 {
+		t.Fatal("expected certificate")
+	}
+	bundle.Certificates[0].TraceHash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	root := repoRoot(t)
+	opts := pcs.ValidateOptions{RepoRoot: root, VerifierVersion: pcs.DefaultVerifierVersion, SourceCommit: "cccccccccccccccccccccccccccccccccccccccc"}
+	result, err := pcs.VerifyScienceClaimBundleValue(bundle, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pcs.VerificationPassed(result) {
+		t.Fatalf("expected Rejected after trace hash corruption, got %s", result.Status)
+	}
+	assertFailedCheck(t, result, "trace_hash_alignment")
 }
 
 func TestInspectReverifyRunsFifteenChecks(t *testing.T) {

@@ -17,6 +17,7 @@ Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts for 
 ./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out /tmp/signed.json
 ./pf inspect science-claim /tmp/signed.json --strict
 ./pf inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
+./pf migrate science-claim tests/pcs/invalid_legacy_singular_runtime_receipt.json --out /tmp/migrated.json
 ```
 
 Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
@@ -26,6 +27,7 @@ Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-
 | File | Role |
 |------|------|
 | `bundle_validator.go` | 15-check verification pipeline |
+| `array_checks.go` | v0.1 `runtime_receipts` / `certificates` cardinality |
 | `schema_validate.go` | JSON Schema validation (all pcs-core schemas) |
 | `signed_bundle.go` | Sign + inspect integrity (`IntegrityOptions`) |
 | `legacy.go` | Legacy detection + offline `MigrateLegacyBundle` |

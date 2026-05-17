@@ -43,6 +43,37 @@ func TestMigrateLegacyBundleConvertsSingularFields(t *testing.T) {
 	}
 }
 
+func TestMigrateArtifactNameSchemaVersion(t *testing.T) {
+	path := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_schema_version_artifact_name.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := pcs.MigrateLegacyBundle(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := pcs.LoadScienceClaimBundleFromBytes(out)
+	if err != nil {
+		t.Fatalf("load migrated: %v", err)
+	}
+	if bundle.SchemaVersion != pcs.SchemaVersionV0 {
+		t.Fatalf("schema_version want v0, got %s", bundle.SchemaVersion)
+	}
+}
+
+func TestLoadRejectsArtifactNameSchemaVersion(t *testing.T) {
+	path := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_schema_version_artifact_name.json")
+	_, err := pcs.LoadScienceClaimBundle(path)
+	if err == nil {
+		t.Fatal("expected load error for artifact-name schema_version")
+	}
+	var legacy *pcs.LegacyBundleError
+	if !errors.As(err, &legacy) {
+		t.Fatalf("expected LegacyBundleError, got %v", err)
+	}
+}
+
 func TestLoadRejectsLegacyWithoutMigration(t *testing.T) {
 	legacyPath := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_legacy_singular_runtime_receipt.json")
 	_, err := pcs.LoadScienceClaimBundle(legacyPath)

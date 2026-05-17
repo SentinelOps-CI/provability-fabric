@@ -9,6 +9,7 @@ import "github.com/spf13/cobra"
 func RegisterPCSCommands(root *cobra.Command) {
 	root.AddCommand(verifyRootCmd())
 	root.AddCommand(inspectRootCmd())
+	root.AddCommand(migrateRootCmd())
 }
 
 // RegisterScienceClaimSign adds pf sign science-claim to an existing sign command group.

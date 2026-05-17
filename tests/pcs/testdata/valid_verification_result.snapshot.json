@@ -8,7 +8,7 @@
   "checks": [
     {
       "check_id": "science_claim_bundle_schema",
-      "description": "ScienceClaimBundle.v0 schema is valid",
+      "description": "Science claim bundle matches pcs-core JSON Schema (v0)",
       "status": "passed",
       "details": {
         "schema": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"
@@ -16,7 +16,7 @@
     },
     {
       "check_id": "claim_artifact_present",
-      "description": "ClaimArtifact.v0 exists",
+      "description": "ClaimArtifact exists",
       "status": "passed",
       "details": {
         "artifact": "claim_artifact",
@@ -25,7 +25,7 @@
     },
     {
       "check_id": "assumption_set_present",
-      "description": "AssumptionSet.v0 exists",
+      "description": "AssumptionSet exists",
       "status": "passed",
       "details": {
         "artifact": "assumption_set",
@@ -34,19 +34,21 @@
     },
     {
       "check_id": "runtime_receipt_present",
-      "description": "RuntimeReceipt.v0 exists in runtime_receipts",
+      "description": "Exactly one RuntimeReceipt exists in runtime_receipts",
       "status": "passed",
       "details": {
         "artifact": "runtime_receipts",
+        "count": 1,
         "present": true
       }
     },
     {
       "check_id": "trace_certificate_present",
-      "description": "At least one TraceCertificate.v0 exists in certificates",
+      "description": "At least one TraceCertificate exists in certificates",
       "status": "passed",
       "details": {
         "artifact": "certificates",
+        "count": 1,
         "present": true
       }
     },

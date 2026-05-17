@@ -26,6 +26,7 @@ make demo-pcs
 ./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out tests/pcs/signed_science_claim_bundle.demo.json
 ./pf inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
 ./pf inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
+./pf migrate science-claim tests/pcs/invalid_legacy_singular_runtime_receipt.json --out /tmp/migrated.json
 
 # Or: go -C (PowerShell, cmd, Git Bash)
 go -C core/cli/pf run . verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
@@ -38,7 +39,7 @@ Paths like `tests/pcs/<file>.json` resolve to the repo-root `tests/pcs/` directo
 | Flag | Purpose |
 |------|---------|
 | `--strict` | Require PF-computed `verification_result` and wrapper digests (pf sign output) |
-| `--reverify` | Re-run the full 15-check PF verifier on the embedded `science_claim_bundle` |
+| `--reverify` | Re-run the full 15-check PF verifier on the embedded `science_claim_bundle` (exits non-zero if re-verification fails) |
 | `--json` | Emit `VerificationResult` JSON (with `--reverify`, emits embedded + reverified) |
 
 LabTrust-exported signed bundles load without `--strict` (external digest rules). Use `--reverify` to confirm PF checks on the embedded bundle.
@@ -52,8 +53,8 @@ Use `--local-dev` on verify/sign only for bundles with `local_dev: true` or the 
 | 1 | `science_claim_bundle_schema` | ScienceClaimBundle.v0 schema valid (pcs-core) |
 | 2 | `claim_artifact_present` | ClaimArtifact.v0 exists |
 | 3 | `assumption_set_present` | AssumptionSet.v0 exists |
-| 4 | `runtime_receipt_present` | RuntimeReceipt in `runtime_receipts` |
-| 5 | `trace_certificate_present` | TraceCertificate in `certificates` |
+| 4 | `runtime_receipt_present` | Exactly one RuntimeReceipt in `runtime_receipts` (v0.1) |
+| 5 | `trace_certificate_present` | At least one TraceCertificate in `certificates` |
 | 6 | `evidence_bundle_present` | EvidenceBundle.v0 exists |
 | 7 | `assumption_set_ref_match` | Claim refs match assumption set id |
 | 8 | `runtime_trace_hash_present` | `runtime_receipts[0].trace_hash` non-empty |
@@ -94,6 +95,10 @@ just pcs-schema-diff
 # or
 make validate-pcs-schema-diff PCS_CORE_PATH=../pcs-core
 bash scripts/pcs-schema-diff.sh /path/to/pcs-core
+
+# Refresh mirrors after pcs-core schema changes (updates config/ and adapters/pcs/schemas/)
+just pcs-schema-sync
+make sync-pcs-schemas PCS_CORE_PATH=../pcs-core
 ```
 
 ## Layout
@@ -105,6 +110,7 @@ core/cli/pf/cmd/               # pf verify|sign|inspect science-claim
 tests/pcs/fixtures/labtrust/   # LabTrust certified + signed reference fixtures
 tools/pcs-validate/            # fixture matrix validator
 scripts/pcs-schema-diff.sh
+scripts/pcs-schema-sync.sh
 ```
 
 ## Tests and CI
@@ -119,13 +125,18 @@ CI: `.github/workflows/pcs-ci.yml` (checks out pcs-core, runs schema diff, fixtu
 
 ## Legacy migration (offline only)
 
-`pf verify` rejects bundles with `runtime_receipt`, `trace_certificate`, or `schema_version: "ScienceClaimBundle.v0"`.
+`pf verify` rejects bundles with `runtime_receipt`, `trace_certificate`, artifact-name `schema_version` values (for example `ScienceClaimBundle.v0`), or other non-canonical top-level keys.
 
-For one-off migration tooling, use `pcs.MigrateLegacyBundle()` in Go (not invoked by the CLI).
+```bash
+./pf migrate science-claim tests/pcs/invalid_legacy_singular_runtime_receipt.json --out /tmp/migrated.json
+./pf verify science-claim /tmp/migrated.json
+```
+
+Go API: `pcs.MigrateLegacyBundle()` for programmatic migration.
 
 ## Rigorous guarantees
 
 - Schemas are embedded in `adapters/pcs` and drift-tested against `config/schemas/pcs/` and pcs-core.
-- Failed checks include `details.reason_code` (for example `PCS_LEGACY_BUNDLE_FORMAT`, `PCS_TRACE_HASH_MISMATCH`).
+- Failed checks include `details.reason_code` (for example `PCS_LEGACY_BUNDLE_FORMAT`, `PCS_RUNTIME_RECEIPT_COUNT`, `PCS_TRACE_HASH_MISMATCH`).
 - All certificates are verified for hash alignment and `CertificateChecked`.
 - `pf verify` exits `1` on failure and prints `check_id: reason_code` lines to stderr.

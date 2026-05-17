@@ -88,6 +88,10 @@ validate-pcs-schema-diff:
 	@$(ECHOOK) "Comparing config/schemas/pcs to pcs-core..."
 	bash scripts/pcs-schema-diff.sh $(PCS_CORE_PATH)
 
+sync-pcs-schemas:
+	@$(ECHOOK) "Syncing PCS schemas from pcs-core..."
+	bash scripts/pcs-schema-sync.sh $(PCS_CORE_PATH)
+
 demo-pcs:
 	@$(ECHOOK) "PCS verify / sign / inspect demo (run from repo root)..."
 	$(PF) verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json

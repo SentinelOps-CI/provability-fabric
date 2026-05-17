@@ -19,6 +19,7 @@ const (
 	ReasonSignatureMissing           = "PCS_SIGNATURE_MISSING"
 	ReasonSourceCommitPlaceholder    = "PCS_SOURCE_COMMIT_PLACEHOLDER"
 	ReasonLegacyBundleFormat         = "PCS_LEGACY_BUNDLE_FORMAT"
+	ReasonRuntimeReceiptCount        = "PCS_RUNTIME_RECEIPT_COUNT"
 )
 
 func withReason(code string, details map[string]any) map[string]any {

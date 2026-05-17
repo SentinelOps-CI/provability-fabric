@@ -6,6 +6,7 @@ package pcs
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Legacy bundle keys rejected by pf verify (pcs-core uses runtime_receipts / certificates arrays).
@@ -27,7 +28,27 @@ func DetectLegacyBundleKeys(data []byte) ([]string, error) {
 			found = append(found, key)
 		}
 	}
+	if raw, ok := doc["schema_version"]; ok {
+		var sv string
+		if err := json.Unmarshal(raw, &sv); err == nil {
+			if reason := nonCanonicalSchemaVersionReason(sv); reason != "" {
+				found = append(found, reason)
+			}
+		}
+	}
 	return found, nil
+}
+
+// nonCanonicalSchemaVersionReason reports legacy artifact-name schema_version values (e.g. ScienceClaimBundle.v0).
+func nonCanonicalSchemaVersionReason(schemaVersion string) string {
+	sv := strings.TrimSpace(schemaVersion)
+	if sv == "" || sv == SchemaVersionV0 {
+		return ""
+	}
+	if strings.Contains(sv, ".") {
+		return "schema_version:" + sv
+	}
+	return ""
 }
 
 // MigrateLegacyBundle converts a pre-pcs-core PF bundle JSON document to canonical array shape.
@@ -72,5 +93,6 @@ type LegacyBundleError struct {
 }
 
 func (e *LegacyBundleError) Error() string {
-	return fmt.Sprintf("legacy pcs bundle format (use runtime_receipts and certificates): %v", e.Keys)
+	return fmt.Sprintf("legacy pcs bundle format (use schema_version %q, runtime_receipts[], certificates[]): %v",
+		SchemaVersionV0, e.Keys)
 }

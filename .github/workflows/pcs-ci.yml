@@ -110,3 +110,19 @@ jobs:
             echo "expected legacy bundle to fail"
             exit 1
           fi
+
+      - name: Migrate legacy bundle then verify
+        run: |
+          cd core/cli/pf
+          MIG="$RUNNER_TEMP/migrated_science_claim.json"
+          go run . migrate science-claim "$GITHUB_WORKSPACE/tests/pcs/invalid_legacy_singular_runtime_receipt.json" --out "$MIG"
+          go run . verify science-claim "$MIG" --json | tee "$RUNNER_TEMP/migrated_verify.json"
+          grep -q '"status": "ProofChecked"' "$RUNNER_TEMP/migrated_verify.json"
+
+      - name: Reject multiple runtime receipts (v0.1)
+        run: |
+          cd core/cli/pf
+          if go run . verify science-claim "$GITHUB_WORKSPACE/tests/pcs/invalid_multiple_runtime_receipts.json"; then
+            echo "expected multiple runtime_receipts to fail"
+            exit 1
+          fi
