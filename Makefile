@@ -90,6 +90,16 @@ sync-pcs-rc-fixtures:
 	python scripts/pcs-sync-from-pcs-core-rc.py $(PCS_CORE_PATH)
 
 ifeq ($(OS),Windows_NT)
+test-pcs-rc-gate:
+	@$(ECHOOK) "PCS RC fixture lock tests..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pcs-rc-gate.ps1
+else
+test-pcs-rc-gate:
+	@$(ECHOOK) "PCS RC fixture lock tests..."
+	bash scripts/test-pcs-rc-gate.sh
+endif
+
+ifeq ($(OS),Windows_NT)
 freeze-pcs-labtrust-signed:
 	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-signed.ps1

@@ -80,46 +80,39 @@ func TestPFLabtrustReleaseFixtureMatchesPCSCoreRC(t *testing.T) {
 	assertFilesMatchRC(t, pfPath, rcPath)
 }
 
-func TestPFVerificationResultMatchesPCSCoreRC(t *testing.T) {
+func TestPFSignedBundleRCIdentity(t *testing.T) {
+	signed, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signed.SignedInputBundleHash != rcCertifiedBundleHash {
+		t.Fatalf("signed_input_bundle_hash %q != canonical %q", signed.SignedInputBundleHash, rcCertifiedBundleHash)
+	}
+	if signed.SourceCommit != rcPFSourceCommit {
+		t.Fatalf("source_commit %q != canonical %q", signed.SourceCommit, rcPFSourceCommit)
+	}
+	vi := signed.VerificationResult.VerifiedInput
+	if vi == nil {
+		t.Fatal("verification_result.verified_input is required")
+	}
+	assertCanonicalRCFields(t, vi.BundleHash, vi.CertificateID, vi.TraceHash, signed.VerificationResult.SourceCommit)
+	if err := pcs.VerifySignedBundleIntegrity(signed, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
+		t.Fatal(err)
+	}
+
 	vrPath := labtrustReleaseFixture(t, "verification_result.json")
 	vrBytes, err := os.ReadFile(vrPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var result pcs.VerificationResult
-	if err := json.Unmarshal(vrBytes, &result); err != nil {
+	var standalone pcs.VerificationResult
+	if err := json.Unmarshal(vrBytes, &standalone); err != nil {
 		t.Fatal(err)
 	}
-	if result.VerifiedInput == nil {
-		t.Fatal("verification_result.verified_input is required")
+	if standalone.VerifiedInput == nil {
+		t.Fatal("standalone verification_result.verified_input is required")
 	}
-	assertCanonicalRCFields(t, result.VerifiedInput.BundleHash, result.VerifiedInput.CertificateID, result.VerifiedInput.TraceHash, result.SourceCommit)
-
-	signed, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if signed.VerificationResult.VerifiedInput == nil {
-		t.Fatal("signed bundle embedded verified_input is required")
-	}
-	vi := signed.VerificationResult.VerifiedInput
-	assertCanonicalRCFields(t, vi.BundleHash, vi.CertificateID, vi.TraceHash, signed.VerificationResult.SourceCommit)
-	if signed.SignedInputBundleHash != rcCertifiedBundleHash {
-		t.Fatalf("signed_input_bundle_hash %q != canonical %q", signed.SignedInputBundleHash, rcCertifiedBundleHash)
-	}
-	if signed.SourceCommit != rcPFSourceCommit {
-		t.Fatalf("signed wrapper source_commit %q != canonical %q", signed.SourceCommit, rcPFSourceCommit)
-	}
-
-	rc := pcsCoreRCDir(t)
-	rcVRPath := filepath.Join(rc, "verification_result.json")
-	rcSignedPath := filepath.Join(rc, "signed_science_claim_bundle.json")
-	assertFilesMatchRC(t, vrPath, rcVRPath)
-	assertFilesMatchRC(t, labtrustReleaseFixture(t, "signed_science_claim_bundle.json"), rcSignedPath)
-
-	if err := pcs.VerifySignedBundleIntegrity(signed, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
-		t.Fatal(err)
-	}
+	assertCanonicalRCFields(t, standalone.VerifiedInput.BundleHash, standalone.VerifiedInput.CertificateID, standalone.VerifiedInput.TraceHash, standalone.SourceCommit)
 }
 
 func assertCanonicalRCFields(t *testing.T, bundleHash, certID, traceHash, sourceCommit string) {
