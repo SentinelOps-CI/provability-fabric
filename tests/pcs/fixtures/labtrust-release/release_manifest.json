@@ -1,0 +1,97 @@
+{
+  "schema_version": "v0",
+  "release_id": "release-pcs-v0.1-labtrust-qc",
+  "release_candidate": "pcs-v0.1.0-rc1",
+  "generated_at": "2026-05-17T17:01:22Z",
+  "validation_profile": "labtrust-v0.1-release-chain",
+  "producer_repos": {
+    "pcs_core": {
+      "repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "commit": "19c715455ac97bc50d7b091aec577b21dd19d930"
+    },
+    "labtrust_gym": {
+      "repo": "https://github.com/fraware/LabTrust-Gym",
+      "commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de"
+    },
+    "certifyedge": {
+      "repo": "https://github.com/fraware/CertifyEdge",
+      "commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc"
+    },
+    "provability_fabric": {
+      "repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
+    },
+    "scientific_memory": {
+      "repo": "https://github.com/fraware/scientific-memory",
+      "commit": "67498ff14325d08ecbbc94b8d41647d9cd79c309"
+    }
+  },
+  "artifacts": {
+    "trace.json": {
+      "artifact_type": "LabTrust.Trace.v0",
+      "schema": "trace.json",
+      "producer": "LabTrust-Gym",
+      "source_repo": "https://github.com/fraware/LabTrust-Gym",
+      "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
+      "sha256": "sha256:f99eb0a90cd2b9819816a25ec4e938663d26ae8d40868cd8188665e940f7ad5c"
+    },
+    "runtime_receipt.json": {
+      "artifact_type": "RuntimeReceipt.v0",
+      "schema": "RuntimeReceipt.v0.schema.json",
+      "producer": "LabTrust-Gym",
+      "source_repo": "https://github.com/fraware/LabTrust-Gym",
+      "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
+      "sha256": "sha256:8e642b59657d70b408be354323006421b963bb0c9fc9514f6abc7aab305345b6"
+    },
+    "trace_certificate.json": {
+      "artifact_type": "TraceCertificate.v0",
+      "schema": "TraceCertificate.v0.schema.json",
+      "producer": "CertifyEdge",
+      "source_repo": "https://github.com/fraware/CertifyEdge",
+      "source_commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc",
+      "sha256": "sha256:c0e09949aaa8441a2adc5a0be05e6827a7ab6a12c3e0c85d77f0554f191d1a28"
+    },
+    "science_claim_bundle.pending.json": {
+      "artifact_type": "ScienceClaimBundle.v0",
+      "schema": "ScienceClaimBundle.v0.schema.json",
+      "producer": "LabTrust-Gym",
+      "source_repo": "https://github.com/fraware/LabTrust-Gym",
+      "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
+      "sha256": "sha256:677e0171743c4c129ad4b1931c62ba3fa0323f10c7d6d8d76290f8a4aabae45e"
+    },
+    "science_claim_bundle.certified.json": {
+      "artifact_type": "ScienceClaimBundle.v0",
+      "schema": "ScienceClaimBundle.v0.schema.json",
+      "producer": "LabTrust-Gym",
+      "source_repo": "https://github.com/fraware/LabTrust-Gym",
+      "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
+      "sha256": "sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+    },
+    "verification_result.json": {
+      "artifact_type": "VerificationResult.v0",
+      "schema": "VerificationResult.v0.schema.json",
+      "producer": "Provability Fabric",
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
+      "sha256": "sha256:3b4b1215b4be6a945c3b99bb548e33a08527981290e7be1ab1da52b67ad8ba14"
+    },
+    "signed_science_claim_bundle.json": {
+      "artifact_type": "SignedScienceClaimBundle.v0",
+      "schema": "SignedScienceClaimBundle.v0.schema.json",
+      "producer": "Provability Fabric",
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
+      "sha256": "sha256:d0ab55f964227c1350b29fe359dcaf61d04ad6b7dfcf1db351b717e1c47aab43"
+    },
+    "scientific_memory_import_report.json": {
+      "artifact_type": "ScientificMemory.ImportReport.v0",
+      "schema": "scientific_memory_import_report.json",
+      "producer": "Scientific Memory",
+      "source_repo": "https://github.com/fraware/scientific-memory",
+      "source_commit": "67498ff14325d08ecbbc94b8d41647d9cd79c309",
+      "sha256": "sha256:30bb1f259a1393d9e39bbdf39513e8ab26cdd92742642016d36c2b4241aebcc0"
+    }
+  },
+  "release_status": "Validated",
+  "signature_or_digest": "sha256:e595937a17d76f78925a18a5d9e8f1de10d086846448400fea1f19d440c49c69"
+}

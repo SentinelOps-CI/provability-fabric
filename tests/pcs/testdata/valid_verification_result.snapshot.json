@@ -96,6 +96,20 @@
       }
     },
     {
+      "check_id": "status_transition_policy",
+      "description": "PCS status transitions allow ProofChecked only from admissible certificate states",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "check_id": "artifact_registry_admission",
+      "description": "Bundle components match ReleaseManifest.v0 artifact registry",
+      "status": "skipped",
+      "details": {
+        "message": "registry not provided"
+      }
+    },
+    {
       "check_id": "evidence_refs_complete",
       "description": "EvidenceBundle references claim, assumption set, receipt, and certificate",
       "status": "passed",
@@ -144,7 +158,7 @@
   "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
   "signature_or_digest": "sha256:snapshot-digest",
   "verified_input": {
-    "bundle_hash": "sha256:603acf3fb3d28baecd1d6bcf0e75e5d09cd441c6a2b0bd870837adfcc6646474",
+    "bundle_hash": "sha256:1ec21bdc1a947b32cdc397de152da4be82062a401069ded4e4427acfb5460ea5",
     "certificate_id": "cert-trace-qc-release-v0.1",
     "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
   }

@@ -3,7 +3,7 @@
 
 package pcs
 
-// RequiredCheckIDs is the ordered v0.1 verification checklist (15 checks).
+// RequiredCheckIDs is the ordered v0.1 verification checklist (17 checks).
 var RequiredCheckIDs = []string{
 	"science_claim_bundle_schema",
 	"claim_artifact_present",
@@ -15,6 +15,8 @@ var RequiredCheckIDs = []string{
 	"runtime_trace_hash_present",
 	"trace_hash_alignment",
 	"certificate_status_checked",
+	"status_transition_policy",
+	"artifact_registry_admission",
 	"evidence_refs_complete",
 	"artifact_not_stale",
 	"source_provenance_present",

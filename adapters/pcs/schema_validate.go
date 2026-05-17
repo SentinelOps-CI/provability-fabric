@@ -151,3 +151,43 @@ func ValidateSignedScienceClaimBundle(repoRoot string, signed *SignedScienceClai
 func ValidateVerificationResultAlways(result VerificationResult) error {
 	return ValidateVerificationResult("", result)
 }
+
+// ValidateHandoffManifestFile validates HandoffManifest.v0 JSON.
+func ValidateHandoffManifestFile(repoRoot, path string) error {
+	resolved, err := ResolveArtifactPath(path)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return err
+	}
+	var doc any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+	if err := ValidateDocumentAgainstSchema(repoRoot, "HandoffManifest.v0.schema.json", doc); err != nil {
+		return err
+	}
+	var manifest HandoffManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return err
+	}
+	return ValidateHandoffManifestSemantics(&manifest)
+}
+
+// ValidateReleaseChainValidationResult validates ReleaseChainValidationResult.v0.
+func ValidateReleaseChainValidationResult(repoRoot string, result ReleaseChainValidationResult) error {
+	var doc any
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	if err := ValidateDocumentAgainstSchema(repoRoot, "ReleaseChainValidationResult.v0.schema.json", doc); err != nil {
+		return err
+	}
+	return ValidateReleaseChainValidationResultSemantics(&result)
+}

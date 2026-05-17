@@ -6,7 +6,7 @@ Canonical release fixtures live in [pcs-core `examples/labtrust-release/`](https
 
 ## What PF verifies
 
-PF runs fifteen structural and consistency checks on `ScienceClaimBundle.v0`:
+PF runs seventeen structural and consistency checks on `ScienceClaimBundle.v0` (frozen RC signed bundles may still embed fifteen checks from the RC generation commit):
 
 - pcs-core JSON Schema validity (`schema_version` v0, `runtime_receipts[]`, `certificates[]`)
 - Presence of claim, assumption set, runtime receipt, trace certificate, and evidence bundle
@@ -17,9 +17,25 @@ PF runs fifteen structural and consistency checks on `ScienceClaimBundle.v0`:
 - Source provenance (`source_repo`, `source_commit`)
 - Release-mode rejection of placeholder commits
 
-On success PF writes `VerificationResult.v0` with `status: ProofChecked`, fifteen `checks`, `verified_input` (bundle file hash, certificate ID, trace hash), and `signature_or_digest`.
+On success PF writes `VerificationResult.v0` with `status: ProofChecked`, seventeen `checks` (including status-transition policy), `verified_input` (bundle file hash, certificate ID, trace hash), and `signature_or_digest`.
 
-Optional `--handoff pf_handoff.json` (LabTrust) ensures the bundle matches the release handoff before verify/sign.
+Optional `--handoff` accepts legacy `pf_handoff.json` or pcs-core `HandoffManifest.v0` and ensures the bundle matches LabTrust release pins before verify/sign.
+
+Phase 2 admission commands:
+
+```bash
+pf verify release-chain \
+  --manifest release_manifest.json \
+  --artifact-dir /path/to/labtrust-release \
+  --out release_chain_validation_result.json
+
+pf verify science-claim science_claim_bundle.certified.json \
+  --handoff handoff_to_pf.json \
+  --registry release_manifest.json \
+  --release-chain-result release_chain_validation_result.json
+```
+
+`--registry` loads `ReleaseManifest.v0` (artifact registry until `ArtifactRegistry.v0` is published in pcs-core).
 
 ## What PF signs
 
@@ -51,7 +67,15 @@ go -C core/cli/pf run . inspect science-claim \
   --strict
 ```
 
-`--strict` requires PF-computed digests on the embedded verification result and wrapper. `--reverify` re-runs all fifteen checks on the embedded bundle.
+`--strict` requires PF-computed digests on the embedded verification result and wrapper. `--reverify` re-runs all current PF checks on the embedded bundle.
+
+Validate Phase 2 protocol artifacts:
+
+```bash
+go -C core/cli/pf run . validate handoff-manifest tests/pcs/fixtures/labtrust-release/handoff_to_pf.json
+go -C core/cli/pf run . validate release-manifest tests/pcs/fixtures/labtrust-release/release_manifest.json
+go -C core/cli/pf run . validate release-chain-result tests/pcs/fixtures/labtrust-release/release_chain_validation_result.json
+```
 
 ## Reproduce the verification result
 
@@ -89,6 +113,7 @@ go -C core/cli/pf run . sign science-claim \
 Lock tests (require pcs-core checkout):
 
 ```bash
+make test-pcs-full   # unit + RC lock + Phase 2 + fixture matrix
 make test-pcs-rc-gate
 ```
 

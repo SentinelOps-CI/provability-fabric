@@ -104,6 +104,36 @@ jobs:
             "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json" \
             --strict
 
+      - name: pf verify science-claim with HandoffManifest.v0
+        run: |
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          go run . verify science-claim \
+            "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json" \
+            --handoff "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json" \
+            --release-mode
+
+      - name: pf verify release-chain (ReleaseManifest.v0)
+        run: |
+          pip install -q -e "${{ github.workspace }}/pcs-core/python"
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          OUT="$RUNNER_TEMP/release_chain_validation_result.json"
+          RC_DIR="${{ github.workspace }}/pcs-core/examples/labtrust-release"
+          MANIFEST="$RC_DIR/release_manifest.v0.json"
+          if [ ! -f "$MANIFEST" ]; then
+            MANIFEST="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/release_manifest.json"
+          fi
+          go run . verify release-chain \
+            --manifest "$MANIFEST" \
+            --artifact-dir "$RC_DIR" \
+            --out "$OUT"
+          pcs validate "$OUT"
+
       - name: Validate PCS fixtures
         run: |
           cd tools/pcs-validate
@@ -116,20 +146,35 @@ jobs:
 
       - name: PCS v0.1 PF clean-chain segment
         run: |
-          export PCS_CORE_PATH="$GITHUB_WORKSPACE/../pcs-core"
+          export PCS_CORE_PATH="${{ github.workspace }}/pcs-core"
           pip install -q -e "$PCS_CORE_PATH/python"
-          export PF_SOURCE_COMMIT="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          WORK="$RUNNER_TEMP/pf-clean-chain"
+          mkdir -p "$WORK"
+          cp "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json" "$WORK/"
+          export PF_SOURCE_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_RELEASE_MODE=1
           export PF_DETERMINISTIC=1
           export PCS_DETERMINISTIC=1
-          bash "$GITHUB_WORKSPACE/scripts/pcs-pf-clean-chain.sh" "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          bash "$GITHUB_WORKSPACE/scripts/pcs-pf-clean-chain.sh" "$WORK"
 
       - name: pcs-core validate release artifacts
         run: |
           pip install -q -e pcs-core/python
-          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json"
-          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/verification_result.json"
-          pcs validate "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json"
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          pcs validate "$RELEASE/science_claim_bundle.certified.json"
+          pcs validate "$RELEASE/verification_result.json"
+          pcs validate "$RELEASE/signed_science_claim_bundle.json"
+          pcs validate "$RELEASE/handoff_to_pf.json"
+          pcs validate "$RELEASE/release_manifest.json"
+          pcs validate "$RELEASE/release_chain_validation_result.json"
+
+      - name: pf validate Phase 2 protocol fixtures
+        run: |
+          cd core/cli/pf
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          go run . validate handoff-manifest "$RELEASE/handoff_to_pf.json"
+          go run . validate release-manifest "$RELEASE/release_manifest.json"
+          go run . validate release-chain-result "$RELEASE/release_chain_validation_result.json"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |
@@ -144,11 +189,11 @@ jobs:
           go run . inspect science-claim "$OUT" --strict | tee "$RUNNER_TEMP/inspect_pf.txt"
           grep -q 'verification_status:  ProofChecked' "$RUNNER_TEMP/inspect_pf.txt"
           grep -q 'science_claim_bundle_schema' "$RUNNER_TEMP/inspect_pf.txt"
-          grep -q 'Embedded checks (15):' "$RUNNER_TEMP/inspect_pf.txt"
+          grep -q 'Embedded checks (17):' "$RUNNER_TEMP/inspect_pf.txt"
           go run . inspect science-claim "$PF_SIGNED" --strict | tee "$RUNNER_TEMP/inspect_pf_signed_fixture.txt"
-          grep -q 'Embedded checks (15):' "$RUNNER_TEMP/inspect_pf_signed_fixture.txt"
+          grep -qE 'Embedded checks \((15|17)\):' "$RUNNER_TEMP/inspect_pf_signed_fixture.txt"
           go run . inspect science-claim "$LABTRUST_SIGNED" --reverify | tee "$RUNNER_TEMP/inspect_labtrust.txt"
-          grep -q 'PF re-verification (15):' "$RUNNER_TEMP/inspect_labtrust.txt"
+          grep -qE 'PF re-verification \((15|17)\):' "$RUNNER_TEMP/inspect_labtrust.txt"
 
       - name: Reject failed bundle sign
         run: |

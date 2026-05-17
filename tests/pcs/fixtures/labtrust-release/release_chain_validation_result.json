@@ -1,0 +1,31 @@
+{
+  "schema_version": "v0",
+  "validation_id": "validation-pcs-v0.1-labtrust-qc-rc",
+  "release_id": "release-pcs-v0.1-labtrust-qc",
+  "release_candidate": "pcs-v0.1.0-rc1",
+  "validator": "pcs-core",
+  "validator_version": "0.1.0",
+  "checked_at": "2026-05-17T17:01:22Z",
+  "status": "ProofChecked",
+  "checks": [
+    {
+      "check_id": "certificate_id_consistency",
+      "description": "Certificate ID is identical across certificate, certified bundle, verification result, and signed bundle",
+      "status": "passed",
+      "details": {
+        "certificate_id": "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
+      }
+    },
+    {
+      "check_id": "manifest_hash_alignment",
+      "description": "All manifest artifact hashes match on-disk files",
+      "status": "passed",
+      "details": {}
+    }
+  ],
+  "artifacts_checked": 8,
+  "failure_codes": [],
+  "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+  "source_commit": "19c715455ac97bc50d7b091aec577b21dd19d930",
+  "signature_or_digest": "sha256:62310945234d37c9d595ccb2d92c3ce6dd3be67a80282d76c36c910eceda1251"
+}

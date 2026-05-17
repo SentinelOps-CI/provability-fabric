@@ -6,6 +6,8 @@ package pcs
 // Canonical PCS status values used in v0.1 verification.
 const (
 	StatusCertificateChecked = "CertificateChecked"
+	StatusProofChecked       = "ProofChecked"
+	StatusRuntimeObserved    = "RuntimeObserved"
 	StatusRejected           = "Rejected"
 	StatusStale              = "Stale"
 

@@ -66,7 +66,7 @@ func encodeCanonical(buf *bytes.Buffer, v any) error {
 		}
 		buf.Write(b)
 	case string:
-		b, err := json.Marshal(t)
+		b, err := marshalJSONString(t)
 		if err != nil {
 			return err
 		}
@@ -108,4 +108,19 @@ func encodeCanonical(buf *bytes.Buffer, v any) error {
 		return fmt.Errorf("unsupported canonical type %T", v)
 	}
 	return nil
+}
+
+// marshalJSONString matches Python json.dumps(..., ensure_ascii=False) (no HTML escapes).
+func marshalJSONString(s string) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(s); err != nil {
+		return nil, err
+	}
+	b := buf.Bytes()
+	if len(b) > 0 && b[len(b)-1] == '\n' {
+		b = b[:len(b)-1]
+	}
+	return b, nil
 }

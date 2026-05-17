@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/HandoffManifest.v0.schema.json",
+  "title": "HandoffManifest.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "handoff_id",
+    "handoff_kind",
+    "from_component",
+    "to_component",
+    "created_at",
+    "source_repo",
+    "source_commit",
+    "input_artifacts",
+    "expected_outputs",
+    "invariants",
+    "status",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "handoff_id": { "type": "string", "minLength": 1 },
+    "handoff_kind": { "$ref": "common.defs.json#/$defs/handoff_kind" },
+    "from_component": { "type": "string", "minLength": 1 },
+    "to_component": { "type": "string", "minLength": 1 },
+    "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "input_artifacts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "common.defs.json#/$defs/handoff_artifact_ref"
+      }
+    },
+    "expected_outputs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "common.defs.json#/$defs/handoff_artifact_ref"
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "status": { "$ref": "common.defs.json#/$defs/handoff_status" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

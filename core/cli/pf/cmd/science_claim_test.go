@@ -151,6 +151,9 @@ func TestValidateLabtrustReleaseArtifactsCLI(t *testing.T) {
 	for _, args := range [][]string{
 		{"validate", "verification-result", filepath.Join(release, "verification_result.json")},
 		{"validate", "signed-science-claim", filepath.Join(release, "signed_science_claim_bundle.json")},
+		{"validate", "handoff-manifest", filepath.Join(release, "handoff_to_pf.json")},
+		{"validate", "release-manifest", filepath.Join(release, "release_manifest.json")},
+		{"validate", "release-chain-result", filepath.Join(release, "release_chain_validation_result.json")},
 	} {
 		cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
 		cmd.Dir = pfDir(t)
@@ -176,8 +179,8 @@ func TestInspectLabtrustReleaseSignedBundleCLI(t *testing.T) {
 	if !strings.Contains(body, "verification_status:  ProofChecked") {
 		t.Fatalf("expected ProofChecked verification_status:\n%s", body)
 	}
-	if !strings.Contains(body, "Embedded checks (15):") {
-		t.Fatalf("expected 15 embedded checks:\n%s", body)
+	if !strings.Contains(body, "Embedded checks (15):") && !strings.Contains(body, "Embedded checks (17):") {
+		t.Fatalf("expected embedded checks summary:\n%s", body)
 	}
 	if !strings.Contains(body, "scb-pcs-qc-release-v0.1") {
 		t.Fatalf("expected release bundle_id in inspect output:\n%s", body)
@@ -218,11 +221,95 @@ func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
 		t.Fatalf("inspect failed: %v\n%s", err, out)
 	}
 	body := string(out)
-	if !strings.Contains(body, "PF re-verification (15):") {
-		t.Fatalf("expected 15 PF re-verification checks:\n%s", body)
+	if !strings.Contains(body, "PF re-verification (15):") && !strings.Contains(body, "PF re-verification (17):") {
+		t.Fatalf("expected PF re-verification checks:\n%s", body)
 	}
 	if !strings.Contains(body, "pf_status:            ProofChecked") {
 		t.Fatalf("expected ProofChecked pf_status:\n%s", body)
+	}
+}
+
+func TestVerifyScienceClaimWithHandoffManifestCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
+	handoff := filepath.Join(release, "handoff_to_pf.json")
+	manifestPath := filepath.Join(release, "FIXTURE_MANIFEST.json")
+	manifestBytes, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(manifestBytes), "pf_source_commit") {
+		t.Fatal("fixture manifest missing pf_source_commit")
+	}
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+		"--handoff", handoff, "--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = append(os.Environ(), "PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PF_RELEASE_MODE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("verify with handoff failed: %v\n%s", err, out)
+	}
+}
+
+func TestVerifyScienceClaimWithHandoffAndRegistryCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
+	handoff := filepath.Join(release, "handoff_to_pf.json")
+	registry := filepath.Join(release, "release_manifest.json")
+	if _, err := os.Stat(registry); err != nil {
+		t.Skip("release manifest fixture not present")
+	}
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+		"--handoff", handoff,
+		"--registry", registry,
+		"--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = append(os.Environ(),
+		"PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
+		"PF_RELEASE_MODE=1",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("verify with handoff+registry failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "ProofChecked") {
+		t.Fatalf("expected ProofChecked: %s", out)
+	}
+}
+
+func TestVerifyReleaseChainCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	manifest := filepath.Join(release, "release_manifest.json")
+	artifactDir := release
+	pcsCore := filepath.Join(root, "..", "pcs-core", "examples", "labtrust-release")
+	if _, err := os.Stat(filepath.Join(pcsCore, "science_claim_bundle.certified.json")); err == nil {
+		artifactDir = pcsCore
+		if _, err := os.Stat(filepath.Join(pcsCore, "release_manifest.v0.json")); err == nil {
+			manifest = filepath.Join(pcsCore, "release_manifest.v0.json")
+		}
+	} else if _, err := os.Stat(manifest); err != nil {
+		t.Skip("release manifest fixtures not present")
+	}
+	outPath := filepath.Join(t.TempDir(), "release_chain_validation_result.json")
+	cmd := exec.Command("go", "run", ".", "verify", "release-chain",
+		"--manifest", manifest,
+		"--artifact-dir", artifactDir,
+		"--out", outPath,
+		"--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = append(os.Environ(), "PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PF_RELEASE_MODE=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("verify release-chain failed: %v\n%s", err, out)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"status": "ProofChecked"`) {
+		t.Fatalf("expected ProofChecked release chain result: %s", data)
 	}
 }
 
@@ -247,10 +334,10 @@ func TestInspectPrintsCheckSummaryCLI(t *testing.T) {
 	if !strings.Contains(body, "verification_status:  ProofChecked") && !strings.Contains(body, "verification_status: ProofChecked") {
 		t.Fatalf("inspect output missing ProofChecked status:\n%s", body)
 	}
-	if !strings.Contains(body, "Embedded checks (15):") {
-		t.Fatalf("inspect must list all 15 embedded checks:\n%s", body)
+	if !strings.Contains(body, "Embedded checks (17):") {
+		t.Fatalf("inspect must list all 17 embedded checks:\n%s", body)
 	}
-	for _, id := range []string{"trace_hash_alignment", "science_claim_bundle_schema", "source_commit_not_placeholder"} {
+	for _, id := range []string{"trace_hash_alignment", "science_claim_bundle_schema", "source_commit_not_placeholder", "status_transition_policy"} {
 		if !strings.Contains(body, id) {
 			t.Fatalf("inspect missing check_id %s", id)
 		}

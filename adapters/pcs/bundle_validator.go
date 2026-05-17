@@ -17,7 +17,8 @@ type ValidateOptions struct {
 	LocalDev           bool
 	ReleaseMode        bool
 	SkipSchemaValidate bool
-	Handoff            *PFHandoff
+	Handoff            *LoadedHandoff
+	Registry           *ArtifactRegistry
 }
 
 // VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
@@ -42,8 +43,13 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 		result.SignatureOrDigest = DigestVerificationResult(result)
 	}
 	if opts.Handoff != nil && VerificationPassed(result) {
-		if err := AssertBundleMatchesHandoff(bundle, bundlePath, opts.Handoff); err != nil {
+		if err := opts.Handoff.AssertBundleMatchesHandoff(bundle, bundlePath); err != nil {
 			return VerificationResult{}, fmt.Errorf("handoff guard: %w", err)
+		}
+	}
+	if opts.Registry != nil && VerificationPassed(result) {
+		if err := ValidateBundleAgainstRegistry(bundle, opts.Registry); err != nil {
+			return VerificationResult{}, fmt.Errorf("registry guard: %w", err)
 		}
 	}
 	if err := ValidateVerificationResult(opts.RepoRoot, result); err != nil {
@@ -72,6 +78,8 @@ func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptio
 		CheckRuntimeTraceHashPresent(receipt),
 		CheckAllTraceHashAlignment(receipt, certs),
 		CheckAllCertificateStatus(certs),
+		CheckStatusTransitionPolicy(bundle),
+		checkArtifactRegistryAdmission(bundle, opts),
 		checkEvidenceRefsComplete(bundle),
 		checkNotStale(bundle),
 		checkSourceProvenance(bundle),

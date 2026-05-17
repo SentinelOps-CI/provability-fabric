@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ReleaseManifest.v0.schema.json",
+  "title": "ReleaseManifest.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "release_id",
+    "release_candidate",
+    "generated_at",
+    "validation_profile",
+    "producer_repos",
+    "artifacts",
+    "release_status",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "release_id": { "type": "string", "minLength": 1 },
+    "release_candidate": { "type": "string", "minLength": 1 },
+    "generated_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "validation_profile": { "type": "string", "minLength": 1 },
+    "producer_repos": {
+      "type": "object",
+      "required": [
+        "pcs_core",
+        "labtrust_gym",
+        "certifyedge",
+        "provability_fabric",
+        "scientific_memory"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pcs_core": { "$ref": "common.defs.json#/$defs/producer_repo_pin" },
+        "labtrust_gym": { "$ref": "common.defs.json#/$defs/producer_repo_pin" },
+        "certifyedge": { "$ref": "common.defs.json#/$defs/producer_repo_pin" },
+        "provability_fabric": { "$ref": "common.defs.json#/$defs/producer_repo_pin" },
+        "scientific_memory": { "$ref": "common.defs.json#/$defs/producer_repo_pin" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "common.defs.json#/$defs/manifest_artifact_entry"
+      }
+    },
+    "release_status": { "$ref": "common.defs.json#/$defs/release_status" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

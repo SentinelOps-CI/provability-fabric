@@ -27,7 +27,7 @@ type SignOptions struct {
 	ReleaseMode bool
 	LocalDev    bool
 	BundlePath  string
-	Handoff     *PFHandoff
+	Handoff     *LoadedHandoff
 }
 
 // SignVerificationResultWithOptions builds a signed wrapper with optional release-mode checks.
@@ -43,7 +43,7 @@ func SignVerificationResultWithOptions(repoRoot string, bundle *ScienceClaimBund
 		return nil, err
 	}
 	if opts.Handoff != nil {
-		if err := AssertBundleMatchesHandoff(bundle, opts.BundlePath, opts.Handoff); err != nil {
+		if err := opts.Handoff.AssertBundleMatchesHandoff(bundle, opts.BundlePath); err != nil {
 			return nil, fmt.Errorf("handoff guard: %w", err)
 		}
 	}

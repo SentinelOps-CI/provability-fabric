@@ -13,6 +13,10 @@ import (
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
+func loadedLegacyHandoff(h *pcs.PFHandoff) *pcs.LoadedHandoff {
+	return &pcs.LoadedHandoff{Legacy: h}
+}
+
 func signWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 	t.Helper()
 	t.Setenv("PF_DETERMINISTIC", "1")
@@ -38,7 +42,7 @@ func signWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 	_, err = pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
 		ReleaseMode: true,
 		BundlePath:  path,
-		Handoff:     handoff,
+		Handoff:     loadedLegacyHandoff(handoff),
 	})
 	return err
 }

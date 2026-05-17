@@ -64,7 +64,7 @@ func scienceClaimSignCmd() *cobra.Command {
 				BundlePath:  resolved,
 			}
 			if strings.TrimSpace(handoffPath) != "" {
-				handoff, err := pcs.LoadPFHandoff(handoffPath)
+				handoff, err := pcs.LoadHandoff(handoffPath)
 				if err != nil {
 					return err
 				}

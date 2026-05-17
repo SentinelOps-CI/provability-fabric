@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +49,7 @@ func resolvePCSOpts(bundlePath string, localDev, releaseMode bool) (pcs.Validate
 	}, nil
 }
 
-func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath string) (pcs.VerificationResult, error) {
+func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath, registryPath string) (pcs.VerificationResult, error) {
 	resolved, err := pcs.ResolveArtifactPath(bundlePath)
 	if err != nil {
 		return pcs.VerificationResult{}, err
@@ -62,11 +63,18 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath str
 		return pcs.VerificationResult{}, err
 	}
 	if strings.TrimSpace(handoffPath) != "" {
-		handoff, err := pcs.LoadPFHandoff(handoffPath)
+		handoff, err := pcs.LoadHandoff(handoffPath)
 		if err != nil {
 			return pcs.VerificationResult{}, err
 		}
 		opts.Handoff = handoff
+	}
+	if strings.TrimSpace(registryPath) != "" {
+		registry, err := pcs.LoadArtifactRegistry(registryPath)
+		if err != nil {
+			return pcs.VerificationResult{}, err
+		}
+		opts.Registry = registry
 	}
 	result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
 	if err != nil {
@@ -76,6 +84,48 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath str
 		return result, err
 	}
 	return result, nil
+}
+
+func writeReleaseChainResult(bundlePath string, result pcs.VerificationResult, handoffPath, registryPath, outPath string, localDev, releaseMode bool) error {
+	opts, err := resolveReleaseChainOpts(localDev, releaseMode)
+	if err != nil {
+		return err
+	}
+	var manifest *pcs.ReleaseManifest
+	if strings.TrimSpace(registryPath) != "" {
+		manifest, err = pcs.LoadReleaseManifest(registryPath)
+		if err != nil {
+			return err
+		}
+	}
+	var handoff *pcs.HandoffManifest
+	if strings.TrimSpace(handoffPath) != "" {
+		loaded, err := pcs.LoadHandoff(handoffPath)
+		if err != nil {
+			return err
+		}
+		if loaded.Manifest != nil {
+			handoff = loaded.Manifest
+		}
+	}
+	if manifest == nil {
+		manifest = &pcs.ReleaseManifest{
+			ReleaseID:        "release-pf-science-claim",
+			ReleaseCandidate: "pf-verify",
+		}
+	}
+	rcvr, err := pcs.BuildReleaseChainValidationResultFromVerification(manifest, result, handoff, opts)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(rcvr, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(outPath, data, 0644); err != nil {
+		return fmt.Errorf("write release chain validation result: %w", err)
+	}
+	return nil
 }
 
 func printVerificationFailures(result pcs.VerificationResult) {

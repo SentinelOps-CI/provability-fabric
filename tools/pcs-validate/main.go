@@ -127,6 +127,23 @@ func validateLabtrustReleaseFixtures(releaseDir, root string, localDev bool, res
 			failed++
 		}
 	}
+	for _, spec := range []struct {
+		file   string
+		schema string
+	}{
+		{"handoff_to_pf.json", "handoff"},
+		{"release_manifest.json", "release_manifest"},
+		{"release_chain_validation_result.json", "release_chain_result"},
+	} {
+		path := filepath.Join(releaseDir, spec.file)
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		label := filepath.ToSlash(filepath.Join("fixtures", "labtrust-release", spec.file))
+		if validatePhase2ProtocolFixture(path, label, root, spec.schema, results) {
+			failed++
+		}
+	}
 	entries, _ := os.ReadDir(releaseDir)
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasPrefix(e.Name(), "invalid_") {
@@ -139,6 +156,41 @@ func validateLabtrustReleaseFixtures(releaseDir, root string, localDev bool, res
 		}
 	}
 	return failed
+}
+
+func validatePhase2ProtocolFixture(path, label, root, kind string, results *[]validateResult) bool {
+	switch kind {
+	case "handoff":
+		if err := pcs.ValidateHandoffManifestFile(root, path); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			return true
+		}
+	case "release_manifest":
+		if err := pcs.ValidateReleaseManifestFile(root, path); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			return true
+		}
+	case "release_chain_result":
+		data, err := os.ReadFile(path)
+		if err != nil {
+			*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+			return true
+		}
+		var result pcs.ReleaseChainValidationResult
+		if err := json.Unmarshal(data, &result); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "parse_error", Error: err.Error()})
+			return true
+		}
+		if err := pcs.ValidateReleaseChainValidationResult(root, result); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			return true
+		}
+	default:
+		*results = append(*results, validateResult{File: label, Status: "internal_error", Error: "unknown phase2 fixture kind"})
+		return true
+	}
+	*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+	return false
 }
 
 func validateVerificationResultFile(path, label, root string, results *[]validateResult) bool {

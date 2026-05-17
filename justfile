@@ -9,6 +9,9 @@ default:
 test-pcs:
     make test-pcs
 
+test-pcs-full:
+    make test-pcs-full
+
 pcs-schema-diff:
     bash "{{root}}/scripts/pcs-schema-diff.sh" "{{pcs_core}}"
 

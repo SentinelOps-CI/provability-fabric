@@ -13,6 +13,17 @@ PF_ARTIFACTS = (
     "signed_science_claim_bundle.json",
 )
 
+PF_PROTOCOL_FROM_RC = (
+    ("handoff_manifest.bundle_to_verifier.v0.json", "handoff_to_pf.json"),
+    ("release_manifest.v0.json", "release_manifest.json"),
+    ("release_chain_validation_result.v0.json", "release_chain_validation_result.json"),
+)
+
+PF_PROTOCOL_FALLBACK = (
+    ("handoff_manifest.valid.json", "handoff_to_pf.json"),
+    ("release_manifest.valid.json", "release_manifest.json"),
+)
+
 
 def sha256_file(path: pathlib.Path) -> str:
     h = hashlib.sha256()
@@ -79,6 +90,18 @@ def main() -> int:
         "trace_hash": certified["runtime_receipts"][0]["trace_hash"],
     }
     (pf_release / "pf_handoff.json").write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
+    for src_name, dst_name in PF_PROTOCOL_FROM_RC:
+        src = canonical / src_name
+        if src.is_file():
+            (pf_release / dst_name).write_bytes(src.read_bytes())
+    examples = pcs_core / "examples"
+    for src_name, dst_name in PF_PROTOCOL_FALLBACK:
+        dst = pf_release / dst_name
+        if dst.is_file():
+            continue
+        src = examples / src_name
+        if src.is_file():
+            dst.write_bytes(src.read_bytes())
     invalid_script = root / "scripts" / "pcs-freeze-labtrust-release-invalid.py"
     if invalid_script.is_file():
         import subprocess

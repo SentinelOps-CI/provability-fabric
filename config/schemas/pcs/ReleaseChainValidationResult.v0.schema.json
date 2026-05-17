@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ReleaseChainValidationResult.v0.schema.json",
+  "title": "ReleaseChainValidationResult.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "validation_id",
+    "release_id",
+    "release_candidate",
+    "validator",
+    "validator_version",
+    "checked_at",
+    "status",
+    "checks",
+    "artifacts_checked",
+    "failure_codes",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "validation_id": { "type": "string", "minLength": 1 },
+    "release_id": { "type": "string", "minLength": 1 },
+    "release_candidate": { "type": "string", "minLength": 1 },
+    "validator": { "type": "string", "minLength": 1 },
+    "validator_version": { "type": "string", "minLength": 1 },
+    "checked_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "status": { "$ref": "common.defs.json#/$defs/release_chain_validation_status" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.defs.json#/$defs/release_validation_check" }
+    },
+    "artifacts_checked": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_codes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

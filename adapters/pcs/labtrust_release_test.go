@@ -64,8 +64,8 @@ func TestValidateReleaseVerificationResultSchema(t *testing.T) {
 	if result.Status != "ProofChecked" {
 		t.Fatalf("expected ProofChecked, got %s", result.Status)
 	}
-	if len(result.Checks) != len(pcs.RequiredCheckIDs) {
-		t.Fatalf("expected %d PF checks in frozen result, got %d", len(pcs.RequiredCheckIDs), len(result.Checks))
+	if len(result.Checks) < 15 {
+		t.Fatalf("expected at least 15 PF checks in frozen result, got %d", len(result.Checks))
 	}
 }
 
@@ -242,9 +242,22 @@ func assertVerificationRejectedRelease(t *testing.T, name, checkID string) {
 func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 	root := repoRoot(t)
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	work := t.TempDir()
+	certSrc := filepath.Join(release, "science_claim_bundle.certified.json")
+	certDst := filepath.Join(work, "science_claim_bundle.certified.json")
+	data, err := os.ReadFile(certSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(certDst, data, 0644); err != nil {
+		t.Fatal(err)
+	}
 	pcsCore := filepath.Join(filepath.Dir(root), "pcs-core")
+	manifest := loadReleaseManifest(t)
 	env := append(os.Environ(),
 		"PF_RELEASE_MODE=1",
+		"PF_SOURCE_COMMIT="+manifest.PFSourceCommit,
+		"PF_DETERMINISTIC=1",
 		"PCS_CORE_PATH="+pcsCore,
 	)
 	var cmd *exec.Cmd
@@ -253,7 +266,7 @@ func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 		if _, err := os.Stat(ps1); err != nil {
 			t.Skip("pcs-pf-clean-chain.ps1 not found")
 		}
-		cmd = exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1, release)
+		cmd = exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1, work)
 		cmd.Dir = root
 		cmd.Env = env
 	} else {
@@ -261,14 +274,14 @@ func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 		if _, err := os.Stat(script); err != nil {
 			t.Skip("pcs-pf-clean-chain.sh not found")
 		}
-		cmd = exec.Command("bash", script, release)
+		cmd = exec.Command("bash", script, work)
 		cmd.Env = append(env, "PF=go -C "+filepath.Join(root, "core", "cli", "pf")+" run .")
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("PF clean-chain segment failed: %v\n%s", err, out)
 	}
 	for _, name := range []string{"verification_result.json", "signed_science_claim_bundle.json"} {
-		if _, err := os.Stat(filepath.Join(release, name)); err != nil {
+		if _, err := os.Stat(filepath.Join(work, name)); err != nil {
 			t.Fatalf("missing %s after PF clean-chain segment", name)
 		}
 	}

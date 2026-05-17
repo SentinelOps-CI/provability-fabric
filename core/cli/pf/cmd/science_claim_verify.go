@@ -20,6 +20,7 @@ func verifyRootCmd() *cobra.Command {
 		Long:  `Verify Proof-Carrying Science artifacts such as ScienceClaimBundle.v0.`,
 	}
 	cmd.AddCommand(scienceClaimVerifyCmd())
+	cmd.AddCommand(releaseChainVerifyCmd())
 	return cmd
 }
 
@@ -27,6 +28,8 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	var jsonOut bool
 	var outPath string
 	var handoffPath string
+	var registryPath string
+	var releaseChainOut string
 	var localDev bool
 	var releaseMode bool
 
@@ -37,9 +40,15 @@ func scienceClaimVerifyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bundlePath := args[0]
-			result, err := verifyBundle(bundlePath, localDev, releaseMode, handoffPath)
+			result, err := verifyBundle(bundlePath, localDev, releaseMode, handoffPath, registryPath)
 			if err != nil {
 				return err
+			}
+
+			if releaseChainOut != "" {
+				if err := writeReleaseChainResult(bundlePath, result, handoffPath, registryPath, releaseChainOut, localDev, releaseMode); err != nil {
+					return err
+				}
 			}
 
 			if outPath != "" {
@@ -83,6 +92,8 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult to file")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")
-	cmd.Flags().StringVar(&handoffPath, "handoff", "", "LabTrust pf_handoff.json; bundle hash, certificate_id, and trace_hash must match")
+	cmd.Flags().StringVar(&handoffPath, "handoff", "", "LabTrust pf_handoff.json or HandoffManifest.v0; bundle pins must match")
+	cmd.Flags().StringVar(&registryPath, "registry", "", "ReleaseManifest.v0 used as artifact registry for admission checks")
+	cmd.Flags().StringVar(&releaseChainOut, "release-chain-result", "", "Write ReleaseChainValidationResult.v0 JSON")
 	return cmd
 }

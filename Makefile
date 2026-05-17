@@ -81,6 +81,9 @@ test-pcs:
 	cd core/cli/pf && go test ./cmd/... -count=1
 	@$(ECHOOK) "OK: PCS unit and CLI tests passed"
 
+test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures
+	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures)"
+
 validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
 	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
@@ -93,10 +96,18 @@ ifeq ($(OS),Windows_NT)
 test-pcs-rc-gate:
 	@$(ECHOOK) "PCS RC fixture lock tests..."
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pcs-rc-gate.ps1
+
+test-pcs-phase2:
+	@$(ECHOOK) "PCS Phase 2 protocol tests..."
+	cd adapters/pcs && go test -count=1 -run "TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition" ./...
 else
 test-pcs-rc-gate:
 	@$(ECHOOK) "PCS RC fixture lock tests..."
 	bash scripts/test-pcs-rc-gate.sh
+
+test-pcs-phase2:
+	@$(ECHOOK) "PCS Phase 2 protocol tests..."
+	cd adapters/pcs && go test -count=1 -run 'TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition' ./...
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -109,8 +120,8 @@ freeze-pcs-labtrust-release:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-release.ps1
 
 pcs-v01-pf-chain:
-	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
-	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
+	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release-run/, does not mutate fixtures)..."
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 release-run
 else
 freeze-pcs-labtrust-signed:
 	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
@@ -121,8 +132,8 @@ freeze-pcs-labtrust-release:
 	bash scripts/pcs-freeze-labtrust-release.sh
 
 pcs-v01-pf-chain:
-	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
-	@PF_RELEASE_MODE=1 PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release
+	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release-run/, does not mutate fixtures)..."
+	@PF_RELEASE_MODE=1 PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh release-run
 endif
 
 pcs-v01-clean-chain:

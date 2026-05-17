@@ -68,6 +68,87 @@
     "ref_list": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "release_status": {
+      "type": "string",
+      "enum": ["Draft", "Validated", "Rejected", "Stale", "Deprecated"]
+    },
+    "handoff_kind": {
+      "type": "string",
+      "enum": [
+        "runtime_to_certificate",
+        "certificate_to_bundle",
+        "bundle_to_verifier",
+        "signed_bundle_to_memory",
+        "release_chain"
+      ]
+    },
+    "handoff_status": {
+      "type": "string",
+      "enum": ["Draft", "Validated", "Rejected", "Stale", "Deprecated"]
+    },
+    "release_chain_validation_status": {
+      "type": "string",
+      "enum": ["ProofChecked", "Rejected", "Stale"]
+    },
+    "validation_check_status": {
+      "type": "string",
+      "enum": ["passed", "failed", "warning", "skipped"]
+    },
+    "producer_repo_pin": {
+      "type": "object",
+      "required": ["repo", "commit"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": { "type": "string", "format": "uri" },
+        "commit": { "$ref": "#/$defs/git_commit" },
+        "local_dev": { "type": "boolean" }
+      }
+    },
+    "manifest_artifact_entry": {
+      "type": "object",
+      "required": [
+        "artifact_type",
+        "schema",
+        "producer",
+        "source_repo",
+        "source_commit",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": { "type": "string", "minLength": 1 },
+        "schema": { "type": "string", "minLength": 1 },
+        "producer": { "type": "string", "minLength": 1 },
+        "source_repo": { "type": "string", "format": "uri" },
+        "source_commit": { "$ref": "#/$defs/git_commit" },
+        "sha256": { "$ref": "#/$defs/hex_digest" },
+        "local_dev": { "type": "boolean" }
+      }
+    },
+    "handoff_artifact_ref": {
+      "type": "object",
+      "required": ["artifact_type"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_type": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
+    "release_validation_check": {
+      "type": "object",
+      "required": ["check_id", "description", "status", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/validation_check_status" },
+        "details": { "type": "object" }
+      }
     }
   }
 }
