@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Provability Fabric CLI wrapper — run from repository root: ./pf verify science-claim ...
+set -e
+ROOT="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+cd "$ROOT/core/cli/pf"
+exec go run . "$@"

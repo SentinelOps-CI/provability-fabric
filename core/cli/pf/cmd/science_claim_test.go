@@ -27,11 +27,15 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
-func TestCLIVerifyScienceClaim(t *testing.T) {
-	root := repoRoot(t)
-	bundle := filepath.Join(root, "tests", "pcs", "valid_labtrust_bundle.json")
+func pfDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(repoRoot(t), "core", "cli", "pf")
+}
+
+func TestVerifyValidLabtrustBundlePassesCLI(t *testing.T) {
+	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "valid_labtrust_bundle.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle, "--json")
-	cmd.Dir = filepath.Join(root, "core", "cli", "pf")
+	cmd.Dir = pfDir(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("verify failed: %v\n%s", err, out)
@@ -39,52 +43,51 @@ func TestCLIVerifyScienceClaim(t *testing.T) {
 	if !strings.Contains(string(out), `"status": "passed"`) {
 		t.Fatalf("expected passed status in output: %s", out)
 	}
-}
-
-func TestCLIInspectScienceClaim(t *testing.T) {
-	root := repoRoot(t)
-	bundle := filepath.Join(root, "tests", "pcs", "valid_labtrust_bundle.json")
-	pfDir := filepath.Join(root, "core", "cli", "pf")
-	signed := filepath.Join(t.TempDir(), "signed_science_claim_bundle.json")
-
-	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)
-	sign.Dir = pfDir
-	if out, err := sign.CombinedOutput(); err != nil {
-		t.Fatalf("sign failed: %v\n%s", err, out)
-	}
-
-	inspect := exec.Command("go", "run", ".", "inspect", "science-claim", signed)
-	inspect.Dir = pfDir
-	out, err := inspect.CombinedOutput()
-	if err != nil {
-		t.Fatalf("inspect failed: %v\n%s", err, out)
-	}
-	body := string(out)
-	for _, want := range []string{"verification_status: passed", "pcs.schema.science_claim_bundle", "Checks (14):"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("inspect output missing %q:\n%s", want, body)
-		}
-	}
-	for _, id := range []string{
-		"pcs.presence.claim_artifact",
-		"pcs.metadata.signature_or_digest",
-	} {
-		if !strings.Contains(body, id) {
-			t.Fatalf("inspect output missing check %q", id)
-		}
+	if !strings.Contains(string(out), `"schema_version": "v0"`) {
+		t.Fatalf("expected schema_version v0: %s", out)
 	}
 }
 
-func TestCLISignRejectsFailedBundle(t *testing.T) {
-	root := repoRoot(t)
-	bundle := filepath.Join(root, "tests", "pcs", "invalid_missing_certificate.json")
+func TestSignFailedBundleRefusesCLI(t *testing.T) {
+	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_missing_certificate.json")
 	cmd := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", filepath.Join(t.TempDir(), "signed.json"))
-	cmd.Dir = filepath.Join(root, "core", "cli", "pf")
+	cmd.Dir = pfDir(t)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected sign to fail, got success: %s", out)
 	}
 	if !strings.Contains(string(out), "signing refused") {
 		t.Fatalf("expected signing refused message: %s", out)
+	}
+}
+
+func TestInspectPrintsCheckSummaryCLI(t *testing.T) {
+	root := repoRoot(t)
+	bundle := filepath.Join(root, "tests", "pcs", "valid_labtrust_bundle.json")
+	signed := filepath.Join(t.TempDir(), "signed_science_claim_bundle.json")
+
+	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)
+	sign.Dir = pfDir(t)
+	if out, err := sign.CombinedOutput(); err != nil {
+		t.Fatalf("sign failed: %v\n%s", err, out)
+	}
+
+	inspect := exec.Command("go", "run", ".", "inspect", "science-claim", signed)
+	inspect.Dir = pfDir(t)
+	out, err := inspect.CombinedOutput()
+	if err != nil {
+		t.Fatalf("inspect failed: %v\n%s", err, out)
+	}
+	body := string(out)
+	if !strings.Contains(body, "verification_status:  passed") && !strings.Contains(body, "verification_status: passed") {
+		t.Fatalf("inspect output missing passed status:\n%s", body)
+	}
+	if !strings.Contains(body, "Checks (15):") {
+		t.Fatalf("inspect must list all 15 checks:\n%s", body)
+	}
+	for _, id := range []string{"trace_hash_alignment", "science_claim_bundle_schema", "source_commit_not_placeholder"} {
+		if !strings.Contains(body, id) {
+			t.Fatalf("inspect missing check_id %s", id)
+		}
 	}
 }

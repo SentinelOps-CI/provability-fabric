@@ -15,6 +15,7 @@ import (
 func scienceClaimSignCmd() *cobra.Command {
 	var outPath string
 	var jsonOut bool
+	var localDev bool
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -26,24 +27,32 @@ func scienceClaimSignCmd() *cobra.Command {
 			if outPath == "" {
 				return fmt.Errorf("--out is required")
 			}
-
-			bundle, err := pcs.LoadScienceClaimBundle(bundlePath)
+			outResolved, err := pcs.ResolveOutputPath(outPath)
 			if err != nil {
 				return err
 			}
-			opts, err := resolvePCSOpts(bundlePath)
+			resolved, err := pcs.ResolveArtifactPath(bundlePath)
 			if err != nil {
 				return err
 			}
-			result, err := pcs.VerifyScienceClaimBundle(bundlePath, bundle, opts)
+			bundle, err := pcs.LoadScienceClaimBundle(resolved)
+			if err != nil {
+				return err
+			}
+			opts, err := resolvePCSOpts(resolved, localDev)
+			if err != nil {
+				return err
+			}
+			result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
 			if err != nil {
 				return err
 			}
 			if !pcs.VerificationPassed(result) {
-				return fmt.Errorf("signing refused: verification status is %s", result.Status)
+				printVerificationFailures(result)
+				return cliExit(ExitVerificationFailed, fmt.Errorf("signing refused: verification status is %s", result.Status))
 			}
 
-			signed, err := pcs.SignVerificationResult(opts.RepoRoot, bundlePath, bundle, result)
+			signed, err := pcs.SignVerificationResult(opts.RepoRoot, bundle, result)
 			if err != nil {
 				return err
 			}
@@ -52,7 +61,7 @@ func scienceClaimSignCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := os.WriteFile(outPath, data, 0644); err != nil {
+			if err := os.WriteFile(outResolved, data, 0644); err != nil {
 				return fmt.Errorf("write signed bundle: %w", err)
 			}
 
@@ -61,7 +70,8 @@ func scienceClaimSignCmd() *cobra.Command {
 				enc.SetIndent("", "  ")
 				_ = enc.Encode(signed)
 			} else {
-				fmt.Printf("signed bundle written to %s\n", outPath)
+				fmt.Printf("signed bundle written to %s\n", outResolved)
+				fmt.Printf("signed_bundle_id: %s\n", signed.SignedBundleID)
 				fmt.Printf("verification_id: %s\n", result.VerificationID)
 				fmt.Printf("status: %s\n", result.Status)
 			}
@@ -71,6 +81,7 @@ func scienceClaimSignCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&outPath, "out", "", "Output path for signed_science_claim_bundle.json")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Also print signed wrapper JSON to stdout")
+	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }

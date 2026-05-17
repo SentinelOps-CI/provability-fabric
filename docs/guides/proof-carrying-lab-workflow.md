@@ -39,12 +39,24 @@ pf inspect science-claim signed_science_claim_bundle.json
 
 Scientific Memory imports `signed_science_claim_bundle.json` and reads:
 
-- `verification_result.status`
-- `verification_result.checks`
-- `verification_result.signature_or_digest`
+- `science_claim_bundle`
+- `verification_result` (including `checks[].details.reason_code` on failures)
 - `signature_or_digest` on the signed wrapper
 
 No in-process Provability Fabric installation is required in Scientific Memory for import.
+
+## Release gates
+
+```bash
+make test-pcs
+make validate-pcs-fixtures
+```
+
+Or run the standalone validator:
+
+```bash
+cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
+```
 
 ## Canonical vocabulary
 

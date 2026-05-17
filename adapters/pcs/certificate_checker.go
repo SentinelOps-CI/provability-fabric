@@ -3,17 +3,35 @@
 
 package pcs
 
-// CheckCertificateStatus verifies TraceCertificate.status is CertificateChecked.
-func CheckCertificateStatus(cert *TraceCertificate) VerificationCheck {
-	const id = "pcs.certificate.status_checked"
-	if cert == nil {
-		return failCheck(id, "TraceCertificate.status is CertificateChecked", "trace certificate missing")
+// CheckAllCertificateStatus verifies every TraceCertificate.status is CertificateChecked.
+func CheckAllCertificateStatus(certs []*TraceCertificate) VerificationCheck {
+	const id = "certificate_status_checked"
+	if len(certs) == 0 {
+		return failCheck(id, "TraceCertificate.status is CertificateChecked", ReasonArtifactMissing,
+			detailMsg("no trace certificates"))
 	}
-	if cert.Status == StatusRejected {
-		return failCheck(id, "TraceCertificate.status is CertificateChecked", "certificate status is Rejected")
+	for i, cert := range certs {
+		if cert == nil {
+			return failCheck(id, "TraceCertificate.status is CertificateChecked", ReasonCertificateNotChecked,
+				map[string]any{"certificate_index": i, "message": "null certificate"})
+		}
+		if cert.Status == StatusRejected {
+			return failCheck(id, "TraceCertificate.status is CertificateChecked", ReasonCertificateRejected, map[string]any{
+				"certificate_index": i,
+				"certificate_id":    cert.CertificateID,
+				"status":              cert.Status,
+			})
+		}
+		if cert.Status != StatusCertificateChecked {
+			return failCheck(id, "TraceCertificate.status is CertificateChecked", ReasonCertificateNotChecked, map[string]any{
+				"certificate_index": i,
+				"certificate_id":    cert.CertificateID,
+				"status":              cert.Status,
+			})
+		}
 	}
-	if cert.Status != StatusCertificateChecked {
-		return failCheck(id, "TraceCertificate.status is CertificateChecked", "status="+cert.Status)
-	}
-	return passCheck(id, "TraceCertificate.status is CertificateChecked", cert.Status)
+	return passCheck(id, "TraceCertificate.status is CertificateChecked", map[string]any{
+		"certificate_count": len(certs),
+		"status":              StatusCertificateChecked,
+	})
 }

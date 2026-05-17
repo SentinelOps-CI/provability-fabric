@@ -38,7 +38,7 @@ func scienceClaimInspectCmd() *cobra.Command {
 			if err := pcs.VerifySignedBundleIntegrity(signed); err != nil {
 				return fmt.Errorf("signed bundle integrity: %w", err)
 			}
-			opts, err := resolvePCSOpts(args[0])
+			opts, err := resolvePCSOpts(args[0], false)
 			if err == nil {
 				if err := pcs.ValidateSignedScienceClaimBundle(opts.RepoRoot, signed); err != nil {
 					return fmt.Errorf("signed bundle schema: %w", err)

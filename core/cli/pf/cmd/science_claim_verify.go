@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+
 func verifyRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify",
@@ -24,6 +25,7 @@ func verifyRootCmd() *cobra.Command {
 func scienceClaimVerifyCmd() *cobra.Command {
 	var jsonOut bool
 	var outPath string
+	var localDev bool
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -32,7 +34,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bundlePath := args[0]
-			result, err := verifyBundle(bundlePath)
+			result, err := verifyBundle(bundlePath, localDev)
 			if err != nil {
 				return err
 			}
@@ -67,13 +69,15 @@ func scienceClaimVerifyCmd() *cobra.Command {
 			}
 
 			if result.Status != "passed" {
-				return fmt.Errorf("verification failed")
+				printVerificationFailures(result)
+				return cliExit(ExitVerificationFailed, fmt.Errorf("verification failed"))
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit VerificationResult.v0 as JSON on stdout")
-	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult.v0 to file")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit VerificationResult as JSON on stdout")
+	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult to file")
+	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	return cmd
 }

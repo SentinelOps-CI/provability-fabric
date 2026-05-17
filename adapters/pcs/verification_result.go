@@ -15,19 +15,29 @@ import (
 	"github.com/google/uuid"
 )
 
-func passCheck(id, description, details string) VerificationCheck {
+func passCheck(id, description string, details map[string]any) VerificationCheck {
+	if details == nil {
+		details = map[string]any{}
+	}
 	return VerificationCheck{CheckID: id, Description: description, Status: CheckPassed, Details: details}
 }
 
-func failCheck(id, description, details string) VerificationCheck {
-	return VerificationCheck{CheckID: id, Description: description, Status: CheckFailed, Details: details}
+func failCheck(id, description, reasonCode string, details map[string]any) VerificationCheck {
+	return VerificationCheck{CheckID: id, Description: description, Status: CheckFailed, Details: withReason(reasonCode, details)}
 }
 
-func skipCheck(id, description, details string) VerificationCheck {
+func skipCheck(id, description string, details map[string]any) VerificationCheck {
+	if details == nil {
+		details = map[string]any{}
+	}
 	return VerificationCheck{CheckID: id, Description: description, Status: CheckSkipped, Details: details}
 }
 
-// BuildVerificationResult constructs VerificationResult.v0 from completed checks.
+func detailMsg(msg string) map[string]any {
+	return map[string]any{"message": msg}
+}
+
+// BuildVerificationResult constructs VerificationResult (schema_version v0).
 func BuildVerificationResult(bundle *ScienceClaimBundle, checks []VerificationCheck, verifierVersion, sourceCommit string) VerificationResult {
 	status := "passed"
 	for _, c := range checks {
@@ -47,8 +57,8 @@ func BuildVerificationResult(bundle *ScienceClaimBundle, checks []VerificationCh
 		sourceCommit = ResolveSourceCommit()
 	}
 	result := VerificationResult{
-		VerificationID:  uuid.NewString(),
-		SchemaVersion:   SchemaVerificationResult,
+		SchemaVersion:   SchemaVersionV0,
+		VerificationID:  fmt.Sprintf("verification-%s", uuid.NewString()),
 		BundleID:        bundleID,
 		Verifier:        VerifierName,
 		VerifierVersion: verifierVersion,
@@ -91,70 +101,18 @@ func ResolveSourceCommit() string {
 	return strings.TrimSpace(string(out))
 }
 
-// SignVerificationResult builds a SignedScienceClaimBundle for import by Scientific Memory.
-func SignVerificationResult(repoRoot, bundlePath string, bundle *ScienceClaimBundle, result VerificationResult) (*SignedScienceClaimBundle, error) {
-	if !VerificationPassed(result) {
-		return nil, fmt.Errorf("cannot sign: verification status is %s", result.Status)
-	}
-	digest, err := BundleDigest(bundlePath)
-	if err != nil {
-		return nil, fmt.Errorf("bundle digest: %w", err)
-	}
-	signed := &SignedScienceClaimBundle{
-		SchemaVersion:      SchemaSignedScienceClaim,
-		BundleID:           result.BundleID,
-		BundleDigest:       "sha256:" + digest,
-		SignedAt:           time.Now().UTC().Format(time.RFC3339),
-		ScienceClaimBundle: bundle,
-		VerificationResult: result,
-	}
-	signed.SignatureOrDigest = digestSignedBundle(signed)
-	if err := VerifySignedBundleIntegrity(signed); err != nil {
-		return nil, err
-	}
-	if repoRoot != "" {
-		if err := ValidateSignedScienceClaimBundle(repoRoot, signed); err != nil {
-			return nil, fmt.Errorf("signed bundle schema: %w", err)
-		}
-	}
-	return signed, nil
-}
-
-func digestSignedBundle(signed *SignedScienceClaimBundle) string {
-	copy := *signed
-	copy.SignatureOrDigest = ""
-	payload, err := CanonicalJSON(copy)
-	if err != nil {
-		return ""
-	}
-	return "sha256:" + SHA256Hex(payload)
-}
-
 // VerificationPassed reports whether all required checks passed.
 func VerificationPassed(result VerificationResult) bool {
 	return result.Status == "passed"
 }
 
-// FormatInspectSummary renders a human-readable inspection report.
-func FormatInspectSummary(signed *SignedScienceClaimBundle) string {
-	var b strings.Builder
-	vr := signed.VerificationResult
-	fmt.Fprintf(&b, "Signed Science Claim Bundle\n")
-	fmt.Fprintf(&b, "  bundle_id:          %s\n", signed.BundleID)
-	fmt.Fprintf(&b, "  bundle_digest:      %s\n", signed.BundleDigest)
-	fmt.Fprintf(&b, "  signed_at:          %s\n", signed.SignedAt)
-	fmt.Fprintf(&b, "  verification_id:    %s\n", vr.VerificationID)
-	fmt.Fprintf(&b, "  verifier:           %s %s\n", vr.Verifier, vr.VerifierVersion)
-	fmt.Fprintf(&b, "  verification_status: %s\n", vr.Status)
-	fmt.Fprintf(&b, "  result_digest:      %s\n", vr.SignatureOrDigest)
-	fmt.Fprintf(&b, "  wrapper_digest:     %s\n\n", signed.SignatureOrDigest)
-	fmt.Fprintf(&b, "Checks (%d):\n", len(vr.Checks))
-	for _, c := range vr.Checks {
-		fmt.Fprintf(&b, "  [%s] %s\n", c.Status, c.CheckID)
-		fmt.Fprintf(&b, "         %s\n", c.Description)
-		if c.Details != "" {
-			fmt.Fprintf(&b, "         %s\n", c.Details)
+// FailedChecks returns checks that did not pass.
+func FailedChecks(result VerificationResult) []VerificationCheck {
+	var failed []VerificationCheck
+	for _, c := range result.Checks {
+		if c.Status == CheckFailed {
+			failed = append(failed, c)
 		}
 	}
-	return b.String()
+	return failed
 }

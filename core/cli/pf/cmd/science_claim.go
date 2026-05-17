@@ -4,42 +4,68 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
-func resolvePCSOpts(bundlePath string) (pcs.ValidateOptions, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return pcs.ValidateOptions{}, err
+// Exit codes for PCS commands (sysexits-inspired).
+const (
+	ExitOK                 = 0
+	ExitVerificationFailed = 1
+	ExitError              = 2
+)
+
+func resolvePCSOpts(bundlePath string, localDev bool) (pcs.ValidateOptions, error) {
+	repoRoot := ""
+	if wd, err := os.Getwd(); err == nil {
+		repoRoot, _ = pcs.FindRepoRoot(wd)
 	}
-	repoRoot, err := pcs.FindRepoRoot(wd)
-	if err != nil {
-		if abs, aerr := filepath.Abs(bundlePath); aerr == nil {
-			repoRoot, err = pcs.FindRepoRoot(filepath.Dir(abs))
+	if repoRoot == "" {
+		if abs, err := filepath.Abs(bundlePath); err == nil {
+			repoRoot, _ = pcs.FindRepoRoot(filepath.Dir(abs))
 		}
-	}
-	if err != nil {
-		return pcs.ValidateOptions{}, fmt.Errorf("%w (run from provability-fabric repo root)", err)
 	}
 	return pcs.ValidateOptions{
 		RepoRoot:        repoRoot,
 		VerifierVersion: pcs.DefaultVerifierVersion,
 		SourceCommit:    pcs.ResolveSourceCommit(),
+		LocalDev:        localDev,
 	}, nil
 }
 
-func verifyBundle(bundlePath string) (pcs.VerificationResult, error) {
-	bundle, err := pcs.LoadScienceClaimBundle(bundlePath)
+func verifyBundle(bundlePath string, localDev bool) (pcs.VerificationResult, error) {
+	resolved, err := pcs.ResolveArtifactPath(bundlePath)
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
-	opts, err := resolvePCSOpts(bundlePath)
+	bundle, err := pcs.LoadScienceClaimBundle(resolved)
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
-	return pcs.VerifyScienceClaimBundle(bundlePath, bundle, opts)
+	opts, err := resolvePCSOpts(resolved, localDev)
+	if err != nil {
+		return pcs.VerificationResult{}, err
+	}
+	return pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
+}
+
+func printVerificationFailures(result pcs.VerificationResult) {
+	for _, c := range pcs.FailedChecks(result) {
+		code, _ := c.Details["reason_code"].(string)
+		if code != "" {
+			printVerifFailure(c.CheckID, code, c.Description)
+		} else {
+			printVerifFailure(c.CheckID, "", c.Description)
+		}
+	}
+}
+
+func printVerifFailure(checkID, reasonCode, description string) {
+	if reasonCode != "" {
+		os.Stderr.WriteString(checkID + ": " + reasonCode + " — " + description + "\n")
+		return
+	}
+	os.Stderr.WriteString(checkID + ": " + description + "\n")
 }

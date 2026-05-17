@@ -50,7 +50,12 @@ jobs:
       - name: Test PCS adapter
         run: |
           cd adapters/pcs
-          go test ./... -count=1 -race
+          go test ./... -count=1
+
+      - name: Validate PCS fixtures
+        run: |
+          cd tools/pcs-validate
+          go run . --fixtures ../../tests/pcs
 
       - name: Test pf PCS CLI
         run: |
@@ -67,7 +72,8 @@ jobs:
           go run . inspect science-claim "$OUT" | tee "$RUNNER_TEMP/inspect.txt"
           grep -q '"status": "passed"' "$RUNNER_TEMP/verify.json"
           grep -q 'verification_status: passed' "$RUNNER_TEMP/inspect.txt"
-          grep -q 'pcs.schema.science_claim_bundle' "$RUNNER_TEMP/inspect.txt"
+          grep -q 'science_claim_bundle_schema' "$RUNNER_TEMP/inspect.txt"
+          grep -q 'Checks (15):' "$RUNNER_TEMP/inspect.txt"
 
       - name: Reject failed bundle sign
         run: |

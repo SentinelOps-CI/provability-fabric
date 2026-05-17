@@ -12,9 +12,13 @@ import (
 
 // LoadScienceClaimBundle reads and unmarshals a ScienceClaimBundle.v0 JSON file.
 func LoadScienceClaimBundle(path string) (*ScienceClaimBundle, error) {
-	data, err := os.ReadFile(path)
+	resolved, err := ResolveArtifactPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("read bundle %s: %w", path, err)
+		return nil, err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("read bundle %s: %w", resolved, err)
 	}
 	var bundle ScienceClaimBundle
 	if err := json.Unmarshal(data, &bundle); err != nil {
@@ -25,9 +29,13 @@ func LoadScienceClaimBundle(path string) (*ScienceClaimBundle, error) {
 
 // LoadSignedScienceClaimBundle reads a signed wrapper produced by pf sign science-claim.
 func LoadSignedScienceClaimBundle(path string) (*SignedScienceClaimBundle, error) {
-	data, err := os.ReadFile(path)
+	resolved, err := ResolveArtifactPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("read signed bundle %s: %w", path, err)
+		return nil, err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("read signed bundle %s: %w", resolved, err)
 	}
 	var signed SignedScienceClaimBundle
 	if err := json.Unmarshal(data, &signed); err != nil {
@@ -38,7 +46,11 @@ func LoadSignedScienceClaimBundle(path string) (*SignedScienceClaimBundle, error
 
 // BundleDigest returns a stable sha256 digest for the raw bundle bytes.
 func BundleDigest(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	resolved, err := ResolveArtifactPath(path)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(resolved)
 	if err != nil {
 		return "", err
 	}

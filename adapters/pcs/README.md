@@ -18,3 +18,10 @@ pf inspect science-claim /tmp/signed.json
 ```
 
 Canonical artifact vocabulary lives in [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
+
+## Output shapes (Scientific Memory import)
+
+- `VerificationResult`: `schema_version` = `v0`, `checks[].details` as JSON objects
+- `SignedScienceClaimBundle`: top-level `science_claim_bundle`, `verification_result`, `signature_or_digest`
+
+Use `--local-dev` on verify/sign only for local bundles with `local_dev: true` or the 40-zero `source_commit` placeholder.

@@ -13,24 +13,50 @@ import (
 )
 
 func loadCompiledSchema(repoRoot, schemaFile string) (*jsonschema.Schema, error) {
-	schemaPath := ResolveSchemaPath(repoRoot, schemaFile)
-	if _, err := os.Stat(schemaPath); err != nil {
-		return nil, fmt.Errorf("schema not found: %s", schemaPath)
-	}
 	compiler := jsonschema.NewCompiler()
-	// Register sibling PCS schemas so cross-$ref resolution works when added later.
+	registered := false
+
+	register := func(name, content string) error {
+		if err := compiler.AddResource(name, strings.NewReader(content)); err != nil {
+			return err
+		}
+		registered = true
+		return nil
+	}
+
 	for _, sibling := range []string{
 		"VerificationResult.v0.schema.json",
 		"ScienceClaimBundle.v0.schema.json",
 		"SignedScienceClaimBundle.v0.schema.json",
 	} {
-		p := ResolveSchemaPath(repoRoot, sibling)
-		if _, err := os.Stat(p); err == nil {
-			_ = compiler.AddResource(sibling, strings.NewReader(mustRead(p)))
+		if body, ok := readEmbeddedSchema(sibling); ok {
+			_ = register(sibling, body)
+		} else if repoRoot != "" {
+			p := ResolveSchemaPath(repoRoot, sibling)
+			if _, err := os.Stat(p); err == nil {
+				_ = register(sibling, mustReadFile(p))
+			}
 		}
 	}
-	if err := compiler.AddResource(schemaFile, strings.NewReader(mustRead(schemaPath))); err != nil {
-		return nil, err
+
+	if body, ok := readEmbeddedSchema(schemaFile); ok {
+		if err := register(schemaFile, body); err != nil {
+			return nil, err
+		}
+	} else if repoRoot != "" {
+		schemaPath := ResolveSchemaPath(repoRoot, schemaFile)
+		if _, err := os.Stat(schemaPath); err != nil {
+			return nil, fmt.Errorf("schema not found: %s (embedded and repo)", schemaFile)
+		}
+		if err := register(schemaFile, mustReadFile(schemaPath)); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("schema not found: %s", schemaFile)
+	}
+
+	if !registered {
+		return nil, fmt.Errorf("no schema resources registered for %s", schemaFile)
 	}
 	return compiler.Compile(schemaFile)
 }
@@ -44,7 +70,7 @@ func ValidateDocumentAgainstSchema(repoRoot, schemaFile string, doc any) error {
 	return schema.Validate(doc)
 }
 
-func mustRead(path string) string {
+func mustReadFile(path string) string {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
@@ -89,4 +115,9 @@ func ValidateSignedScienceClaimBundle(repoRoot string, signed *SignedScienceClai
 		return err
 	}
 	return ValidateDocumentAgainstSchema(repoRoot, "SignedScienceClaimBundle.v0.schema.json", doc)
+}
+
+// ValidateVerificationResultAlways validates using embedded schemas when repo root is unknown.
+func ValidateVerificationResultAlways(result VerificationResult) error {
+	return ValidateVerificationResult("", result)
 }

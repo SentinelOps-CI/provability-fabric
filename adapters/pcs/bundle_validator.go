@@ -11,137 +11,160 @@ import (
 
 // ValidateOptions configures bundle verification.
 type ValidateOptions struct {
-	RepoRoot          string
-	VerifierVersion   string
-	SourceCommit      string
+	RepoRoot           string
+	VerifierVersion    string
+	SourceCommit       string
+	LocalDev           bool
 	SkipSchemaValidate bool
 }
 
-// VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.v0.
+// VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
 func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) (VerificationResult, error) {
+	if bundle != nil && bundle.LocalDev {
+		opts.LocalDev = true
+	}
 	checks, err := runChecks(bundlePath, bundle, opts)
 	if err != nil {
 		return VerificationResult{}, err
 	}
 	result := BuildVerificationResult(bundle, checks, opts.VerifierVersion, opts.SourceCommit)
-	if opts.RepoRoot != "" {
-		if err := ValidateVerificationResult(opts.RepoRoot, result); err != nil {
-			return VerificationResult{}, fmt.Errorf("verification result schema: %w", err)
-		}
+	if err := ValidateVerificationResult(opts.RepoRoot, result); err != nil {
+		return VerificationResult{}, fmt.Errorf("verification result schema: %w", err)
 	}
 	return result, nil
 }
 
 func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) ([]VerificationCheck, error) {
+	certs := bundle.TraceCertificatesList()
+
 	checks := []VerificationCheck{
 		checkBundleSchema(bundlePath, bundle, opts),
-		presenceCheck("pcs.presence.claim_artifact", "ClaimArtifact.v0 is present", bundle.ClaimArtifact != nil),
-		presenceCheck("pcs.presence.assumption_set", "AssumptionSet.v0 is present", bundle.AssumptionSet != nil),
-		presenceCheck("pcs.presence.runtime_receipt", "RuntimeReceipt.v0 is present", bundle.RuntimeReceipt != nil),
-		presenceCheck("pcs.presence.trace_certificate", "TraceCertificate.v0 is present", bundle.TraceCertificate != nil),
-		presenceCheck("pcs.presence.evidence_bundle", "EvidenceBundle.v0 is present", bundle.EvidenceBundle != nil),
+		presenceCheck("claim_artifact_present", "ClaimArtifact.v0 exists", "claim_artifact", bundle.ClaimArtifact != nil),
+		presenceCheck("assumption_set_present", "AssumptionSet.v0 exists", "assumption_set", bundle.AssumptionSet != nil),
+		presenceCheck("runtime_receipt_present", "RuntimeReceipt.v0 exists", "runtime_receipt", bundle.RuntimeReceipt != nil),
+		presenceCheck("trace_certificate_present", "At least one TraceCertificate.v0 exists", "trace_certificate", len(certs) > 0),
+		presenceCheck("evidence_bundle_present", "EvidenceBundle.v0 exists", "evidence_bundle", bundle.EvidenceBundle != nil),
 		CheckAssumptionSetRefMatch(bundle.ClaimArtifact, bundle.AssumptionSet),
 		CheckRuntimeTraceHashPresent(bundle.RuntimeReceipt),
-		CheckTraceHashMatch(bundle.RuntimeReceipt, bundle.TraceCertificate),
-		CheckCertificateStatus(bundle.TraceCertificate),
-		checkEvidenceReferences(bundle),
+		CheckAllTraceHashAlignment(bundle.RuntimeReceipt, certs),
+		CheckAllCertificateStatus(certs),
+		checkEvidenceRefsComplete(bundle),
 		checkNotStale(bundle),
-		checkMajorProvenance(bundle),
-		checkMajorSignatures(bundle),
+		checkSourceProvenance(bundle),
+		checkSignaturesPresent(bundle),
+		checkSourceCommitNotPlaceholder(bundle, opts.LocalDev),
 	}
 	return NormalizeChecks(checks)
 }
 
 func checkBundleSchema(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) VerificationCheck {
-	const id = "pcs.schema.science_claim_bundle"
+	const id = "science_claim_bundle_schema"
 	if opts.SkipSchemaValidate {
-		return skipCheck(id, "ScienceClaimBundle.v0 schema is valid", "schema validation skipped")
+		return skipCheck(id, "ScienceClaimBundle.v0 schema is valid", detailMsg("schema validation skipped"))
 	}
 	repoRoot := opts.RepoRoot
 	if repoRoot == "" {
-		var err error
-		repoRoot, err = FindRepoRoot(filepath.Dir(bundlePath))
-		if err != nil {
-			return failCheck(id, "ScienceClaimBundle.v0 schema is valid", err.Error())
-		}
+		repoRoot, _ = FindRepoRoot(filepath.Dir(bundlePath))
 	}
 	if err := ValidateScienceClaimBundleFile(repoRoot, bundlePath); err != nil {
-		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", err.Error())
+		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", ReasonSchemaInvalid, detailMsg(err.Error()))
 	}
 	if bundle != nil && bundle.SchemaVersion != "" && bundle.SchemaVersion != SchemaScienceClaimBundle {
-		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", "schema_version="+bundle.SchemaVersion)
+		return failCheck(id, "ScienceClaimBundle.v0 schema is valid", ReasonSchemaInvalid,
+			map[string]any{"schema_version": bundle.SchemaVersion})
 	}
-	return passCheck(id, "ScienceClaimBundle.v0 schema is valid", "config/schemas/pcs/ScienceClaimBundle.v0.schema.json")
+	return passCheck(id, "ScienceClaimBundle.v0 schema is valid",
+		map[string]any{"schema": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"})
 }
 
-func presenceCheck(id, description string, ok bool) VerificationCheck {
+func presenceCheck(id, description, artifact string, ok bool) VerificationCheck {
 	if ok {
-		return passCheck(id, description, "present")
+		return passCheck(id, description, map[string]any{"present": true, "artifact": artifact})
 	}
-	return failCheck(id, description, "missing")
+	return failCheck(id, description, ReasonArtifactMissing, map[string]any{"present": false, "artifact": artifact})
 }
 
-func checkEvidenceReferences(bundle *ScienceClaimBundle) VerificationCheck {
-	const id = "pcs.evidence.artifact_refs"
+func checkEvidenceRefsComplete(bundle *ScienceClaimBundle) VerificationCheck {
+	const id = "evidence_refs_complete"
 	ev := bundle.EvidenceBundle
 	if ev == nil {
-		return failCheck(id, "EvidenceBundle references included artifacts", "evidence bundle missing")
+		return failCheck(id, "EvidenceBundle references claim, assumption set, receipt, and certificate",
+			ReasonEvidenceRefsIncomplete, detailMsg("evidence bundle missing"))
 	}
-	known := collectArtifactIDs(bundle)
-	if len(ev.ArtifactRefs) == 0 {
-		return failCheck(id, "EvidenceBundle references included artifacts", "artifact_refs is empty")
+	required := requiredEvidenceRefIDs(bundle)
+	if len(required) < 4 {
+		return failCheck(id, "EvidenceBundle references claim, assumption set, receipt, and certificate",
+			ReasonEvidenceRefsIncomplete, map[string]any{"required_refs": required, "message": "missing component artifacts"})
+	}
+	refSet := make(map[string]struct{}, len(ev.ArtifactRefs))
+	for _, ref := range ev.ArtifactRefs {
+		refSet[ref] = struct{}{}
 	}
 	var missing []string
-	for _, ref := range ev.ArtifactRefs {
-		if _, ok := known[ref]; !ok {
-			missing = append(missing, ref)
+	for _, req := range required {
+		if _, ok := refSet[req]; !ok {
+			missing = append(missing, req)
 		}
 	}
 	if len(missing) > 0 {
-		return failCheck(id, "EvidenceBundle references included artifacts", "unknown refs: "+strings.Join(missing, ", "))
+		return failCheck(id, "EvidenceBundle references claim, assumption set, receipt, and certificate",
+			ReasonEvidenceRefsIncomplete, map[string]any{"missing_refs": missing, "artifact_refs": ev.ArtifactRefs})
 	}
-	return passCheck(id, "EvidenceBundle references included artifacts", strings.Join(ev.ArtifactRefs, ", "))
+	return passCheck(id, "EvidenceBundle references claim, assumption set, receipt, and certificate",
+		map[string]any{"artifact_refs": ev.ArtifactRefs})
 }
 
-func collectArtifactIDs(bundle *ScienceClaimBundle) map[string]struct{} {
-	ids := make(map[string]struct{})
-	add := func(id string) {
-		if id != "" {
-			ids[id] = struct{}{}
+func requiredEvidenceRefIDs(bundle *ScienceClaimBundle) []string {
+	var refs []string
+	if bundle.ClaimArtifact != nil {
+		if id := bundle.ClaimArtifact.ClaimID; id != "" {
+			refs = append(refs, id)
+		} else if id := bundle.ClaimArtifact.ArtifactID; id != "" {
+			refs = append(refs, id)
 		}
 	}
-	if bundle.ClaimArtifact != nil {
-		add(bundle.ClaimArtifact.ArtifactID)
-		add(bundle.ClaimArtifact.ClaimID)
-		add(bundle.ClaimArtifact.AssumptionSetRef)
-	}
 	if bundle.AssumptionSet != nil {
-		add(bundle.AssumptionSet.ArtifactID)
-		add(bundle.AssumptionSet.AssumptionSetID)
+		if id := bundle.AssumptionSet.AssumptionSetID; id != "" {
+			refs = append(refs, id)
+		} else if id := bundle.AssumptionSet.ArtifactID; id != "" {
+			refs = append(refs, id)
+		}
 	}
 	if bundle.RuntimeReceipt != nil {
-		add(bundle.RuntimeReceipt.ArtifactID)
-		add(bundle.RuntimeReceipt.ReceiptID)
+		if id := bundle.RuntimeReceipt.ReceiptID; id != "" {
+			refs = append(refs, id)
+		} else if id := bundle.RuntimeReceipt.ArtifactID; id != "" {
+			refs = append(refs, id)
+		}
 	}
-	if bundle.TraceCertificate != nil {
-		add(bundle.TraceCertificate.ArtifactID)
-		add(bundle.TraceCertificate.CertificateID)
+	for _, cert := range bundle.TraceCertificatesList() {
+		if cert == nil {
+			continue
+		}
+		if id := cert.CertificateID; id != "" {
+			refs = append(refs, id)
+			break
+		}
+		if id := cert.ArtifactID; id != "" {
+			refs = append(refs, id)
+			break
+		}
 	}
-	if bundle.EvidenceBundle != nil {
-		add(bundle.EvidenceBundle.ArtifactID)
-		add(bundle.EvidenceBundle.EvidenceBundleID)
-	}
-	return ids
+	return refs
 }
 
 func checkNotStale(bundle *ScienceClaimBundle) VerificationCheck {
-	const id = "pcs.artifact.not_stale"
+	const id = "artifact_not_stale"
 	names := []string{"claim_artifact", "assumption_set", "runtime_receipt", "trace_certificate", "evidence_bundle"}
+	var certMeta *MajorArtifactMeta
+	if certs := bundle.TraceCertificatesList(); len(certs) > 0 {
+		certMeta = artifactMetaCert(certs[0])
+	}
 	metas := []*MajorArtifactMeta{
 		artifactMetaClaim(bundle.ClaimArtifact),
 		artifactMetaAssumption(bundle.AssumptionSet),
 		artifactMetaReceipt(bundle.RuntimeReceipt),
-		artifactMetaCert(bundle.TraceCertificate),
+		certMeta,
 		artifactMetaEvidence(bundle.EvidenceBundle),
 	}
 	var stale []string
@@ -154,13 +177,13 @@ func checkNotStale(bundle *ScienceClaimBundle) VerificationCheck {
 		}
 	}
 	if len(stale) > 0 {
-		return failCheck(id, "No required artifact has status Stale", strings.Join(stale, ", "))
+		return failCheck(id, "No required artifact has status Stale", ReasonArtifactStale, map[string]any{"stale_artifacts": stale})
 	}
-	return passCheck(id, "No required artifact has status Stale", "ok")
+	return passCheck(id, "No required artifact has status Stale", map[string]any{})
 }
 
-func checkMajorProvenance(bundle *ScienceClaimBundle) VerificationCheck {
-	const id = "pcs.metadata.source_provenance"
+func checkSourceProvenance(bundle *ScienceClaimBundle) VerificationCheck {
+	const id = "source_provenance_present"
 	var missing []string
 	for name, meta := range majorArtifacts(bundle) {
 		if meta == nil {
@@ -171,14 +194,17 @@ func checkMajorProvenance(bundle *ScienceClaimBundle) VerificationCheck {
 			missing = append(missing, name)
 		}
 	}
-	if len(missing) > 0 {
-		return failCheck(id, "source_repo and source_commit are present for all major artifacts", strings.Join(missing, ", "))
+	if strings.TrimSpace(bundle.SourceRepo) == "" || strings.TrimSpace(bundle.SourceCommit) == "" {
+		missing = append(missing, "bundle")
 	}
-	return passCheck(id, "source_repo and source_commit are present for all major artifacts", "ok")
+	if len(missing) > 0 {
+		return failCheck(id, "source_repo and source_commit are present", ReasonSourceProvenanceMissing, map[string]any{"missing": missing})
+	}
+	return passCheck(id, "source_repo and source_commit are present", map[string]any{})
 }
 
-func checkMajorSignatures(bundle *ScienceClaimBundle) VerificationCheck {
-	const id = "pcs.metadata.signature_or_digest"
+func checkSignaturesPresent(bundle *ScienceClaimBundle) VerificationCheck {
+	const id = "signature_or_digest_present"
 	var missing []string
 	for name, meta := range majorArtifacts(bundle) {
 		if meta == nil {
@@ -189,20 +215,51 @@ func checkMajorSignatures(bundle *ScienceClaimBundle) VerificationCheck {
 			missing = append(missing, name)
 		}
 	}
-	if len(missing) > 0 {
-		return failCheck(id, "signature_or_digest is present for all major artifacts", strings.Join(missing, ", "))
+	if strings.TrimSpace(bundle.SignatureOrDigest) == "" {
+		missing = append(missing, "bundle")
 	}
-	return passCheck(id, "signature_or_digest is present for all major artifacts", "ok")
+	if len(missing) > 0 {
+		return failCheck(id, "signature_or_digest is present", ReasonSignatureMissing, map[string]any{"missing": missing})
+	}
+	return passCheck(id, "signature_or_digest is present", map[string]any{})
+}
+
+func checkSourceCommitNotPlaceholder(bundle *ScienceClaimBundle, localDev bool) VerificationCheck {
+	const id = "source_commit_not_placeholder"
+	if localDev {
+		return passCheck(id, "source_commit is not the 40-zero placeholder (release mode)",
+			map[string]any{"local_dev": true})
+	}
+	var offenders []string
+	check := func(name, commit string) {
+		if strings.TrimSpace(commit) == ZeroSourceCommitPlaceholder {
+			offenders = append(offenders, name)
+		}
+	}
+	check("bundle", bundle.SourceCommit)
+	for name, meta := range majorArtifacts(bundle) {
+		if meta != nil {
+			check(name, meta.SourceCommit)
+		}
+	}
+	if len(offenders) > 0 {
+		return failCheck(id, "source_commit is not the 40-zero placeholder unless local_dev = true",
+			ReasonSourceCommitPlaceholder, map[string]any{"placeholder_commits": offenders})
+	}
+	return passCheck(id, "source_commit is not the 40-zero placeholder unless local_dev = true", map[string]any{})
 }
 
 func majorArtifacts(bundle *ScienceClaimBundle) map[string]*MajorArtifactMeta {
-	return map[string]*MajorArtifactMeta{
-		"claim_artifact":    artifactMetaClaim(bundle.ClaimArtifact),
-		"assumption_set":    artifactMetaAssumption(bundle.AssumptionSet),
-		"runtime_receipt":   artifactMetaReceipt(bundle.RuntimeReceipt),
-		"trace_certificate": artifactMetaCert(bundle.TraceCertificate),
-		"evidence_bundle":   artifactMetaEvidence(bundle.EvidenceBundle),
+	out := map[string]*MajorArtifactMeta{
+		"claim_artifact":  artifactMetaClaim(bundle.ClaimArtifact),
+		"assumption_set":  artifactMetaAssumption(bundle.AssumptionSet),
+		"runtime_receipt": artifactMetaReceipt(bundle.RuntimeReceipt),
+		"evidence_bundle": artifactMetaEvidence(bundle.EvidenceBundle),
 	}
+	if certs := bundle.TraceCertificatesList(); len(certs) > 0 {
+		out["trace_certificate"] = artifactMetaCert(certs[0])
+	}
+	return out
 }
 
 func artifactMetaClaim(c *ClaimArtifact) *MajorArtifactMeta {
@@ -244,4 +301,3 @@ func artifactMetaEvidence(e *EvidenceBundle) *MajorArtifactMeta {
 	m := e.MajorArtifactMeta
 	return &m
 }
-

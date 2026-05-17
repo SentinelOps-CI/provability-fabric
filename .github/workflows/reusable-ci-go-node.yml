@@ -49,6 +49,9 @@ jobs:
       - name: Run spectral lint
         run: spectral lint **/spec.yaml --ruleset config/schemas/aispec-schema.json
 
+      - name: Test PCS science-claim
+        run: make test-pcs validate-pcs-fixtures
+
       - name: Test Go CLI
         run: |
           cd core/cli/pf

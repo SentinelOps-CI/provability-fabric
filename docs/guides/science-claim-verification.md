@@ -1,71 +1,85 @@
 # Science claim verification (PCS v0.1)
 
-Provability Fabric verifies and signs `ScienceClaimBundle.v0` artifacts produced by the LabTrust-Gym and CertifyEdge proof-carrying lab workflow.
+Provability Fabric verifies and signs `ScienceClaimBundle.v0` artifacts from the LabTrust proof-carrying lab workflow.
 
 ## Commands
 
 ```bash
-pf verify science-claim science_claim_bundle.certified.json
-pf sign science-claim science_claim_bundle.certified.json --out signed_science_claim_bundle.json
-pf inspect science-claim signed_science_claim_bundle.json
+# From repository root (recommended)
+make demo-pcs
+
+# Wrapper (Git Bash / WSL)
+./pf verify science-claim tests/pcs/valid_labtrust_bundle.json
+./pf sign science-claim tests/pcs/valid_labtrust_bundle.json --out tests/pcs/signed_science_claim_bundle.demo.json
+./pf inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json
+
+# Or: go -C (PowerShell, cmd, Git Bash)
+go -C core/cli/pf run . verify science-claim tests/pcs/valid_labtrust_bundle.json
 ```
 
-Use `--json` on verify or inspect to emit machine-readable `VerificationResult.v0` JSON.
+Paths like `tests/pcs/<file>.json` always resolve to the repo-root `tests/pcs/` directory (sign output included), even when the Go module cwd is `core/cli/pf`. Do not use `../../tests/pcs/...` from `core/cli/pf` — that used to create a shadow tree under `core/cli/pf/tests/`.
 
-## Required checks (exactly 14)
+Use `--json` on verify or inspect for machine-readable output. Use `--local-dev` only for local bundles that set `local_dev: true` or use the 40-zero `source_commit` placeholder.
 
-Verification emits exactly fourteen checks in a stable order (`pcs.RequiredCheckIDs` in `adapters/pcs/checks_registry.go`):
+## Fifteen required checks
 
-1. `ScienceClaimBundle.v0` schema validity
-2. `ClaimArtifact.v0` present
-3. `AssumptionSet.v0` present
-4. `RuntimeReceipt.v0` present
-5. `TraceCertificate.v0` present
-6. `EvidenceBundle.v0` present
-7. `ClaimArtifact.assumption_set_ref` matches included `AssumptionSet`
-8. `RuntimeReceipt.trace_hash` present
-9. `TraceCertificate.trace_hash` matches `RuntimeReceipt.trace_hash`
-10. `TraceCertificate.status` is `CertificateChecked`
-11. `EvidenceBundle` references included artifacts
-12. No major artifact has status `Stale`
-13. `source_repo` and `source_commit` on all major artifacts
-14. `signature_or_digest` on all major artifacts
+| # | check_id | Description |
+|---|----------|-------------|
+| 1 | `science_claim_bundle_schema` | ScienceClaimBundle.v0 schema valid |
+| 2 | `claim_artifact_present` | ClaimArtifact.v0 exists |
+| 3 | `assumption_set_present` | AssumptionSet.v0 exists |
+| 4 | `runtime_receipt_present` | RuntimeReceipt.v0 exists |
+| 5 | `trace_certificate_present` | At least one TraceCertificate.v0 exists |
+| 6 | `evidence_bundle_present` | EvidenceBundle.v0 exists |
+| 7 | `assumption_set_ref_match` | Claim refs match assumption set id |
+| 8 | `runtime_trace_hash_present` | RuntimeReceipt.trace_hash non-empty |
+| 9 | `trace_hash_alignment` | Certificate trace_hash matches receipt |
+| 10 | `certificate_status_checked` | TraceCertificate.status is CertificateChecked |
+| 11 | `evidence_refs_complete` | Evidence references claim, assumption, receipt, certificate |
+| 12 | `artifact_not_stale` | No required artifact has status Stale |
+| 13 | `source_provenance_present` | source_repo and source_commit present |
+| 14 | `signature_or_digest_present` | signature_or_digest present |
+| 15 | `source_commit_not_placeholder` | No 40-zero source_commit in release mode |
 
-## Output
+## Output for Scientific Memory
 
-Successful verification emits `VerificationResult.v0` with `status: passed`. Any failed required check sets `status: failed`.
+**VerificationResult** (`schema_version`: `v0`):
 
-Signing is allowed only when verification passes. The signed wrapper (`SignedScienceClaimBundle.v0`) is importable by Scientific Memory without re-running Provability Fabric.
+- `verification_id`: `verification-<uuid>`
+- `checks[].details`: JSON object (may be empty `{}`)
+- `signature_or_digest`: `sha256:...` (canonical JSON digest)
 
-## Fixtures
+**SignedScienceClaimBundle** (`schema_version`: `v0`):
 
-Development fixtures live under `tests/pcs/`:
+- `science_claim_bundle`
+- `verification_result`
+- `signer`: `Provability Fabric`
+- `signed_bundle_id`: `signed-<uuid>`
+- `signature_or_digest`: `sha256:...`
 
-- `valid_labtrust_bundle.json` — passing LabTrust demo bundle
-- `invalid_missing_assumption.json`
-- `invalid_missing_certificate.json`
-- `invalid_mismatched_trace_hash.json`
-- `invalid_rejected_certificate.json`
-- `invalid_stale_artifact.json`
+Signing is refused when `verification_result.status` is `failed`.
 
-Run adapter tests from the repository root:
+## Layout
+
+```
+config/schemas/pcs/          # VerificationResult + SignedScienceClaimBundle schemas
+adapters/pcs/                # verification engine
+core/cli/pf/cmd/             # pf verify|sign|inspect science-claim
+tests/pcs/                   # LabTrust fixtures
+```
+
+## Tests
 
 ```bash
 make test-pcs
 ```
 
-Or:
-
-```bash
-cd adapters/pcs && go test ./...
-cd core/cli/pf && go test ./cmd/...
-```
-
-CI: `.github/workflows/pcs-ci.yml` runs adapter tests, CLI tests, smoke verify/sign/inspect, and rejects signing failed bundles.
+CI: `.github/workflows/pcs-ci.yml`
 
 ## Rigorous guarantees
 
-- Input bundles are validated against `config/schemas/pcs/ScienceClaimBundle.v0.schema.json`.
-- Output `VerificationResult.v0` is validated against its schema before return.
-- Signed wrappers are validated against `SignedScienceClaimBundle.v0.schema.json` and digests are recomputed on inspect.
-- Artifact digests use canonical JSON (sorted object keys) for cross-tool stability.
+- Schemas are embedded in `adapters/pcs` (drift-tested against `config/schemas/pcs/`).
+- Failed checks include `details.reason_code` (for example `PCS_TRACE_HASH_MISMATCH`).
+- All trace certificates are verified for hash alignment and `CertificateChecked`.
+- `pf verify` exits `1` on failure and prints `check_id: reason_code` lines to stderr.
+- `make validate-pcs-fixtures` runs the full valid/invalid fixture matrix via `tools/pcs-validate`.

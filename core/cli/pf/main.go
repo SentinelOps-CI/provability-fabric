@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -87,6 +88,11 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
+		var cliExit pfcmd.CLIExitError
+		if errors.As(err, &cliExit) {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", cliExit.Err)
+			os.Exit(cliExit.Code)
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
