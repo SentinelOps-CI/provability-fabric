@@ -25,6 +25,7 @@ on:
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - 'docs/guides/pcs-v01-clean-chain.md'
+      - 'docs/releases/**'
       - '.github/workflows/pcs-ci.yml'
   pull_request:
     branches: [main]
@@ -47,6 +48,7 @@ on:
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - 'docs/guides/pcs-v01-clean-chain.md'
+      - 'docs/releases/**'
       - '.github/workflows/pcs-ci.yml'
   workflow_dispatch:
 

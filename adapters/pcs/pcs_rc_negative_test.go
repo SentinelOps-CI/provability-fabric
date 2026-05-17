@@ -4,6 +4,9 @@
 package pcs_test
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -108,6 +111,59 @@ func TestInspectRejectsTamperedSignedBundle(t *testing.T) {
 		signed2,
 	); err == nil {
 		t.Fatal("expected release chain assert to fail after tampering embedded certificate_id")
+	}
+}
+
+func inspectFixture(t *testing.T, mutate func(map[string]any)) error {
+	t.Helper()
+	raw, err := os.ReadFile(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if mutate != nil {
+		mutate(doc)
+	}
+	path := filepath.Join(t.TempDir(), "signed_mutated.json")
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	signed, err := pcs.LoadSignedScienceClaimBundle(path)
+	if err != nil {
+		return err
+	}
+	return pcs.InspectSignedScienceClaimBundle(repoRoot(t), signed, pcs.IntegrityOptions{VerifyPFDigests: true})
+}
+
+func TestInspectRejectsMissingVerificationResult(t *testing.T) {
+	err := inspectFixture(t, func(doc map[string]any) {
+		delete(doc, "verification_result")
+	})
+	if err == nil {
+		t.Fatal("expected inspect to fail when verification_result is missing")
+	}
+}
+
+func TestInspectRejectsFailedVerificationResult(t *testing.T) {
+	err := inspectFixture(t, func(doc map[string]any) {
+		vr, ok := doc["verification_result"].(map[string]any)
+		if !ok {
+			t.Fatal("verification_result must be an object")
+		}
+		vr["status"] = "Rejected"
+	})
+	if err == nil {
+		t.Fatal("expected inspect to fail when verification status is Rejected")
+	}
+	if !strings.Contains(err.Error(), "ProofChecked") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

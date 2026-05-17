@@ -7,7 +7,7 @@
   "pf_source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
   "labtrust_gym_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
   "certifyedge_commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc",
-  "scientific_memory_commit": "d49cbf78837d42883a3c73078f098669e69f5e3d",
+  "scientific_memory_commit": "67498ff14325d08ecbbc94b8d41647d9cd79c309",
   "pf_outputs": [
     "verification_result.json",
     "signed_science_claim_bundle.json"

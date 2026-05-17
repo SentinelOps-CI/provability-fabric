@@ -114,6 +114,17 @@ func digestSignedBundle(signed *SignedScienceClaimBundle) string {
 	return "sha256:" + SHA256Hex(payload)
 }
 
+// InspectSignedScienceClaimBundle runs the same checks as pf inspect science-claim (schema + integrity).
+func InspectSignedScienceClaimBundle(repoRoot string, signed *SignedScienceClaimBundle, opts IntegrityOptions) error {
+	if signed == nil {
+		return fmt.Errorf("signed bundle is nil")
+	}
+	if err := ValidateSignedScienceClaimBundle(repoRoot, signed); err != nil {
+		return fmt.Errorf("signed bundle schema: %w", err)
+	}
+	return VerifySignedBundleIntegrity(signed, opts)
+}
+
 // VerifySignedBundleIntegrity validates structure and optionally PF digest fields.
 func VerifySignedBundleIntegrity(signed *SignedScienceClaimBundle, opts IntegrityOptions) error {
 	if signed == nil {
