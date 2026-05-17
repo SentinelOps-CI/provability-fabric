@@ -59,6 +59,7 @@ func scienceClaimSignCmd() *cobra.Command {
 			signed, err := pcs.SignVerificationResultWithOptions(opts.RepoRoot, bundle, result, pcs.SignOptions{
 				ReleaseMode: opts.ReleaseMode,
 				LocalDev:    opts.LocalDev,
+				BundlePath:  resolved,
 			})
 			if err != nil {
 				return err

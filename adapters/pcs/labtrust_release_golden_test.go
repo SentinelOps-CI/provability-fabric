@@ -41,7 +41,10 @@ func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)
 	}
-	regenerated, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{ReleaseMode: true})
+	regenerated, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
+		ReleaseMode: true,
+		BundlePath:  path,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +80,10 @@ func releaseDeterministicGoldenIDs(pfCommit string, t *testing.T) (verificationI
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)
 	}
-	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{ReleaseMode: true})
+	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
+		ReleaseMode: true,
+		BundlePath:  path,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

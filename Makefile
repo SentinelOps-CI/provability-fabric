@@ -85,17 +85,31 @@ validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
 	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
 
+ifeq ($(OS),Windows_NT)
 freeze-pcs-labtrust-signed:
 	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
-	bash scripts/pcs-freeze-labtrust-signed.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-signed.ps1
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-signed.ps1
 
 freeze-pcs-labtrust-release:
 	@$(ECHOOK) "Freezing LabTrust-CertifyEdge release fixtures..."
-	bash scripts/pcs-freeze-labtrust-release.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-release.ps1
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-freeze-labtrust-release.ps1
 
 pcs-v01-pf-chain:
 	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
-	@PF_RELEASE_MODE=1 PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
+	@powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-pf-clean-chain.ps1 tests/pcs/fixtures/labtrust-release
+else
+freeze-pcs-labtrust-signed:
+	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
+	bash scripts/pcs-freeze-labtrust-signed.sh
+
+freeze-pcs-labtrust-release:
+	@$(ECHOOK) "Freezing LabTrust-CertifyEdge release fixtures..."
+	bash scripts/pcs-freeze-labtrust-release.sh
+
+pcs-v01-pf-chain:
+	@$(ECHOOK) "PCS v0.1 PF clean-chain segment (release fixtures)..."
+	@PF_RELEASE_MODE=1 PF="$(PF)" bash scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release
+endif
 
 pcs-v01-clean-chain:
 	@$(ECHOOK) "PCS v0.1 full clean-checkout chain..."

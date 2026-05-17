@@ -29,11 +29,12 @@ func TestDeterministicSignIsStable(t *testing.T) {
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)
 	}
-	signed1, err := pcs.SignVerificationResult(root, bundle, result)
+	signOpts := pcs.SignOptions{BundlePath: path}
+	signed1, err := pcs.SignVerificationResultWithOptions(root, bundle, result, signOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signed2, err := pcs.SignVerificationResult(root, bundle, result)
+	signed2, err := pcs.SignVerificationResultWithOptions(root, bundle, result, signOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +66,15 @@ func TestNonDeterministicSignUsesRandomIDs(t *testing.T) {
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v", err)
 	}
-	s1, _ := pcs.SignVerificationResult(root, bundle, result)
-	s2, _ := pcs.SignVerificationResult(root, bundle, result)
+	signOpts := pcs.SignOptions{BundlePath: path}
+	s1, err := pcs.SignVerificationResultWithOptions(root, bundle, result, signOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := pcs.SignVerificationResultWithOptions(root, bundle, result, signOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if s1.SignedBundleID == s2.SignedBundleID {
 		t.Fatal("expected random signed_bundle_id when not in deterministic mode")
 	}

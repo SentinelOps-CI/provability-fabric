@@ -241,3 +241,15 @@ workspaces_verify_preflight_smoke/
 /predictions.sha256
 /run_status.json
 /python
+
+# Ephemeral PCS release-run artifacts (README committed)
+/release-run/*.json
+/release-run/trace.json
+/release-run/runtime_receipt.json
+/release-run/trace_certificate.json
+/release-run/science_claim_bundle.pending.json
+/release-run/science_claim_bundle.certified.json
+/release-run/verification_result.json
+/release-run/signed_science_claim_bundle.json
+/release-run/scientific_memory_import_report.json
+/release-run/RELEASE_FIXTURE_MANIFEST.json

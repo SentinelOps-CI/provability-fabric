@@ -184,6 +184,7 @@ type VerificationResult struct {
 	SourceRepo        string              `json:"source_repo"`
 	SourceCommit      string              `json:"source_commit"`
 	SignatureOrDigest string              `json:"signature_or_digest"`
+	VerifiedInput     *VerifiedInput      `json:"verified_input,omitempty"`
 }
 
 // SignedScienceClaimBundle is the importable signed wrapper for Scientific Memory.
@@ -196,8 +197,9 @@ type SignedScienceClaimBundle struct {
 	SignedAt           string              `json:"signed_at"`
 	SourceRepo         string              `json:"source_repo"`
 	SourceCommit       string              `json:"source_commit"`
-	SignatureOrDigest  string              `json:"signature_or_digest"`
-	LocalDev           bool                `json:"local_dev,omitempty"`
+	SignatureOrDigest     string              `json:"signature_or_digest"`
+	SignedInputBundleHash string              `json:"signed_input_bundle_hash,omitempty"`
+	LocalDev              bool                `json:"local_dev,omitempty"`
 }
 
 const (

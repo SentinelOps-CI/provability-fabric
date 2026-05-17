@@ -26,6 +26,7 @@ func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result 
 type SignOptions struct {
 	ReleaseMode bool
 	LocalDev    bool
+	BundlePath  string
 }
 
 // SignVerificationResultWithOptions builds a signed wrapper with optional release-mode checks.
@@ -40,19 +41,50 @@ func SignVerificationResultWithOptions(repoRoot string, bundle *ScienceClaimBund
 	if err := ValidatePFProvenanceCommit(wrapperCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
 		return nil, err
 	}
+	var inputVI VerifiedInput
+	if strings.TrimSpace(opts.BundlePath) != "" {
+		computed, err := BuildVerifiedInput(bundle, opts.BundlePath)
+		if err != nil {
+			return nil, fmt.Errorf("pre-sign verified_input: %w", err)
+		}
+		if result.VerifiedInput != nil && !verifiedInputsEqual(*result.VerifiedInput, computed) {
+			return nil, fmt.Errorf("verification_result.verified_input does not match bundle being signed")
+		}
+		inputVI = computed
+	} else if result.VerifiedInput != nil {
+		inputVI = *result.VerifiedInput
+	} else {
+		computed, err := BuildVerifiedInput(bundle, "")
+		if err != nil {
+			return nil, fmt.Errorf("pre-sign verified_input: %w", err)
+		}
+		inputVI = computed
+	}
+	if result.VerifiedInput == nil {
+		result.VerifiedInput = &inputVI
+		result.SignatureOrDigest = DigestVerificationResult(result)
+	}
+	embedded, err := CloneScienceClaimBundle(bundle)
+	if err != nil {
+		return nil, fmt.Errorf("clone bundle for signing: %w", err)
+	}
 	signedAt := time.Now().UTC().Format(time.RFC3339)
 	if DeterministicMode() {
 		signedAt = deterministicRFC3339(bundle)
 	}
 	signed := &SignedScienceClaimBundle{
-		SchemaVersion:      SchemaVersionV0,
-		SignedBundleID:     newSignedBundleID(bundle.BundleID, result.VerificationID),
-		ScienceClaimBundle: bundle,
-		VerificationResult: result,
-		Signer:             VerifierName,
-		SignedAt:           signedAt,
-		SourceRepo:         VerifierSourceRepo,
-		SourceCommit:       wrapperCommit,
+		SchemaVersion:         SchemaVersionV0,
+		SignedBundleID:        newSignedBundleID(bundle.BundleID, result.VerificationID),
+		ScienceClaimBundle:    embedded,
+		VerificationResult:    result,
+		Signer:                VerifierName,
+		SignedAt:              signedAt,
+		SourceRepo:            VerifierSourceRepo,
+		SourceCommit:          wrapperCommit,
+		SignedInputBundleHash: result.VerifiedInput.BundleHash,
+	}
+	if err := AssertReleaseArtifactChain(bundle, result, signed); err != nil {
+		return nil, fmt.Errorf("release artifact chain: %w", err)
 	}
 	signed.SignatureOrDigest = digestSignedBundle(signed)
 	if err := VerifySignedBundleIntegrity(signed, IntegrityOptions{VerifyPFDigests: true}); err != nil {

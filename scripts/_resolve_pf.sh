@@ -2,6 +2,16 @@
 # Resolve pf CLI for bash scripts (Git Bash / WSL). Source and call resolve_pf ROOT.
 # Sets PF_CMD as a bash array: "${PF_CMD[@]}" verify science-claim ...
 
+path_exists() {
+  local p="$1"
+  [[ -n "${p}" ]] || return 1
+  if [[ "${p}" == *.exe ]]; then
+    [[ -f "${p}" ]]
+  else
+    [[ -x "${p}" ]]
+  fi
+}
+
 resolve_go_bin() {
   if command -v go >/dev/null 2>&1; then
     command -v go
@@ -11,8 +21,10 @@ resolve_go_bin() {
   if [[ -n "${ProgramFiles:-}" ]]; then
     candidates+=("${ProgramFiles}/Go/bin/go.exe")
   fi
-  if [[ -n "${ProgramFiles(x86):-}" ]]; then
-    candidates+=("${ProgramFiles(x86)}/Go/bin/go.exe")
+  local pf86
+  pf86="$(printenv 'ProgramFiles(x86)' 2>/dev/null || true)"
+  if [[ -n "${pf86}" ]]; then
+    candidates+=("${pf86}/Go/bin/go.exe")
   fi
   candidates+=(
     "/mnt/c/Program Files/Go/bin/go.exe"
@@ -21,12 +33,17 @@ resolve_go_bin() {
   )
   local c
   for c in "${candidates[@]}"; do
-    if [[ -n "${c}" && -x "${c}" ]]; then
+    if path_exists "${c}"; then
       echo "${c}"
       return 0
     fi
   done
   return 1
+}
+
+pf_exe_path() {
+  local root="$1"
+  echo "${root}/core/cli/pf/pf.exe"
 }
 
 resolve_pf() {
@@ -37,8 +54,9 @@ resolve_pf() {
     PF_CMD=(${PF})
     return 0
   fi
-  local pf_exe="${root}/core/cli/pf/pf.exe"
-  if [[ -x "${pf_exe}" ]]; then
+  local pf_exe
+  pf_exe="$(pf_exe_path "${root}")"
+  if path_exists "${pf_exe}"; then
     PF_CMD=("${pf_exe}")
     return 0
   fi
@@ -47,10 +65,10 @@ resolve_pf() {
     echo "go not found; install Go or build core/cli/pf/pf.exe (set PF=...)" >&2
     return 1
   fi
-  if [[ ! -x "${pf_exe}" ]]; then
+  if ! path_exists "${pf_exe}"; then
     (cd "${root}/core/cli/pf" && "${go_bin}" build -o pf.exe .) || return 1
   fi
-  if [[ -x "${pf_exe}" ]]; then
+  if path_exists "${pf_exe}"; then
     PF_CMD=("${pf_exe}")
     return 0
   fi
@@ -60,21 +78,33 @@ resolve_pf() {
 
 run_pf() {
   if [[ ${#PF_CMD[@]} -eq 0 ]]; then
-    echo "run_pf: call resolve_pf first" >&2
+    echo "run_pf: call resolve_pf or ensure_pf first" >&2
     return 1
   fi
   "${PF_CMD[@]}" "$@"
 }
 
-# rebuild_pf compiles core/cli/pf/pf.exe (use before fixture freeze so adapter changes apply).
-rebuild_pf() {
+# ensure_pf builds pf.exe when Go is available; otherwise reuses an existing pf.exe.
+ensure_pf() {
   local root="$1"
+  local pf_exe
+  pf_exe="$(pf_exe_path "${root}")"
   local go_bin
-  if ! go_bin="$(resolve_go_bin)"; then
-    echo "go not found; cannot rebuild pf" >&2
-    return 1
+  if go_bin="$(resolve_go_bin)"; then
+    (cd "${root}/core/cli/pf" && "${go_bin}" build -o pf.exe .) || return 1
+    PF_CMD=("${pf_exe}")
+    return 0
   fi
-  (cd "${root}/core/cli/pf" && "${go_bin}" build -o pf.exe .) || return 1
-  PF_CMD=("${root}/core/cli/pf/pf.exe")
-  return 0
+  if path_exists "${pf_exe}"; then
+    echo "warning: go not found; using existing ${pf_exe}" >&2
+    PF_CMD=("${pf_exe}")
+    return 0
+  fi
+  echo "go not found and ${pf_exe} is missing; install Go or build pf.exe" >&2
+  return 1
+}
+
+# rebuild_pf is an alias for ensure_pf (always attempts build when Go is present).
+rebuild_pf() {
+  ensure_pf "$1"
 }

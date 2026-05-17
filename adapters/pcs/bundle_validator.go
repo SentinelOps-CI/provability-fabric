@@ -36,6 +36,10 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 		return VerificationResult{}, err
 	}
 	result := BuildVerificationResult(bundle, checks, opts.VerifierVersion, opts.SourceCommit)
+	if vi, err := BuildVerifiedInput(bundle, bundlePath); err == nil && VerificationPassed(result) {
+		result.VerifiedInput = &vi
+		result.SignatureOrDigest = DigestVerificationResult(result)
+	}
 	if err := ValidateVerificationResult(opts.RepoRoot, result); err != nil {
 		return VerificationResult{}, fmt.Errorf("verification result schema: %w", err)
 	}

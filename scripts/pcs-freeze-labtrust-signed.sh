@@ -13,7 +13,7 @@ export PF_SOURCE_COMMIT="${PF_SOURCE_COMMIT:-ccccccccccccccccccccccccccccccccccc
 export PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}"
 export PCS_DETERMINISTIC="${PCS_DETERMINISTIC:-1}"
 
-if ! rebuild_pf "${ROOT}"; then
+if ! ensure_pf "${ROOT}"; then
   exit 2
 fi
 

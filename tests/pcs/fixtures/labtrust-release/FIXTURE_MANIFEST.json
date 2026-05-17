@@ -3,7 +3,7 @@
   "bundle_id": "scb-pcs-qc-release-v0.1",
   "claim_id": "claim-pcs-qc-release-v0.1",
   "certified_source": "LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json",
-  "pf_source_commit": "0c30431e5d5cbb5c7c8fe074e3bc9ccf249a2941",
+  "pf_source_commit": "a9987359e60d12ef8f89079ecb433d0a424b81dc",
   "pf_outputs": [
     "verification_result.json",
     "signed_science_claim_bundle.json"

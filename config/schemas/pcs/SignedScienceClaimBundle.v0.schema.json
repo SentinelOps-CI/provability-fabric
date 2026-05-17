@@ -25,6 +25,7 @@
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "type": "string", "minLength": 1 },
     "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "signed_input_bundle_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
     "local_dev": { "type": "boolean" }
   }
 }

@@ -32,6 +32,28 @@ func loadReleaseManifest(t *testing.T) releaseFixtureManifest {
 	return m
 }
 
+func TestPFReleaseCertificateIDChain(t *testing.T) {
+	certified, err := pcs.LoadScienceClaimBundle(labtrustReleaseFixture(t, "science_claim_bundle.certified.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vrBytes, err := os.ReadFile(labtrustReleaseFixture(t, "verification_result.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result pcs.VerificationResult
+	if err := json.Unmarshal(vrBytes, &result); err != nil {
+		t.Fatal(err)
+	}
+	if err := pcs.AssertReleaseArtifactChain(certified, result, signed); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPFReleaseFixtureHasRealSourceCommit(t *testing.T) {
 	manifest := loadReleaseManifest(t)
 	for _, name := range []string{"verification_result.json", "signed_science_claim_bundle.json"} {

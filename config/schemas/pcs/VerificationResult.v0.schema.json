@@ -44,6 +44,16 @@
     "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "type": "string", "minLength": 7 },
-    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "verified_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_hash", "certificate_id", "trace_hash"],
+      "properties": {
+        "bundle_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+        "certificate_id": { "type": "string", "minLength": 1 },
+        "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" }
+      }
+    }
   }
 }

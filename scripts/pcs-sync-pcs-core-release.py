@@ -24,7 +24,11 @@ def main() -> int:
     pcs_release = pathlib.Path(sys.argv[2])
     pf_commit = sys.argv[3]
     pcs_release.mkdir(parents=True, exist_ok=True)
-    for name in ("verification_result.json", "signed_science_claim_bundle.json"):
+    for name in (
+        "science_claim_bundle.certified.json",
+        "verification_result.json",
+        "signed_science_claim_bundle.json",
+    ):
         src = pf_release / name
         dst = pcs_release / name
         dst.write_bytes(src.read_bytes())
@@ -35,6 +39,9 @@ def main() -> int:
         data = {"schema_version": "v0", "artifacts": {}}
     data["provability_fabric_commit"] = pf_commit
     arts = data.setdefault("artifacts", {})
+    arts["science_claim_bundle.certified.json"] = sha256_file(
+        pf_release / "science_claim_bundle.certified.json"
+    )
     arts["verification_result.json"] = sha256_file(pf_release / "verification_result.json")
     arts["signed_science_claim_bundle.json"] = sha256_file(pf_release / "signed_science_claim_bundle.json")
     manifest_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
