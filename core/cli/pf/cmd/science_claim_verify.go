@@ -26,6 +26,7 @@ func verifyRootCmd() *cobra.Command {
 func scienceClaimVerifyCmd() *cobra.Command {
 	var jsonOut bool
 	var outPath string
+	var handoffPath string
 	var localDev bool
 	var releaseMode bool
 
@@ -36,7 +37,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bundlePath := args[0]
-			result, err := verifyBundle(bundlePath, localDev, releaseMode)
+			result, err := verifyBundle(bundlePath, localDev, releaseMode, handoffPath)
 			if err != nil {
 				return err
 			}
@@ -82,5 +83,6 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult to file")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")
+	cmd.Flags().StringVar(&handoffPath, "handoff", "", "LabTrust pf_handoff.json; bundle hash, certificate_id, and trace_hash must match")
 	return cmd
 }

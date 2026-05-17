@@ -184,6 +184,31 @@ func TestInspectLabtrustReleaseSignedBundleCLI(t *testing.T) {
 	}
 }
 
+func TestInspectRejectsTamperedReleaseSignedBundleCLI(t *testing.T) {
+	src := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release", "signed_science_claim_bundle.json")
+	tampered := filepath.Join(t.TempDir(), "signed_tampered.json")
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupt := strings.Replace(string(raw),
+		`"signature_or_digest": "sha256:`,
+		`"signature_or_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000`,
+		1)
+	if err := os.WriteFile(tampered, []byte(corrupt), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", tampered, "--strict")
+	cmd.Dir = pfDir(t)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected inspect --strict to fail on tampered signed bundle: %s", out)
+	}
+	if !strings.Contains(string(out), "integrity") && !strings.Contains(string(out), "digest") {
+		t.Fatalf("expected digest/integrity error: %s", out)
+	}
+}
+
 func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
 	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.labtrust-export.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")

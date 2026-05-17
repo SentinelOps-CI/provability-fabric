@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
@@ -47,7 +48,7 @@ func resolvePCSOpts(bundlePath string, localDev, releaseMode bool) (pcs.Validate
 	}, nil
 }
 
-func verifyBundle(bundlePath string, localDev, releaseMode bool) (pcs.VerificationResult, error) {
+func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath string) (pcs.VerificationResult, error) {
 	resolved, err := pcs.ResolveArtifactPath(bundlePath)
 	if err != nil {
 		return pcs.VerificationResult{}, err
@@ -59,6 +60,13 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool) (pcs.Verificati
 	opts, err := resolvePCSOpts(resolved, localDev, releaseMode)
 	if err != nil {
 		return pcs.VerificationResult{}, err
+	}
+	if strings.TrimSpace(handoffPath) != "" {
+		handoff, err := pcs.LoadPFHandoff(handoffPath)
+		if err != nil {
+			return pcs.VerificationResult{}, err
+		}
+		opts.Handoff = handoff
 	}
 	result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
 	if err != nil {

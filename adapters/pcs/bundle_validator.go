@@ -17,6 +17,7 @@ type ValidateOptions struct {
 	LocalDev           bool
 	ReleaseMode        bool
 	SkipSchemaValidate bool
+	Handoff            *PFHandoff
 }
 
 // VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
@@ -39,6 +40,11 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 	if vi, err := BuildVerifiedInput(bundle, bundlePath); err == nil && VerificationPassed(result) {
 		result.VerifiedInput = &vi
 		result.SignatureOrDigest = DigestVerificationResult(result)
+	}
+	if opts.Handoff != nil && VerificationPassed(result) {
+		if err := AssertBundleMatchesHandoff(bundle, bundlePath, opts.Handoff); err != nil {
+			return VerificationResult{}, fmt.Errorf("handoff guard: %w", err)
+		}
 	}
 	if err := ValidateVerificationResult(opts.RepoRoot, result); err != nil {
 		return VerificationResult{}, fmt.Errorf("verification result schema: %w", err)
