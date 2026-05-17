@@ -14,15 +14,17 @@
     "source_commit",
     "signature_or_digest"
   ],
+  "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": "v0" },
-    "signed_bundle_id": { "type": "string", "pattern": "^signed-" },
-    "science_claim_bundle": { "type": "object" },
-    "verification_result": { "type": "object" },
-    "signer": { "const": "Provability Fabric" },
-    "signed_at": { "type": "string" },
-    "source_repo": { "type": "string" },
-    "source_commit": { "type": "string" },
-    "signature_or_digest": { "type": "string", "pattern": "^sha256:" }
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "signed_bundle_id": { "type": "string", "minLength": 1 },
+    "science_claim_bundle": { "$ref": "ScienceClaimBundle.v0.schema.json" },
+    "verification_result": { "$ref": "VerificationResult.v0.schema.json" },
+    "signer": { "type": "string", "minLength": 1 },
+    "signed_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 1 },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "local_dev": { "type": "boolean" }
   }
 }

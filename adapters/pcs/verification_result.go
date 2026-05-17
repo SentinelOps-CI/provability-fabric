@@ -39,10 +39,11 @@ func detailMsg(msg string) map[string]any {
 
 // BuildVerificationResult constructs VerificationResult (schema_version v0).
 func BuildVerificationResult(bundle *ScienceClaimBundle, checks []VerificationCheck, verifierVersion, sourceCommit string) VerificationResult {
-	status := "passed"
+	// pcs-core VerificationResult.status uses artifact_status enum (not "passed"/"failed").
+	status := "ProofChecked"
 	for _, c := range checks {
 		if c.Status == CheckFailed {
-			status = "failed"
+			status = "Rejected"
 			break
 		}
 	}
@@ -96,14 +97,18 @@ func ResolveSourceCommit() string {
 	}
 	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
 	if err != nil {
-		return "unknown"
+		return "0000000000000000000000000000000000000001"
 	}
-	return strings.TrimSpace(string(out))
+	commit := strings.TrimSpace(string(out))
+	if len(commit) < 7 {
+		return "0000000000000000000000000000000000000001"
+	}
+	return commit
 }
 
-// VerificationPassed reports whether all required checks passed.
+// VerificationPassed reports whether all required checks passed (pcs-core artifact_status).
 func VerificationPassed(result VerificationResult) bool {
-	return result.Status == "passed"
+	return result.Status == "ProofChecked"
 }
 
 // FailedChecks returns checks that did not pass.

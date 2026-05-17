@@ -35,6 +35,39 @@ func TestEmbeddedSchemasMatchConfig(t *testing.T) {
 	}
 }
 
+func TestSchemaMirrorMatchesPCSCore(t *testing.T) {
+	root := repoRoot(t)
+	pcsCore := os.Getenv("PCS_CORE_PATH")
+	if pcsCore == "" {
+		pcsCore = filepath.Join(root, "..", "pcs-core")
+	}
+	canonical := filepath.Join(pcsCore, "schemas")
+	if st, err := os.Stat(canonical); err != nil || !st.IsDir() {
+		t.Skipf("pcs-core schemas not found at %s (set PCS_CORE_PATH)", canonical)
+	}
+	vendor := filepath.Join(root, "config", "schemas", "pcs")
+	entries, err := os.ReadDir(canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		want, err := os.ReadFile(filepath.Join(canonical, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := os.ReadFile(filepath.Join(vendor, e.Name()))
+		if err != nil {
+			t.Fatalf("provability-fabric missing schema %s: %v", e.Name(), err)
+		}
+		if hash(want) != hash(got) {
+			t.Fatalf("schema drift vs pcs-core: %s (run: just pcs-schema-diff)", e.Name())
+		}
+	}
+}
+
 func hash(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])

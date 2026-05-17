@@ -1,6 +1,19 @@
 # Science claim verification (PCS v0.1)
 
-Provability Fabric verifies and signs `ScienceClaimBundle.v0` artifacts from the LabTrust proof-carrying lab workflow.
+Provability Fabric verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts from the LabTrust proof-carrying lab workflow.
+
+## Canonical bundle shape (pcs-core)
+
+Provability Fabric does **not** accept legacy PF-only shapes. Bundles must use:
+
+| Field | pcs-core canonical |
+|-------|-------------------|
+| `schema_version` | `"v0"` (not `"ScienceClaimBundle.v0"`) |
+| Runtime evidence | `runtime_receipts[]` (not `runtime_receipt`) |
+| Certificates | `certificates[]` (not `trace_certificate`) |
+| Policy | `verification_policy` with `policy_id` and `required_checks` |
+
+LabTrust reference fixtures live under `tests/pcs/fixtures/labtrust/` (copied from [pcs-core](https://github.com/SentinelOps-CI/pcs-core) examples).
 
 ## Commands
 
@@ -9,33 +22,44 @@ Provability Fabric verifies and signs `ScienceClaimBundle.v0` artifacts from the
 make demo-pcs
 
 # Wrapper (Git Bash / WSL)
-./pf verify science-claim tests/pcs/valid_labtrust_bundle.json
-./pf sign science-claim tests/pcs/valid_labtrust_bundle.json --out tests/pcs/signed_science_claim_bundle.demo.json
-./pf inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json
+./pf verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
+./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out tests/pcs/signed_science_claim_bundle.demo.json
+./pf inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
+./pf inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
 
 # Or: go -C (PowerShell, cmd, Git Bash)
-go -C core/cli/pf run . verify science-claim tests/pcs/valid_labtrust_bundle.json
+go -C core/cli/pf run . verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
 ```
 
-Paths like `tests/pcs/<file>.json` always resolve to the repo-root `tests/pcs/` directory (sign output included), even when the Go module cwd is `core/cli/pf`. Do not use `../../tests/pcs/...` from `core/cli/pf` — that used to create a shadow tree under `core/cli/pf/tests/`.
+Paths like `tests/pcs/<file>.json` resolve to the repo-root `tests/pcs/` directory even when the Go module cwd is `core/cli/pf`.
 
-Use `--json` on verify or inspect for machine-readable output. Use `--local-dev` only for local bundles that set `local_dev: true` or use the 40-zero `source_commit` placeholder.
+### Inspect flags
+
+| Flag | Purpose |
+|------|---------|
+| `--strict` | Require PF-computed `verification_result` and wrapper digests (pf sign output) |
+| `--reverify` | Re-run the full 15-check PF verifier on the embedded `science_claim_bundle` |
+| `--json` | Emit `VerificationResult` JSON (with `--reverify`, emits embedded + reverified) |
+
+LabTrust-exported signed bundles load without `--strict` (external digest rules). Use `--reverify` to confirm PF checks on the embedded bundle.
+
+Use `--local-dev` on verify/sign only for bundles with `local_dev: true` or the 40-zero `source_commit` placeholder.
 
 ## Fifteen required checks
 
 | # | check_id | Description |
 |---|----------|-------------|
-| 1 | `science_claim_bundle_schema` | ScienceClaimBundle.v0 schema valid |
+| 1 | `science_claim_bundle_schema` | ScienceClaimBundle.v0 schema valid (pcs-core) |
 | 2 | `claim_artifact_present` | ClaimArtifact.v0 exists |
 | 3 | `assumption_set_present` | AssumptionSet.v0 exists |
-| 4 | `runtime_receipt_present` | RuntimeReceipt.v0 exists |
-| 5 | `trace_certificate_present` | At least one TraceCertificate.v0 exists |
+| 4 | `runtime_receipt_present` | RuntimeReceipt in `runtime_receipts` |
+| 5 | `trace_certificate_present` | TraceCertificate in `certificates` |
 | 6 | `evidence_bundle_present` | EvidenceBundle.v0 exists |
 | 7 | `assumption_set_ref_match` | Claim refs match assumption set id |
-| 8 | `runtime_trace_hash_present` | RuntimeReceipt.trace_hash non-empty |
+| 8 | `runtime_trace_hash_present` | `runtime_receipts[0].trace_hash` non-empty |
 | 9 | `trace_hash_alignment` | Certificate trace_hash matches receipt |
 | 10 | `certificate_status_checked` | TraceCertificate.status is CertificateChecked |
-| 11 | `evidence_refs_complete` | Evidence references claim, assumption, receipt, certificate |
+| 11 | `evidence_refs_complete` | Evidence refs claim, assumption set, receipt, certificate |
 | 12 | `artifact_not_stale` | No required artifact has status Stale |
 | 13 | `source_provenance_present` | source_repo and source_commit present |
 | 14 | `signature_or_digest_present` | signature_or_digest present |
@@ -46,8 +70,9 @@ Use `--json` on verify or inspect for machine-readable output. Use `--local-dev`
 **VerificationResult** (`schema_version`: `v0`):
 
 - `verification_id`: `verification-<uuid>`
-- `checks[].details`: JSON object (may be empty `{}`)
-- `signature_or_digest`: `sha256:...` (canonical JSON digest)
+- `status`: `ProofChecked` when all checks pass, `Rejected` otherwise (pcs-core `artifact_status` enum)
+- `checks[].details`: JSON object (may include `reason_code`)
+- `signature_or_digest`: `sha256:<64-hex>` (PF canonical JSON digest)
 
 **SignedScienceClaimBundle** (`schema_version`: `v0`):
 
@@ -55,31 +80,52 @@ Use `--json` on verify or inspect for machine-readable output. Use `--local-dev`
 - `verification_result`
 - `signer`: `Provability Fabric`
 - `signed_bundle_id`: `signed-<uuid>`
-- `signature_or_digest`: `sha256:...`
+- `signature_or_digest`: `sha256:<64-hex>`
 
-Signing is refused when `verification_result.status` is `failed`.
+Signing is refused when verification status is not `ProofChecked`.
+
+## Schema sync with pcs-core
+
+Schemas under `config/schemas/pcs/` must match [pcs-core/schemas](https://github.com/SentinelOps-CI/pcs-core/tree/main/schemas) exactly. Embedded copies live in `adapters/pcs/schemas/`.
+
+```bash
+# Compare against sibling checkout (default ../pcs-core)
+just pcs-schema-diff
+# or
+make validate-pcs-schema-diff PCS_CORE_PATH=../pcs-core
+bash scripts/pcs-schema-diff.sh /path/to/pcs-core
+```
 
 ## Layout
 
 ```
-config/schemas/pcs/          # VerificationResult + SignedScienceClaimBundle schemas
-adapters/pcs/                # verification engine
-core/cli/pf/cmd/             # pf verify|sign|inspect science-claim
-tests/pcs/                   # LabTrust fixtures
+config/schemas/pcs/          # pcs-core mirror (10 JSON files)
+adapters/pcs/                  # verification engine + embedded schemas
+core/cli/pf/cmd/               # pf verify|sign|inspect science-claim
+tests/pcs/fixtures/labtrust/   # LabTrust certified + signed reference fixtures
+tools/pcs-validate/            # fixture matrix validator
+scripts/pcs-schema-diff.sh
 ```
 
-## Tests
+## Tests and CI
 
 ```bash
 make test-pcs
+make validate-pcs-fixtures
+make validate-pcs-schema-diff
 ```
 
-CI: `.github/workflows/pcs-ci.yml`
+CI: `.github/workflows/pcs-ci.yml` (checks out pcs-core, runs schema diff, fixture matrix, CLI smoke).
+
+## Legacy migration (offline only)
+
+`pf verify` rejects bundles with `runtime_receipt`, `trace_certificate`, or `schema_version: "ScienceClaimBundle.v0"`.
+
+For one-off migration tooling, use `pcs.MigrateLegacyBundle()` in Go (not invoked by the CLI).
 
 ## Rigorous guarantees
 
-- Schemas are embedded in `adapters/pcs` (drift-tested against `config/schemas/pcs/`).
-- Failed checks include `details.reason_code` (for example `PCS_TRACE_HASH_MISMATCH`).
-- All trace certificates are verified for hash alignment and `CertificateChecked`.
+- Schemas are embedded in `adapters/pcs` and drift-tested against `config/schemas/pcs/` and pcs-core.
+- Failed checks include `details.reason_code` (for example `PCS_LEGACY_BUNDLE_FORMAT`, `PCS_TRACE_HASH_MISMATCH`).
+- All certificates are verified for hash alignment and `CertificateChecked`.
 - `pf verify` exits `1` on failure and prints `check_id: reason_code` lines to stderr.
-- `make validate-pcs-fixtures` runs the full valid/invalid fixture matrix via `tools/pcs-validate`.

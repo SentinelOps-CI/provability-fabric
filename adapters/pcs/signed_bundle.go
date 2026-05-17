@@ -12,6 +12,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// IntegrityOptions configures signed-bundle integrity verification.
+type IntegrityOptions struct {
+	// VerifyPFDigests recomputes PF canonical digests (required for pf sign output).
+	// External signers (e.g. LabTrust) may use different digest rules; leave false for inspect.
+	VerifyPFDigests bool
+}
+
 // SignVerificationResult builds SignedScienceClaimBundle.v0 for Scientific Memory import.
 func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result VerificationResult) (*SignedScienceClaimBundle, error) {
 	if !VerificationPassed(result) {
@@ -28,7 +35,7 @@ func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result 
 		SourceCommit:       ResolveSourceCommit(),
 	}
 	signed.SignatureOrDigest = digestSignedBundle(signed)
-	if err := VerifySignedBundleIntegrity(signed); err != nil {
+	if err := VerifySignedBundleIntegrity(signed, IntegrityOptions{VerifyPFDigests: true}); err != nil {
 		return nil, err
 	}
 	if repoRoot != "" {
@@ -49,19 +56,26 @@ func digestSignedBundle(signed *SignedScienceClaimBundle) string {
 	return "sha256:" + SHA256Hex(payload)
 }
 
-// VerifySignedBundleIntegrity recomputes digests and ensures verification still passes.
-func VerifySignedBundleIntegrity(signed *SignedScienceClaimBundle) error {
+// VerifySignedBundleIntegrity validates structure and optionally PF digest fields.
+func VerifySignedBundleIntegrity(signed *SignedScienceClaimBundle, opts IntegrityOptions) error {
 	if signed == nil {
 		return fmt.Errorf("signed bundle is nil")
 	}
 	if signed.SchemaVersion != SchemaVersionV0 {
-		return fmt.Errorf("unexpected schema_version %q", signed.SchemaVersion)
+		return fmt.Errorf("unexpected schema_version %q (want %q)", signed.SchemaVersion, SchemaVersionV0)
 	}
 	if signed.ScienceClaimBundle == nil {
 		return fmt.Errorf("science_claim_bundle is required")
 	}
+	if signed.ScienceClaimBundle.SchemaVersion != "" && signed.ScienceClaimBundle.SchemaVersion != SchemaVersionV0 {
+		return fmt.Errorf("science_claim_bundle.schema_version %q is not pcs-core canonical (want %q)",
+			signed.ScienceClaimBundle.SchemaVersion, SchemaVersionV0)
+	}
 	if !VerificationPassed(signed.VerificationResult) {
-		return fmt.Errorf("embedded verification status is %s", signed.VerificationResult.Status)
+		return fmt.Errorf("embedded verification status is %s (want ProofChecked)", signed.VerificationResult.Status)
+	}
+	if !opts.VerifyPFDigests {
+		return nil
 	}
 	expectedResultDigest := DigestVerificationResult(signed.VerificationResult)
 	if signed.VerificationResult.SignatureOrDigest != expectedResultDigest {
@@ -74,8 +88,13 @@ func VerifySignedBundleIntegrity(signed *SignedScienceClaimBundle) error {
 	return nil
 }
 
-// FormatInspectSummary renders a human-readable inspection report with every check.
+// FormatInspectSummary renders a human-readable inspection report with embedded checks.
 func FormatInspectSummary(signed *SignedScienceClaimBundle) string {
+	return FormatInspectSummaryWithReverify(signed, nil)
+}
+
+// FormatInspectSummaryWithReverify renders embedded checks and optional PF re-verification results.
+func FormatInspectSummaryWithReverify(signed *SignedScienceClaimBundle, reverify *VerificationResult) string {
 	var b strings.Builder
 	vr := signed.VerificationResult
 	fmt.Fprintf(&b, "Signed Science Claim Bundle\n")
@@ -87,12 +106,21 @@ func FormatInspectSummary(signed *SignedScienceClaimBundle) string {
 	fmt.Fprintf(&b, "  verification_status:  %s\n", vr.Status)
 	fmt.Fprintf(&b, "  result_digest:        %s\n", vr.SignatureOrDigest)
 	fmt.Fprintf(&b, "  wrapper_digest:       %s\n\n", signed.SignatureOrDigest)
-	fmt.Fprintf(&b, "Checks (%d):\n", len(vr.Checks))
-	for _, c := range vr.Checks {
-		fmt.Fprintf(&b, "  [%s] %s\n", c.Status, c.CheckID)
-		fmt.Fprintf(&b, "         %s\n", c.Description)
-		detailsJSON, _ := json.Marshal(c.Details)
-		fmt.Fprintf(&b, "         %s\n", string(detailsJSON))
+	appendChecksSection(&b, "Embedded checks", vr.Checks)
+	if reverify != nil {
+		fmt.Fprintf(&b, "\n")
+		appendChecksSection(&b, "PF re-verification", reverify.Checks)
+		fmt.Fprintf(&b, "  pf_status:            %s\n", reverify.Status)
 	}
 	return b.String()
+}
+
+func appendChecksSection(b *strings.Builder, title string, checks []VerificationCheck) {
+	fmt.Fprintf(b, "%s (%d):\n", title, len(checks))
+	for _, c := range checks {
+		fmt.Fprintf(b, "  [%s] %s\n", c.Status, c.CheckID)
+		fmt.Fprintf(b, "         %s\n", c.Description)
+		detailsJSON, _ := json.Marshal(c.Details)
+		fmt.Fprintf(b, "         %s\n", string(detailsJSON))
+	}
 }

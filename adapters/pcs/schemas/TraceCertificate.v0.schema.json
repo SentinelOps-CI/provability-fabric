@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/TraceCertificate.v0.schema.json",
+  "title": "TraceCertificate.v0",
+  "type": "object",
+  "required": [
+    "certificate_id",
+    "schema_version",
+    "trace_hash",
+    "spec_hash",
+    "property_id",
+    "checker",
+    "checker_version",
+    "status",
+    "counterexample_ref",
+    "created_at",
+    "producer",
+    "producer_version",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "certificate_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "spec_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "property_id": { "type": "string", "minLength": 1 },
+    "checker": { "type": "string", "minLength": 1 },
+    "checker_version": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "common.defs.json#/$defs/trace_certificate_status" },
+    "counterexample_ref": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+    },
+    "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "producer": { "type": "string", "minLength": 1 },
+    "producer_version": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

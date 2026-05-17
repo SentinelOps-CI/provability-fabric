@@ -30,9 +30,10 @@ Provability Fabric is the admission gate for PCS bundles:
 - It emits `VerificationResult.v0` and, when requested, `SignedScienceClaimBundle.v0`.
 
 ```bash
-pf verify science-claim science_claim_bundle.certified.json
-pf sign science-claim science_claim_bundle.certified.json --out signed_science_claim_bundle.json
-pf inspect science-claim signed_science_claim_bundle.json
+./pf verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
+./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out signed_science_claim_bundle.json
+./pf inspect science-claim signed_science_claim_bundle.json --strict
+./pf inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
 ```
 
 ## Scientific Memory handoff
@@ -50,6 +51,8 @@ No in-process Provability Fabric installation is required in Scientific Memory f
 ```bash
 make test-pcs
 make validate-pcs-fixtures
+make validate-pcs-schema-diff
+just pcs-schema-diff
 ```
 
 Or run the standalone validator:

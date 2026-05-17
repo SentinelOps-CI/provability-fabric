@@ -1,27 +1,41 @@
 # PCS adapter (Provability Fabric)
 
-Verifies and signs `ScienceClaimBundle.v0` artifacts for the Proof-Carrying Lab Workflow v0.1 demo.
+Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts for the Proof-Carrying Lab Workflow v0.1.
 
 ## Responsibilities
 
-- Load LabTrust-certified science claim bundles
-- Run required consistency and provenance checks
-- Emit `VerificationResult.v0`
+- Load LabTrust-certified science claim bundles (`runtime_receipts[]`, `certificates[]`, `schema_version: "v0"`)
+- Reject legacy singular-field PF bundles at load and schema validation
+- Run 15 consistency and provenance checks
+- Emit `VerificationResult.v0` with `ProofChecked` / `Rejected` status
 - Build `SignedScienceClaimBundle.v0` wrappers for Scientific Memory import
 
 ## Usage (via CLI)
 
 ```bash
-pf verify science-claim tests/pcs/valid_labtrust_bundle.json
-pf sign science-claim tests/pcs/valid_labtrust_bundle.json --out /tmp/signed.json
-pf inspect science-claim /tmp/signed.json
+./pf verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
+./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out /tmp/signed.json
+./pf inspect science-claim /tmp/signed.json --strict
+./pf inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
 ```
 
-Canonical artifact vocabulary lives in [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
+Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
 
-## Output shapes (Scientific Memory import)
+## Package layout
 
-- `VerificationResult`: `schema_version` = `v0`, `checks[].details` as JSON objects
-- `SignedScienceClaimBundle`: top-level `science_claim_bundle`, `verification_result`, `signature_or_digest`
+| File | Role |
+|------|------|
+| `bundle_validator.go` | 15-check verification pipeline |
+| `schema_validate.go` | JSON Schema validation (all pcs-core schemas) |
+| `signed_bundle.go` | Sign + inspect integrity (`IntegrityOptions`) |
+| `legacy.go` | Legacy detection + offline `MigrateLegacyBundle` |
+| `paths.go` | Repo-root path resolution for `tests/pcs/` |
+| `schemas/*.json` | Embedded pcs-core mirror |
 
-Use `--local-dev` on verify/sign only for local bundles with `local_dev: true` or the 40-zero `source_commit` placeholder.
+## Tests
+
+```bash
+cd adapters/pcs && go test ./... -count=1
+```
+
+Set `PCS_CORE_PATH` for `TestSchemaMirrorMatchesPCSCore`.

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/SourceSpan.v0.schema.json",
+  "title": "SourceSpan.v0",
+  "type": "object",
+  "required": [
+    "source_span_id",
+    "schema_version",
+    "source_type",
+    "source_uri",
+    "start",
+    "end",
+    "hash",
+    "description"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "source_span_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "paper",
+        "policy_file",
+        "trace_event",
+        "lean_file",
+        "protocol_file",
+        "runtime_log",
+        "manual_note",
+        "source_code"
+      ]
+    },
+    "source_uri": { "type": "string", "minLength": 1 },
+    "start": {
+      "type": "object",
+      "required": ["line", "column"],
+      "additionalProperties": false,
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "end": {
+      "type": "object",
+      "required": ["line", "column"],
+      "additionalProperties": false,
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "description": { "type": "string" }
+  }
+}

@@ -61,6 +61,17 @@ func main() {
 		if strings.Contains(e.Name(), "snapshot") || strings.Contains(e.Name(), "trace_certificate") {
 			continue
 		}
+		if e.Name() == "signed_science_claim_bundle.demo.json" {
+			continue
+		}
+		if strings.HasPrefix(e.Name(), "invalid_legacy") {
+			path := filepath.Join(dir, e.Name())
+			data, _ := os.ReadFile(path)
+			if keys, err := pcs.DetectLegacyBundleKeys(data); err == nil && len(keys) > 0 {
+				results = append(results, result{File: e.Name(), Status: "failed"})
+				continue
+			}
+		}
 		path := filepath.Join(dir, e.Name())
 		bundle, err := pcs.LoadScienceClaimBundle(path)
 		if err != nil {
@@ -82,12 +93,12 @@ func main() {
 		}
 
 		expectFail := strings.HasPrefix(e.Name(), "invalid_")
-		if expectFail && vr.Status != "failed" {
+		if expectFail && pcs.VerificationPassed(vr) {
 			results = append(results, result{File: e.Name(), Status: "unexpected_pass"})
 			failed++
 			continue
 		}
-		if !expectFail && vr.Status != "passed" {
+		if !expectFail && !pcs.VerificationPassed(vr) {
 			results = append(results, result{File: e.Name(), Status: "unexpected_fail"})
 			failed++
 			continue

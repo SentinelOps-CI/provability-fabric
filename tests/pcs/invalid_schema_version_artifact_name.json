@@ -1,6 +1,6 @@
 {
   "bundle_id": "scb-qc-release-v0.1",
-  "schema_version": "v0",
+  "schema_version": "ScienceClaimBundle.v0",
   "claim_artifact": {
     "artifact_id": "claim-qc-release-v0.1",
     "artifact_type": "ClaimArtifact.v0",
@@ -23,7 +23,7 @@
     "producer": "labtrust-gym",
     "producer_version": "0.1.0",
     "source_repo": "https://github.com/fraware/LabTrust-Gym",
-    "source_commit": "0000000000000000000000000000000000000000",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "signature_or_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
   },
   "assumption_set": {
@@ -148,6 +148,6 @@
   "producer": "labtrust-gym",
   "producer_version": "0.1.0",
   "source_repo": "https://github.com/fraware/LabTrust-Gym",
-  "source_commit": "0000000000000000000000000000000000000000",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "signature_or_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 }

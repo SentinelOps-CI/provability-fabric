@@ -12,9 +12,6 @@ func CheckAssumptionSetRefMatch(claim *ClaimArtifact, assumptions *AssumptionSet
 	}
 	ref := claim.AssumptionSetRef
 	setID := assumptions.AssumptionSetID
-	if setID == "" {
-		setID = assumptions.ArtifactID
-	}
 	if ref == "" || setID == "" {
 		return failCheck(id, "ClaimArtifact.assumption_set_ref matches AssumptionSet.assumption_set_id",
 			ReasonAssumptionRefMismatch, map[string]any{"assumption_set_ref": ref, "assumption_set_id": setID})

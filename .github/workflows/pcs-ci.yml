@@ -11,6 +11,9 @@ on:
       - 'core/cli/pf/**'
       - 'config/schemas/pcs/**'
       - 'tests/pcs/**'
+      - 'tools/pcs-validate/**'
+      - 'scripts/pcs-schema-diff.sh'
+      - 'justfile'
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - '.github/workflows/pcs-ci.yml'
@@ -21,6 +24,9 @@ on:
       - 'core/cli/pf/**'
       - 'config/schemas/pcs/**'
       - 'tests/pcs/**'
+      - 'tools/pcs-validate/**'
+      - 'scripts/pcs-schema-diff.sh'
+      - 'justfile'
       - 'docs/guides/science-claim-verification.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - '.github/workflows/pcs-ci.yml'
@@ -40,12 +46,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/checkout@v4
+        with:
+          repository: SentinelOps-CI/pcs-core
+          path: pcs-core
+          sparse-checkout: |
+            schemas
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
           cache-dependency-path: |
             adapters/pcs/go.sum
             core/cli/pf/go.sum
+            tools/pcs-validate/go.sum
+
+      - name: Schema mirror matches pcs-core
+        run: bash scripts/pcs-schema-diff.sh pcs-core
 
       - name: Test PCS adapter
         run: |
@@ -65,20 +82,31 @@ jobs:
       - name: CLI smoke (verify, sign, inspect)
         run: |
           cd core/cli/pf
-          BUNDLE="$GITHUB_WORKSPACE/tests/pcs/valid_labtrust_bundle.json"
-          OUT="$RUNNER_TEMP/signed_science_claim_bundle.json"
+          BUNDLE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json"
+          LABTRUST_SIGNED="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json"
+          OUT="$RUNNER_TEMP/pf_signed.json"
           go run . verify science-claim "$BUNDLE" --json | tee "$RUNNER_TEMP/verify.json"
+          grep -q '"status": "ProofChecked"' "$RUNNER_TEMP/verify.json"
           go run . sign science-claim "$BUNDLE" --out "$OUT"
-          go run . inspect science-claim "$OUT" | tee "$RUNNER_TEMP/inspect.txt"
-          grep -q '"status": "passed"' "$RUNNER_TEMP/verify.json"
-          grep -q 'verification_status: passed' "$RUNNER_TEMP/inspect.txt"
-          grep -q 'science_claim_bundle_schema' "$RUNNER_TEMP/inspect.txt"
-          grep -q 'Checks (15):' "$RUNNER_TEMP/inspect.txt"
+          go run . inspect science-claim "$OUT" --strict | tee "$RUNNER_TEMP/inspect_pf.txt"
+          grep -q 'verification_status:  ProofChecked' "$RUNNER_TEMP/inspect_pf.txt"
+          grep -q 'science_claim_bundle_schema' "$RUNNER_TEMP/inspect_pf.txt"
+          grep -q 'Embedded checks (15):' "$RUNNER_TEMP/inspect_pf.txt"
+          go run . inspect science-claim "$LABTRUST_SIGNED" --reverify | tee "$RUNNER_TEMP/inspect_labtrust.txt"
+          grep -q 'PF re-verification (15):' "$RUNNER_TEMP/inspect_labtrust.txt"
 
       - name: Reject failed bundle sign
         run: |
           cd core/cli/pf
           if go run . sign science-claim "$GITHUB_WORKSPACE/tests/pcs/invalid_missing_certificate.json" --out "$RUNNER_TEMP/bad.json"; then
             echo "expected sign to fail"
+            exit 1
+          fi
+
+      - name: Reject legacy singular-field bundle
+        run: |
+          cd core/cli/pf
+          if go run . verify science-claim "$GITHUB_WORKSPACE/tests/pcs/invalid_legacy_singular_runtime_receipt.json"; then
+            echo "expected legacy bundle to fail"
             exit 1
           fi

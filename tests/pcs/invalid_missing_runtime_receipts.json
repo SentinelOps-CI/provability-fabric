@@ -23,7 +23,7 @@
     "producer": "labtrust-gym",
     "producer_version": "0.1.0",
     "source_repo": "https://github.com/fraware/LabTrust-Gym",
-    "source_commit": "0000000000000000000000000000000000000000",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "signature_or_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
   },
   "assumption_set": {
@@ -58,38 +58,6 @@
     "status": "HumanReviewed",
     "signature_or_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
   },
-  "runtime_receipts": [
-    {
-      "receipt_id": "receipt-qc-release-run-001",
-      "schema_version": "v0",
-      "run_id": "runs/qc-release",
-      "environment": {
-        "platform": "linux",
-        "python": "3.12",
-        "labtrust_version": "0.1.0"
-      },
-      "started_at": "2026-05-16T11:58:00Z",
-      "ended_at": "2026-05-16T12:00:00Z",
-      "status": "RuntimeObserved",
-      "run_outcome": "passed",
-      "final_reason_code": "ok",
-      "released": true,
-      "events_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-      "policy_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-      "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
-      "producer": "labtrust-gym",
-      "producer_version": "0.1.0",
-      "source_repo": "https://github.com/fraware/LabTrust-Gym",
-      "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "input_hashes": {
-        "spec": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
-      },
-      "output_hashes": {
-        "trace.json": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
-      },
-      "signature_or_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
-    }
-  ],
   "certificates": [
     {
       "certificate_id": "cert-trace-qc-release-v0.1",
@@ -148,6 +116,6 @@
   "producer": "labtrust-gym",
   "producer_version": "0.1.0",
   "source_repo": "https://github.com/fraware/LabTrust-Gym",
-  "source_commit": "0000000000000000000000000000000000000000",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "signature_or_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 }

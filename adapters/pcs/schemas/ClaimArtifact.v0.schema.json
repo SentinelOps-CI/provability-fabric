@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ClaimArtifact.v0.schema.json",
+  "title": "ClaimArtifact.v0",
+  "type": "object",
+  "required": [
+    "artifact_id",
+    "artifact_type",
+    "schema_version",
+    "claim_text",
+    "claim_kind",
+    "status",
+    "assumption_set_ref",
+    "source_span_refs",
+    "formal_statement",
+    "certificate_refs",
+    "runtime_receipt_refs",
+    "created_at",
+    "producer",
+    "producer_version",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": { "type": "string", "minLength": 1 },
+    "artifact_type": { "const": "ClaimArtifact.v0" },
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "claim_text": { "type": "string", "minLength": 1 },
+    "claim_kind": {
+      "type": "string",
+      "enum": [
+        "scientific_claim",
+        "protocol_safety_claim",
+        "runtime_safety_claim",
+        "temporal_claim",
+        "policy_claim"
+      ]
+    },
+    "status": { "$ref": "common.defs.json#/$defs/artifact_status" },
+    "assumption_set_ref": { "type": "string", "minLength": 1 },
+    "source_span_refs": { "$ref": "common.defs.json#/$defs/ref_list" },
+    "formal_statement": { "type": "string" },
+    "certificate_refs": { "$ref": "common.defs.json#/$defs/ref_list" },
+    "runtime_receipt_refs": { "$ref": "common.defs.json#/$defs/ref_list" },
+    "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "producer": { "type": "string", "minLength": 1 },
+    "producer_version": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

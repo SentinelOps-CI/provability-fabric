@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +69,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 				}
 			}
 
-			if result.Status != "passed" {
+			if !pcs.VerificationPassed(result) {
 				printVerificationFailures(result)
 				return cliExit(ExitVerificationFailed, fmt.Errorf("verification failed"))
 			}

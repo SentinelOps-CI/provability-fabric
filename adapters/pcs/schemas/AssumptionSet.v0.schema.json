@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/AssumptionSet.v0.schema.json",
+  "title": "AssumptionSet.v0",
+  "type": "object",
+  "required": [
+    "assumption_set_id",
+    "schema_version",
+    "created_at",
+    "producer",
+    "producer_version",
+    "source_repo",
+    "source_commit",
+    "assumptions",
+    "human_review_status",
+    "status",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "assumption_set_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "producer": { "type": "string", "minLength": 1 },
+    "producer_version": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assumption_id", "text", "kind", "status", "source_span_refs"],
+        "additionalProperties": false,
+        "properties": {
+          "assumption_id": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "kind": {
+            "type": "string",
+            "enum": ["domain", "operational", "formal", "empirical", "security", "policy"]
+          },
+          "status": { "$ref": "common.defs.json#/$defs/artifact_status" },
+          "source_span_refs": { "$ref": "common.defs.json#/$defs/ref_list" }
+        }
+      }
+    },
+    "human_review_status": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected", "not_required"]
+    },
+    "status": { "$ref": "common.defs.json#/$defs/artifact_status" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

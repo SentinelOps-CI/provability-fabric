@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/common.defs.json",
+  "title": "PCS Common Definitions",
+  "$defs": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v0$"
+    },
+    "iso8601_datetime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "hex_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "artifact_status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Extracted",
+        "HumanReviewed",
+        "Formalized",
+        "ProofPending",
+        "ProofChecked",
+        "CertificatePending",
+        "CertificateChecked",
+        "RuntimeObserved",
+        "RuntimeChecked",
+        "Rejected",
+        "EmpiricalOnly",
+        "Deprecated",
+        "Stale"
+      ]
+    },
+    "trace_certificate_status": {
+      "type": "string",
+      "enum": ["CertificatePending", "CertificateChecked", "Rejected", "Stale"]
+    },
+    "producer_metadata": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "created_at",
+        "producer",
+        "producer_version",
+        "source_repo",
+        "source_commit",
+        "status",
+        "signature_or_digest"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/schema_version" },
+        "created_at": { "$ref": "#/$defs/iso8601_datetime" },
+        "producer": { "type": "string", "minLength": 1 },
+        "producer_version": { "type": "string", "minLength": 1 },
+        "source_repo": { "type": "string", "format": "uri" },
+        "source_commit": { "type": "string", "minLength": 7 },
+        "status": { "$ref": "#/$defs/artifact_status" },
+        "signature_or_digest": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
+    "hash_map": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/hex_digest" }
+    },
+    "ref_list": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

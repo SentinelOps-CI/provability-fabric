@@ -4,8 +4,8 @@
   "title": "VerificationResult.v0",
   "type": "object",
   "required": [
-    "schema_version",
     "verification_id",
+    "schema_version",
     "bundle_id",
     "verifier",
     "verifier_version",
@@ -16,32 +16,34 @@
     "source_commit",
     "signature_or_digest"
   ],
+  "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": "v0" },
-    "verification_id": { "type": "string", "pattern": "^verification-" },
-    "bundle_id": { "type": "string" },
-    "verifier": { "const": "Provability Fabric" },
-    "verifier_version": { "type": "string" },
-    "status": { "enum": ["passed", "failed"] },
+    "verification_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "bundle_id": { "type": "string", "minLength": 1 },
+    "verifier": { "type": "string", "minLength": 1 },
+    "verifier_version": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "common.defs.json#/$defs/artifact_status" },
     "checks": {
       "type": "array",
-      "minItems": 15,
       "items": {
         "type": "object",
         "required": ["check_id", "description", "status", "details"],
+        "additionalProperties": false,
         "properties": {
-          "check_id": { "type": "string" },
-          "description": { "type": "string" },
+          "check_id": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
           "status": {
+            "type": "string",
             "enum": ["passed", "failed", "skipped", "warning"]
           },
           "details": { "type": "object" }
         }
       }
     },
-    "created_at": { "type": "string" },
-    "source_repo": { "type": "string" },
-    "source_commit": { "type": "string" },
-    "signature_or_digest": { "type": "string", "pattern": "^sha256:" }
+    "created_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   }
 }

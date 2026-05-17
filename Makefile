@@ -84,11 +84,16 @@ validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
 	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
 
+validate-pcs-schema-diff:
+	@$(ECHOOK) "Comparing config/schemas/pcs to pcs-core..."
+	bash scripts/pcs-schema-diff.sh $(PCS_CORE_PATH)
+
 demo-pcs:
 	@$(ECHOOK) "PCS verify / sign / inspect demo (run from repo root)..."
-	$(PF) verify science-claim tests/pcs/valid_labtrust_bundle.json
-	$(PF) sign science-claim tests/pcs/valid_labtrust_bundle.json --out tests/pcs/signed_science_claim_bundle.demo.json
-	$(PF) inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json
+	$(PF) verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
+	$(PF) sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out tests/pcs/signed_science_claim_bundle.demo.json
+	$(PF) inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
+	$(PF) inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
 
 test:
 	@$(ECHOOK) "🧪 Running platform tests..."
