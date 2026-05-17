@@ -83,7 +83,8 @@ jobs:
         run: |
           cd core/cli/pf
           BUNDLE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json"
-          LABTRUST_SIGNED="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json"
+          LABTRUST_SIGNED="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/signed_science_claim_bundle.labtrust-export.json"
+          PF_SIGNED="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json"
           OUT="$RUNNER_TEMP/pf_signed.json"
           go run . verify science-claim "$BUNDLE" --json | tee "$RUNNER_TEMP/verify.json"
           grep -q '"status": "ProofChecked"' "$RUNNER_TEMP/verify.json"
@@ -92,6 +93,8 @@ jobs:
           grep -q 'verification_status:  ProofChecked' "$RUNNER_TEMP/inspect_pf.txt"
           grep -q 'science_claim_bundle_schema' "$RUNNER_TEMP/inspect_pf.txt"
           grep -q 'Embedded checks (15):' "$RUNNER_TEMP/inspect_pf.txt"
+          go run . inspect science-claim "$PF_SIGNED" --strict | tee "$RUNNER_TEMP/inspect_pf_signed_fixture.txt"
+          grep -q 'Embedded checks (15):' "$RUNNER_TEMP/inspect_pf_signed_fixture.txt"
           go run . inspect science-claim "$LABTRUST_SIGNED" --reverify | tee "$RUNNER_TEMP/inspect_labtrust.txt"
           grep -q 'PF re-verification (15):' "$RUNNER_TEMP/inspect_labtrust.txt"
 

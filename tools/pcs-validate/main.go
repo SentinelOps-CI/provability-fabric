@@ -14,10 +14,17 @@ import (
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
+type validateResult struct {
+	File   string `json:"file"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
 func main() {
 	fixturesDir := flag.String("fixtures", "tests/pcs", "Directory containing PCS JSON fixtures")
 	repoRoot := flag.String("repo-root", "", "Provability-fabric repo root (auto-detected if empty)")
 	localDev := flag.Bool("local-dev", false, "Allow 40-zero source_commit placeholder")
+	labtrust := flag.Bool("labtrust", true, "Also validate tests/pcs/fixtures/labtrust canonical fixtures")
 	jsonOut := flag.Bool("json", false, "Emit machine-readable summary")
 	flag.Parse()
 
@@ -39,67 +46,12 @@ func main() {
 	}
 	dir = filepath.Clean(dir)
 
-	type result struct {
-		File   string `json:"file"`
-		Status string `json:"status"`
-		Error  string `json:"error,omitempty"`
-	}
+	var results []validateResult
+	failed := validateBundleFixtures(dir, root, *localDev, &results)
 
-	var results []result
-	var failed int
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read fixtures: %v\n", err)
-		os.Exit(2)
-	}
-
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		if strings.Contains(e.Name(), "snapshot") || strings.Contains(e.Name(), "trace_certificate") {
-			continue
-		}
-		if e.Name() == "signed_science_claim_bundle.demo.json" {
-			continue
-		}
-		path := filepath.Join(dir, e.Name())
-		expectFail := strings.HasPrefix(e.Name(), "invalid_")
-		bundle, err := pcs.LoadScienceClaimBundle(path)
-		if err != nil {
-			if expectFail {
-				results = append(results, result{File: e.Name(), Status: "LoadRejected"})
-				continue
-			}
-			results = append(results, result{File: e.Name(), Status: "load_error", Error: err.Error()})
-			failed++
-			continue
-		}
-		opts := pcs.ValidateOptions{
-			RepoRoot:        root,
-			VerifierVersion: pcs.DefaultVerifierVersion,
-			SourceCommit:    "pcs-validate",
-			LocalDev:        *localDev,
-		}
-		vr, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
-		if err != nil {
-			results = append(results, result{File: e.Name(), Status: "error", Error: err.Error()})
-			failed++
-			continue
-		}
-
-		if expectFail && pcs.VerificationPassed(vr) {
-			results = append(results, result{File: e.Name(), Status: "unexpected_pass"})
-			failed++
-			continue
-		}
-		if !expectFail && !pcs.VerificationPassed(vr) {
-			results = append(results, result{File: e.Name(), Status: "unexpected_fail"})
-			failed++
-			continue
-		}
-		results = append(results, result{File: e.Name(), Status: vr.Status})
+	if *labtrust {
+		labtrustDir := filepath.Join(dir, "fixtures", "labtrust")
+		failed += validateLabtrustFixtures(labtrustDir, root, *localDev, &results)
 	}
 
 	if *jsonOut {
@@ -119,14 +71,132 @@ func main() {
 		os.Exit(1)
 	}
 	if !*jsonOut {
-		var negative, positive int
-		for _, r := range results {
-			if strings.HasPrefix(r.File, "invalid_") {
-				negative++
-			} else {
-				positive++
-			}
-		}
-		fmt.Printf("OK: %d negative fixtures rejected, %d positive fixture passed\n", negative, positive)
+		fmt.Printf("OK: PCS fixture validation passed (%d artifacts)\n", len(results))
 	}
+}
+
+func validateBundleFixtures(dir, root string, localDev bool, results *[]validateResult) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read fixtures: %v\n", err)
+		os.Exit(2)
+	}
+
+	var failed int
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if shouldSkipFixtureName(e.Name()) {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		expectFail := strings.HasPrefix(e.Name(), "invalid_")
+		if validateScienceClaimBundle(path, e.Name(), root, localDev, expectFail, results) {
+			failed++
+		}
+	}
+	return failed
+}
+
+func validateLabtrustFixtures(labtrustDir, root string, localDev bool, results *[]validateResult) int {
+	var failed int
+	certified := filepath.Join(labtrustDir, "science_claim_bundle.certified.json")
+	if _, err := os.Stat(certified); err == nil {
+		label := "fixtures/labtrust/science_claim_bundle.certified.json"
+		if validateScienceClaimBundle(certified, label, root, localDev, false, results) {
+			failed++
+		}
+	}
+	signed := filepath.Join(labtrustDir, "signed_science_claim_bundle.json")
+	if _, err := os.Stat(signed); err == nil {
+		label := "fixtures/labtrust/signed_science_claim_bundle.json"
+		if validateSignedBundle(signed, label, root, results) {
+			failed++
+		}
+	}
+	export := filepath.Join(labtrustDir, "signed_science_claim_bundle.labtrust-export.json")
+	if _, err := os.Stat(export); err == nil {
+		label := "fixtures/labtrust/signed_science_claim_bundle.labtrust-export.json"
+		if validateSignedBundleExport(export, label, root, results) {
+			failed++
+		}
+	}
+	return failed
+}
+
+func validateScienceClaimBundle(path, label, root string, localDev, expectFail bool, results *[]validateResult) bool {
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		if expectFail {
+			*results = append(*results, validateResult{File: label, Status: "LoadRejected"})
+			return false
+		}
+		*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+		return true
+	}
+	opts := pcs.ValidateOptions{
+		RepoRoot:        root,
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    "pcs-validate",
+		LocalDev:        localDev,
+	}
+	vr, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
+	if err != nil {
+		*results = append(*results, validateResult{File: label, Status: "error", Error: err.Error()})
+		return true
+	}
+	if expectFail && pcs.VerificationPassed(vr) {
+		*results = append(*results, validateResult{File: label, Status: "unexpected_pass"})
+		return true
+	}
+	if !expectFail && !pcs.VerificationPassed(vr) {
+		*results = append(*results, validateResult{File: label, Status: "unexpected_fail"})
+		return true
+	}
+	*results = append(*results, validateResult{File: label, Status: vr.Status})
+	return false
+}
+
+func validateSignedBundle(path, label, root string, results *[]validateResult) bool {
+	signed, err := pcs.LoadSignedScienceClaimBundle(path)
+	if err != nil {
+		*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+		return true
+	}
+	if err := pcs.ValidateSignedScienceClaimBundle(root, signed); err != nil {
+		*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+		return true
+	}
+	if err := pcs.VerifySignedBundleIntegrity(signed, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
+		*results = append(*results, validateResult{File: label, Status: "integrity_failed", Error: err.Error()})
+		return true
+	}
+	if !pcs.VerificationPassed(signed.VerificationResult) {
+		*results = append(*results, validateResult{File: label, Status: "unexpected_embedded_status", Error: signed.VerificationResult.Status})
+		return true
+	}
+	*results = append(*results, validateResult{File: label, Status: "ProofChecked"})
+	return false
+}
+
+func validateSignedBundleExport(path, label, root string, results *[]validateResult) bool {
+	signed, err := pcs.LoadSignedScienceClaimBundle(path)
+	if err != nil {
+		*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+		return true
+	}
+	if err := pcs.ValidateSignedScienceClaimBundle(root, signed); err != nil {
+		*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+		return true
+	}
+	*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+	return false
+}
+
+func shouldSkipFixtureName(name string) bool {
+	if strings.Contains(name, "snapshot") || strings.Contains(name, "trace_certificate") {
+		return true
+	}
+	return name == "signed_science_claim_bundle.demo.json"
 }

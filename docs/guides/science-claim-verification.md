@@ -119,9 +119,19 @@ scripts/pcs-schema-sync.sh
 make test-pcs
 make validate-pcs-fixtures
 make validate-pcs-schema-diff
+make freeze-pcs-labtrust-signed   # rewrite PF signed fixture when verifier output changes
+just pcs-schema-diff
 ```
 
-CI: `.github/workflows/pcs-ci.yml` (checks out pcs-core, runs schema diff, fixture matrix, CLI smoke).
+LabTrust freeze fixtures under `tests/pcs/fixtures/labtrust/`:
+
+| File | Role |
+|------|------|
+| `science_claim_bundle.certified.json` | Canonical pcs-core certified bundle (verify must be `ProofChecked`) |
+| `signed_science_claim_bundle.json` | PF-signed wrapper (`pf sign` output; 15 embedded checks; strict inspect) |
+| `signed_science_claim_bundle.labtrust-export.json` | External LabTrust export (2 embedded checks; use `inspect --reverify`) |
+
+CI: `.github/workflows/pcs-ci.yml` (checks out pcs-core, runs schema diff, fixture matrix, LabTrust freeze validation, CLI smoke).
 
 ## Legacy migration (offline only)
 

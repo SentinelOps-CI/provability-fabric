@@ -128,7 +128,7 @@ func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
 }
 
 func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
-	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.json")
+	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.labtrust-export.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")
 	cmd.Dir = pfDir(t)
 	out, err := cmd.CombinedOutput()

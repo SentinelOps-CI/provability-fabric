@@ -1,6 +1,6 @@
 {
   "schema_version": "v0",
-  "signed_bundle_id": "signed-scb-qc-release-v0.1",
+  "signed_bundle_id": "signed-e1ed91e8-5a63-42da-9317-35951de1a76f",
   "science_claim_bundle": {
     "bundle_id": "scb-qc-release-v0.1",
     "schema_version": "v0",
@@ -12,10 +12,16 @@
       "claim_kind": "temporal_claim",
       "status": "CertificateChecked",
       "assumption_set_ref": "as-labtrust-qc-v0.1",
-      "source_span_refs": ["span-qc-release-spec-1"],
-      "formal_statement": "G (release_ready -> F[0,24h] verified)",
-      "certificate_refs": ["cert-trace-qc-release-v0.1"],
-      "runtime_receipt_refs": ["receipt-qc-release-run-001"],
+      "source_span_refs": [
+        "span-qc-release-spec-1"
+      ],
+      "formal_statement": "G (release_ready -\u003e F[0,24h] verified)",
+      "certificate_refs": [
+        "cert-trace-qc-release-v0.1"
+      ],
+      "runtime_receipt_refs": [
+        "receipt-qc-release-run-001"
+      ],
       "created_at": "2026-05-16T12:05:00Z",
       "producer": "labtrust-gym",
       "producer_version": "0.1.0",
@@ -37,7 +43,18 @@
           "text": "Simulation models a hospital QC release workflow, not a live clinical laboratory.",
           "kind": "domain",
           "status": "HumanReviewed",
-          "source_span_refs": ["span-qc-release-spec-1"]
+          "source_span_refs": [
+            "span-qc-release-spec-1"
+          ]
+        },
+        {
+          "assumption_id": "asm-policy-trace-integrity",
+          "text": "Exported trace.json is byte-stable for the run identifier.",
+          "kind": "policy",
+          "status": "RuntimeObserved",
+          "source_span_refs": [
+            "span-qc-release-spec-1"
+          ]
         }
       ],
       "human_review_status": "approved",
@@ -49,7 +66,11 @@
         "receipt_id": "receipt-qc-release-run-001",
         "schema_version": "v0",
         "run_id": "runs/qc-release",
-        "environment": { "platform": "linux", "labtrust_version": "0.1.0" },
+        "environment": {
+          "labtrust_version": "0.1.0",
+          "platform": "linux",
+          "python": "3.12"
+        },
         "started_at": "2026-05-16T11:58:00Z",
         "ended_at": "2026-05-16T12:00:00Z",
         "status": "RuntimeObserved",
@@ -94,12 +115,22 @@
     "evidence_bundle": {
       "bundle_id": "evidence-qc-release-v0.1",
       "schema_version": "v0",
-      "claim_refs": ["claim-qc-release-v0.1"],
-      "assumption_set_refs": ["as-labtrust-qc-v0.1"],
-      "runtime_receipt_refs": ["receipt-qc-release-run-001"],
-      "certificate_refs": ["cert-trace-qc-release-v0.1"],
+      "claim_refs": [
+        "claim-qc-release-v0.1"
+      ],
+      "assumption_set_refs": [
+        "as-labtrust-qc-v0.1"
+      ],
+      "runtime_receipt_refs": [
+        "receipt-qc-release-run-001"
+      ],
+      "certificate_refs": [
+        "cert-trace-qc-release-v0.1"
+      ],
       "artifact_hashes": {
-        "claim-qc-release-v0.1": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        "cert-trace-qc-release-v0.1": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+        "claim-qc-release-v0.1": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "receipt-qc-release-run-001": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
       },
       "created_at": "2026-05-16T12:12:00Z",
       "producer": "labtrust-gym",
@@ -110,7 +141,11 @@
     },
     "verification_policy": {
       "policy_id": "labtrust-v0.1-qc-release",
-      "required_checks": ["schema-valid", "trace-hash-alignment"]
+      "required_checks": [
+        "schema-valid",
+        "trace-hash-alignment",
+        "assumption-set-present"
+      ]
     },
     "created_at": "2026-05-16T12:15:00Z",
     "producer": "labtrust-gym",
@@ -120,34 +155,154 @@
     "signature_or_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
   "verification_result": {
-    "verification_id": "verify-scb-qc-release-v0.1",
     "schema_version": "v0",
+    "verification_id": "verification-ed5de967-914d-41ff-a02d-3e32c382358b",
     "bundle_id": "scb-qc-release-v0.1",
-    "verifier": "provability-fabric",
+    "verifier": "Provability Fabric",
     "verifier_version": "0.1.0",
     "status": "ProofChecked",
     "checks": [
       {
-        "check_id": "schema-valid",
-        "description": "ScienceClaimBundle conforms to schema",
+        "check_id": "science_claim_bundle_schema",
+        "description": "Science claim bundle matches pcs-core JSON Schema (v0)",
+        "status": "passed",
+        "details": {
+          "schema": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"
+        }
+      },
+      {
+        "check_id": "claim_artifact_present",
+        "description": "ClaimArtifact exists",
+        "status": "passed",
+        "details": {
+          "artifact": "claim_artifact",
+          "present": true
+        }
+      },
+      {
+        "check_id": "assumption_set_present",
+        "description": "AssumptionSet exists",
+        "status": "passed",
+        "details": {
+          "artifact": "assumption_set",
+          "present": true
+        }
+      },
+      {
+        "check_id": "runtime_receipt_present",
+        "description": "Exactly one RuntimeReceipt exists in runtime_receipts",
+        "status": "passed",
+        "details": {
+          "artifact": "runtime_receipts",
+          "count": 1,
+          "present": true
+        }
+      },
+      {
+        "check_id": "trace_certificate_present",
+        "description": "At least one TraceCertificate exists in certificates",
+        "status": "passed",
+        "details": {
+          "artifact": "certificates",
+          "count": 1,
+          "present": true
+        }
+      },
+      {
+        "check_id": "evidence_bundle_present",
+        "description": "EvidenceBundle exists",
+        "status": "passed",
+        "details": {
+          "artifact": "evidence_bundle",
+          "present": true
+        }
+      },
+      {
+        "check_id": "assumption_set_ref_match",
+        "description": "ClaimArtifact.assumption_set_ref matches AssumptionSet.assumption_set_id",
+        "status": "passed",
+        "details": {
+          "assumption_set_ref": "as-labtrust-qc-v0.1"
+        }
+      },
+      {
+        "check_id": "runtime_trace_hash_present",
+        "description": "RuntimeReceipt.trace_hash is non-empty",
+        "status": "passed",
+        "details": {
+          "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      },
+      {
+        "check_id": "trace_hash_alignment",
+        "description": "TraceCertificate.trace_hash matches RuntimeReceipt.trace_hash",
+        "status": "passed",
+        "details": {
+          "certificate_count": 1,
+          "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      },
+      {
+        "check_id": "certificate_status_checked",
+        "description": "TraceCertificate.status is CertificateChecked",
+        "status": "passed",
+        "details": {
+          "certificate_count": 1,
+          "status": "CertificateChecked"
+        }
+      },
+      {
+        "check_id": "evidence_refs_complete",
+        "description": "EvidenceBundle references claim, assumption set, receipt, and certificate",
+        "status": "passed",
+        "details": {
+          "assumption_set_refs": [
+            "as-labtrust-qc-v0.1"
+          ],
+          "certificate_refs": [
+            "cert-trace-qc-release-v0.1"
+          ],
+          "claim_refs": [
+            "claim-qc-release-v0.1"
+          ],
+          "runtime_receipt_refs": [
+            "receipt-qc-release-run-001"
+          ]
+        }
+      },
+      {
+        "check_id": "artifact_not_stale",
+        "description": "No required artifact has status Stale",
         "status": "passed",
         "details": {}
       },
       {
-        "check_id": "trace-hash-alignment",
-        "description": "Receipt trace_hash matches certificate",
+        "check_id": "source_provenance_present",
+        "description": "source_repo and source_commit are present",
+        "status": "passed",
+        "details": {}
+      },
+      {
+        "check_id": "signature_or_digest_present",
+        "description": "signature_or_digest is present",
+        "status": "passed",
+        "details": {}
+      },
+      {
+        "check_id": "source_commit_not_placeholder",
+        "description": "source_commit is not the 40-zero placeholder unless local_dev = true",
         "status": "passed",
         "details": {}
       }
     ],
-    "created_at": "2026-05-16T12:20:00Z",
+    "created_at": "2026-05-17T13:00:26Z",
     "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
     "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
-    "signature_or_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "signature_or_digest": "sha256:d06c72573ffb493f17a6823c344b5da2c5cbb00931beb981704f6d30344933ee"
   },
-  "signer": "provability-fabric",
-  "signed_at": "2026-05-16T12:25:00Z",
+  "signer": "Provability Fabric",
+  "signed_at": "2026-05-17T13:00:26Z",
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-  "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
-  "signature_or_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  "source_commit": "b990527544fefc09fa1d679c341f2fd49cec0bb6",
+  "signature_or_digest": "sha256:9528bfb5a7fa17b7ebec4d6a5e2703b68970ee6fc9ab09924c0af59e8758a0f4"
 }

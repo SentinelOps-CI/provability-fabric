@@ -295,8 +295,11 @@ func TestInspectAcceptsPCSCoreSignedBundle(t *testing.T) {
 		t.Fatalf("inspect integrity: %v", err)
 	}
 	summary := pcs.FormatInspectSummary(signed)
-	if !strings.Contains(summary, "signed-scb-qc-release-v0.1") || !strings.Contains(summary, "ProofChecked") {
-		t.Fatalf("inspect summary missing labtrust signed bundle fields: %s", summary)
+	if !strings.Contains(summary, "scb-qc-release-v0.1") || !strings.Contains(summary, "ProofChecked") {
+		t.Fatalf("inspect summary missing signed bundle fields: %s", summary)
+	}
+	if !strings.Contains(summary, "Embedded checks (15):") {
+		t.Fatalf("PF signed bundle must embed 15 checks: %s", summary)
 	}
 }
 

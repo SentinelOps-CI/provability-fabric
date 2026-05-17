@@ -15,5 +15,8 @@ pcs-schema-diff:
 pcs-schema-sync:
     bash "{{root}}/scripts/pcs-schema-sync.sh" "{{pcs_core}}"
 
+freeze-pcs-labtrust-signed:
+    make freeze-pcs-labtrust-signed
+
 demo-pcs:
     make demo-pcs

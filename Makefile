@@ -85,6 +85,10 @@ validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
 	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
 
+freeze-pcs-labtrust-signed:
+	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."
+	bash scripts/pcs-freeze-labtrust-signed.sh
+
 validate-pcs-schema-diff:
 	@$(ECHOOK) "Comparing config/schemas/pcs to pcs-core..."
 	bash scripts/pcs-schema-diff.sh $(PCS_CORE_PATH)
@@ -98,7 +102,7 @@ demo-pcs:
 	$(PF) verify science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json
 	$(PF) sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out tests/pcs/signed_science_claim_bundle.demo.json
 	$(PF) inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
-	$(PF) inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
+	$(PF) inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.labtrust-export.json --reverify
 	@$(ECHOOK) "OK: PCS demo completed (verify, sign, inspect --strict, inspect --reverify)"
 
 test:
