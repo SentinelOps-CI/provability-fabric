@@ -54,7 +54,7 @@
     },
     {
       "check_id": "evidence_bundle_present",
-      "description": "EvidenceBundle.v0 exists",
+      "description": "EvidenceBundle exists",
       "status": "passed",
       "details": {
         "artifact": "evidence_bundle",

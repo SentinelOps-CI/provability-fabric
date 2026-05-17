@@ -79,6 +79,7 @@ test-pcs:
 	@$(ECHOOK) "Running PCS science-claim tests..."
 	cd adapters/pcs && go test ./... -count=1
 	cd core/cli/pf && go test ./cmd/... -count=1
+	@$(ECHOOK) "OK: PCS unit and CLI tests passed"
 
 validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
@@ -98,6 +99,7 @@ demo-pcs:
 	$(PF) sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out tests/pcs/signed_science_claim_bundle.demo.json
 	$(PF) inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
 	$(PF) inspect science-claim tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json --reverify
+	@$(ECHOOK) "OK: PCS demo completed (verify, sign, inspect --strict, inspect --reverify)"
 
 test:
 	@$(ECHOOK) "🧪 Running platform tests..."

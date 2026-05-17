@@ -56,7 +56,7 @@ func runChecks(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptio
 		presenceCheck("assumption_set_present", "AssumptionSet exists", "assumption_set", bundle.AssumptionSet != nil),
 		checkRuntimeReceiptPresent(bundle),
 		checkTraceCertificatesPresent(bundle),
-		presenceCheck("evidence_bundle_present", "EvidenceBundle.v0 exists", "evidence_bundle", bundle.EvidenceBundle != nil),
+		presenceCheck("evidence_bundle_present", "EvidenceBundle exists", "evidence_bundle", bundle.EvidenceBundle != nil),
 		CheckAssumptionSetRefMatch(bundle.ClaimArtifact, bundle.AssumptionSet),
 		CheckRuntimeTraceHashPresent(receipt),
 		CheckAllTraceHashAlignment(receipt, certs),
