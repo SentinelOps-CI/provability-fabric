@@ -16,6 +16,7 @@ on:
       - 'scripts/pcs-pf-clean-chain.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
       - 'scripts/pcs-freeze-labtrust-release-invalid.py'
+      - 'scripts/pcs-sync-from-pcs-core-rc.py'
       - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
@@ -35,6 +36,7 @@ on:
       - 'scripts/pcs-pf-clean-chain.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
       - 'scripts/pcs-freeze-labtrust-release-invalid.py'
+      - 'scripts/pcs-sync-from-pcs-core-rc.py'
       - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
@@ -78,9 +80,18 @@ jobs:
         run: bash scripts/pcs-schema-diff.sh pcs-core
 
       - name: Test PCS adapter
+        env:
+          PCS_CORE_PATH: ${{ github.workspace }}/pcs-core
         run: |
           cd adapters/pcs
           go test ./... -count=1
+
+      - name: pf inspect labtrust-release signed fixture
+        run: |
+          cd core/cli/pf
+          go run . inspect science-claim \
+            "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json" \
+            --strict
 
       - name: Validate PCS fixtures
         run: |

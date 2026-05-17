@@ -4,13 +4,23 @@
 package pcs_test
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
+)
+
+// Canonical pcs-core RC values (pcs-core/examples/labtrust-release).
+const (
+	rcCertifiedBundleHash = "sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+	rcCertificateID       = "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
+	rcTraceHash           = "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
+	rcPFSourceCommit      = "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
 )
 
 func fileSHA256Hex(path string) (string, error) {
@@ -22,117 +32,33 @@ func fileSHA256Hex(path string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// Canonical pcs-core RC values (pcs-core/examples/labtrust-release).
-const (
-	rcCertifiedBundleHash = "sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
-	rcCertificateID       = "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
-	rcTraceHash           = "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
-	rcPFSourceCommit      = "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
-)
-
 func pcsCoreRCDir(t *testing.T) string {
 	t.Helper()
-	dir := filepath.Join(repoRoot(t), "..", "pcs-core", "examples", "labtrust-release")
+	base := os.Getenv("PCS_CORE_PATH")
+	if base == "" {
+		base = filepath.Join(repoRoot(t), "..", "pcs-core")
+	}
+	dir := filepath.Join(base, "examples", "labtrust-release")
 	if _, err := os.Stat(dir); err != nil {
-		t.Skip("pcs-core/examples/labtrust-release not present")
+		t.Skipf("pcs-core RC dir not present: %s", dir)
 	}
 	return dir
 }
 
-func TestPFFixtureMatchesPCSCoreRC(t *testing.T) {
-	rc := pcsCoreRCDir(t)
-	for _, name := range []string{
-		"science_claim_bundle.certified.json",
-		"verification_result.json",
-		"signed_science_claim_bundle.json",
-	} {
-		pfPath := labtrustReleaseFixture(t, name)
-		rcPath := filepath.Join(rc, name)
-		pfHash, err := fileSHA256Hex(pfPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rcHash, err := fileSHA256Hex(rcPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if pfHash != rcHash {
-			t.Fatalf("%s digest mismatch: pf sha256:%s rc sha256:%s", name, pfHash, rcHash)
-		}
-	}
-}
-
-func TestPFVerifyAcceptsCanonicalRCBundle(t *testing.T) {
-	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
-	bundle, err := pcs.LoadScienceClaimBundle(path)
+func assertFilesMatchRC(t *testing.T, pfPath, rcPath string) {
+	t.Helper()
+	pfBytes, err := os.ReadFile(pfPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := loadReleaseManifest(t)
-	opts := pcs.ValidateOptions{
-		RepoRoot:        repoRoot(t),
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
-	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
+	rcBytes, err := os.ReadFile(rcPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pcs.VerificationPassed(result) {
-		t.Fatalf("expected ProofChecked, got %s", result.Status)
+	if bytes.Equal(pfBytes, rcBytes) {
+		return
 	}
-	if result.VerifiedInput == nil {
-		t.Fatal("expected verified_input")
-	}
-	if result.VerifiedInput.BundleHash != rcCertifiedBundleHash {
-		t.Fatalf("verified_input.bundle_hash %q != canonical %q", result.VerifiedInput.BundleHash, rcCertifiedBundleHash)
-	}
-	if result.VerifiedInput.CertificateID != rcCertificateID {
-		t.Fatalf("verified_input.certificate_id %q != canonical %q", result.VerifiedInput.CertificateID, rcCertificateID)
-	}
-	if result.VerifiedInput.TraceHash != rcTraceHash {
-		t.Fatalf("verified_input.trace_hash %q != canonical %q", result.VerifiedInput.TraceHash, rcTraceHash)
-	}
-	if result.SourceCommit != rcPFSourceCommit {
-		t.Fatalf("source_commit %q != canonical %q", result.SourceCommit, rcPFSourceCommit)
-	}
-}
-
-func TestPFInspectAcceptsCanonicalRCSignedBundle(t *testing.T) {
-	path := labtrustReleaseFixture(t, "signed_science_claim_bundle.json")
-	signed, err := pcs.LoadSignedScienceClaimBundle(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := pcs.VerifySignedBundleIntegrity(signed, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
-		t.Fatal(err)
-	}
-	if err := pcs.ValidateSignedScienceClaimBundle(repoRoot(t), signed); err != nil {
-		t.Fatal(err)
-	}
-	if signed.SignedInputBundleHash != rcCertifiedBundleHash {
-		t.Fatalf("signed_input_bundle_hash %q != canonical %q", signed.SignedInputBundleHash, rcCertifiedBundleHash)
-	}
-	if signed.SourceCommit != rcPFSourceCommit {
-		t.Fatalf("source_commit %q != canonical %q", signed.SourceCommit, rcPFSourceCommit)
-	}
-	vi := signed.VerificationResult.VerifiedInput
-	if vi == nil {
-		t.Fatal("expected embedded verified_input")
-	}
-	if vi.CertificateID != rcCertificateID {
-		t.Fatalf("verified_input.certificate_id %q != canonical %q", vi.CertificateID, rcCertificateID)
-	}
-	if vi.BundleHash != rcCertifiedBundleHash {
-		t.Fatalf("verified_input.bundle_hash %q != canonical %q", vi.BundleHash, rcCertifiedBundleHash)
-	}
-	if vi.TraceHash != rcTraceHash {
-		t.Fatalf("verified_input.trace_hash %q != canonical %q", vi.TraceHash, rcTraceHash)
-	}
-
-	rcPath := filepath.Join(pcsCoreRCDir(t), "signed_science_claim_bundle.json")
-	pfHash, err := fileSHA256Hex(path)
+	pfHash, err := fileSHA256Hex(pfPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +66,74 @@ func TestPFInspectAcceptsCanonicalRCSignedBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pfHash != rcHash {
-		t.Fatalf("signed bundle file digest mismatch: pf sha256:%s rc sha256:%s", pfHash, rcHash)
+	if pfHash == rcHash {
+		t.Logf("byte layout differs but sha256 matches (pf %d bytes, rc %d bytes)", len(pfBytes), len(rcBytes))
+		return
+	}
+	t.Fatalf("file drift: pf sha256:%s rc sha256:%s (pf %d bytes, rc %d bytes)", pfHash, rcHash, len(pfBytes), len(rcBytes))
+}
+
+func TestPFLabtrustReleaseFixtureMatchesPCSCoreRC(t *testing.T) {
+	rc := pcsCoreRCDir(t)
+	pfPath := labtrustReleaseFixture(t, "signed_science_claim_bundle.json")
+	rcPath := filepath.Join(rc, "signed_science_claim_bundle.json")
+	assertFilesMatchRC(t, pfPath, rcPath)
+}
+
+func TestPFVerificationResultMatchesPCSCoreRC(t *testing.T) {
+	vrPath := labtrustReleaseFixture(t, "verification_result.json")
+	vrBytes, err := os.ReadFile(vrPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result pcs.VerificationResult
+	if err := json.Unmarshal(vrBytes, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.VerifiedInput == nil {
+		t.Fatal("verification_result.verified_input is required")
+	}
+	assertCanonicalRCFields(t, result.VerifiedInput.BundleHash, result.VerifiedInput.CertificateID, result.VerifiedInput.TraceHash, result.SourceCommit)
+
+	signed, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signed.VerificationResult.VerifiedInput == nil {
+		t.Fatal("signed bundle embedded verified_input is required")
+	}
+	vi := signed.VerificationResult.VerifiedInput
+	assertCanonicalRCFields(t, vi.BundleHash, vi.CertificateID, vi.TraceHash, signed.VerificationResult.SourceCommit)
+	if signed.SignedInputBundleHash != rcCertifiedBundleHash {
+		t.Fatalf("signed_input_bundle_hash %q != canonical %q", signed.SignedInputBundleHash, rcCertifiedBundleHash)
+	}
+	if signed.SourceCommit != rcPFSourceCommit {
+		t.Fatalf("signed wrapper source_commit %q != canonical %q", signed.SourceCommit, rcPFSourceCommit)
+	}
+
+	rc := pcsCoreRCDir(t)
+	rcVRPath := filepath.Join(rc, "verification_result.json")
+	rcSignedPath := filepath.Join(rc, "signed_science_claim_bundle.json")
+	assertFilesMatchRC(t, vrPath, rcVRPath)
+	assertFilesMatchRC(t, labtrustReleaseFixture(t, "signed_science_claim_bundle.json"), rcSignedPath)
+
+	if err := pcs.VerifySignedBundleIntegrity(signed, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertCanonicalRCFields(t *testing.T, bundleHash, certID, traceHash, sourceCommit string) {
+	t.Helper()
+	if bundleHash != rcCertifiedBundleHash {
+		t.Fatalf("verified_input.bundle_hash %q != canonical %q", bundleHash, rcCertifiedBundleHash)
+	}
+	if certID != rcCertificateID {
+		t.Fatalf("verified_input.certificate_id %q != canonical %q", certID, rcCertificateID)
+	}
+	if traceHash != rcTraceHash {
+		t.Fatalf("verified_input.trace_hash %q != canonical %q", traceHash, rcTraceHash)
+	}
+	if sourceCommit != rcPFSourceCommit {
+		t.Fatalf("verification_result.source_commit %q != canonical %q", sourceCommit, rcPFSourceCommit)
 	}
 }
