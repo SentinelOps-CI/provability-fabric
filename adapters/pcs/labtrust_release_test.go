@@ -123,7 +123,10 @@ func TestSignLabtrustReleaseBundleOutputsPCSCoreSignedBundle(t *testing.T) {
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify before sign: %v status=%s", err, result.Status)
 	}
-	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{ReleaseMode: true})
+	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
+		ReleaseMode: true,
+		BundlePath:  path,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

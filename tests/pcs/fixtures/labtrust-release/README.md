@@ -1,19 +1,20 @@
-# LabTrust + CertifyEdge release fixtures
+# LabTrust release fixtures (PCS v0.1 RC)
 
-Real release candidate from LabTrust-Gym `examples/pcs_qc_release/release/`, plus PF-generated verification and signed wrappers.
+Canonical release candidate artifacts live in **`pcs-core/examples/labtrust-release/`**. PF fixtures here are synchronized from that directory; do not regenerate PF outputs independently unless the full release chain is promoted atomically.
 
 | File | Source |
 |------|--------|
-| `science_claim_bundle.certified.json` | `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` |
-| `verification_result.json` | `pf verify science-claim ... --out` |
-| `signed_science_claim_bundle.json` | `pf sign science-claim ... --out` |
+| `science_claim_bundle.certified.json` | pcs-core RC |
+| `verification_result.json` | pcs-core RC |
+| `signed_science_claim_bundle.json` | pcs-core RC |
 
 Negative fixtures (`invalid_*.json`) are derived from the certified bundle by `scripts/pcs-freeze-labtrust-release-invalid.py`.
 
-Regenerate everything:
+Sync from pcs-core:
 
 ```bash
-make freeze-pcs-labtrust-release
+make sync-pcs-rc-fixtures
+# or: python scripts/pcs-sync-from-pcs-core-rc.py ../pcs-core
 ```
 
-Requires LabTrust-Gym cloned beside provability-fabric (or `LABTRUST_GYM_ROOT`).
+Regenerate the full chain (LabTrust → CertifyEdge → PF → pcs-core) only via atomic release-run promotion upstream; then run `make sync-pcs-rc-fixtures` in this repo.

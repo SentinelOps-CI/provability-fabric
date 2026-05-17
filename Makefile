@@ -85,6 +85,10 @@ validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."
 	cd tools/pcs-validate && go run . --fixtures ../../tests/pcs
 
+sync-pcs-rc-fixtures:
+	@$(ECHOOK) "Syncing PF labtrust-release fixtures from pcs-core RC..."
+	python scripts/pcs-sync-from-pcs-core-rc.py $(PCS_CORE_PATH)
+
 ifeq ($(OS),Windows_NT)
 freeze-pcs-labtrust-signed:
 	@$(ECHOOK) "Regenerating PF-signed LabTrust fixture..."

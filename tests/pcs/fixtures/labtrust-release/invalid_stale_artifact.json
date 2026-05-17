@@ -53,25 +53,25 @@
     "producer": "labtrust-gym",
     "producer_version": "0.2.0",
     "schema_version": "v0",
-    "signature_or_digest": "sha256:269ca35c4371bdd378afddae173385059cc654f008fbd9729dbcbd9f64328dff",
-    "source_commit": "44a5c4830c0d16194e2d0d3e65d39c8ccb52f911",
+    "signature_or_digest": "sha256:8bccb67ae04d888050c7aeff6e32e04075816e7f1251fd3341b3efdab9bd04bf",
+    "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
     "source_repo": "https://github.com/fraware/LabTrust-Gym",
     "status": "HumanReviewed"
   },
   "bundle_id": "scb-pcs-qc-release-v0.1",
   "certificates": [
     {
-      "certificate_id": "cert-trace-cde5c89f-556c-4b12-8fc5-358418285d18",
+      "certificate_id": "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a",
       "checker": "CertifyEdge",
       "checker_version": "0.1.0",
       "counterexample_ref": null,
-      "created_at": "2026-05-17T15:07:32Z",
+      "created_at": "2026-05-17T15:37:01Z",
       "producer": "CertifyEdge",
       "producer_version": "0.1.0",
       "property_id": "hospital_lab.qc_release",
       "schema_version": "v0",
-      "signature_or_digest": "sha256:db4546e258d56ec11f88df5c6d98d80b5a52c9c8f5274b5e7e538a32f1d72ba7",
-      "source_commit": "4fbfe170d7b08e148329e95b38395f02a81729ec",
+      "signature_or_digest": "sha256:34dec7d507119b599c2e2611bff0f984359a64d12cee2600901cc73537fd6f2b",
+      "source_commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc",
       "source_repo": "https://github.com/fraware/CertifyEdge",
       "spec_hash": "sha256:7c66dfcf640d382653d8ce7c2c700371d72ff0d6fb59156d411cf2aa9a7dfe5e",
       "status": "CertificateChecked",
@@ -83,7 +83,7 @@
     "artifact_type": "ClaimArtifact.v0",
     "assumption_set_ref": "as-pcs-qc-release-v0.1",
     "certificate_refs": [
-      "cert-trace-cde5c89f-556c-4b12-8fc5-358418285d18"
+      "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
     ],
     "claim_kind": "protocol_safety_claim",
     "claim_text": "A sample may be released only after accession, QC completion, analysis, authorization by a release-capable actor, and satisfaction of the required temporal protocol constraints.",
@@ -95,8 +95,8 @@
       "receipt-qc-release"
     ],
     "schema_version": "v0",
-    "signature_or_digest": "sha256:7800404adfbf8ad6053b1adbc6f65b71194423d8619849a7ddac02d55b6a7ec0",
-    "source_commit": "44a5c4830c0d16194e2d0d3e65d39c8ccb52f911",
+    "signature_or_digest": "sha256:74e855f9c76b9129d155075d4fb8d109df27d4d58c47e77e669758927006523d",
+    "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
     "source_repo": "https://github.com/fraware/LabTrust-Gym",
     "source_span_refs": [
       "span-pcs-qc-release-v0.1"
@@ -106,16 +106,16 @@
   "created_at": "2026-01-15T11:00:00Z",
   "evidence_bundle": {
     "artifact_hashes": {
-      "cert-trace-cde5c89f-556c-4b12-8fc5-358418285d18": "sha256:db4546e258d56ec11f88df5c6d98d80b5a52c9c8f5274b5e7e538a32f1d72ba7",
-      "claim-pcs-qc-release-v0.1": "sha256:7800404adfbf8ad6053b1adbc6f65b71194423d8619849a7ddac02d55b6a7ec0",
-      "receipt-qc-release": "sha256:6bb75b6ced29a2903c992f680d560d2bc408c3081b38502c41ec40e41eef198c"
+      "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a": "sha256:34dec7d507119b599c2e2611bff0f984359a64d12cee2600901cc73537fd6f2b",
+      "claim-pcs-qc-release-v0.1": "sha256:74e855f9c76b9129d155075d4fb8d109df27d4d58c47e77e669758927006523d",
+      "receipt-qc-release": "sha256:9d3da54103b2978b3295635e8e9b13676436ed7be1a1bde24f053e1aba26b9e6"
     },
     "assumption_set_refs": [
       "as-pcs-qc-release-v0.1"
     ],
     "bundle_id": "evidence-pcs-qc-release-v0.1",
     "certificate_refs": [
-      "cert-trace-cde5c89f-556c-4b12-8fc5-358418285d18"
+      "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
     ],
     "claim_refs": [
       "claim-pcs-qc-release-v0.1"
@@ -127,8 +127,8 @@
       "receipt-qc-release"
     ],
     "schema_version": "v0",
-    "signature_or_digest": "sha256:84753a1f8123d88012c6bb450247cbc36de9a8420b92a644addcae39df8d9c1e",
-    "source_commit": "44a5c4830c0d16194e2d0d3e65d39c8ccb52f911",
+    "signature_or_digest": "sha256:d2f0f193863bf2fc12d37157f78a2a53d3478a41efc1c725b354766e77c2880a",
+    "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
     "source_repo": "https://github.com/fraware/LabTrust-Gym"
   },
   "producer": "labtrust-gym",
@@ -157,8 +157,8 @@
       "run_id": "qc-release",
       "run_outcome": "passed",
       "schema_version": "v0",
-      "signature_or_digest": "sha256:6bb75b6ced29a2903c992f680d560d2bc408c3081b38502c41ec40e41eef198c",
-      "source_commit": "44a5c4830c0d16194e2d0d3e65d39c8ccb52f911",
+      "signature_or_digest": "sha256:9d3da54103b2978b3295635e8e9b13676436ed7be1a1bde24f053e1aba26b9e6",
+      "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
       "source_repo": "https://github.com/fraware/LabTrust-Gym",
       "started_at": "2026-01-15T08:00:00Z",
       "status": "RuntimeObserved",
@@ -166,8 +166,8 @@
     }
   ],
   "schema_version": "v0",
-  "signature_or_digest": "sha256:eadda2781fd8433949dbf3f8b19a731e42b865666bc81ee5c55a73e4f183635d",
-  "source_commit": "44a5c4830c0d16194e2d0d3e65d39c8ccb52f911",
+  "signature_or_digest": "sha256:fe0f649b3eccb80c5e92cd1dfa9c11b0815e27c230960a049cd11a432b0eec03",
+  "source_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
   "source_repo": "https://github.com/fraware/LabTrust-Gym",
   "verification_policy": {
     "policy_id": "labtrust-pcs-qc-release-v0.1",

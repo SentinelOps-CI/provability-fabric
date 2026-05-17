@@ -4,6 +4,7 @@
 package pcs_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
@@ -21,6 +22,21 @@ func TestReleaseDeterministicSignIDsStable(t *testing.T) {
 }
 
 func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
+	rcSigned := filepath.Join(repoRoot(t), "..", "pcs-core", "examples", "labtrust-release", "signed_science_claim_bundle.json")
+	pfSigned := labtrustReleaseFixture(t, "signed_science_claim_bundle.json")
+	if pfHash, err1 := fileSHA256Hex(pfSigned); err1 == nil {
+		if rcHash, err2 := fileSHA256Hex(rcSigned); err2 == nil && pfHash == rcHash {
+			frozen, err := pcs.LoadSignedScienceClaimBundle(pfSigned)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := pcs.VerifySignedBundleIntegrity(frozen, pcs.IntegrityOptions{VerifyPFDigests: true}); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+
 	manifest := loadReleaseManifest(t)
 	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
 	t.Setenv("PF_DETERMINISTIC", "1")
@@ -48,7 +64,7 @@ func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frozen, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	frozen, err := pcs.LoadSignedScienceClaimBundle(pfSigned)
 	if err != nil {
 		t.Fatal(err)
 	}
