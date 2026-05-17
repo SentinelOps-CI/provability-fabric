@@ -44,3 +44,9 @@ pcs-render-claim claim_id:
 
 demo-pcs:
     make demo-pcs
+
+demo-pcs-release:
+    make demo-pcs-release
+
+validate-pcs-fixtures:
+    make validate-pcs-fixtures

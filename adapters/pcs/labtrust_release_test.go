@@ -21,6 +21,8 @@ func labtrustReleaseFixture(t *testing.T, name string) string {
 	return filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release", name)
 }
 
+// LabTrust + CertifyEdge release fixture freeze tests (PCS v0.1 release gate).
+
 func TestVerifyLabtrustReleaseCertifiedBundlePasses(t *testing.T) {
 	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
 	bundle, err := pcs.LoadScienceClaimBundle(path)
@@ -96,6 +98,63 @@ func TestReleaseSignedBundleProvenance(t *testing.T) {
 	}
 }
 
+func TestSignLabtrustReleaseBundleOutputsPCSCoreSignedBundle(t *testing.T) {
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := repoRoot(t)
+	t.Setenv("PF_SOURCE_COMMIT", "cccccccccccccccccccccccccccccccccccccccc")
+	t.Setenv("PF_DETERMINISTIC", "1")
+	opts := pcs.ValidateOptions{
+		RepoRoot:        root,
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    "cccccccccccccccccccccccccccccccccccccccc",
+	}
+	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
+	if err != nil || !pcs.VerificationPassed(result) {
+		t.Fatalf("verify before sign: %v status=%s", err, result.Status)
+	}
+	signed, err := pcs.SignVerificationResult(root, bundle, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pcs.ValidateSignedScienceClaimBundle(root, signed); err != nil {
+		t.Fatalf("signed bundle schema: %v", err)
+	}
+	if len(signed.VerificationResult.Checks) != len(pcs.RequiredCheckIDs) {
+		t.Fatalf("PF sign must embed %d checks, got %d", len(pcs.RequiredCheckIDs), len(signed.VerificationResult.Checks))
+	}
+}
+
+func TestReleaseSignedFixtureMatchesCertifiedBundle(t *testing.T) {
+	cert, err := pcs.LoadScienceClaimBundle(labtrustReleaseFixture(t, "science_claim_bundle.certified.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := pcs.LoadSignedScienceClaimBundle(labtrustReleaseFixture(t, "signed_science_claim_bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signed.ScienceClaimBundle == nil {
+		t.Fatal("missing embedded science_claim_bundle")
+	}
+	if signed.ScienceClaimBundle.BundleID != cert.BundleID {
+		t.Fatalf("bundle_id mismatch: signed %q certified %q", signed.ScienceClaimBundle.BundleID, cert.BundleID)
+	}
+	if signed.VerificationResult.BundleID != cert.BundleID {
+		t.Fatalf("verification bundle_id mismatch")
+	}
+}
+
+func TestRegenerateLabtrustReleaseFixturesOptional(t *testing.T) {
+	if os.Getenv("UPDATE_PCS_LABTRUST_RELEASE") != "1" {
+		t.Skip("set UPDATE_PCS_LABTRUST_RELEASE=1 to run make freeze-pcs-labtrust-release")
+	}
+	t.Skip("run: make freeze-pcs-labtrust-release (requires LabTrust-Gym release/)")
+}
+
 func TestInspectReleaseSignedBundleSucceeds(t *testing.T) {
 	path := labtrustReleaseFixture(t, "signed_science_claim_bundle.json")
 	signed, err := pcs.LoadSignedScienceClaimBundle(path)
@@ -103,9 +162,13 @@ func TestInspectReleaseSignedBundleSucceeds(t *testing.T) {
 		t.Fatal(err)
 	}
 	summary := pcs.FormatInspectSummary(signed)
-	if !strings.Contains(summary, "ProofChecked") || !strings.Contains(summary, "scb-qc-release-rc1") {
+	if !strings.Contains(summary, "ProofChecked") || !strings.Contains(summary, "scb-pcs-qc-release-v0.1") {
 		t.Fatalf("inspect summary: %s", summary)
 	}
+}
+
+func TestReleaseStaleArtifactRejected(t *testing.T) {
+	assertVerificationRejectedRelease(t, "invalid_stale_artifact.json", "artifact_not_stale")
 }
 
 func TestReleaseLegacySingularRuntimeReceiptRejected(t *testing.T) {

@@ -146,6 +146,26 @@ func TestValidateLabtrustReleaseArtifactsCLI(t *testing.T) {
 	}
 }
 
+func TestInspectLabtrustReleaseSignedBundleCLI(t *testing.T) {
+	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release", "signed_science_claim_bundle.json")
+	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--strict")
+	cmd.Dir = pfDir(t)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("inspect failed: %v\n%s", err, out)
+	}
+	body := string(out)
+	if !strings.Contains(body, "verification_status:  ProofChecked") {
+		t.Fatalf("expected ProofChecked verification_status:\n%s", body)
+	}
+	if !strings.Contains(body, "Embedded checks (15):") {
+		t.Fatalf("expected 15 embedded checks:\n%s", body)
+	}
+	if !strings.Contains(body, "scb-pcs-qc-release-v0.1") {
+		t.Fatalf("expected release bundle_id in inspect output:\n%s", body)
+	}
+}
+
 func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
 	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.labtrust-export.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")

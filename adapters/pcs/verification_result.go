@@ -6,13 +6,11 @@ package pcs
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 )
 
 func passCheck(id, description string, details map[string]any) VerificationCheck {
@@ -57,15 +55,19 @@ func BuildVerificationResult(bundle *ScienceClaimBundle, checks []VerificationCh
 	if sourceCommit == "" {
 		sourceCommit = ResolveSourceCommit()
 	}
+	createdAt := time.Now().UTC().Format(time.RFC3339)
+	if DeterministicMode() {
+		createdAt = deterministicRFC3339(bundle)
+	}
 	result := VerificationResult{
 		SchemaVersion:   SchemaVersionV0,
-		VerificationID:  fmt.Sprintf("verification-%s", uuid.NewString()),
+		VerificationID:  newVerificationID(bundleID),
 		BundleID:        bundleID,
 		Verifier:        VerifierName,
 		VerifierVersion: verifierVersion,
 		Status:          status,
 		Checks:          checks,
-		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
+		CreatedAt:       createdAt,
 		SourceRepo:      VerifierSourceRepo,
 		SourceCommit:    sourceCommit,
 	}

@@ -14,6 +14,9 @@ on:
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
       - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/pcs-freeze-labtrust-release.sh'
+      - 'scripts/pcs-freeze-labtrust-release-invalid.py'
+      - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
@@ -30,6 +33,9 @@ on:
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
       - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/pcs-freeze-labtrust-release.sh'
+      - 'scripts/pcs-freeze-labtrust-release-invalid.py'
+      - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
@@ -91,6 +97,8 @@ jobs:
           export PCS_CORE_PATH="$GITHUB_WORKSPACE/../pcs-core"
           pip install -q -e "$PCS_CORE_PATH/python"
           export PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc
+          export PF_DETERMINISTIC=1
+          export PCS_DETERMINISTIC=1
           bash "$GITHUB_WORKSPACE/scripts/pcs-pf-clean-chain.sh" "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
 
       - name: pcs-core validate release artifacts

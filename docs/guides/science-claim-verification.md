@@ -119,11 +119,11 @@ scripts/pcs-schema-sync.sh
 make test-pcs
 make validate-pcs-fixtures
 make validate-pcs-schema-diff
-make freeze-pcs-labtrust-signed   # rewrite PF signed fixture when verifier output changes
+make freeze-pcs-labtrust-signed   # rewrite PF signed fixture (deterministic when PF_DETERMINISTIC=1)
 just pcs-schema-diff
 ```
 
-LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): real LabTrust + CertifyEdge `scb-qc-release-rc1` certified bundle from pcs-core, plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release`.
+LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): certified bundle from `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` (`scb-pcs-qc-release-v0.1`), plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release` (requires LabTrust-Gym beside this repo). Freeze scripts set `PF_SOURCE_COMMIT`, `PF_DETERMINISTIC`, and `PCS_DETERMINISTIC` so verification/signed IDs and digests are reproducible in CI.
 
 ```bash
 pf validate verification-result tests/pcs/fixtures/labtrust-release/verification_result.json

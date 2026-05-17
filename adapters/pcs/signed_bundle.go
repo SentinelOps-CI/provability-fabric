@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // IntegrityOptions configures signed-bundle integrity verification.
@@ -24,13 +22,17 @@ func SignVerificationResult(repoRoot string, bundle *ScienceClaimBundle, result 
 	if !VerificationPassed(result) {
 		return nil, fmt.Errorf("signing refused: verification status is %s", result.Status)
 	}
+	signedAt := time.Now().UTC().Format(time.RFC3339)
+	if DeterministicMode() {
+		signedAt = deterministicRFC3339(bundle)
+	}
 	signed := &SignedScienceClaimBundle{
 		SchemaVersion:      SchemaVersionV0,
-		SignedBundleID:     fmt.Sprintf("signed-%s", uuid.NewString()),
+		SignedBundleID:     newSignedBundleID(bundle.BundleID, result.VerificationID),
 		ScienceClaimBundle: bundle,
 		VerificationResult: result,
 		Signer:             VerifierName,
-		SignedAt:           time.Now().UTC().Format(time.RFC3339),
+		SignedAt:           signedAt,
 		SourceRepo:         VerifierSourceRepo,
 		SourceCommit:       ResolveSourceCommit(),
 	}

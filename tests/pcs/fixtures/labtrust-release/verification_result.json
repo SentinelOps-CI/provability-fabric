@@ -1,7 +1,7 @@
 {
   "schema_version": "v0",
-  "verification_id": "verification-4e2409e0-3817-484c-bcd4-ecc46b83593a",
-  "bundle_id": "scb-qc-release-rc1",
+  "verification_id": "verification-31ac5758-9219-47cf-b832-0ca8ae07a871",
+  "bundle_id": "scb-pcs-qc-release-v0.1",
   "verifier": "Provability Fabric",
   "verifier_version": "0.1.0",
   "status": "ProofChecked",
@@ -66,7 +66,7 @@
       "description": "ClaimArtifact.assumption_set_ref matches AssumptionSet.assumption_set_id",
       "status": "passed",
       "details": {
-        "assumption_set_ref": "as-labtrust-qc-v0.1"
+        "assumption_set_ref": "as-pcs-qc-release-v0.1"
       }
     },
     {
@@ -74,7 +74,7 @@
       "description": "RuntimeReceipt.trace_hash is non-empty",
       "status": "passed",
       "details": {
-        "trace_hash": "sha256:cec07719b3abb6647590fe5af0ec09b8b1355bc6620cdb80d6aa22f611a60fde"
+        "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
       }
     },
     {
@@ -83,7 +83,7 @@
       "status": "passed",
       "details": {
         "certificate_count": 1,
-        "trace_hash": "sha256:cec07719b3abb6647590fe5af0ec09b8b1355bc6620cdb80d6aa22f611a60fde"
+        "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
       }
     },
     {
@@ -101,16 +101,16 @@
       "status": "passed",
       "details": {
         "assumption_set_refs": [
-          "as-labtrust-qc-v0.1"
+          "as-pcs-qc-release-v0.1"
         ],
         "certificate_refs": [
-          "cert-trace-qc-release-rc1"
+          "cert-trace-e6779edd-47fd-43e3-bfd1-dbd2a1b97dac"
         ],
         "claim_refs": [
-          "claim-qc-release-v0.1"
+          "claim-pcs-qc-release-v0.1"
         ],
         "runtime_receipt_refs": [
-          "receipt-qc-release-rc1-001"
+          "receipt-qc-release"
         ]
       }
     },
@@ -139,8 +139,8 @@
       "details": {}
     }
   ],
-  "created_at": "2026-05-17T13:32:40Z",
+  "created_at": "2026-01-15T11:00:00Z",
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
   "source_commit": "cccccccccccccccccccccccccccccccccccccccc",
-  "signature_or_digest": "sha256:7da9ad8a001e6aeee90cb2f6ff31577567a1dc8fa4fe12d407f82536b27141d5"
+  "signature_or_digest": "sha256:f3928e9a8f834cc748e55b805ace89001b2c8bfcb9fdcf334bb2484b8a8a735e"
 }
