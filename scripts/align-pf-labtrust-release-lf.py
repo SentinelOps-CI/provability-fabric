@@ -35,10 +35,11 @@ def main() -> int:
         print(f"missing {RELEASE}", file=sys.stderr)
         return 1
 
-    for path in sorted(RELEASE.glob("*.json")):
-        normalize_bytes(path)
-
     cert_path = RELEASE / CERTIFIED
+    if not cert_path.is_file():
+        print(f"missing {cert_path}", file=sys.stderr)
+        return 1
+    normalize_bytes(cert_path)
     digest = file_digest(cert_path)
     if digest != CERTIFIED_HASH:
         print(f"warning: {CERTIFIED} digest {digest} != expected {CERTIFIED_HASH}", file=sys.stderr)
