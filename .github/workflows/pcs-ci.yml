@@ -75,6 +75,7 @@ jobs:
           sparse-checkout: |
             schemas
             python
+            examples/labtrust-release
 
       - uses: actions/setup-go@v5
         with:
