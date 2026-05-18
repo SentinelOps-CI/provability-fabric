@@ -68,6 +68,7 @@ if (-not $env:PF_SOURCE_COMMIT) {
     Pop-Location
 }
 if (-not $env:PF_RELEASE_MODE) { $env:PF_RELEASE_MODE = "1" }
+if (-not $env:PF_ADMISSION_PROFILE) { $env:PF_ADMISSION_PROFILE = "labtrust_qc_release" }
 
 $ReleaseFixtures = Join-Path $Root "tests\pcs\fixtures\labtrust-release"
 $Handoff = if ($env:PF_HANDOFF) { $env:PF_HANDOFF } else { Join-Path $ReleaseFixtures "handoff_to_pf.json" }

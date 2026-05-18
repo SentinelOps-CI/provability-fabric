@@ -33,7 +33,7 @@ if ! REGISTRY_SRC="$(resolve_pf_registry "${LT_RELEASE}" "${PCS_CORE}" "${ROOT}"
 fi
 
 PF_SOURCE_COMMIT="$(git -C "${ROOT}" rev-parse HEAD)"
-export PF_SOURCE_COMMIT PF_RELEASE_MODE=1 PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}"
+export PF_SOURCE_COMMIT PF_RELEASE_MODE=1 PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}" PF_ADMISSION_PROFILE="${PF_ADMISSION_PROFILE:-labtrust_qc_release}"
 
 cp -f "${CERTIFIED_SRC}" "${CERTIFIED}"
 echo "== PF release-run: certified bundle from LabTrust handoff =="

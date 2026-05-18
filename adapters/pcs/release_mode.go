@@ -27,7 +27,11 @@ func (h *LoadedHandoff) IsLegacy() bool {
 }
 
 // EnforceScienceClaimAdmission returns an error when release-mode requirements are not met.
-func EnforceScienceClaimAdmission(policy ReleaseAdmissionPolicy, handoff *LoadedHandoff, registry *ArtifactRegistry) error {
+// Tool-use profiles skip handoff/registry until the full tool-use release path exists (skeleton).
+func EnforceScienceClaimAdmission(policy ReleaseAdmissionPolicy, handoff *LoadedHandoff, registry *ArtifactRegistry, profile *AdmissionProfile) error {
+	if profile != nil && profile.IsToolUseProfile() {
+		return nil
+	}
 	if !policy.ReleaseMode {
 		return nil
 	}

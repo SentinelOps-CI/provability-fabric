@@ -50,7 +50,7 @@ func pfCLIEnv(extra ...string) []string {
 func pfReleaseEnv(extra ...string) []string {
 	env := make([]string, 0, len(os.Environ())+1+len(extra))
 	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, "PF_RELEASE_MODE=") {
+		if strings.HasPrefix(e, "PF_RELEASE_MODE=") || strings.HasPrefix(e, "PF_ADMISSION_PROFILE=") {
 			continue
 		}
 		env = append(env, e)
@@ -306,7 +306,7 @@ func TestVerifyScienceClaimWithHandoffManifestCLI(t *testing.T) {
 	}
 	registry := filepath.Join(release, "artifact_registry.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
-		"--handoff", handoff, "--registry", registry, "--release-mode")
+		"--handoff", handoff, "--registry", registry, "--admission-profile", "labtrust_qc_release", "--release-mode")
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PCS_CORE_PATH="+filepath.Join(root, "..", "pcs-core"))
 	out, err := cmd.CombinedOutput()
@@ -327,6 +327,7 @@ func TestVerifyScienceClaimWithHandoffAndRegistryCLI(t *testing.T) {
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
 		"--handoff", handoff,
 		"--registry", registry,
+		"--admission-profile", "labtrust_qc_release",
 		"--release-mode")
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
@@ -370,6 +371,7 @@ func TestVerifyReleaseChainCLI(t *testing.T) {
 		"--registry", registry,
 		"--artifact-dir", artifactDir,
 		"--out", outPath,
+		"--admission-profile", "labtrust_qc_release",
 		"--release-mode")
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=" + pfCommit)
@@ -424,7 +426,7 @@ func TestReleaseModeRequiresHandoffCLI(t *testing.T) {
 	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
 	registry := filepath.Join(release, "artifact_registry.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
-		"--registry", registry, "--release-mode")
+		"--registry", registry, "--admission-profile", "labtrust_qc_release", "--release-mode")
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
 	out, err := cmd.CombinedOutput()
@@ -436,13 +438,32 @@ func TestReleaseModeRequiresHandoffCLI(t *testing.T) {
 	}
 }
 
+func TestReleaseModeRequiresAdmissionProfileCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
+	handoff := filepath.Join(release, "handoff_to_pf.json")
+	registry := filepath.Join(release, "artifact_registry.json")
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+		"--handoff", handoff, "--registry", registry, "--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected release-mode without admission profile to fail: %s", out)
+	}
+	if !strings.Contains(string(out), "missing_admission_profile") {
+		t.Fatalf("expected missing_admission_profile in output: %s", out)
+	}
+}
+
 func TestReleaseModeRequiresRegistryCLI(t *testing.T) {
 	root := repoRoot(t)
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
 	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
 	handoff := filepath.Join(release, "handoff_to_pf.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
-		"--handoff", handoff, "--release-mode")
+		"--handoff", handoff, "--admission-profile", "labtrust_qc_release", "--release-mode")
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv(
 		"PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",

@@ -122,7 +122,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Also print signed wrapper JSON to stdout")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require handoff and ArtifactRegistry.v0; reject placeholder commits")
-	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust.qc_release) or set PF_ADMISSION_PROFILE")
+	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust_qc_release); required in release mode")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }

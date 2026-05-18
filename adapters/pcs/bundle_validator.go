@@ -30,10 +30,10 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 		ReleaseMode:                   opts.ReleaseMode,
 		AllowMissingHandoff:           opts.AllowMissingHandoff,
 		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
-	}, opts.Handoff, opts.Registry); err != nil {
+	}, opts.Handoff, opts.Registry, opts.AdmissionProfile); err != nil {
 		return VerificationResult{}, err
 	}
-	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundle, opts.Handoff); err != nil {
+	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundlePath, bundle, opts.Handoff); err != nil {
 		return VerificationResult{}, err
 	}
 	if opts.Handoff != nil {

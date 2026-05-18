@@ -1,0 +1,20 @@
+{
+  "bundle_id": "scb-tool-use-unauthorized-v0",
+  "schema_version": "v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-004",
+    "tool_trace_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "producer": "Agent-Runtime"
+  },
+  "tool_use_certificate": {
+    "schema_version": "v0",
+    "certificate_id": "cert-tool-004",
+    "status": "CertificateChecked",
+    "tool_trace_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "violations": ["unauthorized shell execution"],
+    "authorized_tool_calls": ["read_file"],
+    "producer": "ToolUse-Safety"
+  },
+  "producer": "Agent-Runtime"
+}

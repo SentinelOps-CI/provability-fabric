@@ -71,7 +71,7 @@ func releaseChainVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow placeholder source_commit (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require registry and reject placeholder commits")
 	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
-	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust.qc_release) or set PF_ADMISSION_PROFILE")
+	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust_qc_release); required in release mode")
 	return cmd
 }
 

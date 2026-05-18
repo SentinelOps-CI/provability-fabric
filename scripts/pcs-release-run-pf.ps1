@@ -64,6 +64,7 @@ if (-not $RegistrySrc) {
 Push-Location $Root
 try { $env:PF_SOURCE_COMMIT = (git rev-parse HEAD).Trim() } finally { Pop-Location }
 $env:PF_RELEASE_MODE = "1"
+if (-not $env:PF_ADMISSION_PROFILE) { $env:PF_ADMISSION_PROFILE = "labtrust_qc_release" }
 if (-not $env:PF_DETERMINISTIC) { $env:PF_DETERMINISTIC = "1" }
 
 Copy-Item -Force $CertifiedSrc $Certified

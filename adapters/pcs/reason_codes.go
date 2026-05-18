@@ -38,6 +38,16 @@ const (
 	FailureCodeReleaseModeLocalDevForbidden    = "release_mode_local_dev_forbidden"
 	FailureCodeReleaseModeRegistryCheckSkipped = "release_mode_registry_check_skipped"
 	FailureCodeReleaseModeRegistryCheckUnregistered = "release_mode_registry_check_unregistered"
+	FailureCodeMissingAdmissionProfile              = "missing_admission_profile"
+	FailureCodeUnknownAdmissionProfile              = "unknown_admission_profile"
+	FailureCodeMissingToolUseTrace                  = "missing_tool_use_trace"
+	FailureCodeMissingToolUseCertificate            = "missing_tool_use_certificate"
+	FailureCodeToolUseCertificateRejected           = "tool_use_certificate_rejected"
+	FailureCodeToolTraceHashMismatch                = "tool_trace_hash_mismatch"
+	FailureCodeUnauthorizedToolCallViolation        = "unauthorized_tool_call_certificate_violation"
+	FailureCodeToolUseReleaseNotImplemented         = "tool_use_release_not_implemented"
+	FailureCodeRegistryCheckMissingResponsible      = "registry_check_missing_responsible_component"
+	FailureCodeRegistryCheckNotInResult             = "registry_check_not_in_release_chain_result"
 )
 
 func withReason(code string, details map[string]any) map[string]any {

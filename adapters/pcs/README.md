@@ -7,7 +7,8 @@ Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts for 
 - Load LabTrust-certified science claim bundles (`runtime_receipts[]`, `certificates[]`, `schema_version: "v0"`)
 - Reject legacy singular-field PF bundles at load and schema validation
 - Run 17 consistency, provenance, registry, and status-transition checks
-- Enforce release-mode admission: mandatory `HandoffManifest.v0` + `ArtifactRegistry.v0`
+- Enforce release-mode admission: mandatory admission profile, `HandoffManifest.v0`, and `ArtifactRegistry.v0`
+- Load workflow admission profiles from `admission_profiles/` (`labtrust_qc_release`, `agent_tool_use_safety`)
 - Emit schema-valid `ReleaseChainValidationResult.v0` with stable release-chain check IDs
 - Emit `VerificationResult.v0` with `ProofChecked` / `Rejected` status
 - Build `SignedScienceClaimBundle.v0` wrappers for Scientific Memory import
@@ -19,11 +20,13 @@ Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts for 
 ./pf verify science-claim tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json \
   --handoff tests/pcs/fixtures/labtrust-release/handoff_to_pf.json \
   --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
+  --admission-profile labtrust_qc_release \
   --release-mode
 ./pf verify release-chain \
   --manifest tests/pcs/fixtures/labtrust-release/release_manifest.json \
   --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
   --artifact-dir ../pcs-core/examples/labtrust-release \
+  --admission-profile labtrust_qc_release \
   --out /tmp/release_chain_validation_result.json \
   --release-mode
 ./pf sign science-claim tests/pcs/fixtures/labtrust/science_claim_bundle.certified.json --out /tmp/signed.json
@@ -46,7 +49,10 @@ Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-
 | `handoff_manifest.go` | HandoffManifest.v0 + legacy `pf_handoff.json` |
 | `release_chain_validation.go` | ReleaseChainValidationResult.v0 emission |
 | `release_manifest.go` | ReleaseManifest.v0 loader |
+| `admission_profile.go` | Admission profiles + release-mode profile resolution |
+| `tool_use_admission.go` | Agent tool-use admission skeleton |
 | `release_mode.go` | Release-mode admission policy |
+| `registry_semantic_audit.go` | Auditable registry semantic check execution |
 | `registry_validate.go` | ArtifactRegistry.v0 bundle + manifest admission |
 | `registry_release_chain.go` | Granular registry_* release-chain checks |
 | `explain.go` | Actionable failure explanations |

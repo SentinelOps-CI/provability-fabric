@@ -53,20 +53,37 @@ func appendHandoffAdmissionChecks(
 		failureCodes = append(failureCodes, ReasonHandoffInvalid)
 	}
 	if opts.AdmissionProfile != nil {
-		kind := opts.AdmissionProfile.RequiredHandoffKind
-		if kind == "" {
-			kind = "bundle_to_verifier"
-		}
 		kindID := "handoff_kind_matches_profile"
-		if handoff.HandoffKind == kind {
+		allowed := opts.AdmissionProfile.RequiredHandoffKinds
+		if len(allowed) == 0 {
+			allowed = []string{"bundle_to_verifier"}
+		}
+		matched := false
+		for _, kind := range allowed {
+			if handoff.HandoffKind == kind {
+				matched = true
+				break
+			}
+		}
+		if matched {
 			checks = append(checks, releasePassCheck(kindID,
 				"HandoffManifest handoff_kind matches admission profile",
-				map[string]any{"handoff_kind": handoff.HandoffKind, "profile_id": opts.AdmissionProfile.ProfileID}))
+				map[string]any{
+					"handoff_kind":  handoff.HandoffKind,
+					"handoff_id":    handoff.HandoffID,
+					"profile_id":    opts.AdmissionProfile.ProfileID,
+					"handoff_ref":   handoff.HandoffID,
+				}))
 		} else {
 			checks = append(checks, releaseFailCheck(kindID,
 				"HandoffManifest handoff_kind matches admission profile",
 				FailureCodeReleaseModeHandoffKindMismatch,
-				map[string]any{"expected": kind, "actual": handoff.HandoffKind, "profile_id": opts.AdmissionProfile.ProfileID}))
+				map[string]any{
+					"expected":    allowed,
+					"actual":      handoff.HandoffKind,
+					"profile_id":  opts.AdmissionProfile.ProfileID,
+					"handoff_ref": handoff.HandoffID,
+				}))
 			failureCodes = append(failureCodes, FailureCodeReleaseModeHandoffKindMismatch)
 		}
 	}

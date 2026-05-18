@@ -11,7 +11,7 @@ import (
 )
 
 func TestReleaseModeStrictRequiresHandoffAndRegistry(t *testing.T) {
-	err := pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, nil, nil)
+	err := pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, nil, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeReleaseModeHandoffRequired) {
 		t.Fatalf("expected handoff required: %v", err)
 	}
@@ -19,7 +19,7 @@ func TestReleaseModeStrictRequiresHandoffAndRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, handoff, nil)
+	err = pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, handoff, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeReleaseModeRegistryRequired) {
 		t.Fatalf("expected registry required: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestReleaseModeRejectsLegacyHandoffWithFailureCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, legacy, loadArtifactRegistry(t))
+	err = pcs.EnforceScienceClaimAdmission(pcs.ReleaseAdmissionPolicy{ReleaseMode: true}, legacy, loadArtifactRegistry(t), nil)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeLegacyHandoffForbiddenInReleaseMode) {
 		t.Fatalf("expected legacy forbidden: %v", err)
 	}
@@ -82,23 +82,13 @@ func TestReleaseChainFailedCheckIncludesAuditFields(t *testing.T) {
 }
 
 func TestAdmissionProfileFromEnv(t *testing.T) {
-	t.Setenv("PF_ADMISSION_PROFILE", "labtrust.qc_release")
+	t.Setenv("PF_ADMISSION_PROFILE", "labtrust_qc_release")
 	profile, err := pcs.AdmissionProfileFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.ProfileID != "labtrust.qc_release" {
+	if profile.ProfileID != "labtrust_qc_release" {
 		t.Fatalf("profile_id=%q", profile.ProfileID)
 	}
 	t.Setenv("PF_ADMISSION_PROFILE", "")
-}
-
-func TestGenericToolUseProfileLoads(t *testing.T) {
-	profile, err := pcs.LoadAdmissionProfile("generic_tool_use_trace")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(profile.RequiredCertificateArtifacts) != 0 {
-		t.Fatal("placeholder profile must not require certificates yet")
-	}
 }

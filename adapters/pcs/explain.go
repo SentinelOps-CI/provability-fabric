@@ -11,10 +11,13 @@ import (
 // FailureExplanation is one actionable failure line for operators.
 type FailureExplanation struct {
 	CheckID              string `json:"check_id"`
+	FailureCode          string `json:"failure_code,omitempty"`
 	ArtifactPath         string `json:"artifact_path,omitempty"`
 	Expected             string `json:"expected,omitempty"`
 	Actual               string `json:"actual,omitempty"`
 	ResponsibleComponent string `json:"responsible_component,omitempty"`
+	RegistryCheckRef     string `json:"registry_check_ref,omitempty"`
+	HandoffRef           string `json:"handoff_ref,omitempty"`
 	RepairHint           string `json:"repair_hint"`
 	RegenerateCmd        string `json:"regenerate_command,omitempty"`
 }
@@ -47,23 +50,45 @@ func explainDeferredRegistryCheck(c ReleaseValidationCheck) []FailureExplanation
 	reason, _ := c.Details["deferral_reason"].(string)
 	enforcedBy, _ := c.Details["enforced_by"].(string)
 	responsible, _ := c.Details["responsible_component"].(string)
+	registryRef, _ := c.Details["registry_check_ref"].(string)
+	if registryRef == "" {
+		registryRef, _ = c.Details["registry_check_id"].(string)
+	}
 	allowed, _ := c.Details["release_mode_allowed"].(bool)
 	hint := reason
 	if enforcedBy != "" {
 		hint = fmt.Sprintf("%s (enforced by release-chain check %s)", reason, enforcedBy)
 	}
-	regenerate := "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode"
+	regenerate := "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --admission-profile labtrust_qc_release --release-mode"
 	if strings.HasPrefix(c.CheckID, "registry.") {
-		regenerate = "pf verify science-claim science_claim_bundle.certified.json --handoff handoff_to_pf.json --registry artifact_registry.json --release-mode && " + regenerate
+		regenerate = "pf verify science-claim science_claim_bundle.certified.json --handoff handoff_to_pf.json --registry artifact_registry.json --admission-profile labtrust_qc_release --release-mode && " + regenerate
 	}
 	return []FailureExplanation{{
 		CheckID:              c.CheckID,
+		RegistryCheckRef:     registryRef,
 		ResponsibleComponent: responsible,
 		Expected:             fmt.Sprintf("deferral allowed in release mode=%v", allowed),
 		Actual:               fmt.Sprintf("execution=%s", RegistryExecutionDeferred),
 		RepairHint:           hint,
 		RegenerateCmd:        regenerate,
 	}}
+}
+
+func releaseCheckExplanationFields(c ReleaseValidationCheck) (failureCode, artifactPath, expected, actual, responsible, registryRef, handoffRef string) {
+	failureCode, _ = c.Details["failure_code"].(string)
+	artifactPath, _ = c.Details["artifact_path"].(string)
+	expected, _ = c.Details["expected"].(string)
+	actual, _ = c.Details["actual"].(string)
+	responsible, _ = c.Details["responsible_component"].(string)
+	registryRef, _ = c.Details["registry_check_ref"].(string)
+	if registryRef == "" {
+		registryRef, _ = c.Details["registry_check_id"].(string)
+	}
+	handoffRef, _ = c.Details["handoff_ref"].(string)
+	if handoffRef == "" {
+		handoffRef, _ = c.Details["handoff_id"].(string)
+	}
+	return
 }
 
 func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
@@ -104,20 +129,32 @@ func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
 }
 
 func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
+	fc, artifactPath, expected, actual, responsible, registryRef, handoffRef := releaseCheckExplanationFields(c)
 	if strings.HasPrefix(c.CheckID, "registry.") {
 		errMsg, _ := c.Details["error"].(string)
-		responsible, _ := c.Details["responsible_component"].(string)
 		exec, _ := c.Details["execution"].(string)
+		exp := expected
+		if exp == "" {
+			exp = RegistryExecutionPassed
+		}
+		act := actual
+		if act == "" {
+			act = exec + ": " + errMsg
+		}
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,
+			FailureCode:          fc,
+			ArtifactPath:         artifactPath,
 			ResponsibleComponent: responsible,
-			Expected:             RegistryExecutionPassed,
-			Actual:               exec + ": " + errMsg,
+			RegistryCheckRef:     registryRef,
+			HandoffRef:           handoffRef,
+			Expected:             exp,
+			Actual:               act,
 			RepairHint:           "Fix registry semantic check failure or update ArtifactRegistry.v0 semantic_checks for this artifact type.",
-			RegenerateCmd:        "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode",
+			RegenerateCmd:        "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --admission-profile labtrust_qc_release --release-mode",
 		}}
 	}
-	code, _ := c.Details["failure_code"].(string)
+	code := fc
 	switch c.CheckID {
 	case "manifest_hashes_match":
 		return []FailureExplanation{{
@@ -171,11 +208,20 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 			RegenerateCmd:        "labtrust attach-certificate --trace trace.json --certificate trace_certificate.json --out science_claim_bundle.certified.json",
 		}}
 	default:
+		act := actual
+		if act == "" {
+			act = c.Description
+		}
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,
-			ResponsibleComponent: responsibleComponentForReason(code),
+			FailureCode:          fc,
+			ArtifactPath:         artifactPath,
+			ResponsibleComponent: responsible,
+			RegistryCheckRef:     registryRef,
+			HandoffRef:           handoffRef,
+			Expected:             expected,
+			Actual:               act,
 			RepairHint:           defaultReleaseChainRepair(code, c.Description),
-			Actual:               c.Description,
 		}}
 	}
 }

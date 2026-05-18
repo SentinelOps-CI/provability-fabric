@@ -1,0 +1,18 @@
+{
+  "bundle_id": "scb-tool-use-rejected-cert-v0",
+  "schema_version": "v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-002",
+    "tool_trace_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "producer": "Agent-Runtime"
+  },
+  "tool_use_certificate": {
+    "schema_version": "v0",
+    "certificate_id": "cert-tool-002",
+    "status": "Rejected",
+    "tool_trace_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "producer": "ToolUse-Safety"
+  },
+  "producer": "Agent-Runtime"
+}

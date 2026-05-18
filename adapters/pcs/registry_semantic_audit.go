@@ -186,11 +186,15 @@ func auditRegistrySemanticCheck(ctx RegistrySemanticAuditContext, regEntry Regis
 	if responsible == "" {
 		responsible = regEntry.Producer
 	}
+	if responsible == "" {
+		responsible = ComponentProvabilityFabric
+	}
 	releaseBlocking := isReleaseBlockingSeverity(check.Severity)
 	baseDetails := map[string]any{
 		"artifact_type":         regEntry.ArtifactType,
 		"responsible_component": responsible,
 		"registry_check_id":     check.CheckID,
+		"registry_check_ref":    id,
 		"release_blocking":      releaseBlocking,
 		"severity":              check.Severity,
 	}
@@ -362,6 +366,9 @@ func hasUnexplainedDeferredRegistryCheck(checks []ReleaseValidationCheck, releas
 
 func ValidateRegistrySemanticCheckRecords(checks []ReleaseValidationCheck) error {
 	for _, c := range registrySemanticChecksFromResult(checks) {
+		if rc, _ := c.Details["responsible_component"].(string); strings.TrimSpace(rc) == "" {
+			return fmt.Errorf("%s: registry check %q missing responsible_component", FailureCodeRegistryCheckMissingResponsible, c.CheckID)
+		}
 		exec, _ := c.Details["execution"].(string)
 		if exec != RegistryExecutionDeferred {
 			continue
@@ -373,6 +380,21 @@ func ValidateRegistrySemanticCheckRecords(checks []ReleaseValidationCheck) error
 		}
 		if _, ok := c.Details["release_mode_allowed"]; !ok {
 			return fmt.Errorf("deferred registry check %q missing release_mode_allowed", c.CheckID)
+		}
+	}
+	return nil
+}
+
+// ValidateRegistrySemanticChecksPresent ensures every expected registry semantic check appears in RCVR.
+func ValidateRegistrySemanticChecksPresent(ctx RegistrySemanticAuditContext, checks []ReleaseValidationCheck) error {
+	expected := CollectRegistrySemanticChecks(ctx)
+	byID := make(map[string]struct{}, len(checks))
+	for _, c := range checks {
+		byID[c.CheckID] = struct{}{}
+	}
+	for _, exp := range expected {
+		if _, ok := byID[exp.CheckID]; !ok {
+			return fmt.Errorf("%s: registry semantic check %q not recorded in release chain result", FailureCodeRegistryCheckNotInResult, exp.CheckID)
 		}
 	}
 	return nil

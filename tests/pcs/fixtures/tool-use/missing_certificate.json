@@ -1,0 +1,12 @@
+{
+  "bundle_id": "scb-tool-use-missing-cert-v0",
+  "schema_version": "v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-001",
+    "tool_trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "producer": "Agent-Runtime"
+  },
+  "producer": "Agent-Runtime",
+  "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

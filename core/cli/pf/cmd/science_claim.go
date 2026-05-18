@@ -53,6 +53,20 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, adm resolvedSci
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
+	if adm.Profile != nil && adm.Profile.IsToolUseProfile() {
+		opts, err := resolvePCSOpts(resolved, localDev, releaseMode)
+		if err != nil {
+			return pcs.VerificationResult{}, err
+		}
+		applyAdmissionToValidateOpts(&opts, adm)
+		if err := pcs.EnforceScienceClaimAdmission(adm.Policy, adm.Handoff, adm.Registry, adm.Profile); err != nil {
+			return pcs.VerificationResult{}, wrapAdmissionError(err)
+		}
+		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, nil, adm.Handoff); err != nil {
+			return pcs.VerificationResult{}, wrapAdmissionError(err)
+		}
+		return pcs.VerificationResult{}, fmt.Errorf("%s: full tool-use bundle verification is not implemented yet", pcs.FailureCodeToolUseReleaseNotImplemented)
+	}
 	bundle, err := pcs.LoadScienceClaimBundle(resolved)
 	if err != nil {
 		return pcs.VerificationResult{}, err

@@ -1,0 +1,18 @@
+{
+  "bundle_id": "scb-tool-use-hash-mismatch-v0",
+  "schema_version": "v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-003",
+    "tool_trace_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "producer": "Agent-Runtime"
+  },
+  "tool_use_certificate": {
+    "schema_version": "v0",
+    "certificate_id": "cert-tool-003",
+    "status": "CertificateChecked",
+    "tool_trace_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "producer": "ToolUse-Safety"
+  },
+  "producer": "Agent-Runtime"
+}

@@ -118,6 +118,6 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&releaseChainOut, "release-chain-result", "", "Write ReleaseChainValidationResult.v0 JSON")
 	cmd.Flags().BoolVar(&allowMissingHandoff, "allow-missing-handoff-for-local-dev", false, "Allow verify without --handoff in release mode (local development only)")
 	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
-	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust.qc_release) or set PF_ADMISSION_PROFILE")
+	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id or filename (e.g. labtrust_qc_release); required in release mode")
 	return cmd
 }

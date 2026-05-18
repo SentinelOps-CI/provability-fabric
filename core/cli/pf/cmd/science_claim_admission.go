@@ -81,13 +81,13 @@ func resolveScienceClaimAdmission(in scienceClaimAdmissionInput) (resolvedScienc
 		out.Manifest = manifest
 	}
 
-	profile, err := pcs.ResolveAdmissionProfile(in.AdmissionProfileID)
+	profile, err := pcs.ResolveAdmissionProfileForReleaseMode(in.AdmissionProfileID, releaseMode)
 	if err != nil {
 		return out, err
 	}
 	out.Profile = profile
 
-	if err := pcs.EnforceScienceClaimAdmission(policy, out.Handoff, out.Registry); err != nil {
+	if err := pcs.EnforceScienceClaimAdmission(policy, out.Handoff, out.Registry, out.Profile); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -133,7 +133,7 @@ func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admis
 	}, manifestPath, registry); err != nil {
 		return opts, nil, err
 	}
-	profile, err := pcs.ResolveAdmissionProfile(admissionProfileID)
+	profile, err := pcs.ResolveAdmissionProfileForReleaseMode(admissionProfileID, releaseMode)
 	if err != nil {
 		return opts, nil, err
 	}
@@ -160,6 +160,12 @@ func admissionErrorHint(err error) string {
 	}
 	if strings.Contains(msg, pcs.FailureCodeReleaseModeRegistryRequired) {
 		return "export PCS_CORE_PATH=../pcs-core && pf verify science-claim <bundle> --registry artifact_registry.json --release-mode"
+	}
+	if strings.Contains(msg, pcs.FailureCodeMissingAdmissionProfile) {
+		return "pf verify science-claim <bundle> --handoff handoff_to_pf.json --registry artifact_registry.json --admission-profile labtrust_qc_release --release-mode"
+	}
+	if strings.Contains(msg, pcs.FailureCodeUnknownAdmissionProfile) {
+		return "use --admission-profile labtrust_qc_release or agent_tool_use_safety (built-in profiles under adapters/pcs/admission_profiles/)"
 	}
 	return ""
 }

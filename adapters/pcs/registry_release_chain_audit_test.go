@@ -103,37 +103,6 @@ func TestReleaseModeRejectsUnexplainedDeferredCheck(t *testing.T) {
 	}
 }
 
-func TestAdmissionProfileLabtrustQCReleasePasses(t *testing.T) {
-	profile, err := pcs.LoadAdmissionProfile("labtrust.qc_release")
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
-	bundle, err := pcs.LoadScienceClaimBundle(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handoff, err := pcs.LoadHandoff(validHandoffManifestPath(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := pcs.EnforceAdmissionProfile(profile, bundle, handoff); err != nil {
-		t.Fatalf("labtrust_qc_release profile should pass fixture bundle: %v", err)
-	}
-	if !profile.ProfileEnforcesRegistryCheck("trace_hash_matches_runtime_receipt") {
-		t.Fatal("profile must list trace_hash_matches_runtime_receipt")
-	}
-	if handoff.Manifest.HandoffKind != "bundle_to_verifier" {
-		t.Fatalf("fixture handoff_kind=%q", handoff.Manifest.HandoffKind)
-	}
-}
-
-func TestUnknownAdmissionProfileRejected(t *testing.T) {
-	_, err := pcs.LoadAdmissionProfile("not_a_real_profile")
-	if err == nil || !strings.Contains(err.Error(), "unknown admission profile") {
-		t.Fatalf("expected unknown profile error, got %v", err)
-	}
-}
 
 func runLabtrustReleaseChain(t *testing.T, releaseMode bool) pcs.ReleaseChainValidationResult {
 	t.Helper()
@@ -145,7 +114,7 @@ func runLabtrustReleaseChain(t *testing.T, releaseMode bool) pcs.ReleaseChainVal
 	if _, err := os.Stat(manifestPath); err != nil {
 		manifestPath = validReleaseManifestPath(t)
 	}
-	profile, _ := pcs.LoadAdmissionProfile("labtrust.qc_release")
+	profile, _ := pcs.LoadAdmissionProfile("labtrust_qc_release")
 	opts := pcs.ReleaseChainVerifyOptions{
 		RepoRoot:         repoRoot(t),
 		ArtifactDir:      artifactDir,

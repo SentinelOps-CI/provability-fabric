@@ -31,6 +31,7 @@ export PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}"
 export PCS_DETERMINISTIC="${PCS_DETERMINISTIC:-1}"
 
 RELEASE_FIXTURES="${ROOT}/tests/pcs/fixtures/labtrust-release"
+export PF_ADMISSION_PROFILE="${PF_ADMISSION_PROFILE:-labtrust_qc_release}"
 HANDOFF="${PF_HANDOFF:-${RELEASE_FIXTURES}/handoff_to_pf.json}"
 REGISTRY="${PF_REGISTRY:-${RELEASE_FIXTURES}/artifact_registry.json}"
 MANIFEST="${PF_MANIFEST:-${RELEASE_FIXTURES}/release_manifest.json}"

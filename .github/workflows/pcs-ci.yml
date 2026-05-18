@@ -119,6 +119,7 @@ jobs:
             "$RELEASE/science_claim_bundle.certified.json" \
             --handoff "$RELEASE/handoff_to_pf.json" \
             --registry "$RELEASE/artifact_registry.json" \
+            --admission-profile labtrust_qc_release \
             --release-mode
 
       - name: pf verify release-chain (ReleaseManifest.v0)
@@ -147,7 +148,7 @@ jobs:
             --manifest "$MANIFEST" \
             --registry "$REGISTRY" \
             --artifact-dir "$RC_DIR" \
-            --admission-profile labtrust.qc_release \
+            --admission-profile labtrust_qc_release \
             --release-mode \
             --out "$OUT"
           go run . validate release-chain-result "$OUT"
@@ -168,6 +169,7 @@ jobs:
             "$RELEASE/science_claim_bundle.certified.json" \
             --handoff "$RELEASE/pf_handoff.json" \
             --registry "$RELEASE/artifact_registry.json" \
+            --admission-profile labtrust_qc_release \
             --release-mode; then
             echo "expected legacy pf_handoff to be rejected in release mode"
             exit 1
@@ -241,19 +243,63 @@ jobs:
           go run . explain release-chain "$RELEASE/release_chain_validation_result.json" --json | tee "$RUNNER_TEMP/explain_rc.json"
           grep -q '"failed_count"' "$RUNNER_TEMP/explain_rc.json"
 
-      - name: pf verify science-claim with admission profile
+      - name: Reject release-mode without admission profile
+        run: |
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          unset PF_ADMISSION_PROFILE
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          if go run . verify science-claim \
+            "$RELEASE/science_claim_bundle.certified.json" \
+            --handoff "$RELEASE/handoff_to_pf.json" \
+            --registry "$RELEASE/artifact_registry.json" \
+            --release-mode 2>&1 | tee "$RUNNER_TEMP/missing_profile.txt"; then
+            echo "expected release-mode without admission profile to fail"
+            exit 1
+          fi
+          grep -q missing_admission_profile "$RUNNER_TEMP/missing_profile.txt"
+
+      - name: Reject unknown admission profile in release mode
         run: |
           cd core/cli/pf
           PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
-          go run . verify science-claim \
+          if go run . verify science-claim \
             "$RELEASE/science_claim_bundle.certified.json" \
             --handoff "$RELEASE/handoff_to_pf.json" \
             --registry "$RELEASE/artifact_registry.json" \
-            --admission-profile labtrust.qc_release \
-            --release-mode
+            --admission-profile not_a_real_profile_xyz \
+            --release-mode 2>&1 | tee "$RUNNER_TEMP/unknown_profile.txt"; then
+            echo "expected unknown admission profile to fail"
+            exit 1
+          fi
+          grep -q unknown_admission_profile "$RUNNER_TEMP/unknown_profile.txt"
+
+      - name: Tool-use admission profile rejects incomplete bundles
+        run: |
+          cd core/cli/pf
+          export PF_RELEASE_MODE=1
+          TOOL_USE="$GITHUB_WORKSPACE/tests/pcs/fixtures/tool-use"
+          expect_fail() {
+            local fixture="$1"
+            local code="$2"
+            if go run . verify science-claim "$TOOL_USE/$fixture" \
+              --admission-profile agent_tool_use_safety \
+              --release-mode 2>&1 | tee "$RUNNER_TEMP/tool_use_${fixture}.txt"; then
+              echo "expected $fixture to fail"
+              exit 1
+            fi
+            grep -q "$code" "$RUNNER_TEMP/tool_use_${fixture}.txt"
+          }
+          expect_fail incomplete_science_claim_shape.json missing_tool_use_trace
+          expect_fail missing_certificate.json missing_tool_use_certificate
+          expect_fail rejected_certificate.json tool_use_certificate_rejected
+          expect_fail trace_hash_mismatch.json tool_trace_hash_mismatch
+          expect_fail unauthorized_violation.json unauthorized_tool_call_certificate_violation
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

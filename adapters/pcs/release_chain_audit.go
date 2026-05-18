@@ -52,6 +52,12 @@ func enrichFailedReleaseCheck(c ReleaseValidationCheck) ReleaseValidationCheck {
 	if e.RegenerateCmd != "" {
 		c.Details["regenerate_command"] = e.RegenerateCmd
 	}
+	if e.RegistryCheckRef != "" {
+		c.Details["registry_check_ref"] = e.RegistryCheckRef
+	}
+	if e.HandoffRef != "" {
+		c.Details["handoff_ref"] = e.HandoffRef
+	}
 	return c
 }
 
@@ -107,6 +113,18 @@ func FormatFailureExplanationsOperational(explanations []FailureExplanation) str
 		}
 		b.WriteString("Failure\n")
 		b.WriteString(e.CheckID)
+		if e.FailureCode != "" {
+			b.WriteString("\n\nFailure code\n")
+			b.WriteString(e.FailureCode)
+		}
+		if e.RegistryCheckRef != "" {
+			b.WriteString("\n\nRegistry check reference\n")
+			b.WriteString(e.RegistryCheckRef)
+		}
+		if e.HandoffRef != "" {
+			b.WriteString("\n\nHandoff reference\n")
+			b.WriteString(e.HandoffRef)
+		}
 		b.WriteString("\n\nArtifact\n")
 		if e.ArtifactPath != "" {
 			b.WriteString(e.ArtifactPath)

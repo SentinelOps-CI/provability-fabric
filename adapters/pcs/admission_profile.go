@@ -8,24 +8,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 //go:embed admission_profiles/*.json
 var admissionProfileFS embed.FS
 
+// StatusPolicy and RepairHintPolicy name built-in policy bundles.
+type StatusPolicy string
+type RepairHintPolicy string
+
+const (
+	StatusPolicyLabtrustReleaseV01  StatusPolicy = "labtrust_release_v0.1"
+	StatusPolicyToolUseSafetyV01     StatusPolicy = "tool_use_safety_v0.1"
+	RepairHintPolicyOperationalV0  RepairHintPolicy = "operational_v0"
+)
+
 // AdmissionProfile defines PF admission policy for a PCS workflow.
 type AdmissionProfile struct {
-	ProfileID                      string   `json:"profile_id"`
-	Description                    string   `json:"description,omitempty"`
-	AcceptedBundleArtifact         string   `json:"accepted_bundle_artifact"`
-	AcceptedBundleArtifactType     string   `json:"accepted_bundle_artifact_type,omitempty"`
-	RequiredCertificateArtifacts   []string `json:"required_certificate_artifacts"`
+	ProfileID                    string   `json:"profile_id"`
+	Description                  string   `json:"description,omitempty"`
+	AcceptedBundleArtifact       string   `json:"accepted_bundle_artifact"`
+	AcceptedBundleArtifactType   string   `json:"accepted_bundle_artifact_type,omitempty"`
+	RequiredRuntimeArtifacts     []string `json:"required_runtime_artifacts"`
+	RequiredCertificateArtifacts []string `json:"required_certificate_artifacts"`
 	RequiredCertificateArtifactTypes []string `json:"required_certificate_artifact_types,omitempty"`
-	RequiredHandoffKind            string   `json:"required_handoff_kind"`
-	RequiredRegistryChecks         []string `json:"required_registry_checks"`
-	RegistryChecksEnforce          []string `json:"registry_checks_enforce,omitempty"`
-	SignaturePolicy                string   `json:"signature_policy"`
+	RequiredHandoffKinds         []string `json:"required_handoff_kinds"`
+	RequiredHandoffKind          string   `json:"required_handoff_kind,omitempty"`
+	RequiredRegistryChecks       []string `json:"required_registry_checks"`
+	RegistryChecksEnforce        []string `json:"registry_checks_enforce,omitempty"`
+	StatusPolicy                 string   `json:"status_policy"`
+	SignaturePolicy              string   `json:"signature_policy"`
+	RepairHintPolicy             string   `json:"repair_hint_policy"`
 }
 
 func (p *AdmissionProfile) normalize() {
@@ -38,6 +53,21 @@ func (p *AdmissionProfile) normalize() {
 	if len(p.RequiredRegistryChecks) == 0 {
 		p.RequiredRegistryChecks = p.RegistryChecksEnforce
 	}
+	if len(p.RequiredHandoffKinds) == 0 && strings.TrimSpace(p.RequiredHandoffKind) != "" {
+		p.RequiredHandoffKinds = []string{p.RequiredHandoffKind}
+	}
+	if len(p.RequiredHandoffKinds) > 0 && p.RequiredHandoffKind == "" {
+		p.RequiredHandoffKind = p.RequiredHandoffKinds[0]
+	}
+}
+
+// IsToolUseProfile reports whether this profile targets tool-use bundles.
+func (p *AdmissionProfile) IsToolUseProfile() bool {
+	if p == nil {
+		return false
+	}
+	p.normalize()
+	return p.AcceptedBundleArtifact == "ToolUseScienceClaimBundle.v0"
 }
 
 // AdmissionProfileFromEnv loads PF_ADMISSION_PROFILE when set.
@@ -49,33 +79,61 @@ func AdmissionProfileFromEnv() (*AdmissionProfile, error) {
 	return LoadAdmissionProfile(id)
 }
 
-// ResolveAdmissionProfile loads by explicit id or PF_ADMISSION_PROFILE.
-func ResolveAdmissionProfile(explicitID string) (*AdmissionProfile, error) {
-	if strings.TrimSpace(explicitID) != "" {
-		return LoadAdmissionProfile(explicitID)
+// ResolveAdmissionProfile loads by explicit ref or PF_ADMISSION_PROFILE (not required by itself).
+func ResolveAdmissionProfile(explicitRef string) (*AdmissionProfile, error) {
+	ref := normalizeProfileRef(explicitRef)
+	if ref != "" {
+		return LoadAdmissionProfile(ref)
 	}
 	return AdmissionProfileFromEnv()
 }
 
-// LoadAdmissionProfile loads a built-in admission profile by id.
-func LoadAdmissionProfile(profileID string) (*AdmissionProfile, error) {
-	id := strings.TrimSpace(profileID)
+// ResolveAdmissionProfileForReleaseMode requires a profile when releaseMode is true.
+func ResolveAdmissionProfileForReleaseMode(explicitRef string, releaseMode bool) (*AdmissionProfile, error) {
+	if !releaseMode {
+		return ResolveAdmissionProfile(explicitRef)
+	}
+	ref := normalizeProfileRef(explicitRef)
+	if ref == "" {
+		ref = normalizeProfileRef(os.Getenv("PF_ADMISSION_PROFILE"))
+	}
+	if ref == "" {
+		return nil, fmt.Errorf("%s: --admission-profile is required in release mode (or set PF_ADMISSION_PROFILE)", FailureCodeMissingAdmissionProfile)
+	}
+	profile, err := LoadAdmissionProfile(ref)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", FailureCodeUnknownAdmissionProfile, err)
+	}
+	return profile, nil
+}
+
+func normalizeProfileRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	ref = strings.TrimSuffix(ref, ".json")
+	return ref
+}
+
+// LoadAdmissionProfile loads a built-in admission profile by id or filename stem.
+func LoadAdmissionProfile(profileRef string) (*AdmissionProfile, error) {
+	id := normalizeProfileRef(profileRef)
 	if id == "" {
 		return nil, fmt.Errorf("admission profile id is required")
 	}
-	var data []byte
-	var err error
-	for _, path := range []string{
+	candidates := []string{
 		"admission_profiles/" + id + ".json",
 		"admission_profiles/" + strings.ReplaceAll(id, ".", "_") + ".json",
-	} {
+		"admission_profiles/" + strings.ReplaceAll(id, "_", ".") + ".json",
+	}
+	var data []byte
+	var err error
+	for _, path := range candidates {
 		data, err = admissionProfileFS.ReadFile(path)
 		if err == nil {
 			break
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("unknown admission profile %q", id)
+		return nil, fmt.Errorf("%s: profile %q not found in built-in admission_profiles", FailureCodeUnknownAdmissionProfile, id)
 	}
 	var profile AdmissionProfile
 	if err := json.Unmarshal(data, &profile); err != nil {
@@ -103,29 +161,47 @@ func ValidateAdmissionProfile(p *AdmissionProfile) error {
 	if strings.TrimSpace(p.AcceptedBundleArtifact) == "" {
 		return fmt.Errorf("admission profile %q missing accepted_bundle_artifact", p.ProfileID)
 	}
-	if strings.TrimSpace(p.RequiredHandoffKind) == "" {
-		return fmt.Errorf("admission profile %q missing required_handoff_kind", p.ProfileID)
+	if len(p.RequiredHandoffKinds) == 0 {
+		return fmt.Errorf("admission profile %q missing required_handoff_kinds", p.ProfileID)
+	}
+	if strings.TrimSpace(p.StatusPolicy) == "" {
+		return fmt.Errorf("admission profile %q missing status_policy", p.ProfileID)
 	}
 	if strings.TrimSpace(p.SignaturePolicy) == "" {
 		return fmt.Errorf("admission profile %q missing signature_policy", p.ProfileID)
+	}
+	if strings.TrimSpace(p.RepairHintPolicy) == "" {
+		return fmt.Errorf("admission profile %q missing repair_hint_policy", p.ProfileID)
 	}
 	return nil
 }
 
 // EnforceAdmissionProfile validates bundle and handoff against profile rules.
-func EnforceAdmissionProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
+func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
 	if profile == nil {
 		return nil
 	}
 	profile.normalize()
+	if profile.IsToolUseProfile() {
+		return enforceAgentToolUseSafetyProfile(profile, bundlePath)
+	}
+	return enforceLabtrustQCProfile(profile, bundle, handoff)
+}
+
+func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
 	if bundle == nil {
-		return fmt.Errorf("%s: admission profile requires a science claim bundle", FailureCodeReleaseModeBundleRequired)
+		return fmt.Errorf("%s: profile %q requires a science claim bundle", FailureCodeReleaseModeBundleRequired, profile.ProfileID)
 	}
 	if profile.AcceptedBundleArtifact != "" && profile.AcceptedBundleArtifact != "ScienceClaimBundle.v0" {
 		return fmt.Errorf("%s: profile %q accepts %s only", FailureCodeReleaseModeProfileRejected, profile.ProfileID, profile.AcceptedBundleArtifact)
 	}
 	if err := enforceProfileHandoff(profile, handoff); err != nil {
 		return err
+	}
+	for _, rt := range profile.RequiredRuntimeArtifacts {
+		if rt == "RuntimeReceipt.v0" && bundle.PrimaryRuntimeReceipt() == nil {
+			return fmt.Errorf("%s: profile %q requires %s", FailureCodeReleaseModeCertificateRequired, profile.ProfileID, rt)
+		}
 	}
 	if len(profile.RequiredCertificateArtifacts) == 0 {
 		return nil
@@ -150,12 +226,12 @@ func EnforceAdmissionProfile(profile *AdmissionProfile, bundle *ScienceClaimBund
 }
 
 func enforceProfileHandoff(profile *AdmissionProfile, handoff *LoadedHandoff) error {
-	kind := profile.RequiredHandoffKind
-	if kind == "" || kind == "HandoffManifest.v0" {
-		kind = "bundle_to_verifier"
+	allowed := profile.RequiredHandoffKinds
+	if len(allowed) == 0 {
+		allowed = []string{"bundle_to_verifier"}
 	}
 	if handoff == nil || (handoff.Manifest == nil && handoff.Legacy == nil) {
-		return fmt.Errorf("%s: profile %q requires handoff kind %q", FailureCodeReleaseModeHandoffRequired, profile.ProfileID, kind)
+		return fmt.Errorf("%s: profile %q requires handoff kinds %v", FailureCodeReleaseModeHandoffRequired, profile.ProfileID, allowed)
 	}
 	if handoff.IsLegacy() {
 		return fmt.Errorf("%s: profile %q forbids legacy pf_handoff.json", FailureCodeLegacyHandoffForbiddenInReleaseMode, profile.ProfileID)
@@ -163,10 +239,12 @@ func enforceProfileHandoff(profile *AdmissionProfile, handoff *LoadedHandoff) er
 	if handoff.Manifest == nil {
 		return fmt.Errorf("%s: profile %q requires HandoffManifest.v0", FailureCodeReleaseModeHandoffRequired, profile.ProfileID)
 	}
-	if kind != "" && handoff.Manifest.HandoffKind != kind {
-		return fmt.Errorf("%s: profile %q requires handoff_kind %q (got %q)", FailureCodeReleaseModeHandoffKindMismatch, profile.ProfileID, kind, handoff.Manifest.HandoffKind)
+	for _, kind := range allowed {
+		if handoff.Manifest.HandoffKind == kind {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("%s: profile %q requires handoff_kind in %v (got %q)", FailureCodeReleaseModeHandoffKindMismatch, profile.ProfileID, allowed, handoff.Manifest.HandoffKind)
 }
 
 // ValidateProfileRequiredRegistryChecks ensures profile-required registry semantics are satisfied in RCVR.
@@ -180,7 +258,7 @@ func ValidateProfileRequiredRegistryChecks(profile *AdmissionProfile, checks []R
 		byID[c.CheckID] = c
 	}
 	for _, req := range profile.RequiredRegistryChecks {
-		if satisfied := profileRegistryCheckSatisfied(req, byID); satisfied {
+		if profileRegistryCheckSatisfied(req, byID) {
 			continue
 		}
 		return fmt.Errorf("%s: required registry check %q not satisfied in release chain result", ReasonRegistryAdmissionFailed, req)
@@ -191,12 +269,16 @@ func ValidateProfileRequiredRegistryChecks(profile *AdmissionProfile, checks []R
 func profileRegistryCheckSatisfied(req string, byID map[string]ReleaseValidationCheck) bool {
 	aliases := []string{req}
 	switch req {
-	case "trace_hash_matches_runtime_receipt":
+	case "trace_hash_matches_runtime_receipt", "tool_trace_hash_matches_certificate":
 		aliases = append(aliases, "trace_hash_consistent", "registry.TraceCertificate.v0.trace_hash_matches_runtime_receipt")
 	case "certificate_id_consistency":
 		aliases = append(aliases, "certificate_id_consistent")
 	case "signed_input_bundle_hash_matches_certified":
 		aliases = append(aliases, "signed_input_bundle_hash_match", "registry.SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified")
+	case "tool_use_certificate_not_rejected":
+		aliases = append(aliases, "tool_use_certificate_status")
+	case "authorized_tool_calls_only":
+		aliases = append(aliases, "tool_use_authorization")
 	}
 	for _, id := range aliases {
 		c, ok := byID[id]
@@ -226,4 +308,25 @@ func (p *AdmissionProfile) ProfileEnforcesRegistryCheck(checkID string) bool {
 		}
 	}
 	return false
+}
+
+// LoadAdmissionProfileFromPath loads profile JSON from an external file (for tests/overrides).
+func LoadAdmissionProfileFromPath(path string) (*AdmissionProfile, error) {
+	resolved, err := ResolveArtifactPath(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("%s: read %s: %w", FailureCodeUnknownAdmissionProfile, filepath.Base(resolved), err)
+	}
+	var profile AdmissionProfile
+	if err := json.Unmarshal(data, &profile); err != nil {
+		return nil, fmt.Errorf("%s: parse %s: %w", FailureCodeUnknownAdmissionProfile, filepath.Base(resolved), err)
+	}
+	profile.normalize()
+	if err := ValidateAdmissionProfile(&profile); err != nil {
+		return nil, err
+	}
+	return &profile, nil
 }

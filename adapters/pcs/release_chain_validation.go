@@ -190,6 +190,14 @@ func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts Relea
 		failureCodes = append(failureCodes, ReasonRegistryAdmissionFailed)
 		checks = replaceCheck(checks, byID["registry_semantic_checks_executed"])
 	}
+	if err := ValidateRegistrySemanticChecksPresent(auditCtx, checks); err != nil && opts.ReleaseMode && !opts.AllowSkippedRegistrySemantics {
+		byID["registry_semantic_checks_executed"] = releaseFailCheck("registry_semantic_checks_executed",
+			registryCheckDescription("registry_semantic_checks_executed"),
+			FailureCodeRegistryCheckNotInResult,
+			map[string]any{"error": err.Error()})
+		failureCodes = append(failureCodes, FailureCodeRegistryCheckNotInResult)
+		checks = replaceCheck(checks, byID["registry_semantic_checks_executed"])
+	}
 	return checks, uniqueStrings(failureCodes)
 }
 
