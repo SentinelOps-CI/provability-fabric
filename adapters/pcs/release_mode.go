@@ -32,7 +32,8 @@ func EnforceScienceClaimAdmission(policy ReleaseAdmissionPolicy, handoff *Loaded
 		return nil
 	}
 	if !policy.AllowMissingHandoff && handoff == nil {
-		return fmt.Errorf("release-mode requires --handoff HandoffManifest.v0 (or --allow-missing-handoff-for-local-dev)")
+		return fmt.Errorf("%s: release-mode requires --handoff HandoffManifest.v0 (or --allow-missing-handoff-for-local-dev)",
+			FailureCodeReleaseModeHandoffRequired)
 	}
 	if handoff != nil {
 		if handoff.Legacy != nil {
@@ -40,11 +41,12 @@ func EnforceScienceClaimAdmission(policy ReleaseAdmissionPolicy, handoff *Loaded
 				FailureCodeLegacyHandoffForbiddenInReleaseMode)
 		}
 		if handoff.Manifest == nil {
-			return fmt.Errorf("release-mode requires HandoffManifest.v0 via --handoff")
+			return fmt.Errorf("%s: release-mode requires HandoffManifest.v0 via --handoff", FailureCodeReleaseModeHandoffRequired)
 		}
 	}
 	if registry == nil {
-		return fmt.Errorf("release-mode requires --registry ArtifactRegistry.v0 (or set PCS_CORE_PATH for default artifact_registry.valid.json)")
+		return fmt.Errorf("%s: release-mode requires --registry ArtifactRegistry.v0 (or set PCS_CORE_PATH for default artifact_registry.valid.json)",
+			FailureCodeReleaseModeRegistryRequired)
 	}
 	return nil
 }
@@ -55,10 +57,11 @@ func EnforceReleaseChainAdmission(policy ReleaseAdmissionPolicy, manifestPath st
 		return nil
 	}
 	if strings.TrimSpace(manifestPath) == "" {
-		return fmt.Errorf("release-mode requires --manifest ReleaseManifest.v0")
+		return fmt.Errorf("%s: release-mode requires --manifest ReleaseManifest.v0", FailureCodeReleaseModeManifestRequired)
 	}
 	if registry == nil {
-		return fmt.Errorf("release-mode requires --registry ArtifactRegistry.v0 (or set PCS_CORE_PATH for default artifact_registry.valid.json)")
+		return fmt.Errorf("%s: release-mode requires --registry ArtifactRegistry.v0 (or set PCS_CORE_PATH for default artifact_registry.valid.json)",
+			FailureCodeReleaseModeRegistryRequired)
 	}
 	return nil
 }

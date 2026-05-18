@@ -28,16 +28,42 @@ func ExplainVerificationFailures(result VerificationResult) []FailureExplanation
 	return out
 }
 
-// ExplainReleaseChainFailures returns repair hints for failed release-chain checks.
+// ExplainReleaseChainFailures returns repair hints for failed and deferred release-chain checks.
 func ExplainReleaseChainFailures(result ReleaseChainValidationResult) []FailureExplanation {
 	var out []FailureExplanation
 	for _, c := range result.Checks {
-		if c.Status != "failed" {
+		if c.Status == "failed" {
+			out = append(out, explainReleaseChainCheck(c)...)
 			continue
 		}
-		out = append(out, explainReleaseChainCheck(c)...)
+		if exec, _ := c.Details["execution"].(string); exec == RegistryExecutionDeferred {
+			out = append(out, explainDeferredRegistryCheck(c)...)
+		}
 	}
 	return out
+}
+
+func explainDeferredRegistryCheck(c ReleaseValidationCheck) []FailureExplanation {
+	reason, _ := c.Details["deferral_reason"].(string)
+	enforcedBy, _ := c.Details["enforced_by"].(string)
+	responsible, _ := c.Details["responsible_component"].(string)
+	allowed, _ := c.Details["release_mode_allowed"].(bool)
+	hint := reason
+	if enforcedBy != "" {
+		hint = fmt.Sprintf("%s (enforced by release-chain check %s)", reason, enforcedBy)
+	}
+	regenerate := "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode"
+	if strings.HasPrefix(c.CheckID, "registry.") {
+		regenerate = "pf verify science-claim science_claim_bundle.certified.json --handoff handoff_to_pf.json --registry artifact_registry.json --release-mode && " + regenerate
+	}
+	return []FailureExplanation{{
+		CheckID:              c.CheckID,
+		ResponsibleComponent: responsible,
+		Expected:             fmt.Sprintf("deferral allowed in release mode=%v", allowed),
+		Actual:               fmt.Sprintf("execution=%s", RegistryExecutionDeferred),
+		RepairHint:           hint,
+		RegenerateCmd:        regenerate,
+	}}
 }
 
 func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
@@ -78,6 +104,19 @@ func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
 }
 
 func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
+	if strings.HasPrefix(c.CheckID, "registry.") {
+		errMsg, _ := c.Details["error"].(string)
+		responsible, _ := c.Details["responsible_component"].(string)
+		exec, _ := c.Details["execution"].(string)
+		return []FailureExplanation{{
+			CheckID:              c.CheckID,
+			ResponsibleComponent: responsible,
+			Expected:             RegistryExecutionPassed,
+			Actual:               exec + ": " + errMsg,
+			RepairHint:           "Fix registry semantic check failure or update ArtifactRegistry.v0 semantic_checks for this artifact type.",
+			RegenerateCmd:        "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode",
+		}}
+	}
 	code, _ := c.Details["failure_code"].(string)
 	switch c.CheckID {
 	case "manifest_hashes_match":
@@ -112,6 +151,24 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 			Actual:               act,
 			RepairHint:           "Re-sign the certified bundle with PF after verification passes.",
 			RegenerateCmd:        "pf sign science-claim science_claim_bundle.certified.json --handoff handoff_to_pf.json --registry artifact_registry.json --out signed_science_claim_bundle.json --release-mode",
+		}}
+	case "certificate_id_consistent":
+		exp, _ := c.Details["expected"].(string)
+		if exp == "" {
+			exp, _ = c.Details["certificate_id"].(string)
+		}
+		act, _ := c.Details["actual"].(string)
+		if act == "" {
+			act, _ = c.Details["verification_result"].(string)
+		}
+		return []FailureExplanation{{
+			CheckID:              "certificate_id_mismatch",
+			ArtifactPath:         "science_claim_bundle.certified.json",
+			ResponsibleComponent: ComponentLabTrustGym,
+			Expected:             exp,
+			Actual:               act,
+			RepairHint:           "Regenerate the certified bundle from the current trace certificate.",
+			RegenerateCmd:        "labtrust attach-certificate --trace trace.json --certificate trace_certificate.json --out science_claim_bundle.certified.json",
 		}}
 	default:
 		return []FailureExplanation{{

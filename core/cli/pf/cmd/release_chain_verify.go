@@ -21,6 +21,7 @@ func releaseChainVerifyCmd() *cobra.Command {
 	var localDev bool
 	var releaseMode bool
 	var allowSkippedRegistrySemantics bool
+	var admissionProfileID string
 
 	cmd := &cobra.Command{
 		Use:   "release-chain",
@@ -30,7 +31,7 @@ func releaseChainVerifyCmd() *cobra.Command {
 			if strings.TrimSpace(manifestPath) == "" {
 				return fmt.Errorf("--manifest ReleaseManifest.v0 is required")
 			}
-			opts, _, err := resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, allowSkippedRegistrySemantics, localDev, releaseMode)
+			opts, _, err := resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admissionProfileID, allowSkippedRegistrySemantics, localDev, releaseMode)
 			if err != nil {
 				return wrapAdmissionError(err)
 			}
@@ -70,6 +71,7 @@ func releaseChainVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow placeholder source_commit (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require registry and reject placeholder commits")
 	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
+	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust.qc_release) or set PF_ADMISSION_PROFILE")
 	return cmd
 }
 

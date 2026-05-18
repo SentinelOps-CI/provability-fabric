@@ -15,6 +15,7 @@ type scienceClaimAdmissionInput struct {
 	HandoffPath                   string
 	RegistryPath                  string
 	ManifestPath                  string
+	AdmissionProfileID            string
 	AllowMissingHandoff           bool
 	AllowSkippedRegistrySemantics bool
 	LocalDev                      bool
@@ -26,6 +27,7 @@ type resolvedScienceClaimAdmission struct {
 	Handoff  *pcs.LoadedHandoff
 	Registry *pcs.ArtifactRegistry
 	Manifest *pcs.ReleaseManifest
+	Profile  *pcs.AdmissionProfile
 	Policy   pcs.ReleaseAdmissionPolicy
 }
 
@@ -79,6 +81,12 @@ func resolveScienceClaimAdmission(in scienceClaimAdmissionInput) (resolvedScienc
 		out.Manifest = manifest
 	}
 
+	profile, err := pcs.ResolveAdmissionProfile(in.AdmissionProfileID)
+	if err != nil {
+		return out, err
+	}
+	out.Profile = profile
+
 	if err := pcs.EnforceScienceClaimAdmission(policy, out.Handoff, out.Registry); err != nil {
 		return out, err
 	}
@@ -91,9 +99,10 @@ func applyAdmissionToValidateOpts(opts *pcs.ValidateOptions, adm resolvedScience
 	opts.AllowSkippedRegistrySemantics = adm.Policy.AllowSkippedRegistrySemantics
 	opts.Handoff = adm.Handoff
 	opts.Registry = adm.Registry
+	opts.AdmissionProfile = adm.Profile
 }
 
-func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir string, allowSkipped bool, localDev, releaseMode bool) (pcs.ReleaseChainVerifyOptions, *pcs.ArtifactRegistry, error) {
+func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admissionProfileID string, allowSkipped bool, localDev, releaseMode bool) (pcs.ReleaseChainVerifyOptions, *pcs.ArtifactRegistry, error) {
 	if !releaseMode {
 		releaseMode = pcs.ReleaseModeFromEnv()
 	}
@@ -124,6 +133,11 @@ func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir string
 	}, manifestPath, registry); err != nil {
 		return opts, nil, err
 	}
+	profile, err := pcs.ResolveAdmissionProfile(admissionProfileID)
+	if err != nil {
+		return opts, nil, err
+	}
+	opts.AdmissionProfile = profile
 	return opts, registry, nil
 }
 
@@ -140,6 +154,12 @@ func admissionErrorHint(err error) string {
 	}
 	if strings.Contains(msg, "--manifest") {
 		return "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode"
+	}
+	if strings.Contains(msg, pcs.FailureCodeReleaseModeHandoffRequired) {
+		return "pf verify science-claim <bundle> --handoff handoff_to_pf.json --registry artifact_registry.json --release-mode"
+	}
+	if strings.Contains(msg, pcs.FailureCodeReleaseModeRegistryRequired) {
+		return "export PCS_CORE_PATH=../pcs-core && pf verify science-claim <bundle> --registry artifact_registry.json --release-mode"
 	}
 	return ""
 }

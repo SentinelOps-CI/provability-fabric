@@ -19,6 +19,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	var manifestPath string
 	var allowMissingHandoff bool
 	var allowSkippedRegistrySemantics bool
+	var admissionProfileID string
 	var jsonOut bool
 	var localDev bool
 	var releaseMode bool
@@ -45,6 +46,7 @@ func scienceClaimSignCmd() *cobra.Command {
 				HandoffPath:                   handoffPath,
 				RegistryPath:                  registryPath,
 				ManifestPath:                  manifestPath,
+				AdmissionProfileID:            admissionProfileID,
 				AllowMissingHandoff:           allowMissingHandoff,
 				AllowSkippedRegistrySemantics: allowSkippedRegistrySemantics,
 				LocalDev:                      localDev,
@@ -120,6 +122,7 @@ func scienceClaimSignCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Also print signed wrapper JSON to stdout")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require handoff and ArtifactRegistry.v0; reject placeholder commits")
+	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust.qc_release) or set PF_ADMISSION_PROFILE")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }

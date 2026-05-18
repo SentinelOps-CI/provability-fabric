@@ -1,0 +1,13 @@
+{
+  "profile_id": "labtrust.qc_release",
+  "description": "LabTrust-Gym QC release: certified ScienceClaimBundle with TraceCertificate.v0",
+  "accepted_bundle_artifact": "ScienceClaimBundle.v0",
+  "required_certificate_artifacts": ["TraceCertificate.v0"],
+  "required_handoff_kind": "bundle_to_verifier",
+  "required_registry_checks": [
+    "trace_hash_matches_runtime_receipt",
+    "certificate_id_consistency",
+    "signed_input_bundle_hash_matches_certified"
+  ],
+  "signature_policy": "digest_v0"
+}

@@ -147,6 +147,7 @@ jobs:
             --manifest "$MANIFEST" \
             --registry "$REGISTRY" \
             --artifact-dir "$RC_DIR" \
+            --admission-profile labtrust.qc_release \
             --release-mode \
             --out "$OUT"
           go run . validate release-chain-result "$OUT"
@@ -231,7 +232,28 @@ jobs:
             echo "expected explain failure to exit non-zero"
             exit 1
           fi
-          grep -q 'repair:' "$RUNNER_TEMP/explain_vr.txt"
+          grep -qE '(Repair|repair:)' "$RUNNER_TEMP/explain_vr.txt"
+
+      - name: pf explain release-chain JSON
+        run: |
+          cd core/cli/pf
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          go run . explain release-chain "$RELEASE/release_chain_validation_result.json" --json | tee "$RUNNER_TEMP/explain_rc.json"
+          grep -q '"failed_count"' "$RUNNER_TEMP/explain_rc.json"
+
+      - name: pf verify science-claim with admission profile
+        run: |
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          go run . verify science-claim \
+            "$RELEASE/science_claim_bundle.certified.json" \
+            --handoff "$RELEASE/handoff_to_pf.json" \
+            --registry "$RELEASE/artifact_registry.json" \
+            --admission-profile labtrust.qc_release \
+            --release-mode
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

@@ -26,6 +26,20 @@ const (
 	ReasonLegacyHandoffForbidden     = "legacy_handoff_forbidden_in_release_mode"
 )
 
+// Release-mode admission failure codes (precise operator signals).
+const (
+	FailureCodeReleaseModeHandoffRequired      = "release_mode_handoff_required"
+	FailureCodeReleaseModeRegistryRequired     = "release_mode_registry_required"
+	FailureCodeReleaseModeManifestRequired     = "release_mode_manifest_required"
+	FailureCodeReleaseModeHandoffKindMismatch  = "release_mode_handoff_kind_mismatch"
+	FailureCodeReleaseModeCertificateRequired  = "release_mode_certificate_required"
+	FailureCodeReleaseModeBundleRequired       = "release_mode_bundle_required"
+	FailureCodeReleaseModeProfileRejected      = "release_mode_profile_rejected"
+	FailureCodeReleaseModeLocalDevForbidden    = "release_mode_local_dev_forbidden"
+	FailureCodeReleaseModeRegistryCheckSkipped = "release_mode_registry_check_skipped"
+	FailureCodeReleaseModeRegistryCheckUnregistered = "release_mode_registry_check_unregistered"
+)
+
 func withReason(code string, details map[string]any) map[string]any {
 	if details == nil {
 		details = map[string]any{}

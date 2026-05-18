@@ -21,6 +21,7 @@ type ValidateOptions struct {
 	Registry                      *ArtifactRegistry
 	AllowMissingHandoff           bool
 	AllowSkippedRegistrySemantics bool
+	AdmissionProfile              *AdmissionProfile
 }
 
 // VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
@@ -30,6 +31,9 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 		AllowMissingHandoff:           opts.AllowMissingHandoff,
 		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
 	}, opts.Handoff, opts.Registry); err != nil {
+		return VerificationResult{}, err
+	}
+	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundle, opts.Handoff); err != nil {
 		return VerificationResult{}, err
 	}
 	if opts.Handoff != nil {

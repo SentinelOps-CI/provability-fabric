@@ -477,7 +477,7 @@ func TestExplainFailureCLI(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected explain failure to exit non-zero: %s", out)
 	}
-	if !strings.Contains(string(out), "repair:") {
+	if !strings.Contains(string(out), "Repair") && !strings.Contains(string(out), "repair:") {
 		t.Fatalf("expected repair hint in explain output: %s", out)
 	}
 }

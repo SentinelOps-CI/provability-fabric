@@ -65,6 +65,7 @@ type ReleaseChainVerifyOptions struct {
 	ReleaseMode                   bool
 	Registry                      *ArtifactRegistry
 	AllowSkippedRegistrySemantics bool
+	AdmissionProfile              *AdmissionProfile
 }
 
 // VerifyReleaseChainFromManifest validates manifest artifact pins and registry admission.
@@ -158,7 +159,79 @@ func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts Relea
 	byID["registry_admission_passed"] = regCheck
 	failureCodes = append(failureCodes, regFailures...)
 
-	return normalizeReleaseChainChecks(byID), uniqueStrings(failureCodes)
+	checks := normalizeReleaseChainChecks(byID)
+	auditCtx := RegistrySemanticAuditContext{
+		Manifest: manifest,
+		Registry: opts.Registry,
+		BaseDir:  baseDir,
+		Bundle:   loadCertifiedBundleForAudit(baseDir),
+		Opts: RegistryValidateOptions{
+			ReleaseMode:                   opts.ReleaseMode,
+			AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+		},
+	}
+	registrySemantic := CollectRegistrySemanticChecks(auditCtx)
+	checks = append(checks, registrySemantic...)
+	byID["registry_semantic_checks_executed"] = summarizeRegistrySemanticChecksExecuted(registrySemantic, opts)
+	for _, c := range registrySemantic {
+		if c.Status == "failed" {
+			if fc, ok := c.Details["failure_code"].(string); ok && fc != "" {
+				failureCodes = append(failureCodes, fc)
+			} else {
+				failureCodes = append(failureCodes, ReasonRegistryAdmissionFailed)
+			}
+		}
+	}
+	if hasUnexplainedDeferredRegistryCheck(checks, opts.ReleaseMode, opts.AllowSkippedRegistrySemantics) {
+		byID["registry_semantic_checks_executed"] = releaseFailCheck("registry_semantic_checks_executed",
+			registryCheckDescription("registry_semantic_checks_executed"),
+			ReasonRegistryAdmissionFailed,
+			map[string]any{"error": "unexplained deferred registry semantic check in release mode"})
+		failureCodes = append(failureCodes, ReasonRegistryAdmissionFailed)
+		checks = replaceCheck(checks, byID["registry_semantic_checks_executed"])
+	}
+	return checks, uniqueStrings(failureCodes)
+}
+
+func replaceCheck(checks []ReleaseValidationCheck, updated ReleaseValidationCheck) []ReleaseValidationCheck {
+	for i, c := range checks {
+		if c.CheckID == updated.CheckID {
+			checks[i] = updated
+			return checks
+		}
+	}
+	return append(checks, updated)
+}
+
+func summarizeRegistrySemanticChecksExecuted(registrySemantic []ReleaseValidationCheck, opts ReleaseChainVerifyOptions) ReleaseValidationCheck {
+	const id = "registry_semantic_checks_executed"
+	if opts.Registry == nil {
+		return releaseSkipCheck(id, registryCheckDescription(id), map[string]any{"message": "registry not provided"})
+	}
+	if len(registrySemantic) == 0 {
+		return releasePassCheck(id, registryCheckDescription(id), map[string]any{"registry_semantic_checks": 0})
+	}
+	var failed, deferred int
+	for _, c := range registrySemantic {
+		switch c.Status {
+		case "failed":
+			failed++
+		case "passed":
+			if exec, _ := c.Details["execution"].(string); exec == RegistryExecutionDeferred {
+				deferred++
+			}
+		}
+	}
+	if failed > 0 {
+		return releaseFailCheck(id, registryCheckDescription(id),
+			ReasonRegistryAdmissionFailed,
+			map[string]any{"failed_registry_semantic_checks": failed, "deferred_registry_semantic_checks": deferred})
+	}
+	return releasePassCheck(id, registryCheckDescription(id),
+		map[string]any{
+			"registry_semantic_checks":          len(registrySemantic),
+			"deferred_registry_semantic_checks": deferred,
+		})
 }
 
 func normalizeReleaseChainChecks(byID map[string]ReleaseValidationCheck) []ReleaseValidationCheck {
@@ -188,10 +261,18 @@ func checkManifestHashesMatch(baseDir string, manifest *ReleaseManifest) (Releas
 		}
 	}
 	if len(mismatches) > 0 {
+		details := map[string]any{"mismatches": mismatches}
+		if len(mismatches) == 1 {
+			if art, ok := mismatches[0]["artifact"].(string); ok {
+				details["artifact_path"] = art
+			}
+			details["expected"] = mismatches[0]["expected"]
+			details["actual"] = mismatches[0]["actual"]
+		}
 		return releaseFailCheck("manifest_hashes_match",
 			"All manifest artifact hashes match on-disk files",
 			"PCS_MANIFEST_HASH_MISMATCH",
-			map[string]any{"mismatches": mismatches}), []string{"PCS_MANIFEST_HASH_MISMATCH"}
+			details), []string{"PCS_MANIFEST_HASH_MISMATCH"}
 	}
 	return releasePassCheck("manifest_hashes_match",
 		"All manifest artifact hashes match on-disk files",
@@ -230,7 +311,14 @@ func checkCertificateIDConsistent(baseDir string, manifest *ReleaseManifest) (Re
 			return releaseFailCheck("certificate_id_consistent",
 				"Certificate ID is identical across certificate, certified bundle, verification result, and signed bundle",
 				"PCS_CERTIFICATE_ID_MISMATCH",
-				map[string]any{"certificate_id": certID, "verification_result": vr.VerifiedInput.CertificateID}), []string{"PCS_CERTIFICATE_ID_MISMATCH"}
+				map[string]any{
+					"certificate_id":      certID,
+					"verification_result": vr.VerifiedInput.CertificateID,
+					"artifact_path":       "science_claim_bundle.certified.json",
+					"expected":            certID,
+					"actual":              vr.VerifiedInput.CertificateID,
+					"responsible_component": ComponentLabTrustGym,
+				}), []string{"PCS_CERTIFICATE_ID_MISMATCH"}
 		}
 	}
 	return releasePassCheck("certificate_id_consistent",
@@ -476,6 +564,9 @@ func buildReleaseChainResult(
 	if err := ValidateReleaseChainValidationResultSemantics(&result); err != nil {
 		return result, fmt.Errorf("release chain validation result semantics: %w", err)
 	}
+	if err := ValidateRegistrySemanticCheckRecords(result.Checks); err != nil {
+		return result, fmt.Errorf("release chain validation result semantics: %w", err)
+	}
 	return result, nil
 }
 
@@ -502,36 +593,7 @@ func BuildReleaseChainValidationResultFromVerification(
 	if manifest != nil {
 		checks, failureCodes = runReleaseChainChecks(artifactDir, manifest, opts)
 	}
-	if handoff != nil {
-		id := "handoff_manifest_validated"
-		if handoff.Status == HandoffStatusValidated &&
-			handoff.FromComponent == ComponentLabTrustGym &&
-			handoff.ToComponent == ComponentProvabilityFabric {
-			checks = append(checks, releasePassCheck(id, "HandoffManifest.v0 targets Provability Fabric with Validated status",
-				map[string]any{"handoff_id": handoff.HandoffID}))
-		} else {
-			checks = append(checks, releaseFailCheck(id, "HandoffManifest.v0 targets Provability Fabric with Validated status",
-				"PCS_HANDOFF_INVALID", map[string]any{"status": handoff.Status}))
-			failureCodes = append(failureCodes, "PCS_HANDOFF_INVALID")
-		}
-	}
-	vrCheck := "science_claim_bundle_verification"
-	if bundleResult.Status == StatusProofChecked {
-		checks = append(checks, releasePassCheck(vrCheck,
-			"ScienceClaimBundle verification reached ProofChecked",
-			map[string]any{"verification_id": bundleResult.VerificationID}))
-	} else {
-		checks = append(checks, releaseFailCheck(vrCheck,
-			"ScienceClaimBundle verification reached ProofChecked",
-			"PCS_VERIFICATION_REJECTED", map[string]any{"status": bundleResult.Status}))
-		failureCodes = append(failureCodes, "PCS_VERIFICATION_REJECTED")
-		for _, c := range FailedChecks(bundleResult) {
-			if code, ok := c.Details["reason_code"].(string); ok && code != "" {
-				failureCodes = append(failureCodes, code)
-			}
-		}
-	}
-	failureCodes = uniqueStrings(failureCodes)
+	checks, failureCodes = appendVerificationAdmissionChecks(checks, failureCodes, handoff, bundleResult, opts)
 	return buildReleaseChainResult(manifest, checks, failureCodes, opts, nil)
 }
 

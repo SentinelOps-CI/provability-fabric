@@ -79,6 +79,7 @@ func writeReleaseChainResult(bundlePath string, result pcs.VerificationResult, a
 	}
 	opts.AllowSkippedRegistrySemantics = adm.Policy.AllowSkippedRegistrySemantics
 	opts.Registry = adm.Registry
+	opts.AdmissionProfile = adm.Profile
 	if adm.Manifest != nil {
 		if resolved, err := pcs.ResolveArtifactPath(bundlePath); err == nil {
 			opts.ArtifactDir = filepath.Dir(resolved)
