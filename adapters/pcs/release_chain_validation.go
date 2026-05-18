@@ -20,15 +20,22 @@ var RequiredReleaseChainCheckIDs = []string{
 	"trace_hash_consistent",
 	"signed_input_bundle_hash_match",
 	"scientific_memory_import_passed",
+	"registry_artifact_registered",
+	"registry_schema_matches",
+	"registry_producer_allowed",
+	"registry_status_allowed",
+	"registry_required_fields_present",
+	"registry_semantic_checks_executed",
 	"registry_admission_passed",
 }
 
 // ReleaseValidationCheck is a pcs-core release_validation_check entry.
 type ReleaseValidationCheck struct {
-	CheckID     string         `json:"check_id"`
-	Description string         `json:"description"`
-	Status      string         `json:"status"`
-	Details     map[string]any `json:"details"`
+	CheckID           string         `json:"check_id"`
+	Description       string         `json:"description"`
+	Status            string         `json:"status"`
+	Details           map[string]any `json:"details"`
+	RegistryCheckRefs []string       `json:"registry_check_refs"`
 }
 
 // ReleaseChainValidationResult is ReleaseChainValidationResult.v0 emitted by PF.
@@ -137,6 +144,15 @@ func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts Relea
 	smCheck, smFailures := checkScientificMemoryImportPassed(baseDir, manifest, opts)
 	byID["scientific_memory_import_passed"] = smCheck
 	failureCodes = append(failureCodes, smFailures...)
+
+	for id, c := range runRegistryReleaseChainChecks(manifest, opts) {
+		byID[id] = c
+		if c.Status == "failed" {
+			if fc, ok := c.Details["failure_code"].(string); ok && fc != "" {
+				failureCodes = append(failureCodes, fc)
+			}
+		}
+	}
 
 	regCheck, regFailures := checkRegistryAdmissionPassed(manifest, opts)
 	byID["registry_admission_passed"] = regCheck
@@ -523,14 +539,20 @@ func releaseSkipCheck(id, description string, details map[string]any) ReleaseVal
 	if details == nil {
 		details = map[string]any{}
 	}
-	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "skipped", Details: details}
+	return ReleaseValidationCheck{
+		CheckID: id, Description: description, Status: "skipped", Details: details,
+		RegistryCheckRefs: []string{},
+	}
 }
 
 func releasePassCheck(id, description string, details map[string]any) ReleaseValidationCheck {
 	if details == nil {
 		details = map[string]any{}
 	}
-	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "passed", Details: details}
+	return ReleaseValidationCheck{
+		CheckID: id, Description: description, Status: "passed", Details: details,
+		RegistryCheckRefs: registryCheckRefsFor(id),
+	}
 }
 
 func releaseFailCheck(id, description, failureCode string, details map[string]any) ReleaseValidationCheck {
@@ -538,7 +560,17 @@ func releaseFailCheck(id, description, failureCode string, details map[string]an
 		details = map[string]any{}
 	}
 	details["failure_code"] = failureCode
-	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "failed", Details: details}
+	return ReleaseValidationCheck{
+		CheckID: id, Description: description, Status: "failed", Details: details,
+		RegistryCheckRefs: registryCheckRefsFor(id),
+	}
+}
+
+func registryCheckRefsFor(checkID string) []string {
+	if checkID == "registry_admission_passed" {
+		return append([]string(nil), RegistryReleaseChainCheckIDs...)
+	}
+	return []string{}
 }
 
 func uniqueStrings(in []string) []string {

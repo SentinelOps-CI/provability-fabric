@@ -141,6 +141,24 @@ jobs:
           grep -q '"status": "ProofChecked"' "$OUT"
           grep -q 'manifest_hashes_match' "$OUT"
           grep -q 'registry_admission_passed' "$OUT"
+          grep -q 'registry_artifact_registered' "$OUT"
+          grep -q 'registry_semantic_checks_executed' "$OUT"
+
+      - name: Reject legacy pf_handoff in release mode
+        run: |
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          if go run . verify science-claim \
+            "$RELEASE/science_claim_bundle.certified.json" \
+            --handoff "$RELEASE/pf_handoff.json" \
+            --registry "$RELEASE/artifact_registry.json" \
+            --release-mode; then
+            echo "expected legacy pf_handoff to be rejected in release mode"
+            exit 1
+          fi
 
       - name: Validate PCS fixtures
         run: |
@@ -190,10 +208,18 @@ jobs:
         run: |
           cd core/cli/pf
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
-          if go run . explain failure "$RELEASE/invalid_mismatched_trace_hash.json"; then
+          VR="$RUNNER_TEMP/rejected_verification_result.json"
+          export PF_RELEASE_MODE=0
+          go run . verify science-claim "$RELEASE/invalid_mismatched_trace_hash.json" --out "$VR" || true
+          set +e
+          go run . explain failure "$VR" 2>&1 | tee "$RUNNER_TEMP/explain_vr.txt"
+          EXPLAIN_RC=${PIPESTATUS[0]}
+          set -e
+          if [ "$EXPLAIN_RC" -eq 0 ]; then
             echo "expected explain failure to exit non-zero"
             exit 1
           fi
+          grep -q 'repair:' "$RUNNER_TEMP/explain_vr.txt"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

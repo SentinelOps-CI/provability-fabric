@@ -13,7 +13,7 @@ import (
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
-func verifyWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
+func verifyWithHandoffManifest(t *testing.T, mutate func(*pcs.HandoffManifest)) error {
 	t.Helper()
 	manifest := loadReleaseManifest(t)
 	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
@@ -22,12 +22,19 @@ func verifyWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 	if err != nil {
 		t.Fatal(err)
 	}
+	loaded, err := pcs.LoadHandoff(validHandoffManifestPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mutate != nil {
+		mutate(loaded.Manifest)
+	}
 	opts := pcs.ValidateOptions{
 		RepoRoot:        repoRoot(t),
 		VerifierVersion: pcs.DefaultVerifierVersion,
 		SourceCommit:    manifest.PFSourceCommit,
 		ReleaseMode:     true,
-		Handoff:         loadedLegacyHandoff(handoff),
+		Handoff:         loaded,
 		Registry:        loadArtifactRegistry(t),
 	}
 	_, err = pcs.VerifyScienceClaimBundle(path, bundle, opts)
@@ -35,9 +42,9 @@ func verifyWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 }
 
 func TestVerifyRejectsChangedCertifiedBundleHash(t *testing.T) {
-	h := matchingHandoff(t)
-	h.CertifiedBundleHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	err := verifyWithHandoff(t, h)
+	err := verifyWithHandoffManifest(t, func(h *pcs.HandoffManifest) {
+		h.Invariants["certified_bundle_hash"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	})
 	if err == nil {
 		t.Fatal("expected verify to fail on certified bundle hash mismatch")
 	}
@@ -47,9 +54,9 @@ func TestVerifyRejectsChangedCertifiedBundleHash(t *testing.T) {
 }
 
 func TestVerifyRejectsChangedCertificateID(t *testing.T) {
-	h := matchingHandoff(t)
-	h.CertificateID = "cert-trace-00000000-0000-0000-0000-000000000000"
-	err := verifyWithHandoff(t, h)
+	err := verifyWithHandoffManifest(t, func(h *pcs.HandoffManifest) {
+		h.Invariants["certificate_id"] = "cert-trace-00000000-0000-0000-0000-000000000000"
+	})
 	if err == nil {
 		t.Fatal("expected verify to fail on certificate_id mismatch")
 	}
@@ -59,9 +66,9 @@ func TestVerifyRejectsChangedCertificateID(t *testing.T) {
 }
 
 func TestVerifyRejectsChangedTraceHash(t *testing.T) {
-	h := matchingHandoff(t)
-	h.TraceHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	err := verifyWithHandoff(t, h)
+	err := verifyWithHandoffManifest(t, func(h *pcs.HandoffManifest) {
+		h.Invariants["trace_hash"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	})
 	if err == nil {
 		t.Fatal("expected verify to fail on trace_hash mismatch")
 	}
@@ -71,11 +78,23 @@ func TestVerifyRejectsChangedTraceHash(t *testing.T) {
 }
 
 func TestSignRejectsBundleNotMatchingHandoff(t *testing.T) {
-	h := matchingHandoff(t)
-	h.CertifiedBundleHash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	err := signWithHandoff(t, h)
+	loaded, err := pcs.LoadHandoff(validHandoffManifestPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.Manifest.Invariants["certified_bundle_hash"] = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	manifest := loadReleaseManifest(t)
+	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := releaseModeValidateOpts(t)
+	opts.Handoff = loaded
+	_, err = pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err == nil {
-		t.Fatal("expected sign to fail when bundle does not match handoff")
+		t.Fatal("expected verify to fail when bundle does not match handoff")
 	}
 	if !strings.Contains(err.Error(), "handoff") {
 		t.Fatalf("unexpected error: %v", err)

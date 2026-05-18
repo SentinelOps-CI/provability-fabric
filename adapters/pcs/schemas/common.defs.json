@@ -139,15 +139,46 @@
         "sha256": { "$ref": "#/$defs/hex_digest" }
       }
     },
+    "semantic_check_severity": {
+      "type": "string",
+      "enum": [
+        "required",
+        "optional",
+        "warning_only",
+        "release_blocking",
+        "consumer_responsible",
+        "producer_responsible"
+      ]
+    },
+    "registry_semantic_check": {
+      "type": "object",
+      "required": ["check_id", "severity", "responsible_component"],
+      "additionalProperties": false,
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "severity": { "$ref": "#/$defs/semantic_check_severity" },
+        "responsible_component": { "type": "string", "minLength": 1 }
+      }
+    },
     "release_validation_check": {
       "type": "object",
-      "required": ["check_id", "description", "status", "details"],
+      "required": [
+        "check_id",
+        "description",
+        "status",
+        "details",
+        "registry_check_refs"
+      ],
       "additionalProperties": false,
       "properties": {
         "check_id": { "type": "string", "minLength": 1 },
         "description": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/validation_check_status" },
-        "details": { "type": "object" }
+        "details": { "type": "object" },
+        "registry_check_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "chain_root": {

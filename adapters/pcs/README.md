@@ -48,6 +48,7 @@ Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-
 | `release_manifest.go` | ReleaseManifest.v0 loader |
 | `release_mode.go` | Release-mode admission policy |
 | `registry_validate.go` | ArtifactRegistry.v0 bundle + manifest admission |
+| `registry_release_chain.go` | Granular registry_* release-chain checks |
 | `explain.go` | Actionable failure explanations |
 | `canonical_hash.go` | pcs-core canonical JSON digest |
 | `status_transition.go` | PCS status transition policy |

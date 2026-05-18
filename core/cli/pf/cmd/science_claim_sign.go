@@ -104,6 +104,9 @@ func scienceClaimSignCmd() *cobra.Command {
 				fmt.Printf("verification_id: %s\n", result.VerificationID)
 				fmt.Printf("status: %s\n", result.Status)
 			}
+			if adm.Handoff != nil && adm.Handoff.IsLegacy() && !adm.Policy.ReleaseMode {
+				fmt.Fprintln(os.Stderr, pcs.LegacyHandoffWarning)
+			}
 			return nil
 		},
 	}

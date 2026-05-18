@@ -4,6 +4,7 @@
 package pcs
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -39,6 +40,9 @@ func ValidateBundleAgainstRegistry(bundle *ScienceClaimBundle, registry *Artifac
 		}
 		if comp.status != "" && len(entry.AllowedStatuses) > 0 && !statusAllowed(entry.AllowedStatuses, comp.status) {
 			return fmt.Errorf("status %q not allowed for %s (registry allows %v)", comp.status, comp.artifactType, entry.AllowedStatuses)
+		}
+		if err := validateBundleRequiredReleaseFields(bundle, comp, entry.RequiredReleaseFields); err != nil {
+			return err
 		}
 		if err := executeRegistrySemanticChecks(bundle, entry, opts); err != nil {
 			return err
@@ -95,10 +99,15 @@ func bundleRegistryComponents(bundle *ScienceClaimBundle) []bundleRegistryCompon
 		})
 	}
 	if bundle.EvidenceBundle != nil {
+		evStatus := ""
+		if cert := firstCertificate(bundle); cert != nil {
+			evStatus = cert.Status
+		}
 		out = append(out, bundleRegistryComponent{
 			artifactType: "EvidenceBundle.v0",
 			producer:     bundle.EvidenceBundle.Producer,
 			schemaFile:   "EvidenceBundle.v0.schema.json",
+			status:       evStatus,
 		})
 	}
 	return out
@@ -127,13 +136,13 @@ func statusAllowed(allowed []string, status string) bool {
 
 func executeRegistrySemanticChecks(bundle *ScienceClaimBundle, entry RegistryEntry, opts RegistryValidateOptions) error {
 	for _, check := range entry.SemanticChecks {
-		executed, err := runRegistrySemanticCheck(bundle, check)
+		executed, err := runRegistrySemanticCheck(bundle, check.CheckID)
 		if err != nil {
-			return fmt.Errorf("registry semantic check %q failed: %w", check, err)
+			return fmt.Errorf("registry semantic check %q failed: %w", check.CheckID, err)
 		}
 		if !executed {
 			if opts.ReleaseMode && !opts.AllowSkippedRegistrySemantics {
-				return fmt.Errorf("registry semantic check %q was not executed in release mode", check)
+				return fmt.Errorf("registry semantic check %q was not executed in release mode", check.CheckID)
 			}
 		}
 	}
@@ -245,10 +254,10 @@ func ValidateManifestAgainstRegistry(manifest *ReleaseManifest, registry *Artifa
 			return fmt.Errorf("manifest artifact %q producer %q does not match registry %q", name, entry.Producer, regEntry.Producer)
 		}
 		for _, check := range regEntry.SemanticChecks {
-			if manifestRegistrySemanticDeferred(check) {
+			if manifestRegistrySemanticDeferred(check.CheckID) {
 				continue
 			}
-			if check == "release_mode_commit_policy" {
+			if check.CheckID == "release_mode_commit_policy" {
 				if err := ValidateReleaseManifestSemantics(manifest); err != nil {
 					return err
 				}
@@ -263,7 +272,9 @@ func manifestRegistrySemanticDeferred(check string) bool {
 	case "artifact_hashes_match_files", "verified_input_bundle_hash_matches_certified",
 		"signed_input_bundle_hash_matches_certified", "embedded_bundle_passes_science_claim_semantics",
 		"failed_checks_block_import_ready_status", "status_matches_check_outcomes",
-		"handoff_input_hashes_when_validated":
+		"handoff_input_hashes_when_validated",
+		"non_empty_runtime_receipts", "certified_bundle_has_certificate_when_checked",
+		"assumption_set_ref_present", "certificate_refs_resolve":
 		return true
 	default:
 		return false
@@ -289,4 +300,132 @@ func runManifestRegistrySemantic(check string, manifest *ReleaseManifest, name s
 	default:
 		return false, nil
 	}
+}
+
+func bundleComponentObject(bundle *ScienceClaimBundle, artifactType string) any {
+	if bundle == nil {
+		return nil
+	}
+	switch artifactType {
+	case "ScienceClaimBundle.v0":
+		return bundle
+	case "TraceCertificate.v0":
+		return firstCertificate(bundle)
+	case "RuntimeReceipt.v0":
+		return bundle.PrimaryRuntimeReceipt()
+	case "ClaimArtifact.v0":
+		return bundle.ClaimArtifact
+	case "AssumptionSet.v0":
+		return bundle.AssumptionSet
+	case "EvidenceBundle.v0":
+		return bundle.EvidenceBundle
+	default:
+		return nil
+	}
+}
+
+func validateBundleRequiredReleaseFields(bundle *ScienceClaimBundle, comp bundleRegistryComponent, fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	for _, field := range fields {
+		if field == "status" {
+			if bundleComponentStatus(bundle, comp.artifactType) == "" {
+				return fmt.Errorf("required release field %q missing for %s", field, comp.artifactType)
+			}
+			continue
+		}
+		obj := bundleComponentObject(bundle, comp.artifactType)
+		if err := validateRequiredReleaseFields(comp.artifactType, obj, []string{field}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func bundleComponentStatus(bundle *ScienceClaimBundle, artifactType string) string {
+	switch artifactType {
+	case "ScienceClaimBundle.v0":
+		return bundleStatus(bundle)
+	case "EvidenceBundle.v0":
+		if cert := firstCertificate(bundle); cert != nil {
+			return cert.Status
+		}
+		return ""
+	default:
+		comp := bundleRegistryComponent{artifactType: artifactType}
+		for _, c := range bundleRegistryComponents(bundle) {
+			if c.artifactType == artifactType {
+				comp = c
+				break
+			}
+		}
+		return comp.status
+	}
+}
+
+func validateRequiredReleaseFields(artifactType string, obj any, fields []string) error {
+	if len(fields) == 0 || obj == nil {
+		return nil
+	}
+	for _, field := range fields {
+		if !jsonFieldPresent(obj, field) {
+			return fmt.Errorf("required release field %q missing for %s", field, artifactType)
+		}
+	}
+	return nil
+}
+
+func validateManifestEntryRequiredFields(artifactName string, entry ManifestArtifactEntry, fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	for _, field := range fields {
+		if !manifestPinSupportsRequiredField(field) {
+			continue
+		}
+		if !manifestEntryHasReleaseField(entry, field) {
+			return fmt.Errorf("required release field %q missing for manifest artifact %s (%s)", field, artifactName, entry.ArtifactType)
+		}
+	}
+	return nil
+}
+
+func manifestPinSupportsRequiredField(field string) bool {
+	switch field {
+	case "producer", "source_repo", "source_commit", "sha256", "schema", "artifact_type", "schema_version":
+		return true
+	default:
+		return false
+	}
+}
+
+func manifestEntryHasReleaseField(entry ManifestArtifactEntry, field string) bool {
+	switch field {
+	case "schema_version", "schema":
+		return strings.TrimSpace(entry.Schema) != ""
+	case "artifact_type":
+		return strings.TrimSpace(entry.ArtifactType) != ""
+	default:
+		return jsonFieldPresent(entry, field)
+	}
+}
+
+func jsonFieldPresent(obj any, field string) bool {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return false
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return false
+	}
+	v, ok := m[field]
+	if !ok {
+		return false
+	}
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s) != ""
+	}
+	return v != nil
 }

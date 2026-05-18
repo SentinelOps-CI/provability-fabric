@@ -12,6 +12,14 @@ import (
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
+func TestReleaseModeRequiresHandoffManifest(t *testing.T) {
+	TestReleaseModeRequiresHandoff(t)
+}
+
+func TestReleaseModeRequiresArtifactRegistry(t *testing.T) {
+	TestReleaseModeRequiresRegistry(t)
+}
+
 func TestReleaseModeRequiresHandoff(t *testing.T) {
 	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
 	bundle, err := pcs.LoadScienceClaimBundle(path)
@@ -56,6 +64,88 @@ func TestReleaseModeRequiresRegistry(t *testing.T) {
 	}
 }
 
+func TestReleaseModeRejectsLegacyPFHandoff(t *testing.T) {
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyPath := labtrustReleaseFixture(t, "pf_handoff.json")
+	loaded, err := pcs.LoadHandoff(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !loaded.IsLegacy() {
+		t.Fatal("expected legacy pf_handoff fixture")
+	}
+	manifest := loadReleaseManifest(t)
+	opts := pcs.ValidateOptions{
+		RepoRoot:        repoRoot(t),
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    manifest.PFSourceCommit,
+		ReleaseMode:     true,
+		Handoff:         loaded,
+		Registry:        loadArtifactRegistry(t),
+	}
+	_, err = pcs.VerifyScienceClaimBundle(path, bundle, opts)
+	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeLegacyHandoffForbiddenInReleaseMode) {
+		t.Fatalf("expected legacy handoff forbidden, got %v", err)
+	}
+}
+
+func TestLocalDevStillAcceptsLegacyHandoffWithWarning(t *testing.T) {
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyPath := labtrustReleaseFixture(t, "pf_handoff.json")
+	loaded, err := pcs.LoadHandoff(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := loadReleaseManifest(t)
+	opts := pcs.ValidateOptions{
+		RepoRoot:        repoRoot(t),
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    manifest.PFSourceCommit,
+		ReleaseMode:     false,
+		Handoff:         loaded,
+	}
+	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pcs.VerificationPassed(result) {
+		t.Fatalf("expected legacy handoff verify to pass outside release mode: %s", result.Status)
+	}
+	if pcs.LegacyHandoffWarning == "" {
+		t.Fatal("expected legacy handoff warning constant")
+	}
+}
+
+func TestRegistryWrongProducerRejected(t *testing.T) {
+	TestPFRejectsWrongProducerForTraceCertificate(t)
+}
+
+func TestRegistryDisallowedStatusRejected(t *testing.T) {
+	TestPFRejectsStatusNotAllowedByRegistry(t)
+}
+
+func TestRegistryMissingRequiredFieldRejected(t *testing.T) {
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle.SourceCommit = ""
+	registry := loadArtifactRegistry(t)
+	err = pcs.ValidateBundleAgainstRegistry(bundle, registry, pcs.RegistryValidateOptions{ReleaseMode: true})
+	if err == nil || !strings.Contains(err.Error(), "required release field") {
+		t.Fatalf("expected missing required field rejection, got %v", err)
+	}
+}
+
 func TestHandoffBundleHashMismatchRejected(t *testing.T) {
 	loaded, err := pcs.LoadHandoff(validHandoffManifestPath(t))
 	if err != nil {
@@ -66,14 +156,6 @@ func TestHandoffBundleHashMismatchRejected(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "certified_bundle_hash mismatch") {
 		t.Fatalf("unexpected: %v", err)
 	}
-}
-
-func TestRegistryWrongProducerRejected(t *testing.T) {
-	TestPFRejectsWrongProducerForTraceCertificate(t)
-}
-
-func TestRegistryDisallowedStatusRejected(t *testing.T) {
-	TestPFRejectsStatusNotAllowedByRegistry(t)
 }
 
 func TestReleaseChainResultValidatesAgainstPCSCore(t *testing.T) {
@@ -91,29 +173,61 @@ func TestReleaseChainResultContainsRegistryChecks(t *testing.T) {
 		RepoRoot:         repoRoot(t),
 		ArtifactDir:      artifactDir,
 		ValidatorVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:       loadReleaseManifest(t).PFSourceCommit,
-		Registry:           loadArtifactRegistry(t),
-		ReleaseMode:        true,
+		SourceCommit:     loadReleaseManifest(t).PFSourceCommit,
+		Registry:         loadArtifactRegistry(t),
+		ReleaseMode:      true,
 	}
 	result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, id := range pcs.RequiredReleaseChainCheckIDs {
-		if id == "registry_admission_passed" {
-			found = true
-		}
+	required := append([]string{}, pcs.RequiredReleaseChainCheckIDs...)
+	for _, id := range required {
+		found := false
 		for _, c := range result.Checks {
 			if c.CheckID == id {
-				goto next
+				found = true
+				break
 			}
 		}
-		t.Fatalf("missing required release chain check %q", id)
-	next:
+		if !found {
+			t.Fatalf("missing required release chain check %q", id)
+		}
 	}
-	if !found {
-		t.Fatal("registry_admission_passed must be a required check id")
+	for _, id := range pcs.RegistryReleaseChainCheckIDs {
+		found := false
+		for _, c := range result.Checks {
+			if c.CheckID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing registry release chain check %q", id)
+		}
+	}
+}
+
+func TestPFExplainFailureContainsRepairCommand(t *testing.T) {
+	TestPFExplainFailureOutputsRepairHint(t)
+}
+
+func TestPFExplainReleaseChainContainsRepairCommand(t *testing.T) {
+	result := pcs.ReleaseChainValidationResult{
+		Status: "Rejected",
+		Checks: []pcs.ReleaseValidationCheck{{
+			CheckID:     "manifest_hashes_match",
+			Description: "All manifest artifact hashes match on-disk files",
+			Status:      "failed",
+			Details:     map[string]any{"failure_code": "PCS_MANIFEST_HASH_MISMATCH"},
+		}},
+	}
+	explanations := pcs.ExplainReleaseChainFailures(result)
+	if len(explanations) == 0 || explanations[0].RepairHint == "" {
+		t.Fatal("expected release-chain repair hint")
+	}
+	if !strings.Contains(pcs.FormatFailureExplanations(explanations), "regenerate:") {
+		t.Fatal("expected regenerate command in release-chain explain output")
 	}
 }
 
@@ -136,6 +250,9 @@ func TestPFExplainFailureOutputsRepairHint(t *testing.T) {
 	}
 	if explanations[0].RepairHint == "" {
 		t.Fatal("repair hint must not be empty")
+	}
+	if explanations[0].RegenerateCmd == "" && !strings.Contains(pcs.FormatFailureExplanations(explanations), "regenerate:") {
+		t.Fatal("expected regenerate command in explain output")
 	}
 }
 

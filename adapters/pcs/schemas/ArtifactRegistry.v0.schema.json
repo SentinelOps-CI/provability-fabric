@@ -22,7 +22,9 @@
       "required": [
         "artifact_type",
         "schema",
-        "producer",
+        "schema_owner",
+        "runtime_producer",
+        "allowed_runtime_producers",
         "allowed_statuses",
         "required_release_fields",
         "semantic_checks",
@@ -34,7 +36,18 @@
       "properties": {
         "artifact_type": { "type": "string", "minLength": 1 },
         "schema": { "type": "string", "minLength": 1 },
-        "producer": { "type": "string", "minLength": 1 },
+        "schema_owner": { "type": "string", "minLength": 1 },
+        "runtime_producer": { "type": "string", "minLength": 1 },
+        "allowed_runtime_producers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Deprecated alias for runtime_producer on emitted artifacts."
+        },
         "allowed_statuses": {
           "type": "array",
           "minItems": 1,
@@ -46,7 +59,7 @@
         },
         "semantic_checks": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "$ref": "common.defs.json#/$defs/registry_semantic_check" }
         },
         "consumer_repos": {
           "type": "array",

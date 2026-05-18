@@ -27,7 +27,7 @@ type ManifestArtifactEntry struct {
 	LocalDev      bool   `json:"local_dev,omitempty"`
 }
 
-// ReleaseManifest is ReleaseManifest.v0 (serves as artifact registry for PF admission).
+// ReleaseManifest is ReleaseManifest.v0 (artifact pins and producer commits for release-chain verify).
 type ReleaseManifest struct {
 	SchemaVersion     string                           `json:"schema_version"`
 	ReleaseID         string                           `json:"release_id"`

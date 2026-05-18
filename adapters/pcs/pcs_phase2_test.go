@@ -333,7 +333,9 @@ func TestPFExecutesRegistrySemanticChecks(t *testing.T) {
 	registry := minimalRegistryForBundle(t)
 	for key, entry := range registry.Entries {
 		if entry.ArtifactType == "ScienceClaimBundle.v0" {
-			entry.SemanticChecks = []string{"embedded_bundle_passes_science_claim_semantics"}
+			entry.SemanticChecks = pcs.RegistrySemanticChecks{
+				{CheckID: "embedded_bundle_passes_science_claim_semantics"},
+			}
 			registry.Entries[key] = entry
 			break
 		}

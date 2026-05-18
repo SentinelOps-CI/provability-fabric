@@ -99,6 +99,9 @@ func scienceClaimVerifyCmd() *cobra.Command {
 				printVerificationFailures(result)
 				return cliExit(ExitVerificationFailed, fmt.Errorf("verification failed"))
 			}
+			if adm.Handoff != nil && adm.Handoff.IsLegacy() && !adm.Policy.ReleaseMode {
+				fmt.Fprintln(os.Stderr, pcs.LegacyHandoffWarning)
+			}
 			return nil
 		},
 	}

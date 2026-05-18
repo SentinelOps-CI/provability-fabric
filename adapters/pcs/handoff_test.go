@@ -30,9 +30,13 @@ func signWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	opts := releaseModeValidateOpts(t)
-	opts.RepoRoot = root
-	opts.Handoff = loadedLegacyHandoff(handoff)
+	opts := pcs.ValidateOptions{
+		RepoRoot:        root,
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    manifest.PFSourceCommit,
+		ReleaseMode:     false,
+		Handoff:         loadedLegacyHandoff(handoff),
+	}
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		return err
@@ -41,7 +45,7 @@ func signWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 		return fmt.Errorf("verify status=%s", result.Status)
 	}
 	_, err = pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
-		ReleaseMode: true,
+		ReleaseMode: false,
 		BundlePath:  path,
 		Handoff:     loadedLegacyHandoff(handoff),
 	})

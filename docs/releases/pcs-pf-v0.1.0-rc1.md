@@ -107,12 +107,14 @@ export PF_RELEASE_MODE=1 PF_DETERMINISTIC=1
 
 go -C core/cli/pf run . verify science-claim \
   tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json \
-  --handoff ../LabTrust-Gym/examples/pcs_qc_release/release/pf_handoff.json \
+  --handoff tests/pcs/fixtures/labtrust-release/handoff_to_pf.json \
+  --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
   --release-mode --out /tmp/verification_result.json
 
 go -C core/cli/pf run . sign science-claim \
   tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json \
-  --handoff ../LabTrust-Gym/examples/pcs_qc_release/release/pf_handoff.json \
+  --handoff tests/pcs/fixtures/labtrust-release/handoff_to_pf.json \
+  --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
   --release-mode --out /tmp/signed_science_claim_bundle.json
 ```
 

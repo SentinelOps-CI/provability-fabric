@@ -52,12 +52,14 @@ In **release mode**, PF is the release-chain admission controller. Handoff and r
 
 | Flag | Artifact | Required in release mode |
 |------|----------|--------------------------|
-| `--handoff` | `HandoffManifest.v0` (or legacy `pf_handoff.json`) | Yes, unless `--allow-missing-handoff-for-local-dev` |
+| `--handoff` | `HandoffManifest.v0` only (`pf_handoff.json` forbidden) | Yes, unless `--allow-missing-handoff-for-local-dev` |
 | `--registry` | `ArtifactRegistry.v0` | Yes (defaults to `PCS_CORE_PATH/examples/artifact_registry.valid.json`) |
 | `--manifest` | `ReleaseManifest.v0` | When writing `--release-chain-result` |
 | `--release-chain-result` | Output `ReleaseChainValidationResult.v0` | Optional |
 
 Do **not** pass `ReleaseManifest.v0` to `--registry`; use `--manifest` for release-chain verify.
+
+Legacy `pf_handoff.json` is accepted only outside `--release-mode` (a warning is printed). Release mode fails with `legacy_handoff_forbidden_in_release_mode`.
 
 ```bash
 export PF_SOURCE_COMMIT="$(git rev-parse HEAD)"
@@ -81,7 +83,7 @@ pf explain failure verification_result.json
 pf explain release-chain release_chain_validation_result.json
 ```
 
-Release-chain validation emits schema-valid `ReleaseChainValidationResult.v0` with check IDs including: `manifest_hashes_match`, `producer_commits_match`, `certificate_id_consistent`, `trace_hash_consistent`, `signed_input_bundle_hash_match`, `scientific_memory_import_passed`, `registry_admission_passed`.
+Release-chain validation emits schema-valid `ReleaseChainValidationResult.v0` with check IDs including: `manifest_hashes_match`, `producer_commits_match`, `certificate_id_consistent`, `trace_hash_consistent`, `signed_input_bundle_hash_match`, `scientific_memory_import_passed`, `registry_artifact_registered`, `registry_schema_matches`, `registry_producer_allowed`, `registry_status_allowed`, `registry_required_fields_present`, `registry_semantic_checks_executed`, and `registry_admission_passed`.
 
 ## Seventeen required checks
 

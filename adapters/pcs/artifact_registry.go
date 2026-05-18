@@ -11,14 +11,46 @@ import (
 	"strings"
 )
 
+// RegistrySemanticCheckRef is a pcs-core registry semantic check entry.
+type RegistrySemanticCheckRef struct {
+	CheckID              string `json:"check_id"`
+	Severity             string `json:"severity,omitempty"`
+	ResponsibleComponent string `json:"responsible_component,omitempty"`
+}
+
+// RegistrySemanticChecks unmarshals semantic_checks as check refs or legacy string ids.
+type RegistrySemanticChecks []RegistrySemanticCheckRef
+
+// UnmarshalJSON accepts either ["check_id"] or [{"check_id":"..."}] from pcs-core.
+func (s *RegistrySemanticChecks) UnmarshalJSON(data []byte) error {
+	var ids []string
+	if err := json.Unmarshal(data, &ids); err == nil {
+		out := make(RegistrySemanticChecks, len(ids))
+		for i, id := range ids {
+			out[i] = RegistrySemanticCheckRef{CheckID: id}
+		}
+		*s = out
+		return nil
+	}
+	var refs []RegistrySemanticCheckRef
+	if err := json.Unmarshal(data, &refs); err != nil {
+		return err
+	}
+	*s = refs
+	return nil
+}
+
 // RegistryEntry is one ArtifactRegistry.v0 entries map value.
 type RegistryEntry struct {
-	ArtifactType          string   `json:"artifact_type"`
-	Schema                string   `json:"schema"`
-	Producer              string   `json:"producer"`
-	AllowedStatuses       []string `json:"allowed_statuses"`
-	RequiredReleaseFields []string `json:"required_release_fields"`
-	SemanticChecks        []string `json:"semantic_checks"`
+	ArtifactType            string                 `json:"artifact_type"`
+	Schema                  string                 `json:"schema"`
+	SchemaOwner             string                 `json:"schema_owner,omitempty"`
+	RuntimeProducer         string                 `json:"runtime_producer,omitempty"`
+	AllowedRuntimeProducers []string               `json:"allowed_runtime_producers,omitempty"`
+	Producer                string                 `json:"producer"`
+	AllowedStatuses         []string               `json:"allowed_statuses"`
+	RequiredReleaseFields   []string               `json:"required_release_fields"`
+	SemanticChecks          RegistrySemanticChecks `json:"semantic_checks"`
 }
 
 // ArtifactRegistry is ArtifactRegistry.v0 from pcs-core.

@@ -23,6 +23,7 @@ const (
 	ReasonIllegalStatusTransition    = "PCS_ILLEGAL_STATUS_TRANSITION"
 	ReasonRegistryAdmissionFailed    = "PCS_REGISTRY_ADMISSION_FAILED"
 	ReasonHandoffInvalid             = "PCS_HANDOFF_INVALID"
+	ReasonLegacyHandoffForbidden     = "legacy_handoff_forbidden_in_release_mode"
 )
 
 func withReason(code string, details map[string]any) map[string]any {

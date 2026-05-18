@@ -45,6 +45,22 @@
         }
       }
     },
+    "component_version": { "type": "string", "minLength": 1 },
+    "generated_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "upstream_release_manifest": { "$ref": "common.defs.json#/$defs/manifest_path_ref" },
+    "handoff_artifacts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "validation_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "minLength": 1 },
+        "checks_passed": { "type": "integer", "minimum": 0 },
+        "checks_failed": { "type": "integer", "minimum": 0 }
+      }
+    },
     "signature_or_digest": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$"
