@@ -1,6 +1,7 @@
 {
   "bundle_id": "scb-tool-use-hash-mismatch-v0",
   "schema_version": "v0",
+  "workflow_id": "agent_tool_use.safety_v0",
   "tool_use_trace": {
     "schema_version": "v0",
     "trace_id": "trace-agent-003",
@@ -14,5 +15,17 @@
     "tool_trace_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
     "producer": "ToolUse-Safety"
   },
+  "runtime_receipts": [
+    {
+      "receipt_id": "rr-agent-003",
+      "schema_version": "v0",
+      "run_id": "run-003",
+      "status": "completed",
+      "trace_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "policy_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "producer": "Agent-Runtime",
+      "source_commit": "dddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
   "producer": "Agent-Runtime"
 }

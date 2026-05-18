@@ -19,6 +19,9 @@ const (
 type ScienceClaimBundle struct {
 	BundleID            string               `json:"bundle_id"`
 	SchemaVersion       string               `json:"schema_version"`
+	WorkflowID          string               `json:"workflow_id,omitempty"`
+	ToolUseTrace        *ToolUseTraceV0      `json:"tool_use_trace,omitempty"`
+	ToolUseCertificate  *ToolUseCertificateV0 `json:"tool_use_certificate,omitempty"`
 	ClaimArtifact       *ClaimArtifact       `json:"claim_artifact"`
 	AssumptionSet       *AssumptionSet       `json:"assumption_set"`
 	RuntimeReceipts     []*RuntimeReceipt    `json:"runtime_receipts"`

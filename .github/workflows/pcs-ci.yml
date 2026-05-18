@@ -282,24 +282,30 @@ jobs:
       - name: Tool-use admission profile rejects incomplete bundles
         run: |
           cd core/cli/pf
-          export PF_RELEASE_MODE=1
           TOOL_USE="$GITHUB_WORKSPACE/tests/pcs/fixtures/tool-use"
+          PROFILE="$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/agent_tool_use_safety.json"
           expect_fail() {
             local fixture="$1"
             local code="$2"
             if go run . verify science-claim "$TOOL_USE/$fixture" \
-              --admission-profile agent_tool_use_safety \
-              --release-mode 2>&1 | tee "$RUNNER_TEMP/tool_use_${fixture}.txt"; then
+              --admission-profile "$PROFILE" 2>&1 | tee "$RUNNER_TEMP/tool_use_${fixture}.txt"; then
               echo "expected $fixture to fail"
               exit 1
             fi
             grep -q "$code" "$RUNNER_TEMP/tool_use_${fixture}.txt"
           }
-          expect_fail incomplete_science_claim_shape.json missing_tool_use_trace
+          expect_fail incomplete_science_claim_shape.json admission_profile_workflow_mismatch
           expect_fail missing_certificate.json missing_tool_use_certificate
           expect_fail rejected_certificate.json tool_use_certificate_rejected
           expect_fail trace_hash_mismatch.json tool_trace_hash_mismatch
+          expect_fail policy_hash_mismatch.json policy_hash_mismatch
           expect_fail unauthorized_violation.json unauthorized_tool_call_certificate_violation
+          if go run . verify science-claim "$TOOL_USE/missing_certificate.json" \
+            --admission-profile "$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/labtrust_qc_release.json" 2>&1 | tee "$RUNNER_TEMP/tool_use_wrong_profile.txt"; then
+            echo "expected wrong admission profile to fail"
+            exit 1
+          fi
+          grep -q admission_profile_workflow_mismatch "$RUNNER_TEMP/tool_use_wrong_profile.txt"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

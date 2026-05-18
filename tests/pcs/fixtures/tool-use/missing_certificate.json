@@ -1,12 +1,25 @@
 {
   "bundle_id": "scb-tool-use-missing-cert-v0",
   "schema_version": "v0",
+  "workflow_id": "agent_tool_use.safety_v0",
   "tool_use_trace": {
     "schema_version": "v0",
     "trace_id": "trace-agent-001",
     "tool_trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "producer": "Agent-Runtime"
   },
+  "runtime_receipts": [
+    {
+      "receipt_id": "rr-agent-001",
+      "schema_version": "v0",
+      "run_id": "run-001",
+      "status": "completed",
+      "trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "producer": "Agent-Runtime",
+      "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
   "producer": "Agent-Runtime",
   "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 }

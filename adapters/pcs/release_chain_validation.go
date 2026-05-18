@@ -550,6 +550,13 @@ func buildReleaseChainResult(
 	if failureCodes == nil {
 		failureCodes = []string{}
 	}
+	checks = finalizeReleaseChainChecks(checks, opts.AdmissionProfile)
+	status = StatusProofChecked
+	for _, c := range checks {
+		if c.Status == "failed" {
+			status = StatusRejected
+		}
+	}
 	result := ReleaseChainValidationResult{
 		SchemaVersion:    SchemaVersionV0,
 		ValidationID:     "validation-" + manifest.ReleaseID,

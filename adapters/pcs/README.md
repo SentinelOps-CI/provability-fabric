@@ -8,7 +8,7 @@ Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts for 
 - Reject legacy singular-field PF bundles at load and schema validation
 - Run 17 consistency, provenance, registry, and status-transition checks
 - Enforce release-mode admission: mandatory admission profile, `HandoffManifest.v0`, and `ArtifactRegistry.v0`
-- Load workflow admission profiles from `admission_profiles/` (`labtrust_qc_release`, `agent_tool_use_safety`)
+- Load workflow admission profiles from `admission_profiles/` (`schema.json`, `labtrust_qc_release`, `agent_tool_use_safety`)
 - Emit schema-valid `ReleaseChainValidationResult.v0` with stable release-chain check IDs
 - Emit `VerificationResult.v0` with `ProofChecked` / `Rejected` status
 - Build `SignedScienceClaimBundle.v0` wrappers for Scientific Memory import

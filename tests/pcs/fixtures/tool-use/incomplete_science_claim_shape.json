@@ -1,6 +1,7 @@
 {
   "bundle_id": "scb-tool-use-incomplete-v0",
   "schema_version": "v0",
+  "workflow_id": "labtrust.qc_release_v0",
   "claim_artifact": {
     "artifact_id": "claim-1",
     "artifact_type": "ClaimArtifact.v0",

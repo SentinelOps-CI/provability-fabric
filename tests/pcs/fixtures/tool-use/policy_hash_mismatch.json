@@ -1,0 +1,32 @@
+{
+  "bundle_id": "scb-tool-use-policy-mismatch-v0",
+  "schema_version": "v0",
+  "workflow_id": "agent_tool_use.safety_v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-005",
+    "tool_trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "producer": "Agent-Runtime"
+  },
+  "tool_use_certificate": {
+    "schema_version": "v0",
+    "certificate_id": "cert-tool-005",
+    "status": "CertificateChecked",
+    "tool_trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "policy_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "producer": "ToolUse-Safety"
+  },
+  "runtime_receipts": [
+    {
+      "receipt_id": "rr-agent-005",
+      "schema_version": "v0",
+      "run_id": "run-005",
+      "status": "completed",
+      "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "policy_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "producer": "Agent-Runtime",
+      "source_commit": "ffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "producer": "Agent-Runtime"
+}

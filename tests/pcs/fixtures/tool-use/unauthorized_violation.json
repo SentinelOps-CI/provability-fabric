@@ -1,6 +1,7 @@
 {
   "bundle_id": "scb-tool-use-unauthorized-v0",
   "schema_version": "v0",
+  "workflow_id": "agent_tool_use.safety_v0",
   "tool_use_trace": {
     "schema_version": "v0",
     "trace_id": "trace-agent-004",
@@ -16,5 +17,17 @@
     "authorized_tool_calls": ["read_file"],
     "producer": "ToolUse-Safety"
   },
+  "runtime_receipts": [
+    {
+      "receipt_id": "rr-agent-004",
+      "schema_version": "v0",
+      "run_id": "run-004",
+      "status": "completed",
+      "trace_hash": "sha256:3333333333333333333333333333333333333333333331111111111111111",
+      "policy_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "producer": "Agent-Runtime",
+      "source_commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
   "producer": "Agent-Runtime"
 }

@@ -240,6 +240,20 @@ func responsibleComponentForReason(code string) string {
 }
 
 func defaultVerificationRepair(code, desc string) string {
+	switch code {
+	case FailureCodeMissingAdmissionProfile:
+		return "Pass --admission-profile adapters/pcs/admission_profiles/labtrust_qc_release.json (or agent_tool_use_safety.json) with --release-mode."
+	case FailureCodeUnknownAdmissionProfile:
+		return "Use a built-in profile id (labtrust_qc_release, agent_tool_use_safety) or a path to a valid AdmissionProfile.v0 JSON file."
+	case FailureCodeAdmissionProfileWorkflowMismatch:
+		return "Select the admission profile that matches the bundle workflow_id (labtrust.qc_release_v0 vs agent_tool_use.safety_v0)."
+	case FailureCodeAdmissionProfileRequiredArtifactMissing:
+		return "Regenerate the bundle so all artifacts listed in the admission profile are present and typed correctly."
+	case FailureCodeMissingToolUseTrace, FailureCodeMissingToolUseCertificate:
+		return "Attach ToolUseTrace.v0 and ToolUseCertificate.v0 to the ScienceClaimBundle before release admission."
+	case FailureCodePolicyHashMismatch:
+		return "Align ToolUseCertificate.v0.policy_hash with RuntimeReceipt.v0.policy_hash in the certified bundle."
+	}
 	if code != "" {
 		return fmt.Sprintf("Resolve %s: %s", code, desc)
 	}

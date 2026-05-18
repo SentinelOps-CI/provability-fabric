@@ -1,14 +1,23 @@
 {
   "profile_id": "agent_tool_use_safety",
-  "description": "Agent tool-use safety admission skeleton (full release not implemented)",
-  "accepted_bundle_artifact": "ToolUseScienceClaimBundle.v0",
-  "required_runtime_artifacts": ["ToolUseTrace.v0"],
-  "required_certificate_artifacts": ["ToolUseCertificate.v0"],
-  "required_handoff_kinds": ["tool_trace_to_verifier"],
+  "workflow_id": "agent_tool_use.safety_v0",
+  "description": "Agent tool-use safety admission (skeleton until full workflow artifacts ship)",
+  "accepted_bundle_artifact": "ScienceClaimBundle.v0",
+  "required_runtime_artifacts": [
+    "ToolUseTrace.v0",
+    "RuntimeReceipt.v0"
+  ],
+  "required_certificate_artifacts": [
+    "ToolUseCertificate.v0"
+  ],
+  "required_handoff_kinds": [
+    "bundle_to_verifier"
+  ],
   "required_registry_checks": [
     "tool_trace_hash_matches_certificate",
-    "tool_use_certificate_not_rejected",
-    "authorized_tool_calls_only"
+    "policy_hash_matches_certificate",
+    "certificate_status_checked_for_release",
+    "no_unauthorized_tool_calls"
   ],
   "status_policy": "tool_use_safety_v0.1",
   "signature_policy": "digest_v0",

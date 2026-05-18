@@ -62,16 +62,8 @@ func enrichFailedReleaseCheck(c ReleaseValidationCheck) ReleaseValidationCheck {
 }
 
 func finalizeReleaseChainChecks(checks []ReleaseValidationCheck, profile *AdmissionProfile) []ReleaseValidationCheck {
-	checks = EnrichReleaseChecksWithAudit(checks)
-	if profile != nil {
-		if err := ValidateProfileRequiredRegistryChecks(profile, checks); err != nil {
-			checks = append(checks, releaseFailCheck("admission_profile_registry_checks",
-				"Admission profile required_registry_checks satisfied",
-				ReasonRegistryAdmissionFailed,
-				map[string]any{"error": err.Error(), "profile_id": profile.ProfileID}))
-		}
-	}
-	return checks
+	checks = AppendAdmissionProfileChecks(checks, profile)
+	return EnrichReleaseChecksWithAudit(checks)
 }
 
 // ExplainReleaseChainReport is the JSON shape for pf explain release-chain --json.

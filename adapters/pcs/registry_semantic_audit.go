@@ -128,6 +128,30 @@ var registrySemanticDeferralCatalog = map[string]RegistrySemanticDeferral{
 		ReleaseModeAllowed:   true,
 		ResponsibleComponent: ComponentProvabilityFabric,
 	},
+	"tool_trace_hash_matches_certificate": {
+		Reason:               "PF tool-use admission compares ToolUseTrace.v0 and ToolUseCertificate.v0 tool_trace_hash fields",
+		EnforcedBy:           "admission_profile_enforcement",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentProvabilityFabric,
+	},
+	"policy_hash_matches_certificate": {
+		Reason:               "PF tool-use admission compares ToolUseCertificate.v0.policy_hash to RuntimeReceipt.v0.policy_hash",
+		EnforcedBy:           "admission_profile_enforcement",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentProvabilityFabric,
+	},
+	"certificate_status_checked_for_release": {
+		Reason:               "PF tool-use admission rejects ToolUseCertificate.v0 with status Rejected",
+		EnforcedBy:           "admission_profile_enforcement",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentProvabilityFabric,
+	},
+	"no_unauthorized_tool_calls": {
+		Reason:               "PF tool-use admission inspects ToolUseCertificate.v0 violations and unauthorized tool call entries",
+		EnforcedBy:           "admission_profile_enforcement",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentProvabilityFabric,
+	},
 }
 
 // RegistrySemanticAuditContext inputs for per-check registry semantic audit records.

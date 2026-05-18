@@ -1,5 +1,6 @@
 {
   "profile_id": "labtrust_qc_release",
+  "workflow_id": "labtrust.qc_release_v0",
   "description": "LabTrust-Gym QC release: certified ScienceClaimBundle with TraceCertificate.v0",
   "accepted_bundle_artifact": "ScienceClaimBundle.v0",
   "required_runtime_artifacts": ["RuntimeReceipt.v0"],

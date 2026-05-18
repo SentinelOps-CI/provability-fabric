@@ -20,14 +20,15 @@ type StatusPolicy string
 type RepairHintPolicy string
 
 const (
-	StatusPolicyLabtrustReleaseV01  StatusPolicy = "labtrust_release_v0.1"
-	StatusPolicyToolUseSafetyV01     StatusPolicy = "tool_use_safety_v0.1"
+	StatusPolicyLabtrustReleaseV01 StatusPolicy     = "labtrust_release_v0.1"
+	StatusPolicyToolUseSafetyV01   StatusPolicy     = "tool_use_safety_v0.1"
 	RepairHintPolicyOperationalV0  RepairHintPolicy = "operational_v0"
 )
 
 // AdmissionProfile defines PF admission policy for a PCS workflow.
 type AdmissionProfile struct {
 	ProfileID                    string   `json:"profile_id"`
+	WorkflowID                   string   `json:"workflow_id"`
 	Description                  string   `json:"description,omitempty"`
 	AcceptedBundleArtifact       string   `json:"accepted_bundle_artifact"`
 	AcceptedBundleArtifactType   string   `json:"accepted_bundle_artifact_type,omitempty"`
@@ -61,13 +62,16 @@ func (p *AdmissionProfile) normalize() {
 	}
 }
 
-// IsToolUseProfile reports whether this profile targets tool-use bundles.
+// IsToolUseProfile reports whether this profile targets the agent tool-use workflow.
 func (p *AdmissionProfile) IsToolUseProfile() bool {
 	if p == nil {
 		return false
 	}
 	p.normalize()
-	return p.AcceptedBundleArtifact == "ToolUseScienceClaimBundle.v0"
+	if strings.HasPrefix(p.WorkflowID, "agent_tool_use") {
+		return true
+	}
+	return p.StatusPolicy == string(StatusPolicyToolUseSafetyV01)
 }
 
 // AdmissionProfileFromEnv loads PF_ADMISSION_PROFILE when set.
@@ -83,7 +87,7 @@ func AdmissionProfileFromEnv() (*AdmissionProfile, error) {
 func ResolveAdmissionProfile(explicitRef string) (*AdmissionProfile, error) {
 	ref := normalizeProfileRef(explicitRef)
 	if ref != "" {
-		return LoadAdmissionProfile(ref)
+		return loadAdmissionProfileRef(ref)
 	}
 	return AdmissionProfileFromEnv()
 }
@@ -100,7 +104,7 @@ func ResolveAdmissionProfileForReleaseMode(explicitRef string, releaseMode bool)
 	if ref == "" {
 		return nil, fmt.Errorf("%s: --admission-profile is required in release mode (or set PF_ADMISSION_PROFILE)", FailureCodeMissingAdmissionProfile)
 	}
-	profile, err := LoadAdmissionProfile(ref)
+	profile, err := loadAdmissionProfileRef(ref)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", FailureCodeUnknownAdmissionProfile, err)
 	}
@@ -110,7 +114,26 @@ func ResolveAdmissionProfileForReleaseMode(explicitRef string, releaseMode bool)
 func normalizeProfileRef(ref string) string {
 	ref = strings.TrimSpace(ref)
 	ref = strings.TrimSuffix(ref, ".json")
+	if strings.Contains(ref, "/") || strings.Contains(ref, "\\") {
+		ref = filepath.Base(ref)
+	}
 	return ref
+}
+
+func looksLikeProfilePath(ref string) bool {
+	ref = strings.TrimSpace(ref)
+	return strings.Contains(ref, "/") || strings.Contains(ref, "\\") ||
+		(strings.HasSuffix(ref, ".json") && ref != "schema.json")
+}
+
+func loadAdmissionProfileRef(ref string) (*AdmissionProfile, error) {
+	original := strings.TrimSpace(ref)
+	if looksLikeProfilePath(original) {
+		if profile, err := LoadAdmissionProfileFromPath(original); err == nil {
+			return profile, nil
+		}
+	}
+	return LoadAdmissionProfile(ref)
 }
 
 // LoadAdmissionProfile loads a built-in admission profile by id or filename stem.
@@ -118,6 +141,9 @@ func LoadAdmissionProfile(profileRef string) (*AdmissionProfile, error) {
 	id := normalizeProfileRef(profileRef)
 	if id == "" {
 		return nil, fmt.Errorf("admission profile id is required")
+	}
+	if id == "schema" {
+		return nil, fmt.Errorf("%s: %q is not an admission profile", FailureCodeUnknownAdmissionProfile, profileRef)
 	}
 	candidates := []string{
 		"admission_profiles/" + id + ".json",
@@ -127,6 +153,9 @@ func LoadAdmissionProfile(profileRef string) (*AdmissionProfile, error) {
 	var data []byte
 	var err error
 	for _, path := range candidates {
+		if strings.HasSuffix(path, "schema.json") {
+			continue
+		}
 		data, err = admissionProfileFS.ReadFile(path)
 		if err == nil {
 			break
@@ -135,13 +164,30 @@ func LoadAdmissionProfile(profileRef string) (*AdmissionProfile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: profile %q not found in built-in admission_profiles", FailureCodeUnknownAdmissionProfile, id)
 	}
+	return parseAdmissionProfileJSON(data, id)
+}
+
+// LoadAdmissionProfileFromPath loads profile JSON from an external file (for tests/overrides).
+func LoadAdmissionProfileFromPath(path string) (*AdmissionProfile, error) {
+	resolved, err := ResolveArtifactPath(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("%s: read %s: %w", FailureCodeUnknownAdmissionProfile, filepath.Base(resolved), err)
+	}
+	return parseAdmissionProfileJSON(data, filepath.Base(resolved))
+}
+
+func parseAdmissionProfileJSON(data []byte, ref string) (*AdmissionProfile, error) {
 	var profile AdmissionProfile
 	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, fmt.Errorf("parse admission profile %q: %w", id, err)
+		return nil, fmt.Errorf("%s: parse admission profile %q: %w", FailureCodeUnknownAdmissionProfile, ref, err)
 	}
 	profile.normalize()
 	if profile.ProfileID == "" {
-		profile.ProfileID = id
+		profile.ProfileID = normalizeProfileRef(ref)
 	}
 	if err := ValidateAdmissionProfile(&profile); err != nil {
 		return nil, err
@@ -149,7 +195,7 @@ func LoadAdmissionProfile(profileRef string) (*AdmissionProfile, error) {
 	return &profile, nil
 }
 
-// ValidateAdmissionProfile checks profile shape.
+// ValidateAdmissionProfile checks profile shape against AdmissionProfile.v0 schema rules.
 func ValidateAdmissionProfile(p *AdmissionProfile) error {
 	if p == nil {
 		return fmt.Errorf("admission profile is nil")
@@ -158,8 +204,14 @@ func ValidateAdmissionProfile(p *AdmissionProfile) error {
 	if strings.TrimSpace(p.ProfileID) == "" {
 		return fmt.Errorf("admission profile missing profile_id")
 	}
+	if strings.TrimSpace(p.WorkflowID) == "" {
+		return fmt.Errorf("admission profile %q missing workflow_id", p.ProfileID)
+	}
 	if strings.TrimSpace(p.AcceptedBundleArtifact) == "" {
 		return fmt.Errorf("admission profile %q missing accepted_bundle_artifact", p.ProfileID)
+	}
+	if len(p.RequiredRuntimeArtifacts) == 0 {
+		return fmt.Errorf("admission profile %q missing required_runtime_artifacts", p.ProfileID)
 	}
 	if len(p.RequiredHandoffKinds) == 0 {
 		return fmt.Errorf("admission profile %q missing required_handoff_kinds", p.ProfileID)
@@ -182,8 +234,15 @@ func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundl
 		return nil
 	}
 	profile.normalize()
+	if bundle == nil && strings.TrimSpace(bundlePath) != "" {
+		loaded, err := LoadScienceClaimBundle(bundlePath)
+		if err != nil {
+			return err
+		}
+		bundle = loaded
+	}
 	if profile.IsToolUseProfile() {
-		return enforceAgentToolUseSafetyProfile(profile, bundlePath)
+		return enforceAgentToolUseSafetyProfile(profile, bundle, handoff)
 	}
 	return enforceLabtrustQCProfile(profile, bundle, handoff)
 }
@@ -192,31 +251,38 @@ func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBun
 	if bundle == nil {
 		return fmt.Errorf("%s: profile %q requires a science claim bundle", FailureCodeReleaseModeBundleRequired, profile.ProfileID)
 	}
+	if err := validateAdmissionProfileWorkflow(profile, bundle); err != nil {
+		return err
+	}
 	if profile.AcceptedBundleArtifact != "" && profile.AcceptedBundleArtifact != "ScienceClaimBundle.v0" {
-		return fmt.Errorf("%s: profile %q accepts %s only", FailureCodeReleaseModeProfileRejected, profile.ProfileID, profile.AcceptedBundleArtifact)
+		return fmt.Errorf("%s: profile %q accepts %s only", FailureCodeAdmissionProfileWorkflowMismatch, profile.ProfileID, profile.AcceptedBundleArtifact)
+	}
+	if bundle.ToolUseTrace != nil || bundle.ToolUseCertificate != nil {
+		return fmt.Errorf("%s: bundle %q is agent tool-use workflow %q, profile %q expects %q",
+			FailureCodeAdmissionProfileWorkflowMismatch, bundle.BundleID, InferBundleWorkflowID(bundle), profile.ProfileID, profile.WorkflowID)
 	}
 	if err := enforceProfileHandoff(profile, handoff); err != nil {
 		return err
 	}
 	for _, rt := range profile.RequiredRuntimeArtifacts {
 		if rt == "RuntimeReceipt.v0" && bundle.PrimaryRuntimeReceipt() == nil {
-			return fmt.Errorf("%s: profile %q requires %s", FailureCodeReleaseModeCertificateRequired, profile.ProfileID, rt)
+			return requiredArtifactMissing(profile, rt)
 		}
 	}
 	if len(profile.RequiredCertificateArtifacts) == 0 {
 		return nil
 	}
 	if len(bundle.Certificates) == 0 {
-		return fmt.Errorf("%s: profile %q requires certificate types %v", FailureCodeReleaseModeCertificateRequired, profile.ProfileID, profile.RequiredCertificateArtifacts)
+		return requiredArtifactMissing(profile, "TraceCertificate.v0")
 	}
 	cert := firstCertificate(bundle)
 	if cert == nil {
-		return fmt.Errorf("%s: profile %q requires a certificate", FailureCodeReleaseModeCertificateRequired, profile.ProfileID)
+		return requiredArtifactMissing(profile, "TraceCertificate.v0")
 	}
 	for _, required := range profile.RequiredCertificateArtifacts {
 		if required == "TraceCertificate.v0" {
 			if strings.TrimSpace(cert.CertificateID) == "" {
-				return fmt.Errorf("%s: profile %q requires TraceCertificate.v0", FailureCodeReleaseModeCertificateRequired, profile.ProfileID)
+				return requiredArtifactMissing(profile, required)
 			}
 			continue
 		}
@@ -275,10 +341,12 @@ func profileRegistryCheckSatisfied(req string, byID map[string]ReleaseValidation
 		aliases = append(aliases, "certificate_id_consistent")
 	case "signed_input_bundle_hash_matches_certified":
 		aliases = append(aliases, "signed_input_bundle_hash_match", "registry.SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified")
-	case "tool_use_certificate_not_rejected":
-		aliases = append(aliases, "tool_use_certificate_status")
-	case "authorized_tool_calls_only":
-		aliases = append(aliases, "tool_use_authorization")
+	case "policy_hash_matches_certificate":
+		aliases = append(aliases, "tool_use_policy_hash")
+	case "certificate_status_checked_for_release":
+		aliases = append(aliases, "tool_use_certificate_status", "tool_use_certificate_not_rejected")
+	case "no_unauthorized_tool_calls":
+		aliases = append(aliases, "tool_use_authorization", "authorized_tool_calls_only")
 	}
 	for _, id := range aliases {
 		c, ok := byID[id]
@@ -310,23 +378,17 @@ func (p *AdmissionProfile) ProfileEnforcesRegistryCheck(checkID string) bool {
 	return false
 }
 
-// LoadAdmissionProfileFromPath loads profile JSON from an external file (for tests/overrides).
-func LoadAdmissionProfileFromPath(path string) (*AdmissionProfile, error) {
-	resolved, err := ResolveArtifactPath(path)
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(resolved)
-	if err != nil {
-		return nil, fmt.Errorf("%s: read %s: %w", FailureCodeUnknownAdmissionProfile, filepath.Base(resolved), err)
-	}
-	var profile AdmissionProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		return nil, fmt.Errorf("%s: parse %s: %w", FailureCodeUnknownAdmissionProfile, filepath.Base(resolved), err)
+// AppendAdmissionProfileChecks records admission profile selection in RCVR.
+func AppendAdmissionProfileChecks(checks []ReleaseValidationCheck, profile *AdmissionProfile) []ReleaseValidationCheck {
+	if profile == nil {
+		return checks
 	}
 	profile.normalize()
-	if err := ValidateAdmissionProfile(&profile); err != nil {
-		return nil, err
-	}
-	return &profile, nil
+	return append(checks, releasePassCheck("admission_profile_selected",
+		"Admission profile applied to release chain validation",
+		map[string]any{
+			"profile_id":    profile.ProfileID,
+			"workflow_id":   profile.WorkflowID,
+			"status_policy": profile.StatusPolicy,
+		}))
 }
