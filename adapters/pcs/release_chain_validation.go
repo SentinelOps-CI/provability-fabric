@@ -84,15 +84,16 @@ func VerifyReleaseChainFromManifest(manifestPath string, opts ReleaseChainVerify
 	if err != nil {
 		return ReleaseChainValidationResult{}, err
 	}
+	var manifestSchemaErr error
 	if err := ValidateReleaseManifestFile(opts.RepoRoot, resolved); err != nil {
-		return buildReleaseChainResult(manifest, nil, []string{"PCS_SCHEMA_INVALID"}, opts, err)
+		manifestSchemaErr = err
 	}
 	baseDir := opts.ArtifactDir
 	if strings.TrimSpace(baseDir) == "" {
 		baseDir = filepath.Dir(resolved)
 	}
 	checks, failureCodes := runReleaseChainChecks(baseDir, manifest, opts)
-	return buildReleaseChainResult(manifest, checks, failureCodes, opts, nil)
+	return buildReleaseChainResult(manifest, checks, failureCodes, opts, manifestSchemaErr)
 }
 
 // PFReleaseChainArtifactNames returns manifest artifact filenames PF validates at admission.
@@ -240,6 +241,21 @@ func summarizeRegistrySemanticChecksExecuted(registrySemantic []ReleaseValidatio
 			"registry_semantic_checks":          len(registrySemantic),
 			"deferred_registry_semantic_checks": deferred,
 		})
+}
+
+func mergeManifestSchemaFailure(checks []ReleaseValidationCheck, schemaErr error) []ReleaseValidationCheck {
+	fail := releaseFailCheck("release_manifest_schema_valid",
+		"Release manifest validates against ReleaseManifest.v0 schema",
+		"PCS_SCHEMA_INVALID", map[string]any{"error": schemaErr.Error()})
+	out := make([]ReleaseValidationCheck, 0, len(checks)+1)
+	out = append(out, fail)
+	for _, c := range checks {
+		if c.CheckID == "release_manifest_schema_valid" {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 func normalizeReleaseChainChecks(byID map[string]ReleaseValidationCheck) []ReleaseValidationCheck {
@@ -516,12 +532,8 @@ func buildReleaseChainResult(
 		return ReleaseChainValidationResult{}, fmt.Errorf("release manifest is nil")
 	}
 	if schemaErr != nil {
-		checks = normalizeReleaseChainChecks(map[string]ReleaseValidationCheck{
-			"manifest_hashes_match": releaseFailCheck("manifest_hashes_match",
-				"Release manifest matches pcs-core JSON Schema",
-				"PCS_SCHEMA_INVALID", map[string]any{"error": schemaErr.Error()}),
-		})
-		failureCodes = []string{"PCS_SCHEMA_INVALID"}
+		checks = mergeManifestSchemaFailure(checks, schemaErr)
+		failureCodes = uniqueStrings(append(failureCodes, "PCS_SCHEMA_INVALID"))
 	}
 	if len(checks) == 0 {
 		checks = normalizeReleaseChainChecks(nil)

@@ -157,6 +157,8 @@ jobs:
           grep -q 'registry_admission_passed' "$OUT"
           grep -q 'registry_artifact_registered' "$OUT"
           grep -q 'registry_semantic_checks_executed' "$OUT"
+          grep -q 'admission_profile_selected' "$OUT"
+          grep -q 'registry\.' "$OUT"
 
       - name: Reject legacy pf_handoff in release mode
         run: |

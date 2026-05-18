@@ -211,11 +211,15 @@ func TestReleaseChainResultStatusProofCheckedOnValidChain(t *testing.T) {
 	if manifestPath == "" {
 		t.Skip()
 	}
+	profile, _ := pcs.LoadAdmissionProfile("labtrust_qc_release")
 	opts := pcs.ReleaseChainVerifyOptions{
 		RepoRoot:         repoRoot(t),
 		ArtifactDir:      artifactDir,
 		ValidatorVersion: pcs.DefaultVerifierVersion,
 		SourceCommit:     loadReleaseManifest(t).PFSourceCommit,
+		Registry:         loadArtifactRegistry(t),
+		ReleaseMode:      true,
+		AdmissionProfile: profile,
 	}
 	result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, opts)
 	if err != nil {

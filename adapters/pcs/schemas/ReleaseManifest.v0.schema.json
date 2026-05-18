@@ -26,6 +26,7 @@
     "release_candidate": { "type": "string", "minLength": 1 },
     "generated_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
     "validation_profile": { "type": "string", "minLength": 1 },
+    "workflow_profile_id": { "type": "string", "minLength": 1 },
     "producer_repos": {
       "type": "object",
       "required": [
