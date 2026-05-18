@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +56,33 @@ func pfReleaseEnv(extra ...string) []string {
 		env = append(env, e)
 	}
 	return append(append(env, "PF_RELEASE_MODE=1"), extra...)
+}
+
+func refreshReleaseManifestPins(t *testing.T, root, artifactDir string) {
+	t.Helper()
+	script := filepath.Join(root, "scripts", "refresh-release-manifest-pins.py")
+	try := func(name string, args ...string) error {
+		cmd := exec.Command(name, args...)
+		cmd.Dir = root
+		_, err := cmd.CombinedOutput()
+		return err
+	}
+	for _, spec := range []struct {
+		name string
+		args []string
+	}{
+		{"python3", []string{script, artifactDir}},
+		{"python", []string{script, artifactDir}},
+		{"py", []string{"-3", script, artifactDir}},
+	} {
+		if _, err := exec.LookPath(spec.name); err != nil {
+			continue
+		}
+		if err := try(spec.name, spec.args...); err == nil {
+			return
+		}
+	}
+	t.Fatalf("refresh manifest pins: no working python (tried python3, python, py -3)")
 }
 
 func TestVerifyValidLabtrustBundlePassesCLI(t *testing.T) {
@@ -325,6 +353,16 @@ func TestVerifyReleaseChainCLI(t *testing.T) {
 	} else if _, err := os.Stat(manifest); err != nil {
 		t.Skip("release manifest fixtures not present")
 	}
+	pfCommit := "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
+	if raw, err := os.ReadFile(filepath.Join(release, "FIXTURE_MANIFEST.json")); err == nil {
+		var fm struct {
+			PFSourceCommit string `json:"pf_source_commit"`
+		}
+		if json.Unmarshal(raw, &fm) == nil && fm.PFSourceCommit != "" {
+			pfCommit = fm.PFSourceCommit
+		}
+	}
+	refreshReleaseManifestPins(t, root, artifactDir)
 	outPath := filepath.Join(t.TempDir(), "release_chain_validation_result.json")
 	registry := filepath.Join(release, "artifact_registry.json")
 	cmd := exec.Command("go", "run", ".", "verify", "release-chain",
@@ -334,7 +372,7 @@ func TestVerifyReleaseChainCLI(t *testing.T) {
 		"--out", outPath,
 		"--release-mode")
 	cmd.Dir = pfDir(t)
-	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=" + pfCommit)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("verify release-chain failed: %v\n%s", err, out)
 	}
