@@ -23,8 +23,8 @@
   ],
   "regenerate": "make sync-pcs-rc-fixtures",
   "artifact_hashes": {
-    "science_claim_bundle.certified.json": "sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833",
-    "verification_result.json": "sha256:3b4b1215b4be6a945c3b99bb548e33a08527981290e7be1ab1da52b67ad8ba14",
-    "signed_science_claim_bundle.json": "sha256:d0ab55f964227c1350b29fe359dcaf61d04ad6b7dfcf1db351b717e1c47aab43"
+    "science_claim_bundle.certified.json": "sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536",
+    "verification_result.json": "sha256:a2d48b65f1e418e5b3c6e45bb58ce427383549ecb9de9b4fa0e6dd71dc689088",
+    "signed_science_claim_bundle.json": "sha256:f40606c95aaaca2d4ed1a1649f1c766be035155715f269bf258f5542e3466c15"
   }
 }

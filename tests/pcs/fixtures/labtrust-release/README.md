@@ -1,25 +1,66 @@
-# LabTrust release fixtures (PCS v0.1 RC)
+# LabTrust v0.1 release fixtures
 
-Canonical release candidate artifacts live in **`pcs-core/examples/labtrust-release/`**. PF fixtures here are synchronized from that directory; do not regenerate PF outputs independently unless the full release chain is promoted atomically.
+This directory contains **generated PCS v0.1 release-candidate artifacts** (release evidence only). Files must come from one atomic cross-repo chain run (LabTrust → CertifyEdge → Provability Fabric → Scientific Memory) and must not be updated file-by-file. **Placeholder commits are prohibited** for final release tags.
 
-| File | Source |
-|------|--------|
-| `science_claim_bundle.certified.json` | pcs-core RC |
-| `verification_result.json` | pcs-core RC |
-| `signed_science_claim_bundle.json` | pcs-core RC |
-| `handoff_to_pf.json` | pcs-core `handoff_to_pf.json` or `handoff_manifest.bundle_to_verifier.v0.json`, or `examples/handoff_manifest.valid.json` |
-| `release_manifest.json` | pcs-core `examples/release_manifest.valid.json` (ReleaseManifest.v0) |
-| `artifact_registry.json` | pcs-core `examples/artifact_registry.valid.json` (ArtifactRegistry.v0) |
-| `release_chain_validation_result.json` | pcs-core `examples/labtrust-release/release_chain_validation_result.v0.json`, or `examples/release_chain_validation_result.valid.json` (reference; PF emits its own via `pf verify release-chain`) |
-| `pf_handoff.json` | Derived legacy handoff (sync script) |
+Schema conformance fixtures live in [`../labtrust/`](../labtrust/) and must not be used as release evidence.
 
-Negative fixtures (`invalid_*.json`) are derived from the certified bundle by `scripts/pcs-freeze-labtrust-release-invalid.py`.
+## Regeneration
 
-Sync from pcs-core:
+1. Run the clean-checkout chain from a sibling [LabTrust-Gym](https://github.com/fraware/LabTrust-Gym) checkout:
+
+   ```bash
+   export PCS_DETERMINISTIC=0
+   export CERTIFYEDGE_SOURCE_COMMIT="$(git -C ../CertifyEdge rev-parse HEAD)"
+   export PF_SOURCE_COMMIT="$(git -C ../provability-fabric rev-parse HEAD)"
+   bash examples/pcs_qc_release/scripts/run_pcs_v01_clean_chain.sh
+   ```
+
+2. Import into pcs-core (builds `release-run/`, validates, then atomically replaces this directory):
+
+   ```bash
+   export PCS_CHAIN_WORK=../LabTrust-Gym
+   just generate-labtrust-release-fixtures
+   ```
+
+`RELEASE_FIXTURE_MANIFEST.json` records five repository commits (derived from artifact provenance) and SHA-256 digests of every file.
+
+Phase 2 protocol artifacts (same RC pins, digest-signed):
+
+- `release_manifest.v0.json` — `ReleaseManifest.v0` (superset of the legacy manifest)
+- `handoff_manifest.*.v0.json` — stage handoffs (`runtime_to_certificate`, `certificate_to_bundle`, `bundle_to_verifier`, `signed_bundle_to_memory`)
+- `handoff_to_pf.json` — PF `--handoff` alias for `handoff_manifest.bundle_to_verifier.v0.json` (`HandoffManifest.v0`; legacy `pf_handoff.json` is not used in release mode)
+- `release_chain_validation_result.v0.json` — 30-check `ReleaseChainValidationResult.v0` attestation (pinned `checked_at` to legacy `generated_at`)
+
+Regenerate protocol JSON:
 
 ```bash
-make sync-pcs-rc-fixtures
-# or: python scripts/pcs-sync-from-pcs-core-rc.py ../pcs-core
+just materialize-labtrust-protocol
 ```
 
-Regenerate the full chain (LabTrust → CertifyEdge → PF → pcs-core) only via atomic release-run promotion upstream; then run `make sync-pcs-rc-fixtures` in this repo.
+Windows PowerShell (repo root, no `just` required):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/materialize-labtrust-protocol.ps1
+```
+
+## Validation
+
+```bash
+pcs validate-release-chain examples/labtrust-release/
+just validate-labtrust-release-fixtures
+
+# from repo root (requires pcs-core on PYTHONPATH; install once: pip install -e python/.[dev])
+pytest python/tests/test_release_chain.py python/tests/test_release_fixtures.py
+
+# recommended (matches CI):
+cd python && pytest -q tests/test_release_chain.py tests/test_release_fixtures.py
+# or: just test-release-chain
+```
+
+`validate-release-chain` enforces the 26 RC checks in [docs/labtrust-rc-canonical.md](../../docs/labtrust-rc-canonical.md).
+
+Invalid mixed-run example: [`../labtrust-release-invalid/mixed_certificate_id/`](../labtrust-release-invalid/mixed_certificate_id/).
+
+## Authority
+
+Only this directory may be used as **PCS v0.1 release evidence**. Canonical pin values and downstream copy policy: [docs/labtrust-rc-canonical.md](../../docs/labtrust-rc-canonical.md). Profile: [docs/labtrust-v0.1-profile.md](../../docs/labtrust-v0.1-profile.md).

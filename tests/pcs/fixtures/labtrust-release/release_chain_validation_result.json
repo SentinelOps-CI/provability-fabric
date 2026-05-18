@@ -6,7 +6,7 @@
   "validator": "pcs-core",
   "validator_version": "0.1.0",
   "checked_at": "2026-05-17T22:32:01Z",
-  "status": "ProofChecked",
+  "status": "Rejected",
   "checks": [
     {
       "check_id": "manifest_present",
@@ -27,8 +27,12 @@
     {
       "check_id": "manifest_hashes_match",
       "description": "Every artifact hash matches the manifest digest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "manifest_hash_mismatch",
+        "message": "science_claim_bundle.certified.json: manifest digest mismatch (expected sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833, got sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536)",
+        "artifact": "science_claim_bundle.certified.json"
+      },
       "registry_check_refs": [
         "ReleaseManifest.v0.artifact_hashes_match_files"
       ]
@@ -222,8 +226,11 @@
     {
       "check_id": "verified_input_bundle_hash",
       "description": "verification_result.verified_input.bundle_hash matches certified bundle manifest hash",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "verified_input_hash_mismatch",
+        "message": "verified_input.bundle_hash sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536 != manifest certified bundle hash sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+      },
       "registry_check_refs": [
         "VerificationResult.v0.verified_input_bundle_hash_matches_certified"
       ]
@@ -231,8 +238,11 @@
     {
       "check_id": "signed_input_bundle_hash",
       "description": "signed_science_claim_bundle.signed_input_bundle_hash matches certified manifest hash",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "signed_input_hash_mismatch",
+        "message": "signed_input_bundle_hash sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536 != manifest certified bundle hash sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+      },
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
       ]
@@ -269,8 +279,12 @@
     }
   ],
   "artifacts_checked": 8,
-  "failure_codes": [],
+  "failure_codes": [
+    "manifest_hash_mismatch",
+    "signed_input_hash_mismatch",
+    "verified_input_hash_mismatch"
+  ],
   "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
   "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
-  "signature_or_digest": "sha256:c178e30b86d066ff6364c1b5e21cb4be02787f6685fbe8d4abf70d840a024a18"
+  "signature_or_digest": "sha256:d0d846296e549b1bd135487b7d31c8244d55f95253c7eeb58c7f102abee9ff23"
 }

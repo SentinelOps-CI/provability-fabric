@@ -8,7 +8,7 @@
     "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd",
     "certificate_id": "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a",
     "certified_bundle_hash": "sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536",
-    "signed_bundle_hash": "sha256:d0ab55f964227c1350b29fe359dcaf61d04ad6b7dfcf1db351b717e1c47aab43"
+    "signed_bundle_hash": "sha256:ece9554a3edbe1d310144f443995f618c8648c258c6cb7e90376446e8dfb6a64"
   },
   "release_chain_validation_result": {
     "path": "release_chain_validation_result.v0.json",
@@ -16,7 +16,7 @@
   },
   "canonical_signed_bundle": {
     "path": "signed_science_claim_bundle.json",
-    "sha256": "sha256:d0ab55f964227c1350b29fe359dcaf61d04ad6b7dfcf1db351b717e1c47aab43"
+    "sha256": "sha256:ece9554a3edbe1d310144f443995f618c8648c258c6cb7e90376446e8dfb6a64"
   },
   "canonical_claim_id": "claim-pcs-qc-release-v0.1",
   "limitations_notice": "PCS v0.1 demonstrates a proof-carrying simulated lab workflow; it does not claim clinical validity or production certification.",
@@ -89,7 +89,7 @@
       "producer": "Provability Fabric",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
       "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
-      "sha256": "sha256:3b4b1215b4be6a945c3b99bb548e33a08527981290e7be1ab1da52b67ad8ba14"
+      "sha256": "sha256:2d16bb868550f1c5879e660ad69761314c0ca9d954bc98f7141ab78ac8c6a5e9"
     },
     "signed_science_claim_bundle.json": {
       "artifact_type": "SignedScienceClaimBundle.v0",
@@ -97,7 +97,7 @@
       "producer": "Provability Fabric",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
       "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
-      "sha256": "sha256:d0ab55f964227c1350b29fe359dcaf61d04ad6b7dfcf1db351b717e1c47aab43"
+      "sha256": "sha256:ece9554a3edbe1d310144f443995f618c8648c258c6cb7e90376446e8dfb6a64"
     },
     "scientific_memory_import_report.json": {
       "artifact_type": "ScientificMemory.ImportReport.v0",
