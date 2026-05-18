@@ -125,12 +125,19 @@ jobs:
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
           OUT="$RUNNER_TEMP/release_chain_validation_result.json"
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           RC_DIR="${{ github.workspace }}/pcs-core/examples/labtrust-release"
+          if [ ! -f "$RC_DIR/science_claim_bundle.certified.json" ]; then
+            RC_DIR="$RELEASE"
+          fi
           MANIFEST="$RC_DIR/release_manifest.v0.json"
           if [ ! -f "$MANIFEST" ]; then
-            MANIFEST="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/release_manifest.json"
+            MANIFEST="$RELEASE/release_manifest.v0.json"
           fi
-          REGISTRY="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/artifact_registry.json"
+          if [ ! -f "$MANIFEST" ]; then
+            MANIFEST="$RELEASE/release_manifest.json"
+          fi
+          REGISTRY="$RELEASE/artifact_registry.json"
           go run . verify release-chain \
             --manifest "$MANIFEST" \
             --registry "$REGISTRY" \
