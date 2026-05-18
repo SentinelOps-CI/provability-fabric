@@ -242,6 +242,9 @@ func assertVerificationRejectedRelease(t *testing.T, name, checkID string) {
 }
 
 func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("PF clean-chain segment is exercised by .github/workflows/pcs-ci.yml")
+	}
 	root := repoRoot(t)
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
 	work := t.TempDir()
