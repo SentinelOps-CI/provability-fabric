@@ -28,6 +28,7 @@ func verifyWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 		SourceCommit:    manifest.PFSourceCommit,
 		ReleaseMode:     true,
 		Handoff:         loadedLegacyHandoff(handoff),
+		Registry:        loadArtifactRegistry(t),
 	}
 	_, err = pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	return err

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 func verifyRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify",
@@ -29,9 +28,12 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	var outPath string
 	var handoffPath string
 	var registryPath string
+	var manifestPath string
 	var releaseChainOut string
 	var localDev bool
 	var releaseMode bool
+	var allowMissingHandoff bool
+	var allowSkippedRegistrySemantics bool
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -40,13 +42,26 @@ func scienceClaimVerifyCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bundlePath := args[0]
-			result, err := verifyBundle(bundlePath, localDev, releaseMode, handoffPath, registryPath)
+			adm, err := resolveScienceClaimAdmission(scienceClaimAdmissionInput{
+				HandoffPath:                   handoffPath,
+				RegistryPath:                  registryPath,
+				ManifestPath:                  manifestPath,
+				AllowMissingHandoff:           allowMissingHandoff,
+				AllowSkippedRegistrySemantics: allowSkippedRegistrySemantics,
+				LocalDev:                      localDev,
+				ReleaseMode:                   releaseMode,
+				BundlePath:                    bundlePath,
+			})
+			if err != nil {
+				return wrapAdmissionError(err)
+			}
+			result, err := verifyBundle(bundlePath, localDev, releaseMode, adm)
 			if err != nil {
 				return err
 			}
 
 			if releaseChainOut != "" {
-				if err := writeReleaseChainResult(bundlePath, result, handoffPath, registryPath, releaseChainOut, localDev, releaseMode); err != nil {
+				if err := writeReleaseChainResult(bundlePath, result, adm, releaseChainOut, localDev, releaseMode); err != nil {
 					return err
 				}
 			}
@@ -91,9 +106,12 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit VerificationResult as JSON on stdout")
 	cmd.Flags().StringVar(&outPath, "out", "", "Write VerificationResult to file")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
-	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values on PF outputs (or set PF_RELEASE_MODE=1)")
-	cmd.Flags().StringVar(&handoffPath, "handoff", "", "LabTrust pf_handoff.json or HandoffManifest.v0; bundle pins must match")
-	cmd.Flags().StringVar(&registryPath, "registry", "", "ReleaseManifest.v0 used as artifact registry for admission checks")
+	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require handoff and ArtifactRegistry.v0; reject placeholder commits (or set PF_RELEASE_MODE=1)")
+	cmd.Flags().StringVar(&handoffPath, "handoff", "", "HandoffManifest.v0 or legacy pf_handoff.json (required in release mode)")
+	cmd.Flags().StringVar(&registryPath, "registry", "", "ArtifactRegistry.v0 for admission checks (required in release mode; defaults to PCS_CORE_PATH/examples/artifact_registry.valid.json)")
+	cmd.Flags().StringVar(&manifestPath, "manifest", "", "ReleaseManifest.v0 used when writing --release-chain-result")
 	cmd.Flags().StringVar(&releaseChainOut, "release-chain-result", "", "Write ReleaseChainValidationResult.v0 JSON")
+	cmd.Flags().BoolVar(&allowMissingHandoff, "allow-missing-handoff-for-local-dev", false, "Allow verify without --handoff in release mode (local development only)")
+	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
 	return cmd
 }

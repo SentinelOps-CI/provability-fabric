@@ -12,14 +12,46 @@ $Signed = Join-Path $Workdir "signed_science_claim_bundle.json"
 
 $PfRoot = Join-Path $Root "core\cli\pf"
 $PfExe = Join-Path $PfRoot "pf.exe"
-if (Test-Path $PfExe) {
-    $Pf = $PfExe
-} elseif (Get-Command go -ErrorAction SilentlyContinue) {
+
+function Get-PfCommand {
+    if ($env:PF) {
+        $pf = $env:PF.Trim()
+        $goRunSuffix = ' run .'
+        if ($pf.StartsWith('go -C ') -and $pf.EndsWith($goRunSuffix)) {
+            $dir = $pf.Substring(6, $pf.Length - 6 - $goRunSuffix.Length).Trim().Trim('"')
+            return @('go', '-C', $dir, 'run', '.')
+        }
+        return $pf -split '\s+'
+    }
+    if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
+        if (Test-Path $PfExe) { return @($PfExe) }
+        throw "go or core/cli/pf/pf.exe required; set PF=..."
+    }
     Push-Location $PfRoot
-    try { go build -o pf.exe . | Out-Null } finally { Pop-Location }
-    $Pf = $PfExe
-} else {
-    throw "go or core/cli/pf/pf.exe required; set PF_BIN"
+    try {
+        & go build -o pf.exe .
+        if ($LASTEXITCODE -ne 0) { throw "go build core/cli/pf failed" }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path $PfExe)) { throw "missing $PfExe after build" }
+    return @($PfExe)
+}
+
+$PfCmd = @(Get-PfCommand)
+
+function Invoke-Pf {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Remaining)
+    if ($PfCmd.Count -ge 5 -and $PfCmd[0] -eq 'go' -and $PfCmd[1] -eq '-C' -and $PfCmd[3] -eq 'run') {
+        & $PfCmd[0] -C $PfCmd[2] run . @Remaining
+    } elseif ($PfCmd.Count -eq 1) {
+        & $PfCmd[0] @Remaining
+    } else {
+        & $PfCmd[0] @($PfCmd[1..($PfCmd.Count - 1)] + $Remaining)
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "pf failed (exit $LASTEXITCODE): $($Remaining -join ' ')"
+    }
 }
 
 $PcsCore = if ($env:PCS_CORE_PATH) { $env:PCS_CORE_PATH } else { Join-Path (Split-Path $Root -Parent) "pcs-core" }
@@ -37,16 +69,22 @@ if (-not $env:PF_SOURCE_COMMIT) {
 }
 if (-not $env:PF_RELEASE_MODE) { $env:PF_RELEASE_MODE = "1" }
 
+$ReleaseFixtures = Join-Path $Root "tests\pcs\fixtures\labtrust-release"
+$Handoff = if ($env:PF_HANDOFF) { $env:PF_HANDOFF } else { Join-Path $ReleaseFixtures "handoff_to_pf.json" }
+$Registry = if ($env:PF_REGISTRY) { $env:PF_REGISTRY } else { Join-Path $ReleaseFixtures "artifact_registry.json" }
+
 function Step([string]$Msg) { Write-Host "== $Msg ==" }
 
 Step "Provability Fabric: verify"
-& $Pf verify science-claim $Certified --release-mode --out $VR
+Invoke-Pf verify science-claim $Certified --release-mode --handoff $Handoff --registry $Registry --out $VR
 Step "pcs-core: validate verification_result"
 Invoke-Expression "$Pcs validate `"$VR`""
+if ($LASTEXITCODE -ne 0) { throw "pcs-core validate verification_result failed" }
 Step "Provability Fabric: sign"
-& $Pf sign science-claim $Certified --release-mode --out $Signed
+Invoke-Pf sign science-claim $Certified --release-mode --handoff $Handoff --registry $Registry --out $Signed
 Step "pcs-core: validate signed bundle"
 Invoke-Expression "$Pcs validate `"$Signed`""
+if ($LASTEXITCODE -ne 0) { throw "pcs-core validate signed bundle failed" }
 Step "Provability Fabric: inspect"
-& $Pf inspect science-claim $Signed --strict
+Invoke-Pf inspect science-claim $Signed --strict
 Write-Host "OK: PF clean-chain segment completed in $Workdir"

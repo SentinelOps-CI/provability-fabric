@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/MigrationReport.v0.schema.json",
+  "title": "MigrationReport.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "from_version",
+    "to_version",
+    "artifact_type",
+    "changes",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "from_version": { "type": "string", "minLength": 1 },
+    "to_version": { "type": "string", "minLength": 1 },
+    "artifact_type": { "type": "string", "minLength": 1 },
+    "source_path": { "type": "string", "minLength": 1 },
+    "changes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["noop", "migrated", "rejected"]
+    },
+    "message": { "type": "string" }
+  }
+}

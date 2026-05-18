@@ -46,25 +46,42 @@ LabTrust-exported signed bundles load without `--strict` (external digest rules)
 
 Use `--local-dev` on verify/sign only for bundles with `local_dev: true` or the 40-zero `source_commit` placeholder.
 
-## Release admission (Phase 2)
+## Release admission (default path with `--release-mode`)
+
+In **release mode**, PF is the release-chain admission controller. Handoff and registry are **required** (not optional):
+
+| Flag | Artifact | Required in release mode |
+|------|----------|--------------------------|
+| `--handoff` | `HandoffManifest.v0` (or legacy `pf_handoff.json`) | Yes, unless `--allow-missing-handoff-for-local-dev` |
+| `--registry` | `ArtifactRegistry.v0` | Yes (defaults to `PCS_CORE_PATH/examples/artifact_registry.valid.json`) |
+| `--manifest` | `ReleaseManifest.v0` | When writing `--release-chain-result` |
+| `--release-chain-result` | Output `ReleaseChainValidationResult.v0` | Optional |
+
+Do **not** pass `ReleaseManifest.v0` to `--registry`; use `--manifest` for release-chain verify.
 
 ```bash
-# HandoffManifest.v0 or legacy pf_handoff.json
+export PF_SOURCE_COMMIT="$(git rev-parse HEAD)"
+export PF_RELEASE_MODE=1
+
 pf verify science-claim tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json \
   --handoff tests/pcs/fixtures/labtrust-release/handoff_to_pf.json \
+  --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
+  --out verification_result.json \
+  --release-chain-result release_chain_validation_result.json \
   --release-mode
 
-# ReleaseManifest.v0 artifact registry (until ArtifactRegistry.v0 ships in pcs-core)
-pf verify science-claim tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json \
-  --registry tests/pcs/fixtures/labtrust-release/release_manifest.json \
-  --release-mode
-
-# Release chain validation (PF admission artifacts; colocate manifest with artifacts)
 pf verify release-chain \
   --manifest tests/pcs/fixtures/labtrust-release/release_manifest.json \
+  --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
   --artifact-dir ../pcs-core/examples/labtrust-release \
-  --out /tmp/release_chain_validation_result.json
+  --out release_chain_validation_result.json \
+  --release-mode
+
+pf explain failure verification_result.json
+pf explain release-chain release_chain_validation_result.json
 ```
+
+Release-chain validation emits schema-valid `ReleaseChainValidationResult.v0` with check IDs including: `manifest_hashes_match`, `producer_commits_match`, `certificate_id_consistent`, `trace_hash_consistent`, `signed_input_bundle_hash_match`, `scientific_memory_import_passed`, `registry_admission_passed`.
 
 ## Seventeen required checks
 
@@ -81,7 +98,7 @@ pf verify release-chain \
 | 9 | `trace_hash_alignment` | Certificate trace_hash matches receipt |
 | 10 | `certificate_status_checked` | TraceCertificate.status is CertificateChecked |
 | 11 | `status_transition_policy` | PCS status transitions allow ProofChecked only from admissible states |
-| 12 | `artifact_registry_admission` | Bundle matches ReleaseManifest.v0 registry (skipped without `--registry`) |
+| 12 | `artifact_registry_admission` | Bundle matches ArtifactRegistry.v0 (fails in release mode without `--registry`) |
 | 13 | `evidence_refs_complete` | Evidence refs claim, assumption set, receipt, certificate |
 | 14 | `artifact_not_stale` | No required artifact has status Stale |
 | 15 | `source_provenance_present` | source_repo and source_commit present |
@@ -99,86 +116,49 @@ pf verify release-chain \
 
 **SignedScienceClaimBundle** (`schema_version`: `v0`):
 
-- `science_claim_bundle`
-- `verification_result`
-- `signer`: `Provability Fabric`
-- `signed_bundle_id`: `signed-<uuid>`
-- `signature_or_digest`: `sha256:<64-hex>`
-
-Signing is refused when verification status is not `ProofChecked`.
-
-## Schema sync with pcs-core
-
-Schemas under `config/schemas/pcs/` must match [pcs-core/schemas](https://github.com/SentinelOps-CI/pcs-core/tree/main/schemas) exactly. Embedded copies live in `adapters/pcs/schemas/`.
-
-```bash
-# Compare against sibling checkout (default ../pcs-core)
-just pcs-schema-diff
-# or
-make validate-pcs-schema-diff PCS_CORE_PATH=../pcs-core
-bash scripts/pcs-schema-diff.sh /path/to/pcs-core
-
-# Refresh mirrors after pcs-core schema changes (updates config/ and adapters/pcs/schemas/)
-just pcs-schema-sync
-make sync-pcs-schemas PCS_CORE_PATH=../pcs-core
-```
+- Embeds the certified `science_claim_bundle` and `verification_result`
+- `signed_input_bundle_hash`: raw file SHA-256 of the certified bundle JSON
 
 ## Layout
 
 ```
-config/schemas/pcs/          # pcs-core mirror (HandoffManifest, ReleaseManifest, ReleaseChainValidationResult, …)
-adapters/pcs/                  # verification engine + embedded schemas
-core/cli/pf/cmd/               # pf verify|sign|inspect science-claim
+adapters/pcs/                  # verification engine
+core/cli/pf/cmd/                 # pf verify | sign | inspect | validate | explain
+config/schemas/pcs/            # pcs-core mirror
 tests/pcs/fixtures/labtrust/   # LabTrust certified + signed reference fixtures
+tests/pcs/fixtures/labtrust-release/  # RC-synced release chain fixtures
 tools/pcs-validate/            # fixture matrix validator
 scripts/pcs-schema-diff.sh
 scripts/pcs-schema-sync.sh
 ```
 
-## Tests and CI
+## CI and local gates
 
 ```bash
+make test-pcs-full              # unit + CLI + RC lock + Phase 2 + fixture matrix
 make test-pcs
-make validate-pcs-fixtures   # 28 artifacts including Phase 2 protocol fixtures
+make test-pcs-rc-gate
+make test-pcs-phase2
+make sync-pcs-rc-fixtures       # refresh labtrust-release from pcs-core RC
+make validate-pcs-fixtures   # 29 artifacts including Phase 2 protocol fixtures
 make validate-pcs-schema-diff
 make freeze-pcs-labtrust-signed   # rewrite tests/pcs/fixtures/labtrust/signed_science_claim_bundle.json (required after canonical JSON / check-list changes)
 just pcs-schema-diff
 ```
 
-LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): certified bundle from `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` (`scb-pcs-qc-release-v0.1`), plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release` (requires LabTrust-Gym beside this repo). Freeze scripts set `PF_SOURCE_COMMIT` to `git rev-parse HEAD`, enable `--release-mode`, and reject placeholder commits (`cccc…`, `aaaa…`, etc.) on PF outputs.
-
 ```bash
-pf validate verification-result tests/pcs/fixtures/labtrust-release/verification_result.json
-pf validate signed-science-claim tests/pcs/fixtures/labtrust-release/signed_science_claim_bundle.json
 pf validate handoff-manifest tests/pcs/fixtures/labtrust-release/handoff_to_pf.json
 pf validate release-manifest tests/pcs/fixtures/labtrust-release/release_manifest.json
+pf validate artifact-registry tests/pcs/fixtures/labtrust-release/artifact_registry.json
 pf validate release-chain-result tests/pcs/fixtures/labtrust-release/release_chain_validation_result.json
 ```
 
-LabTrust freeze fixtures under `tests/pcs/fixtures/labtrust/`:
+## LabTrust release fixtures
 
-| File | Role |
-|------|------|
-| `science_claim_bundle.certified.json` | Canonical pcs-core certified bundle (verify must be `ProofChecked`) |
-| `signed_science_claim_bundle.json` | PF-signed wrapper (`pf sign` output; strict inspect; RC bundles may embed 15 checks) |
-| `signed_science_claim_bundle.labtrust-export.json` | External LabTrust export (2 embedded checks; use `inspect --reverify`) |
+LabTrust release fixtures (`tests/pcs/fixtures/labtrust-release/`): certified bundle from `LabTrust-Gym/examples/pcs_qc_release/release/science_claim_bundle.certified.json` (`scb-pcs-qc-release-v0.1`), plus PF-generated `verification_result.json` and `signed_science_claim_bundle.json`. Regenerate with `make freeze-pcs-labtrust-release` (requires LabTrust-Gym beside this repo). Freeze scripts set `PF_SOURCE_COMMIT` to `git rev-parse HEAD`, enable `--release-mode`, and reject placeholder commits (`cccc…`, `aaaa…`, etc.) on PF outputs.
 
-CI: `.github/workflows/pcs-ci.yml` (checks out pcs-core, runs schema diff, fixture matrix, LabTrust freeze validation, CLI smoke).
-
-## Legacy migration (offline only)
-
-`pf verify` rejects bundles with `runtime_receipt`, `trace_certificate`, artifact-name `schema_version` values (for example `ScienceClaimBundle.v0`), or other non-canonical top-level keys.
+Sync from pcs-core:
 
 ```bash
-./pf migrate science-claim tests/pcs/invalid_legacy_singular_runtime_receipt.json --out /tmp/migrated.json
-./pf verify science-claim /tmp/migrated.json
+make sync-pcs-rc-fixtures
 ```
-
-Go API: `pcs.MigrateLegacyBundle()` for programmatic migration.
-
-## Rigorous guarantees
-
-- Schemas are embedded in `adapters/pcs` and drift-tested against `config/schemas/pcs/` and pcs-core.
-- Failed checks include `details.reason_code` (for example `PCS_LEGACY_BUNDLE_FORMAT`, `PCS_RUNTIME_RECEIPT_COUNT`, `PCS_TRACE_HASH_MISMATCH`).
-- All certificates are verified for hash alignment and `CertificateChecked`.
-- `pf verify` exits `1` on failure and prints `check_id: reason_code` lines to stderr.

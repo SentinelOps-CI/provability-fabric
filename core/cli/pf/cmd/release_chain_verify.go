@@ -15,27 +15,28 @@ import (
 
 func releaseChainVerifyCmd() *cobra.Command {
 	var manifestPath string
+	var registryPath string
 	var artifactDir string
 	var outPath string
 	var localDev bool
 	var releaseMode bool
+	var allowSkippedRegistrySemantics bool
 
 	cmd := &cobra.Command{
 		Use:   "release-chain",
 		Short: "Verify a PCS release chain from ReleaseManifest.v0",
-		Long:  `Validate artifact hashes and registry pins declared in ReleaseManifest.v0 and emit ReleaseChainValidationResult.v0.`,
+		Long:  `Validate artifact hashes, producer commits, and ArtifactRegistry.v0 admission; emit ReleaseChainValidationResult.v0.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(manifestPath) == "" {
-				return fmt.Errorf("--manifest is required")
+				return fmt.Errorf("--manifest ReleaseManifest.v0 is required")
 			}
-			opts, err := resolveReleaseChainOpts(localDev, releaseMode)
+			opts, _, err := resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, allowSkippedRegistrySemantics, localDev, releaseMode)
 			if err != nil {
-				return err
+				return wrapAdmissionError(err)
 			}
-			opts.ArtifactDir = artifactDir
 			result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, opts)
 			if err != nil {
-				return err
+				return wrapAdmissionError(err)
 			}
 			if outPath != "" {
 				data, err := json.MarshalIndent(result, "", "  ")
@@ -49,20 +50,26 @@ func releaseChainVerifyCmd() *cobra.Command {
 			fmt.Printf("validation_id: %s\n", result.ValidationID)
 			fmt.Printf("status: %s\n", result.Status)
 			fmt.Printf("artifacts_checked: %d\n", result.ArtifactsChecked)
+			for _, c := range result.Checks {
+				fmt.Printf("  [%s] %s\n", c.Status, c.CheckID)
+			}
 			if outPath != "" {
 				fmt.Printf("wrote %s\n", outPath)
 			}
 			if result.Status != pcs.StatusProofChecked {
+				fmt.Println(pcs.FormatFailureExplanations(pcs.ExplainReleaseChainFailures(result)))
 				return cliExit(ExitVerificationFailed, fmt.Errorf("release chain validation failed"))
 			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&manifestPath, "manifest", "", "ReleaseManifest.v0 JSON path")
+	cmd.Flags().StringVar(&registryPath, "registry", "", "ArtifactRegistry.v0 JSON path (required in release mode; defaults to PCS_CORE_PATH/examples/artifact_registry.valid.json)")
 	cmd.Flags().StringVar(&artifactDir, "artifact-dir", "", "Directory containing manifest artifact files (default: manifest directory)")
 	cmd.Flags().StringVar(&outPath, "out", "", "Write ReleaseChainValidationResult.v0 JSON")
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow placeholder source_commit (local development only)")
-	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Reject placeholder source_commit values")
+	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require registry and reject placeholder commits")
+	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
 	return cmd
 }
 

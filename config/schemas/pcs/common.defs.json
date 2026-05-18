@@ -149,6 +149,35 @@
         "status": { "$ref": "#/$defs/validation_check_status" },
         "details": { "type": "object" }
       }
+    },
+    "chain_root": {
+      "type": "object",
+      "required": [
+        "trace_hash",
+        "certificate_id",
+        "certified_bundle_hash",
+        "signed_bundle_hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trace_hash": { "$ref": "#/$defs/hex_digest" },
+        "certificate_id": { "type": "string", "minLength": 1 },
+        "certified_bundle_hash": { "$ref": "#/$defs/hex_digest" },
+        "signed_bundle_hash": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
+    "manifest_path_ref": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
+    "limitations_notice": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }

@@ -32,10 +32,36 @@ func pfDir(t *testing.T) string {
 	return filepath.Join(repoRoot(t), "core", "cli", "pf")
 }
 
+// pfCLIEnv clears PF_RELEASE_MODE from the parent environment so local dev shells
+// do not turn every verify/sign into release-mode admission.
+func pfCLIEnv(extra ...string) []string {
+	env := make([]string, 0, len(os.Environ())+1+len(extra))
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PF_RELEASE_MODE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	env = append(env, "PF_RELEASE_MODE=0")
+	return append(env, extra...)
+}
+
+func pfReleaseEnv(extra ...string) []string {
+	env := make([]string, 0, len(os.Environ())+1+len(extra))
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PF_RELEASE_MODE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	return append(append(env, "PF_RELEASE_MODE=1"), extra...)
+}
+
 func TestVerifyValidLabtrustBundlePassesCLI(t *testing.T) {
 	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "science_claim_bundle.certified.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle, "--json")
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("verify failed: %v\n%s", err, out)
@@ -52,6 +78,7 @@ func TestSignFailedBundleRefusesCLI(t *testing.T) {
 	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_missing_certificate.json")
 	cmd := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", filepath.Join(t.TempDir(), "signed.json"))
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected sign to fail, got success: %s", out)
@@ -65,6 +92,7 @@ func TestVerifyLegacySingularRuntimeReceiptFailsCLI(t *testing.T) {
 	bundle := filepath.Join(repoRoot(t), "tests", "pcs", "invalid_legacy_singular_runtime_receipt.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle)
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected legacy verify to fail: %s", out)
@@ -79,11 +107,13 @@ func TestMigrateLegacyBundleCLI(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "migrated.json")
 	cmd := exec.Command("go", "run", ".", "migrate", "science-claim", legacy, "--out", out)
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	if outBytes, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("migrate failed: %v\n%s", err, outBytes)
 	}
 	verify := exec.Command("go", "run", ".", "verify", "science-claim", out, "--json")
 	verify.Dir = pfDir(t)
+	verify.Env = pfCLIEnv()
 	verifyOut, err := verify.CombinedOutput()
 	if err != nil {
 		t.Fatalf("verify migrated bundle failed: %v\n%s", err, verifyOut)
@@ -100,6 +130,7 @@ func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
 
 	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)
 	sign.Dir = pfDir(t)
+	sign.Env = pfCLIEnv()
 	if out, err := sign.CombinedOutput(); err != nil {
 		t.Fatalf("sign failed: %v\n%s", err, out)
 	}
@@ -118,6 +149,7 @@ func TestInspectReverifyFailureExitsNonZeroCLI(t *testing.T) {
 
 	inspect := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")
 	inspect.Dir = pfDir(t)
+	inspect.Env = pfCLIEnv()
 	out, err := inspect.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected inspect --reverify to fail on corrupted bundle: %s", out)
@@ -132,10 +164,7 @@ func TestPFReleaseModeRejectsPlaceholderCommitCLI(t *testing.T) {
 	bundle := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release", "science_claim_bundle.certified.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle, "--release-mode")
 	cmd.Dir = pfDir(t)
-	cmd.Env = append(os.Environ(),
-		"PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc",
-		"PF_RELEASE_MODE=0",
-	)
+	cmd.Env = pfCLIEnv("PF_SOURCE_COMMIT=cccccccccccccccccccccccccccccccccccccccc")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected verify --release-mode to fail with placeholder commit: %s", out)
@@ -153,10 +182,12 @@ func TestValidateLabtrustReleaseArtifactsCLI(t *testing.T) {
 		{"validate", "signed-science-claim", filepath.Join(release, "signed_science_claim_bundle.json")},
 		{"validate", "handoff-manifest", filepath.Join(release, "handoff_to_pf.json")},
 		{"validate", "release-manifest", filepath.Join(release, "release_manifest.json")},
+		{"validate", "artifact-registry", filepath.Join(release, "artifact_registry.json")},
 		{"validate", "release-chain-result", filepath.Join(release, "release_chain_validation_result.json")},
 	} {
 		cmd := exec.Command("go", append([]string{"run", "."}, args...)...)
 		cmd.Dir = pfDir(t)
+		cmd.Env = pfCLIEnv()
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("%v failed: %v\n%s", args, err, out)
@@ -171,6 +202,7 @@ func TestInspectLabtrustReleaseSignedBundleCLI(t *testing.T) {
 	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release", "signed_science_claim_bundle.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--strict")
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("inspect failed: %v\n%s", err, out)
@@ -203,6 +235,7 @@ func TestInspectRejectsTamperedReleaseSignedBundleCLI(t *testing.T) {
 	}
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", tampered, "--strict")
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected inspect --strict to fail on tampered signed bundle: %s", out)
@@ -216,6 +249,7 @@ func TestInspectLabtrustSignedBundleCLI(t *testing.T) {
 	signed := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust", "signed_science_claim_bundle.labtrust-export.json")
 	cmd := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--reverify")
 	cmd.Dir = pfDir(t)
+	cmd.Env = pfCLIEnv()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("inspect failed: %v\n%s", err, out)
@@ -242,10 +276,11 @@ func TestVerifyScienceClaimWithHandoffManifestCLI(t *testing.T) {
 	if !strings.Contains(string(manifestBytes), "pf_source_commit") {
 		t.Fatal("fixture manifest missing pf_source_commit")
 	}
+	registry := filepath.Join(release, "artifact_registry.json")
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
-		"--handoff", handoff, "--release-mode")
+		"--handoff", handoff, "--registry", registry, "--release-mode")
 	cmd.Dir = pfDir(t)
-	cmd.Env = append(os.Environ(), "PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PF_RELEASE_MODE=1")
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PCS_CORE_PATH="+filepath.Join(root, "..", "pcs-core"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("verify with handoff failed: %v\n%s", err, out)
@@ -257,19 +292,16 @@ func TestVerifyScienceClaimWithHandoffAndRegistryCLI(t *testing.T) {
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
 	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
 	handoff := filepath.Join(release, "handoff_to_pf.json")
-	registry := filepath.Join(release, "release_manifest.json")
+	registry := filepath.Join(release, "artifact_registry.json")
 	if _, err := os.Stat(registry); err != nil {
-		t.Skip("release manifest fixture not present")
+		t.Skip("artifact registry fixture not present")
 	}
 	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
 		"--handoff", handoff,
 		"--registry", registry,
 		"--release-mode")
 	cmd.Dir = pfDir(t)
-	cmd.Env = append(os.Environ(),
-		"PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
-		"PF_RELEASE_MODE=1",
-	)
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("verify with handoff+registry failed: %v\n%s", err, out)
@@ -294,13 +326,15 @@ func TestVerifyReleaseChainCLI(t *testing.T) {
 		t.Skip("release manifest fixtures not present")
 	}
 	outPath := filepath.Join(t.TempDir(), "release_chain_validation_result.json")
+	registry := filepath.Join(release, "artifact_registry.json")
 	cmd := exec.Command("go", "run", ".", "verify", "release-chain",
 		"--manifest", manifest,
+		"--registry", registry,
 		"--artifact-dir", artifactDir,
 		"--out", outPath,
 		"--release-mode")
 	cmd.Dir = pfDir(t)
-	cmd.Env = append(os.Environ(), "PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PF_RELEASE_MODE=1")
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("verify release-chain failed: %v\n%s", err, out)
 	}
@@ -320,12 +354,14 @@ func TestInspectPrintsCheckSummaryCLI(t *testing.T) {
 
 	sign := exec.Command("go", "run", ".", "sign", "science-claim", bundle, "--out", signed)
 	sign.Dir = pfDir(t)
+	sign.Env = pfCLIEnv()
 	if out, err := sign.CombinedOutput(); err != nil {
 		t.Fatalf("sign failed: %v\n%s", err, out)
 	}
 
 	inspect := exec.Command("go", "run", ".", "inspect", "science-claim", signed, "--strict")
 	inspect.Dir = pfDir(t)
+	inspect.Env = pfCLIEnv()
 	out, err := inspect.CombinedOutput()
 	if err != nil {
 		t.Fatalf("inspect failed: %v\n%s", err, out)
@@ -341,5 +377,69 @@ func TestInspectPrintsCheckSummaryCLI(t *testing.T) {
 		if !strings.Contains(body, id) {
 			t.Fatalf("inspect missing check_id %s", id)
 		}
+	}
+}
+
+func TestReleaseModeRequiresHandoffCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
+	registry := filepath.Join(release, "artifact_registry.json")
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+		"--registry", registry, "--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected release-mode without handoff to fail: %s", out)
+	}
+	if !strings.Contains(string(out), "handoff") {
+		t.Fatalf("expected handoff requirement in output: %s", out)
+	}
+}
+
+func TestReleaseModeRequiresRegistryCLI(t *testing.T) {
+	root := repoRoot(t)
+	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	bundle := filepath.Join(release, "science_claim_bundle.certified.json")
+	handoff := filepath.Join(release, "handoff_to_pf.json")
+	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+		"--handoff", handoff, "--release-mode")
+	cmd.Dir = pfDir(t)
+	cmd.Env = pfReleaseEnv(
+		"PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
+		"PCS_CORE_PATH=",
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected release-mode without registry to fail: %s", out)
+	}
+	if !strings.Contains(string(out), "registry") {
+		t.Fatalf("expected registry requirement in output: %s", out)
+	}
+}
+
+func TestExplainFailureCLI(t *testing.T) {
+	root := repoRoot(t)
+	bundle := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release", "invalid_mismatched_trace_hash.json")
+	vrPath := filepath.Join(t.TempDir(), "verification_result.json")
+	verify := exec.Command("go", "run", ".", "verify", "science-claim", bundle, "--out", vrPath)
+	verify.Dir = pfDir(t)
+	verify.Env = pfCLIEnv()
+	out, err := verify.CombinedOutput()
+	if _, statErr := os.Stat(vrPath); statErr != nil {
+		t.Fatalf("verify invalid bundle: %v\n%s", err, out)
+	}
+	if err == nil {
+		t.Fatalf("expected verify to reject invalid bundle: %s", out)
+	}
+	explain := exec.Command("go", "run", ".", "explain", "failure", vrPath)
+	explain.Dir = pfDir(t)
+	out, err = explain.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected explain failure to exit non-zero: %s", out)
+	}
+	if !strings.Contains(string(out), "repair:") {
+		t.Fatalf("expected repair hint in explain output: %s", out)
 	}
 }

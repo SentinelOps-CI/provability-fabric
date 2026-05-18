@@ -29,13 +29,7 @@ func TestVerifyLabtrustReleaseCertifiedBundlePasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := pcs.ValidateOptions{
-		RepoRoot:        repoRoot(t),
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		ReleaseMode:     true,
-	}
-	manifest := loadReleaseManifest(t)
-	opts.SourceCommit = manifest.PFSourceCommit
+	opts := releaseModeValidateOpts(t)
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -113,19 +107,16 @@ func TestSignLabtrustReleaseBundleOutputsPCSCoreSignedBundle(t *testing.T) {
 	manifest := loadReleaseManifest(t)
 	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
 	t.Setenv("PF_DETERMINISTIC", "1")
-	opts := pcs.ValidateOptions{
-		RepoRoot:        root,
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify before sign: %v status=%s", err, result.Status)
 	}
+	loaded, _ := pcs.LoadHandoff(validHandoffManifestPath(t))
 	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
 		ReleaseMode: true,
 		BundlePath:  path,
+		Handoff:     loaded,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +245,14 @@ func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 	}
 	pcsCore := filepath.Join(filepath.Dir(root), "pcs-core")
 	manifest := loadReleaseManifest(t)
-	env := append(os.Environ(),
+	baseEnv := make([]string, 0, len(os.Environ()))
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PF=") {
+			continue
+		}
+		baseEnv = append(baseEnv, e)
+	}
+	env := append(baseEnv,
 		"PF_RELEASE_MODE=1",
 		"PF_SOURCE_COMMIT="+manifest.PFSourceCommit,
 		"PF_DETERMINISTIC=1",

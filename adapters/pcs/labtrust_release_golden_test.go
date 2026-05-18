@@ -47,19 +47,17 @@ func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	opts := pcs.ValidateOptions{
-		RepoRoot:        root,
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.RepoRoot = root
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)
 	}
+	loaded, _ := pcs.LoadHandoff(validHandoffManifestPath(t))
 	regenerated, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
 		ReleaseMode: true,
 		BundlePath:  path,
+		Handoff:     loaded,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -86,19 +84,18 @@ func releaseDeterministicGoldenIDs(pfCommit string, t *testing.T) (verificationI
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	opts := pcs.ValidateOptions{
-		RepoRoot:        root,
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    pfCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.RepoRoot = root
+	opts.SourceCommit = pfCommit
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)
 	}
+	loaded, _ := pcs.LoadHandoff(validHandoffManifestPath(t))
 	signed, err := pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
 		ReleaseMode: true,
 		BundlePath:  path,
+		Handoff:     loaded,
 	})
 	if err != nil {
 		t.Fatal(err)

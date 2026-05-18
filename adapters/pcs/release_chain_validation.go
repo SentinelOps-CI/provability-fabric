@@ -6,10 +6,22 @@ package pcs
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+// Release validation check IDs emitted by PF release-chain admission.
+var RequiredReleaseChainCheckIDs = []string{
+	"manifest_hashes_match",
+	"producer_commits_match",
+	"certificate_id_consistent",
+	"trace_hash_consistent",
+	"signed_input_bundle_hash_match",
+	"scientific_memory_import_passed",
+	"registry_admission_passed",
+}
 
 // ReleaseValidationCheck is a pcs-core release_validation_check entry.
 type ReleaseValidationCheck struct {
@@ -21,33 +33,41 @@ type ReleaseValidationCheck struct {
 
 // ReleaseChainValidationResult is ReleaseChainValidationResult.v0 emitted by PF.
 type ReleaseChainValidationResult struct {
-	SchemaVersion     string                   `json:"schema_version"`
-	ValidationID      string                   `json:"validation_id"`
-	ReleaseID         string                   `json:"release_id"`
-	ReleaseCandidate  string                   `json:"release_candidate"`
-	Validator         string                   `json:"validator"`
-	ValidatorVersion  string                   `json:"validator_version"`
-	CheckedAt         string                   `json:"checked_at"`
-	Status            string                   `json:"status"`
-	Checks            []ReleaseValidationCheck   `json:"checks"`
-	ArtifactsChecked  int                      `json:"artifacts_checked"`
-	FailureCodes      []string                 `json:"failure_codes"`
-	SourceRepo        string                   `json:"source_repo"`
-	SourceCommit      string                   `json:"source_commit"`
-	SignatureOrDigest string                   `json:"signature_or_digest"`
+	SchemaVersion     string                 `json:"schema_version"`
+	ValidationID      string                 `json:"validation_id"`
+	ReleaseID         string                 `json:"release_id"`
+	ReleaseCandidate  string                 `json:"release_candidate"`
+	Validator         string                 `json:"validator"`
+	ValidatorVersion  string                 `json:"validator_version"`
+	CheckedAt         string                 `json:"checked_at"`
+	Status            string                 `json:"status"`
+	Checks            []ReleaseValidationCheck `json:"checks"`
+	ArtifactsChecked  int                    `json:"artifacts_checked"`
+	FailureCodes      []string               `json:"failure_codes"`
+	SourceRepo        string                 `json:"source_repo"`
+	SourceCommit      string                 `json:"source_commit"`
+	SignatureOrDigest string                 `json:"signature_or_digest"`
 }
 
 // ReleaseChainVerifyOptions configures release-chain validation.
 type ReleaseChainVerifyOptions struct {
-	RepoRoot          string
-	ArtifactDir       string
-	ValidatorVersion  string
-	SourceCommit      string
-	ReleaseMode       bool
+	RepoRoot                      string
+	ArtifactDir                   string
+	ValidatorVersion              string
+	SourceCommit                  string
+	ReleaseMode                   bool
+	Registry                      *ArtifactRegistry
+	AllowSkippedRegistrySemantics bool
 }
 
-// VerifyReleaseChainFromManifest validates manifest artifact pins in the manifest directory.
+// VerifyReleaseChainFromManifest validates manifest artifact pins and registry admission.
 func VerifyReleaseChainFromManifest(manifestPath string, opts ReleaseChainVerifyOptions) (ReleaseChainValidationResult, error) {
+	if err := EnforceReleaseChainAdmission(ReleaseAdmissionPolicy{
+		ReleaseMode:                   opts.ReleaseMode,
+		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+	}, manifestPath, opts.Registry); err != nil {
+		return ReleaseChainValidationResult{}, err
+	}
 	resolved, err := ResolveArtifactPath(manifestPath)
 	if err != nil {
 		return ReleaseChainValidationResult{}, err
@@ -63,7 +83,7 @@ func VerifyReleaseChainFromManifest(manifestPath string, opts ReleaseChainVerify
 	if strings.TrimSpace(baseDir) == "" {
 		baseDir = filepath.Dir(resolved)
 	}
-	checks, failureCodes := validateManifestArtifacts(baseDir, manifest)
+	checks, failureCodes := runReleaseChainChecks(baseDir, manifest, opts)
 	return buildReleaseChainResult(manifest, checks, failureCodes, opts, nil)
 }
 
@@ -72,8 +92,6 @@ func PFReleaseChainArtifactNames(manifest *ReleaseManifest) []string {
 	return pfReleaseChainArtifactNames(manifest)
 }
 
-// pfReleaseChainArtifactNames returns manifest artifact filenames PF validates at admission.
-// Scientific Memory import reports are downstream of PF signing and may use a separate pin.
 func pfReleaseChainArtifactNames(manifest *ReleaseManifest) []string {
 	if manifest == nil {
 		return nil
@@ -92,64 +110,287 @@ func isDownstreamOfPFAdmission(artifactName string) bool {
 	return artifactName == "scientific_memory_import_report.json"
 }
 
-func validateManifestArtifacts(baseDir string, manifest *ReleaseManifest) ([]ReleaseValidationCheck, []string) {
-	var checks []ReleaseValidationCheck
+func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts ReleaseChainVerifyOptions) ([]ReleaseValidationCheck, []string) {
+	byID := make(map[string]ReleaseValidationCheck)
 	var failureCodes []string
+
+	hashCheck, hashFailures := checkManifestHashesMatch(baseDir, manifest)
+	byID["manifest_hashes_match"] = hashCheck
+	failureCodes = append(failureCodes, hashFailures...)
+
+	commitCheck, commitFailures := checkProducerCommitsMatch(manifest, opts.ReleaseMode)
+	byID["producer_commits_match"] = commitCheck
+	failureCodes = append(failureCodes, commitFailures...)
+
+	certCheck, certFailures := checkCertificateIDConsistent(baseDir, manifest)
+	byID["certificate_id_consistent"] = certCheck
+	failureCodes = append(failureCodes, certFailures...)
+
+	traceCheck, traceFailures := checkTraceHashConsistent(baseDir, manifest)
+	byID["trace_hash_consistent"] = traceCheck
+	failureCodes = append(failureCodes, traceFailures...)
+
+	signedCheck, signedFailures := checkSignedInputBundleHashMatch(baseDir, manifest)
+	byID["signed_input_bundle_hash_match"] = signedCheck
+	failureCodes = append(failureCodes, signedFailures...)
+
+	smCheck, smFailures := checkScientificMemoryImportPassed(baseDir, manifest, opts)
+	byID["scientific_memory_import_passed"] = smCheck
+	failureCodes = append(failureCodes, smFailures...)
+
+	regCheck, regFailures := checkRegistryAdmissionPassed(manifest, opts)
+	byID["registry_admission_passed"] = regCheck
+	failureCodes = append(failureCodes, regFailures...)
+
+	return normalizeReleaseChainChecks(byID), uniqueStrings(failureCodes)
+}
+
+func normalizeReleaseChainChecks(byID map[string]ReleaseValidationCheck) []ReleaseValidationCheck {
+	out := make([]ReleaseValidationCheck, 0, len(RequiredReleaseChainCheckIDs))
+	for _, id := range RequiredReleaseChainCheckIDs {
+		if c, ok := byID[id]; ok {
+			out = append(out, c)
+			continue
+		}
+		out = append(out, releaseSkipCheck(id, "check not evaluated", map[string]any{}))
+	}
+	return out
+}
+
+func checkManifestHashesMatch(baseDir string, manifest *ReleaseManifest) (ReleaseValidationCheck, []string) {
+	var mismatches []map[string]any
 	for _, name := range pfReleaseChainArtifactNames(manifest) {
 		entry := manifest.Artifacts[name]
-		checkID := "manifest_artifact_" + sanitizeCheckID(name)
 		path := filepath.Join(baseDir, name)
 		digest, err := FileDigest(path)
 		if err != nil {
-			checks = append(checks, releaseFailCheck(checkID,
-				fmt.Sprintf("Artifact %s is present and matches registry sha256", name),
-				"PCS_ARTIFACT_MISSING", map[string]any{"artifact": name, "error": err.Error()}))
-			failureCodes = append(failureCodes, "PCS_ARTIFACT_MISSING")
+			mismatches = append(mismatches, map[string]any{"artifact": name, "error": err.Error()})
 			continue
 		}
 		if digest != entry.SHA256 {
-			checks = append(checks, releaseFailCheck(checkID,
-				fmt.Sprintf("Artifact %s is present and matches registry sha256", name),
+			mismatches = append(mismatches, map[string]any{"artifact": name, "expected": entry.SHA256, "actual": digest})
+		}
+	}
+	if len(mismatches) > 0 {
+		return releaseFailCheck("manifest_hashes_match",
+			"All manifest artifact hashes match on-disk files",
+			"PCS_MANIFEST_HASH_MISMATCH",
+			map[string]any{"mismatches": mismatches}), []string{"PCS_MANIFEST_HASH_MISMATCH"}
+	}
+	return releasePassCheck("manifest_hashes_match",
+		"All manifest artifact hashes match on-disk files",
+		map[string]any{"artifacts_checked": len(pfReleaseChainArtifactNames(manifest))}), nil
+}
+
+func checkProducerCommitsMatch(manifest *ReleaseManifest, releaseMode bool) (ReleaseValidationCheck, []string) {
+	if !releaseMode {
+		return releasePassCheck("producer_commits_match",
+			"Producer repository commits satisfy release policy",
+			map[string]any{"release_mode": false}), nil
+	}
+	if err := ValidateReleaseManifestSemantics(manifest); err != nil {
+		return releaseFailCheck("producer_commits_match",
+			"Producer repository commits satisfy release policy",
+			"PCS_SOURCE_COMMIT_PLACEHOLDER",
+			map[string]any{"error": err.Error()}), []string{"PCS_SOURCE_COMMIT_PLACEHOLDER"}
+	}
+	return releasePassCheck("producer_commits_match",
+		"Producer repository commits satisfy release policy",
+		map[string]any{"producer_repos": len(manifest.ProducerRepos)}), nil
+}
+
+func checkCertificateIDConsistent(baseDir string, manifest *ReleaseManifest) (ReleaseValidationCheck, []string) {
+	certID, err := loadReleaseChainCertificateID(baseDir)
+	if err != nil {
+		return releaseFailCheck("certificate_id_consistent",
+			"Certificate ID is identical across certificate, certified bundle, verification result, and signed bundle",
+			"PCS_CERTIFICATE_ID_MISMATCH",
+			map[string]any{"error": err.Error()}), []string{"PCS_CERTIFICATE_ID_MISMATCH"}
+	}
+	details := map[string]any{"certificate_id": certID}
+	if vrPath := filepath.Join(baseDir, "verification_result.json"); fileExists(vrPath) {
+		vr, err := loadVerificationResultFile(vrPath)
+		if err == nil && vr.VerifiedInput != nil && vr.VerifiedInput.CertificateID != certID {
+			return releaseFailCheck("certificate_id_consistent",
+				"Certificate ID is identical across certificate, certified bundle, verification result, and signed bundle",
+				"PCS_CERTIFICATE_ID_MISMATCH",
+				map[string]any{"certificate_id": certID, "verification_result": vr.VerifiedInput.CertificateID}), []string{"PCS_CERTIFICATE_ID_MISMATCH"}
+		}
+	}
+	return releasePassCheck("certificate_id_consistent",
+		"Certificate ID is identical across certificate, certified bundle, verification result, and signed bundle",
+		details), nil
+}
+
+func checkTraceHashConsistent(baseDir string, manifest *ReleaseManifest) (ReleaseValidationCheck, []string) {
+	traceHash, err := loadReleaseChainTraceHash(baseDir)
+	if err != nil {
+		return releaseFailCheck("trace_hash_consistent",
+			"Trace hash is identical across runtime receipt, certificate, and verification result",
+			"PCS_TRACE_HASH_MISMATCH",
+			map[string]any{"error": err.Error()}), []string{"PCS_TRACE_HASH_MISMATCH"}
+	}
+	if vrPath := filepath.Join(baseDir, "verification_result.json"); fileExists(vrPath) {
+		vr, err := loadVerificationResultFile(vrPath)
+		if err == nil && vr.VerifiedInput != nil && vr.VerifiedInput.TraceHash != "" && vr.VerifiedInput.TraceHash != traceHash {
+			return releaseFailCheck("trace_hash_consistent",
+				"Trace hash is identical across runtime receipt, certificate, and verification result",
+				"PCS_TRACE_HASH_MISMATCH",
+				map[string]any{"bundle_trace_hash": traceHash, "verification_result": vr.VerifiedInput.TraceHash}), []string{"PCS_TRACE_HASH_MISMATCH"}
+		}
+	}
+	return releasePassCheck("trace_hash_consistent",
+		"Trace hash is identical across runtime receipt, certificate, and verification result",
+		map[string]any{"trace_hash": traceHash}), nil
+}
+
+func checkSignedInputBundleHashMatch(baseDir string, manifest *ReleaseManifest) (ReleaseValidationCheck, []string) {
+	signedPath := filepath.Join(baseDir, "signed_science_claim_bundle.json")
+	if !fileExists(signedPath) {
+		return releaseSkipCheck("signed_input_bundle_hash_match",
+			"Signed bundle signed_input_bundle_hash matches certified bundle file digest",
+			map[string]any{"message": "signed_science_claim_bundle.json not present"}), nil
+	}
+	signed, err := LoadSignedScienceClaimBundle(signedPath)
+	if err != nil {
+		return releaseFailCheck("signed_input_bundle_hash_match",
+			"Signed bundle signed_input_bundle_hash matches certified bundle file digest",
+			"PCS_SIGNED_INPUT_HASH_MISMATCH",
+			map[string]any{"error": err.Error()}), []string{"PCS_SIGNED_INPUT_HASH_MISMATCH"}
+	}
+	certPath := filepath.Join(baseDir, "science_claim_bundle.certified.json")
+	want, err := FileDigest(certPath)
+	if err != nil {
+		return releaseFailCheck("signed_input_bundle_hash_match",
+			"Signed bundle signed_input_bundle_hash matches certified bundle file digest",
+			"PCS_ARTIFACT_MISSING",
+			map[string]any{"error": err.Error()}), []string{"PCS_ARTIFACT_MISSING"}
+	}
+	if signed.SignedInputBundleHash != want {
+		return releaseFailCheck("signed_input_bundle_hash_match",
+			"Signed bundle signed_input_bundle_hash matches certified bundle file digest",
+			"PCS_SIGNED_INPUT_HASH_MISMATCH",
+			map[string]any{"expected": want, "actual": signed.SignedInputBundleHash}), []string{"PCS_SIGNED_INPUT_HASH_MISMATCH"}
+	}
+	return releasePassCheck("signed_input_bundle_hash_match",
+		"Signed bundle signed_input_bundle_hash matches certified bundle file digest",
+		map[string]any{"signed_input_bundle_hash": signed.SignedInputBundleHash}), nil
+}
+
+func checkScientificMemoryImportPassed(baseDir string, manifest *ReleaseManifest, opts ReleaseChainVerifyOptions) (ReleaseValidationCheck, []string) {
+	const name = "scientific_memory_import_report.json"
+	entry, inManifest := manifest.Artifacts[name]
+	if !inManifest {
+		return releasePassCheck("scientific_memory_import_passed",
+			"Scientific Memory import report validated or downstream of PF admission",
+			map[string]any{"message": "not listed in release manifest"}), nil
+	}
+	if isDownstreamOfPFAdmission(name) {
+		path := filepath.Join(baseDir, name)
+		if !fileExists(path) {
+			if opts.ReleaseMode && !opts.AllowSkippedRegistrySemantics {
+				return releaseFailCheck("scientific_memory_import_passed",
+					"Scientific Memory import report validated when pinned in manifest",
+					"PCS_ARTIFACT_MISSING",
+					map[string]any{"artifact": name, "message": "downstream artifact pinned but file missing in release mode"}), []string{"PCS_ARTIFACT_MISSING"}
+			}
+			return releasePassCheck("scientific_memory_import_passed",
+				"Scientific Memory import report validated downstream of PF admission",
+				map[string]any{"artifact": name, "downstream": true}), nil
+		}
+		digest, err := FileDigest(path)
+		if err != nil {
+			return releaseFailCheck("scientific_memory_import_passed",
+				"Scientific Memory import report hash matches manifest pin",
+				"PCS_ARTIFACT_MISSING",
+				map[string]any{"error": err.Error()}), []string{"PCS_ARTIFACT_MISSING"}
+		}
+		if digest != entry.SHA256 {
+			return releaseFailCheck("scientific_memory_import_passed",
+				"Scientific Memory import report hash matches manifest pin",
 				"PCS_MANIFEST_HASH_MISMATCH",
-				map[string]any{"artifact": name, "expected": entry.SHA256, "actual": digest}))
-			failureCodes = append(failureCodes, "PCS_MANIFEST_HASH_MISMATCH")
-			continue
+				map[string]any{"expected": entry.SHA256, "actual": digest}), []string{"PCS_MANIFEST_HASH_MISMATCH"}
 		}
-		checks = append(checks, releasePassCheck(checkID,
-			fmt.Sprintf("Artifact %s is present and matches registry sha256", name),
-			map[string]any{"artifact": name, "sha256": digest}))
+		return releasePassCheck("scientific_memory_import_passed",
+			"Scientific Memory import report hash matches manifest pin",
+			map[string]any{"artifact": name, "sha256": digest}), nil
 	}
-	if len(checks) == 0 {
-		checks = append(checks, releasePassCheck("manifest_artifacts", "Release manifest lists artifacts", map[string]any{}))
-	}
-	for _, name := range manifestArtifactsDownstream(manifest) {
-		checks = append(checks, releaseSkipCheck(
-			"manifest_artifact_"+sanitizeCheckID(name)+"_downstream",
-			fmt.Sprintf("Artifact %s is validated downstream of PF admission", name),
-			map[string]any{"artifact": name},
-		))
-	}
-	return checks, uniqueStrings(failureCodes)
+	return releasePassCheck("scientific_memory_import_passed",
+		"Scientific Memory import report validated",
+		map[string]any{}), nil
 }
 
-func manifestArtifactsDownstream(manifest *ReleaseManifest) []string {
-	if manifest == nil {
-		return nil
-	}
-	var names []string
-	for name := range manifest.Artifacts {
-		if isDownstreamOfPFAdmission(name) {
-			names = append(names, name)
+func checkRegistryAdmissionPassed(manifest *ReleaseManifest, opts ReleaseChainVerifyOptions) (ReleaseValidationCheck, []string) {
+	if opts.Registry == nil {
+		if opts.ReleaseMode {
+			return releaseFailCheck("registry_admission_passed",
+				"Release manifest artifacts satisfy ArtifactRegistry.v0",
+				"PCS_REGISTRY_ADMISSION_FAILED",
+				map[string]any{"error": "registry not provided"}), []string{"PCS_REGISTRY_ADMISSION_FAILED"}
 		}
+		return releaseSkipCheck("registry_admission_passed",
+			"Release manifest artifacts satisfy ArtifactRegistry.v0",
+			map[string]any{"message": "registry not provided"}), nil
 	}
-	return names
+	regOpts := RegistryValidateOptions{
+		ReleaseMode:                   opts.ReleaseMode,
+		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+	}
+	if err := ValidateManifestAgainstRegistry(manifest, opts.Registry, regOpts); err != nil {
+		return releaseFailCheck("registry_admission_passed",
+			"Release manifest artifacts satisfy ArtifactRegistry.v0",
+			"PCS_REGISTRY_ADMISSION_FAILED",
+			map[string]any{"error": err.Error()}), []string{"PCS_REGISTRY_ADMISSION_FAILED"}
+	}
+	return releasePassCheck("registry_admission_passed",
+		"Release manifest artifacts satisfy ArtifactRegistry.v0",
+		map[string]any{"registry_id": opts.Registry.RegistryID}), nil
 }
 
-func releaseSkipCheck(id, description string, details map[string]any) ReleaseValidationCheck {
-	if details == nil {
-		details = map[string]any{}
+func loadReleaseChainCertificateID(baseDir string) (string, error) {
+	certPath := filepath.Join(baseDir, "science_claim_bundle.certified.json")
+	if !fileExists(certPath) {
+		return "", fmt.Errorf("science_claim_bundle.certified.json not found")
 	}
-	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "skipped", Details: details}
+	bundle, err := LoadScienceClaimBundle(certPath)
+	if err != nil {
+		return "", err
+	}
+	cert := firstCertificate(bundle)
+	if cert == nil {
+		return "", fmt.Errorf("no certificate in certified bundle")
+	}
+	return cert.CertificateID, nil
+}
+
+func loadReleaseChainTraceHash(baseDir string) (string, error) {
+	certPath := filepath.Join(baseDir, "science_claim_bundle.certified.json")
+	bundle, err := LoadScienceClaimBundle(certPath)
+	if err != nil {
+		return "", err
+	}
+	r := bundle.PrimaryRuntimeReceipt()
+	if r == nil || strings.TrimSpace(r.TraceHash) == "" {
+		return "", fmt.Errorf("runtime receipt trace_hash missing")
+	}
+	return r.TraceHash, nil
+}
+
+func loadVerificationResultFile(path string) (VerificationResult, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return VerificationResult{}, err
+	}
+	var vr VerificationResult
+	if err := json.Unmarshal(data, &vr); err != nil {
+		return VerificationResult{}, err
+	}
+	return vr, nil
+}
+
+func fileExists(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir()
 }
 
 func buildReleaseChainResult(
@@ -163,22 +404,24 @@ func buildReleaseChainResult(
 		return ReleaseChainValidationResult{}, fmt.Errorf("release manifest is nil")
 	}
 	if schemaErr != nil {
-		checks = []ReleaseValidationCheck{releaseFailCheck("release_manifest_schema",
-			"Release manifest matches pcs-core JSON Schema",
-			"PCS_SCHEMA_INVALID", map[string]any{"error": schemaErr.Error()})}
+		checks = normalizeReleaseChainChecks(map[string]ReleaseValidationCheck{
+			"manifest_hashes_match": releaseFailCheck("manifest_hashes_match",
+				"Release manifest matches pcs-core JSON Schema",
+				"PCS_SCHEMA_INVALID", map[string]any{"error": schemaErr.Error()}),
+		})
 		failureCodes = []string{"PCS_SCHEMA_INVALID"}
 	}
 	if len(checks) == 0 {
-		checks = []ReleaseValidationCheck{releasePassCheck("release_chain", "Release chain validation", map[string]any{})}
+		checks = normalizeReleaseChainChecks(nil)
 	}
 	status := StatusProofChecked
-	if len(failureCodes) > 0 {
-		status = StatusRejected
-	}
 	for _, c := range checks {
 		if c.Status == "failed" {
 			status = StatusRejected
 		}
+	}
+	if len(failureCodes) > 0 {
+		status = StatusRejected
 	}
 	ver := opts.ValidatorVersion
 	if ver == "" {
@@ -220,22 +463,28 @@ func buildReleaseChainResult(
 	return result, nil
 }
 
-// BuildReleaseChainValidationResultFromVerification maps a bundle verification into RCVR for single-bundle admission.
+// BuildReleaseChainValidationResultFromVerification maps bundle verification into RCVR for PF admission.
 func BuildReleaseChainValidationResultFromVerification(
 	manifest *ReleaseManifest,
+	manifestPath string,
 	bundleResult VerificationResult,
 	handoff *HandoffManifest,
+	registry *ArtifactRegistry,
 	opts ReleaseChainVerifyOptions,
 ) (ReleaseChainValidationResult, error) {
+	opts.Registry = registry
+	artifactDir := opts.ArtifactDir
+	if strings.TrimSpace(artifactDir) == "" && strings.TrimSpace(manifestPath) != "" {
+		if resolved, err := ResolveArtifactPath(manifestPath); err == nil {
+			artifactDir = filepath.Dir(resolved)
+		}
+	}
+	opts.ArtifactDir = artifactDir
+
 	var checks []ReleaseValidationCheck
 	var failureCodes []string
-
 	if manifest != nil {
-		checks = append(checks, releasePassCheck("release_manifest_loaded",
-			"Release manifest loaded for admission", map[string]any{
-				"release_id":        manifest.ReleaseID,
-				"release_candidate": manifest.ReleaseCandidate,
-			}))
+		checks, failureCodes = runReleaseChainChecks(artifactDir, manifest, opts)
 	}
 	if handoff != nil {
 		id := "handoff_manifest_validated"
@@ -270,6 +519,13 @@ func BuildReleaseChainValidationResultFromVerification(
 	return buildReleaseChainResult(manifest, checks, failureCodes, opts, nil)
 }
 
+func releaseSkipCheck(id, description string, details map[string]any) ReleaseValidationCheck {
+	if details == nil {
+		details = map[string]any{}
+	}
+	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "skipped", Details: details}
+}
+
 func releasePassCheck(id, description string, details map[string]any) ReleaseValidationCheck {
 	if details == nil {
 		details = map[string]any{}
@@ -283,18 +539,6 @@ func releaseFailCheck(id, description, failureCode string, details map[string]an
 	}
 	details["failure_code"] = failureCode
 	return ReleaseValidationCheck{CheckID: id, Description: description, Status: "failed", Details: details}
-}
-
-func sanitizeCheckID(name string) string {
-	out := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-			return r
-		default:
-			return '_'
-		}
-	}, name)
-	return strings.Trim(out, "_")
 }
 
 func uniqueStrings(in []string) []string {
@@ -329,4 +573,28 @@ func digestReleaseChainValidationResult(result ReleaseChainValidationResult) str
 		return ""
 	}
 	return digest
+}
+
+// DefaultReleaseManifestPath returns a colocated or pcs-core example release manifest when present.
+func DefaultReleaseManifestPath(nearDir string) (string, bool) {
+	if nearDir != "" {
+		for _, name := range []string{"release_manifest.v0.json", "release_manifest.json"} {
+			candidate := filepath.Join(nearDir, name)
+			if fileExists(candidate) {
+				return candidate, true
+			}
+		}
+	}
+	for _, base := range pcsCoreSearchRoots() {
+		for _, name := range []string{
+			filepath.Join("examples", "labtrust-release", "release_manifest.v0.json"),
+			filepath.Join("examples", "release_manifest.valid.json"),
+		} {
+			candidate := filepath.Join(base, name)
+			if fileExists(candidate) {
+				return candidate, true
+			}
+		}
+	}
+	return "", false
 }

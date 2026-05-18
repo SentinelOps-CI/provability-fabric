@@ -59,12 +59,8 @@ func TestVerifyAndSignPreservesVerifiedInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	opts := pcs.ValidateOptions{
-		RepoRoot:        root,
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.RepoRoot = root
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil || !pcs.VerificationPassed(result) {
 		t.Fatalf("verify: %v status=%s", err, result.Status)

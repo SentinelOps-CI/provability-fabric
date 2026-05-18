@@ -19,23 +19,29 @@ PF runs seventeen structural and consistency checks on `ScienceClaimBundle.v0` (
 
 On success PF writes `VerificationResult.v0` with `status: ProofChecked`, seventeen `checks` (including status-transition policy), `verified_input` (bundle file hash, certificate ID, trace hash), and `signature_or_digest`.
 
-Optional `--handoff` accepts legacy `pf_handoff.json` or pcs-core `HandoffManifest.v0` and ensures the bundle matches LabTrust release pins before verify/sign.
+In **release mode**, PF requires `--handoff` (HandoffManifest.v0) and `--registry` (ArtifactRegistry.v0). PF rejects verification without handoff, with handoff bundle/certificate/trace mismatches, and without registry admission.
 
 Phase 2 admission commands:
 
 ```bash
-pf verify release-chain \
-  --manifest release_manifest.json \
-  --artifact-dir /path/to/labtrust-release \
-  --out release_chain_validation_result.json
-
 pf verify science-claim science_claim_bundle.certified.json \
   --handoff handoff_to_pf.json \
-  --registry release_manifest.json \
-  --release-chain-result release_chain_validation_result.json
+  --registry artifact_registry.json \
+  --out verification_result.json \
+  --release-chain-result release_chain_validation_result.json \
+  --release-mode
+
+pf verify release-chain \
+  --manifest release_manifest.json \
+  --registry artifact_registry.json \
+  --artifact-dir /path/to/labtrust-release \
+  --out release_chain_validation_result.json \
+  --release-mode
+
+pf explain failure verification_result.json
 ```
 
-`--registry` loads `ReleaseManifest.v0` (artifact registry until `ArtifactRegistry.v0` is published in pcs-core).
+`--registry` is `ArtifactRegistry.v0`. Use `--manifest` for `ReleaseManifest.v0`.
 
 ## What PF signs
 

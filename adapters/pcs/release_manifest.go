@@ -9,9 +9,6 @@ import (
 	"os"
 )
 
-// ArtifactRegistry is ReleaseManifest.v0 until ArtifactRegistry.v0 ships in pcs-core.
-type ArtifactRegistry = ReleaseManifest
-
 // ProducerRepoPin is a pinned producer repository commit.
 type ProducerRepoPin struct {
 	Repo     string `json:"repo"`
@@ -41,11 +38,6 @@ type ReleaseManifest struct {
 	Artifacts         map[string]ManifestArtifactEntry `json:"artifacts"`
 	ReleaseStatus     string                           `json:"release_status"`
 	SignatureOrDigest string                           `json:"signature_or_digest"`
-}
-
-// LoadArtifactRegistry reads ReleaseManifest.v0 / ArtifactRegistry JSON from disk.
-func LoadArtifactRegistry(path string) (*ArtifactRegistry, error) {
-	return LoadReleaseManifest(path)
 }
 
 // LoadReleaseManifest reads ReleaseManifest.v0 JSON from disk.
@@ -87,4 +79,13 @@ func ValidateReleaseManifestFile(repoRoot, path string) error {
 		return err
 	}
 	return ValidateReleaseManifestSemantics(&manifest)
+}
+
+func firstCertificate(bundle *ScienceClaimBundle) *TraceCertificate {
+	for _, cert := range bundle.Certificates {
+		if cert != nil {
+			return cert
+		}
+	}
+	return nil
 }

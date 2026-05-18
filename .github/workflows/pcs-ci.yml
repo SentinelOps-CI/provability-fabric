@@ -110,9 +110,11 @@ jobs:
           PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           go run . verify science-claim \
-            "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json" \
-            --handoff "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json" \
+            "$RELEASE/science_claim_bundle.certified.json" \
+            --handoff "$RELEASE/handoff_to_pf.json" \
+            --registry "$RELEASE/artifact_registry.json" \
             --release-mode
 
       - name: pf verify release-chain (ReleaseManifest.v0)
@@ -128,11 +130,17 @@ jobs:
           if [ ! -f "$MANIFEST" ]; then
             MANIFEST="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/release_manifest.json"
           fi
+          REGISTRY="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/artifact_registry.json"
           go run . verify release-chain \
             --manifest "$MANIFEST" \
+            --registry "$REGISTRY" \
             --artifact-dir "$RC_DIR" \
+            --release-mode \
             --out "$OUT"
           pcs validate "$OUT"
+          grep -q '"status": "ProofChecked"' "$OUT"
+          grep -q 'manifest_hashes_match' "$OUT"
+          grep -q 'registry_admission_passed' "$OUT"
 
       - name: Validate PCS fixtures
         run: |
@@ -167,6 +175,7 @@ jobs:
           pcs validate "$RELEASE/handoff_to_pf.json"
           pcs validate "$RELEASE/release_manifest.json"
           pcs validate "$RELEASE/release_chain_validation_result.json"
+          pcs validate "$RELEASE/artifact_registry.json"
 
       - name: pf validate Phase 2 protocol fixtures
         run: |
@@ -174,7 +183,17 @@ jobs:
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           go run . validate handoff-manifest "$RELEASE/handoff_to_pf.json"
           go run . validate release-manifest "$RELEASE/release_manifest.json"
+          go run . validate artifact-registry "$RELEASE/artifact_registry.json"
           go run . validate release-chain-result "$RELEASE/release_chain_validation_result.json"
+
+      - name: pf explain failure on rejected fixture
+        run: |
+          cd core/cli/pf
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          if go run . explain failure "$RELEASE/invalid_mismatched_trace_hash.json"; then
+            echo "expected explain failure to exit non-zero"
+            exit 1
+          fi
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

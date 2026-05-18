@@ -133,6 +133,7 @@ func validateLabtrustReleaseFixtures(releaseDir, root string, localDev bool, res
 	}{
 		{"handoff_to_pf.json", "handoff"},
 		{"release_manifest.json", "release_manifest"},
+		{"artifact_registry.json", "artifact_registry"},
 		{"release_chain_validation_result.json", "release_chain_result"},
 	} {
 		path := filepath.Join(releaseDir, spec.file)
@@ -167,6 +168,11 @@ func validatePhase2ProtocolFixture(path, label, root, kind string, results *[]va
 		}
 	case "release_manifest":
 		if err := pcs.ValidateReleaseManifestFile(root, path); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			return true
+		}
+	case "artifact_registry":
+		if err := pcs.ValidateArtifactRegistryFile(root, path); err != nil {
 			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
 			return true
 		}

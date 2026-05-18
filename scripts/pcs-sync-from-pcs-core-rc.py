@@ -22,6 +22,7 @@ PF_PROTOCOL_FROM_RC = (
 PF_PROTOCOL_FALLBACK = (
     ("handoff_manifest.valid.json", "handoff_to_pf.json"),
     ("release_manifest.valid.json", "release_manifest.json"),
+    ("artifact_registry.valid.json", "artifact_registry.json"),
 )
 
 

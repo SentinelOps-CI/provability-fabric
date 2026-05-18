@@ -25,7 +25,10 @@
         "producer",
         "allowed_statuses",
         "required_release_fields",
-        "semantic_checks"
+        "semantic_checks",
+        "consumer_repos",
+        "canonical_hash_required",
+        "release_mode_required"
       ],
       "additionalProperties": false,
       "properties": {
@@ -44,7 +47,14 @@
         "semantic_checks": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "consumer_repos": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "canonical_hash_required": { "type": "boolean" },
+        "release_mode_required": { "type": "boolean" }
       }
     }
   }

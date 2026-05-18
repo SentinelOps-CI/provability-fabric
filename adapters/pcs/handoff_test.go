@@ -5,6 +5,7 @@ package pcs_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,15 +30,15 @@ func signWithHandoff(t *testing.T, handoff *pcs.PFHandoff) error {
 		t.Fatal(err)
 	}
 	root := repoRoot(t)
-	opts := pcs.ValidateOptions{
-		RepoRoot:        root,
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.RepoRoot = root
+	opts.Handoff = loadedLegacyHandoff(handoff)
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
-	if err != nil || !pcs.VerificationPassed(result) {
-		t.Fatalf("verify: %v status=%s", err, result.Status)
+	if err != nil {
+		return err
+	}
+	if !pcs.VerificationPassed(result) {
+		return fmt.Errorf("verify status=%s", result.Status)
 	}
 	_, err = pcs.SignVerificationResultWithOptions(root, bundle, result, pcs.SignOptions{
 		ReleaseMode: true,

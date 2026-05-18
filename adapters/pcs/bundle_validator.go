@@ -16,13 +16,27 @@ type ValidateOptions struct {
 	SourceCommit       string
 	LocalDev           bool
 	ReleaseMode        bool
-	SkipSchemaValidate bool
-	Handoff            *LoadedHandoff
-	Registry           *ArtifactRegistry
+	SkipSchemaValidate            bool
+	Handoff                       *LoadedHandoff
+	Registry                      *ArtifactRegistry
+	AllowMissingHandoff           bool
+	AllowSkippedRegistrySemantics bool
 }
 
 // VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
 func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) (VerificationResult, error) {
+	if err := EnforceScienceClaimAdmission(ReleaseAdmissionPolicy{
+		ReleaseMode:                   opts.ReleaseMode,
+		AllowMissingHandoff:           opts.AllowMissingHandoff,
+		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+	}, opts.Handoff, opts.Registry); err != nil {
+		return VerificationResult{}, err
+	}
+	if opts.Handoff != nil {
+		if err := opts.Handoff.AssertBundleMatchesHandoff(bundle, bundlePath); err != nil {
+			return VerificationResult{}, fmt.Errorf("handoff guard: %w", err)
+		}
+	}
 	if bundle != nil && bundle.LocalDev {
 		opts.LocalDev = true
 	}
@@ -42,13 +56,12 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 		result.VerifiedInput = &vi
 		result.SignatureOrDigest = DigestVerificationResult(result)
 	}
-	if opts.Handoff != nil && VerificationPassed(result) {
-		if err := opts.Handoff.AssertBundleMatchesHandoff(bundle, bundlePath); err != nil {
-			return VerificationResult{}, fmt.Errorf("handoff guard: %w", err)
-		}
-	}
 	if opts.Registry != nil && VerificationPassed(result) {
-		if err := ValidateBundleAgainstRegistry(bundle, opts.Registry); err != nil {
+		regOpts := RegistryValidateOptions{
+			ReleaseMode:                   opts.ReleaseMode,
+			AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+		}
+		if err := ValidateBundleAgainstRegistry(bundle, opts.Registry, regOpts); err != nil {
 			return VerificationResult{}, fmt.Errorf("registry guard: %w", err)
 		}
 	}

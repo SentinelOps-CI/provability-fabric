@@ -8,6 +8,7 @@ import "github.com/spf13/cobra"
 // RegisterPCSCommands wires Proof-Carrying Science CLI commands onto the pf root.
 func RegisterPCSCommands(root *cobra.Command) {
 	root.AddCommand(verifyRootCmd())
+	root.AddCommand(explainRootCmd())
 	root.AddCommand(inspectRootCmd())
 	root.AddCommand(migrateRootCmd())
 	root.AddCommand(validateRootCmd())

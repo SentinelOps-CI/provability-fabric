@@ -15,6 +15,7 @@ import (
 func registerPhase2ValidateCommands(validate *cobra.Command) {
 	validate.AddCommand(validateHandoffManifestCmd())
 	validate.AddCommand(validateReleaseManifestCmd())
+	validate.AddCommand(validateArtifactRegistryCmd())
 	validate.AddCommand(validateReleaseChainResultCmd())
 }
 
@@ -28,6 +29,21 @@ func validateHandoffManifestCmd() *cobra.Command {
 				return err
 			}
 			fmt.Printf("OK: %s (HandoffManifest.v0 schema valid)\n", args[0])
+			return nil
+		},
+	}
+}
+
+func validateArtifactRegistryCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "artifact-registry <registry.json>",
+		Short: "Validate an ArtifactRegistry.v0 file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := pcs.ValidateArtifactRegistryFile("", args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("OK: %s (ArtifactRegistry.v0 schema valid)\n", args[0])
 			return nil
 		},
 	}

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
@@ -49,7 +48,7 @@ func resolvePCSOpts(bundlePath string, localDev, releaseMode bool) (pcs.Validate
 	}, nil
 }
 
-func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath, registryPath string) (pcs.VerificationResult, error) {
+func verifyBundle(bundlePath string, localDev, releaseMode bool, adm resolvedScienceClaimAdmission) (pcs.VerificationResult, error) {
 	resolved, err := pcs.ResolveArtifactPath(bundlePath)
 	if err != nil {
 		return pcs.VerificationResult{}, err
@@ -62,23 +61,10 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath, re
 	if err != nil {
 		return pcs.VerificationResult{}, err
 	}
-	if strings.TrimSpace(handoffPath) != "" {
-		handoff, err := pcs.LoadHandoff(handoffPath)
-		if err != nil {
-			return pcs.VerificationResult{}, err
-		}
-		opts.Handoff = handoff
-	}
-	if strings.TrimSpace(registryPath) != "" {
-		registry, err := pcs.LoadArtifactRegistry(registryPath)
-		if err != nil {
-			return pcs.VerificationResult{}, err
-		}
-		opts.Registry = registry
-	}
+	applyAdmissionToValidateOpts(&opts, adm)
 	result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
 	if err != nil {
-		return result, err
+		return result, wrapAdmissionError(err)
 	}
 	if err := pcs.ValidatePFProvenanceCommit(result.SourceCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
 		return result, err
@@ -86,35 +72,35 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, handoffPath, re
 	return result, nil
 }
 
-func writeReleaseChainResult(bundlePath string, result pcs.VerificationResult, handoffPath, registryPath, outPath string, localDev, releaseMode bool) error {
+func writeReleaseChainResult(bundlePath string, result pcs.VerificationResult, adm resolvedScienceClaimAdmission, outPath string, localDev, releaseMode bool) error {
 	opts, err := resolveReleaseChainOpts(localDev, releaseMode)
 	if err != nil {
 		return err
 	}
-	var manifest *pcs.ReleaseManifest
-	if strings.TrimSpace(registryPath) != "" {
-		manifest, err = pcs.LoadReleaseManifest(registryPath)
-		if err != nil {
-			return err
+	opts.AllowSkippedRegistrySemantics = adm.Policy.AllowSkippedRegistrySemantics
+	opts.Registry = adm.Registry
+	if adm.Manifest != nil {
+		if resolved, err := pcs.ResolveArtifactPath(bundlePath); err == nil {
+			opts.ArtifactDir = filepath.Dir(resolved)
 		}
 	}
 	var handoff *pcs.HandoffManifest
-	if strings.TrimSpace(handoffPath) != "" {
-		loaded, err := pcs.LoadHandoff(handoffPath)
-		if err != nil {
-			return err
-		}
-		if loaded.Manifest != nil {
-			handoff = loaded.Manifest
-		}
+	if adm.Handoff != nil && adm.Handoff.Manifest != nil {
+		handoff = adm.Handoff.Manifest
 	}
+	manifest := adm.Manifest
+	manifestPath := ""
 	if manifest == nil {
 		manifest = &pcs.ReleaseManifest{
 			ReleaseID:        "release-pf-science-claim",
 			ReleaseCandidate: "pf-verify",
 		}
+	} else if adm.Manifest != nil {
+		if def, ok := pcs.DefaultReleaseManifestPath(opts.ArtifactDir); ok {
+			manifestPath = def
+		}
 	}
-	rcvr, err := pcs.BuildReleaseChainValidationResultFromVerification(manifest, result, handoff, opts)
+	rcvr, err := pcs.BuildReleaseChainValidationResultFromVerification(manifest, manifestPath, result, handoff, adm.Registry, opts)
 	if err != nil {
 		return err
 	}

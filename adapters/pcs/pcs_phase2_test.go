@@ -59,12 +59,14 @@ func verifyWithLoadedHandoff(t *testing.T, loaded *pcs.LoadedHandoff) error {
 	if err != nil {
 		t.Fatal(err)
 	}
+	registry := loadArtifactRegistry(t)
 	opts := pcs.ValidateOptions{
 		RepoRoot:        repoRoot(t),
 		VerifierVersion: pcs.DefaultVerifierVersion,
 		SourceCommit:    manifest.PFSourceCommit,
 		ReleaseMode:     true,
 		Handoff:         loaded,
+		Registry:        registry,
 	}
 	_, err = pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	return err
@@ -173,6 +175,7 @@ func TestPFEmitsReleaseChainValidationResult(t *testing.T) {
 		ValidatorVersion: pcs.DefaultVerifierVersion,
 		SourceCommit:     loadReleaseManifest(t).PFSourceCommit,
 		ReleaseMode:      true,
+		Registry:         loadArtifactRegistry(t),
 	}
 	result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, opts)
 	if err != nil {
@@ -277,13 +280,13 @@ func TestReleaseChainResultStatusRejectedOnHashMismatch(t *testing.T) {
 
 func TestPFRejectsUnregisteredArtifactType(t *testing.T) {
 	registry := minimalRegistryForBundle(t)
-	registry.Artifacts = map[string]pcs.ManifestArtifactEntry{}
+	delete(registry.Entries, "ScienceClaimBundle.v0")
 	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
 	bundle, err := pcs.LoadScienceClaimBundle(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.ValidateBundleAgainstRegistry(bundle, registry)
+	err = pcs.ValidateBundleAgainstRegistry(bundle, registry, pcs.RegistryValidateOptions{ReleaseMode: true})
 	if err == nil || !strings.Contains(err.Error(), "unregistered artifact type") {
 		t.Fatalf("unexpected: %v", err)
 	}
@@ -291,10 +294,10 @@ func TestPFRejectsUnregisteredArtifactType(t *testing.T) {
 
 func TestPFRejectsWrongProducerForTraceCertificate(t *testing.T) {
 	registry := minimalRegistryForBundle(t)
-	for name, entry := range registry.Artifacts {
+	for key, entry := range registry.Entries {
 		if entry.ArtifactType == "TraceCertificate.v0" {
 			entry.Producer = "wrong-producer"
-			registry.Artifacts[name] = entry
+			registry.Entries[key] = entry
 			break
 		}
 	}
@@ -303,7 +306,7 @@ func TestPFRejectsWrongProducerForTraceCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.ValidateBundleAgainstRegistry(bundle, registry)
+	err = pcs.ValidateBundleAgainstRegistry(bundle, registry, pcs.RegistryValidateOptions{ReleaseMode: true})
 	if err == nil || !strings.Contains(err.Error(), "producer mismatch") {
 		t.Fatalf("unexpected: %v", err)
 	}
@@ -316,39 +319,74 @@ func TestPFRejectsStatusNotAllowedByRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := minimalRegistryForBundle(t)
-	err = pcs.ValidateBundleAgainstRegistry(bundle, registry)
-	if err == nil || !strings.Contains(err.Error(), "not allowed") {
+	err = pcs.ValidateBundleAgainstRegistry(bundle, registry, pcs.RegistryValidateOptions{ReleaseMode: true})
+	if err == nil {
+		t.Fatal("expected registry rejection")
+	}
+	if !strings.Contains(err.Error(), "not allowed") &&
+		!strings.Contains(err.Error(), "certificate status") {
 		t.Fatalf("unexpected: %v", err)
 	}
 }
 
 func TestPFExecutesRegistrySemanticChecks(t *testing.T) {
 	registry := minimalRegistryForBundle(t)
-	registry.Artifacts["science_claim_bundle.certified.json"] = pcs.ManifestArtifactEntry{
-		ArtifactType: "ScienceClaimBundle.v0",
-		Schema:       "ScienceClaimBundle.v0.schema.json",
-		Producer:     "LabTrust-Gym",
-		SourceRepo:   "https://github.com/fraware/LabTrust-Gym",
-		SourceCommit: "0000000000000000000000000000000000000000",
-		SHA256:       "sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833",
+	for key, entry := range registry.Entries {
+		if entry.ArtifactType == "ScienceClaimBundle.v0" {
+			entry.SemanticChecks = []string{"embedded_bundle_passes_science_claim_semantics"}
+			registry.Entries[key] = entry
+			break
+		}
 	}
-	err := pcs.ValidateReleaseManifestSemantics(registry)
-	if err == nil || !strings.Contains(err.Error(), "zero source_commit") {
+	path := labtrustReleaseFixture(t, "science_claim_bundle.certified.json")
+	bundle, err := pcs.LoadScienceClaimBundle(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pcs.ValidateBundleAgainstRegistry(bundle, registry, pcs.RegistryValidateOptions{ReleaseMode: true})
+	if err == nil || !strings.Contains(err.Error(), "was not executed in release mode") {
 		t.Fatalf("unexpected: %v", err)
 	}
 }
 
-func minimalRegistryForBundle(t *testing.T) *pcs.ReleaseManifest {
+func validArtifactRegistryPath(t *testing.T) string {
 	t.Helper()
-	p := validReleaseManifestPath(t)
-	if p == "" {
-		t.Skip()
+	local := labtrustReleaseFixture(t, "artifact_registry.json")
+	if _, err := os.Stat(local); err == nil {
+		return local
 	}
-	reg, err := pcs.LoadArtifactRegistry(p)
+	return pcsCoreExamples(t, "artifact_registry.valid.json")
+}
+
+func loadArtifactRegistry(t *testing.T) *pcs.ArtifactRegistry {
+	t.Helper()
+	reg, err := pcs.LoadArtifactRegistry(validArtifactRegistryPath(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return reg
+}
+
+func releaseModeValidateOpts(t *testing.T) pcs.ValidateOptions {
+	t.Helper()
+	manifest := loadReleaseManifest(t)
+	loaded, err := pcs.LoadHandoff(validHandoffManifestPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pcs.ValidateOptions{
+		RepoRoot:        repoRoot(t),
+		VerifierVersion: pcs.DefaultVerifierVersion,
+		SourceCommit:    manifest.PFSourceCommit,
+		ReleaseMode:     true,
+		Handoff:         loaded,
+		Registry:        loadArtifactRegistry(t),
+	}
+}
+
+func minimalRegistryForBundle(t *testing.T) *pcs.ArtifactRegistry {
+	t.Helper()
+	return loadArtifactRegistry(t)
 }
 
 func TestPFHashMatchesPCSCoreSignedBundleVector(t *testing.T) {
@@ -411,12 +449,9 @@ func TestPFRejectsStaleArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := pcs.ValidateOptions{
-		RepoRoot:        repoRoot(t),
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.Handoff = nil
+	opts.AllowMissingHandoff = true
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -428,18 +463,13 @@ func TestPFRejectsStaleArtifact(t *testing.T) {
 
 func TestPFRejectsRejectedCertificate(t *testing.T) {
 	path := labtrustReleaseFixture(t, "invalid_rejected_certificate.json")
-	manifest := loadReleaseManifest(t)
-	t.Setenv("PF_SOURCE_COMMIT", manifest.PFSourceCommit)
 	bundle, err := pcs.LoadScienceClaimBundle(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := pcs.ValidateOptions{
-		RepoRoot:        repoRoot(t),
-		VerifierVersion: pcs.DefaultVerifierVersion,
-		SourceCommit:    manifest.PFSourceCommit,
-		ReleaseMode:     true,
-	}
+	opts := releaseModeValidateOpts(t)
+	opts.Handoff = nil
+	opts.AllowMissingHandoff = true
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		t.Fatal(err)

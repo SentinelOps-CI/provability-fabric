@@ -103,7 +103,7 @@
     },
     {
       "check_id": "artifact_registry_admission",
-      "description": "Bundle components match ReleaseManifest.v0 artifact registry",
+      "description": "Bundle components match ArtifactRegistry.v0 admission rules",
       "status": "skipped",
       "details": {
         "message": "registry not provided"

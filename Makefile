@@ -99,7 +99,7 @@ test-pcs-rc-gate:
 
 test-pcs-phase2:
 	@$(ECHOOK) "PCS Phase 2 protocol tests..."
-	cd adapters/pcs && go test -count=1 -run "TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition" ./...
+	cd adapters/pcs && go test -count=1 -run "TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition|TestReleaseModeRequiresHandoff|TestReleaseModeRequiresRegistry|TestReleaseChainResultContainsRegistryChecks|TestPFExplainFailureOutputsRepairHint" ./...
 else
 test-pcs-rc-gate:
 	@$(ECHOOK) "PCS RC fixture lock tests..."
@@ -107,7 +107,7 @@ test-pcs-rc-gate:
 
 test-pcs-phase2:
 	@$(ECHOOK) "PCS Phase 2 protocol tests..."
-	cd adapters/pcs && go test -count=1 -run 'TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition' ./...
+	cd adapters/pcs && go test -count=1 -run 'TestPFAcceptsValidHandoffManifest|TestPFEmitsReleaseChainValidationResult|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestPFRejectsIllegalStatusTransition|TestReleaseModeRequiresHandoff|TestReleaseModeRequiresRegistry|TestReleaseChainResultContainsRegistryChecks|TestPFExplainFailureOutputsRepairHint' ./...
 endif
 
 ifeq ($(OS),Windows_NT)

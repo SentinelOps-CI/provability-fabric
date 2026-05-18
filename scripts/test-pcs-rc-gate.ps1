@@ -6,7 +6,7 @@ if (-not $env:PCS_CORE_PATH) {
 }
 Push-Location (Join-Path $Root "adapters\pcs")
 try {
-    go test -count=1 -run "PFLabtrustReleaseFixtureMatchesPCSCoreRC|PFSignedBundleRCIdentity|TestPFAcceptsValidHandoffManifest|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector" ./...
+    go test -count=1 -run "PFLabtrustReleaseFixtureMatchesPCSCoreRC|PFSignedBundleRCIdentity|TestPFAcceptsValidHandoffManifest|TestReleaseChainResultStatusProofCheckedOnValidChain|TestPFHashMatchesPCSCoreSignedBundleVector|TestReleaseModeRequiresHandoff|TestReleaseModeRequiresRegistry|TestReleaseChainResultContainsRegistryChecks" ./...
 } finally {
     Pop-Location
 }
