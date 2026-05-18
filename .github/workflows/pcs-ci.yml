@@ -88,6 +88,9 @@ jobs:
       - name: Schema mirror matches pcs-core
         run: bash scripts/pcs-schema-diff.sh pcs-core
 
+      - name: Refresh pcs-core release manifest pins
+        run: python3 scripts/refresh-release-manifest-pins.py pcs-core/examples/labtrust-release
+
       - name: Test PCS adapter
         run: |
           cd adapters/pcs
