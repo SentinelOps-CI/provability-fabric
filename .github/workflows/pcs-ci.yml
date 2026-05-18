@@ -149,7 +149,7 @@ jobs:
             --artifact-dir "$RC_DIR" \
             --release-mode \
             --out "$OUT"
-          pcs validate "$OUT"
+          go run . validate release-chain-result "$OUT"
           grep -q '"status": "ProofChecked"' "$OUT"
           grep -q 'manifest_hashes_match' "$OUT"
           grep -q 'registry_admission_passed' "$OUT"
