@@ -31,6 +31,27 @@ func repoRoot(t *testing.T) string {
 	return root
 }
 
+// pcsCoreRoot resolves the pcs-core checkout (PCS_CORE_PATH, repo/pcs-core, or ../pcs-core).
+func pcsCoreRoot(t *testing.T) string {
+	t.Helper()
+	root := repoRoot(t)
+	if p := strings.TrimSpace(os.Getenv("PCS_CORE_PATH")); p != "" {
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			return p
+		}
+	}
+	for _, candidate := range []string{
+		filepath.Join(root, "pcs-core"),
+		filepath.Join(root, "..", "pcs-core"),
+	} {
+		if st, err := os.Stat(candidate); err == nil && st.IsDir() {
+			return candidate
+		}
+	}
+	t.Skip("pcs-core not found (set PCS_CORE_PATH)")
+	return ""
+}
+
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
 	return filepath.Join(repoRoot(t), "tests", "pcs", name)

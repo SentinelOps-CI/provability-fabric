@@ -14,6 +14,7 @@ PF_ARTIFACTS = (
 )
 
 PF_PROTOCOL_FROM_RC = (
+    ("handoff_to_pf.json", "handoff_to_pf.json"),
     ("handoff_manifest.bundle_to_verifier.v0.json", "handoff_to_pf.json"),
     ("release_manifest.v0.json", "release_manifest.json"),
     ("release_chain_validation_result.v0.json", "release_chain_validation_result.json"),
@@ -82,6 +83,7 @@ def main() -> int:
     }
     pf_manifest = {k: v for k, v in pf_manifest.items() if v is not None}
     pf_manifest_path.write_text(json.dumps(pf_manifest, indent=2) + "\n", encoding="utf-8")
+    # Legacy pf_handoff.json: local-dev / negative tests only (forbidden with --release-mode).
     certified = json.loads((pf_release / "science_claim_bundle.certified.json").read_text(encoding="utf-8"))
     handoff = {
         "schema_version": "v0",

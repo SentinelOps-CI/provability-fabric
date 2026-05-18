@@ -63,6 +63,8 @@ jobs:
   pcs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PCS_CORE_PATH: ${{ github.workspace }}/pcs-core
     steps:
       - uses: actions/checkout@v4
 
@@ -86,8 +88,6 @@ jobs:
         run: bash scripts/pcs-schema-diff.sh pcs-core
 
       - name: Test PCS adapter
-        env:
-          PCS_CORE_PATH: ${{ github.workspace }}/pcs-core
         run: |
           cd adapters/pcs
           go test ./... -count=1

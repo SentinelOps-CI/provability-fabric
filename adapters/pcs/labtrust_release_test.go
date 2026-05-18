@@ -21,6 +21,17 @@ func labtrustReleaseFixture(t *testing.T, name string) string {
 	return filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release", name)
 }
 
+// labtrustReleaseArtifactDir is the directory passed to release-chain verification.
+// Prefer pcs-core RC when present; otherwise PF synced fixtures (CI sparse checkout).
+func labtrustReleaseArtifactDir(t *testing.T) string {
+	t.Helper()
+	rc := filepath.Join(pcsCoreRoot(t), "examples", "labtrust-release")
+	if st, err := os.Stat(filepath.Join(rc, "science_claim_bundle.certified.json")); err == nil && !st.IsDir() {
+		return rc
+	}
+	return filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "labtrust-release")
+}
+
 // LabTrust + CertifyEdge release fixture freeze tests (PCS v0.1 release gate).
 
 func TestVerifyLabtrustReleaseCertifiedBundlePasses(t *testing.T) {
@@ -243,7 +254,7 @@ func TestCleanChainPFSegmentOnReleaseFixtures(t *testing.T) {
 	if err := os.WriteFile(certDst, data, 0644); err != nil {
 		t.Fatal(err)
 	}
-	pcsCore := filepath.Join(filepath.Dir(root), "pcs-core")
+	pcsCore := pcsCoreRoot(t)
 	manifest := loadReleaseManifest(t)
 	baseEnv := make([]string, 0, len(os.Environ()))
 	for _, e := range os.Environ() {

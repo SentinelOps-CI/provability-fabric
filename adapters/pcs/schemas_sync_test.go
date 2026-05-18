@@ -37,10 +37,7 @@ func TestEmbeddedSchemasMatchConfig(t *testing.T) {
 
 func TestSchemaMirrorMatchesPCSCore(t *testing.T) {
 	root := repoRoot(t)
-	pcsCore := os.Getenv("PCS_CORE_PATH")
-	if pcsCore == "" {
-		pcsCore = filepath.Join(root, "..", "pcs-core")
-	}
+	pcsCore := pcsCoreRoot(t)
 	canonical := filepath.Join(pcsCore, "schemas")
 	if st, err := os.Stat(canonical); err != nil || !st.IsDir() {
 		t.Skipf("pcs-core schemas not found at %s (set PCS_CORE_PATH)", canonical)

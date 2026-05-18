@@ -5,12 +5,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=_resolve_pf.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_resolve_pf.sh"
+# shellcheck source=_resolve_pf_release_admission.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_resolve_pf_release_admission.sh"
 
 PARENT="$(cd "${ROOT}/.." && pwd)"
 RUN="${PCS_RELEASE_RUN:-${ROOT}/release-run}"
 LABTRUST="${LABTRUST_GYM_ROOT:-${PARENT}/LabTrust-Gym}"
-CERTIFIED_SRC="${LABTRUST}/examples/pcs_qc_release/release/science_claim_bundle.certified.json"
-HANDOFF_SRC="${LABTRUST}/examples/pcs_qc_release/release/pf_handoff.json"
+PCS_CORE="${PCS_CORE_PATH:-${PARENT}/pcs-core}"
+LT_RELEASE="${LABTRUST}/examples/pcs_qc_release/release"
+CERTIFIED_SRC="${LT_RELEASE}/science_claim_bundle.certified.json"
 CERTIFIED="${RUN}/science_claim_bundle.certified.json"
 VR="${RUN}/verification_result.json"
 SIGNED="${RUN}/signed_science_claim_bundle.json"
@@ -20,8 +23,12 @@ if [[ ! -f "${CERTIFIED_SRC}" ]]; then
   echo "error: LabTrust certified handoff not found: ${CERTIFIED_SRC}" >&2
   exit 1
 fi
-if [[ ! -f "${HANDOFF_SRC}" ]]; then
-  echo "error: LabTrust pf_handoff.json not found: ${HANDOFF_SRC}" >&2
+if ! HANDOFF_SRC="$(resolve_pf_handoff "${LT_RELEASE}" "${PCS_CORE}")"; then
+  echo "error: HandoffManifest.v0 not found under ${LT_RELEASE} or ${PCS_CORE}/examples/labtrust-release" >&2
+  exit 1
+fi
+if ! REGISTRY_SRC="$(resolve_pf_registry "${LT_RELEASE}" "${PCS_CORE}" "${ROOT}")"; then
+  echo "error: ArtifactRegistry.v0 not found for release-mode PF" >&2
   exit 1
 fi
 
@@ -35,8 +42,10 @@ if ! ensure_pf "${ROOT}"; then
   exit 2
 fi
 
-run_pf verify science-claim "${CERTIFIED}" --release-mode --out "${VR}"
-run_pf sign science-claim "${CERTIFIED}" --release-mode --handoff "${HANDOFF_SRC}" --out "${SIGNED}"
+run_pf verify science-claim "${CERTIFIED}" \
+  --release-mode --handoff "${HANDOFF_SRC}" --registry "${REGISTRY_SRC}" --out "${VR}"
+run_pf sign science-claim "${CERTIFIED}" \
+  --release-mode --handoff "${HANDOFF_SRC}" --registry "${REGISTRY_SRC}" --out "${SIGNED}"
 run_pf inspect science-claim "${SIGNED}" --strict
 
 python3 "${ROOT}/scripts/pcs-release-run-validate.py" "${RUN}"

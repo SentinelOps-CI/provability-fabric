@@ -163,11 +163,13 @@ func TestReleaseChainResultValidatesAgainstPCSCore(t *testing.T) {
 }
 
 func TestReleaseChainResultContainsRegistryChecks(t *testing.T) {
-	artifactDir := filepath.Join(repoRoot(t), "..", "pcs-core", "examples", "labtrust-release")
+	artifactDir := labtrustReleaseArtifactDir(t)
+	if _, err := os.Stat(filepath.Join(artifactDir, "trace.json")); err != nil {
+		t.Skip("full labtrust-release artifact dir required (pcs-core examples/labtrust-release)")
+	}
 	manifestPath := filepath.Join(artifactDir, "release_manifest.v0.json")
 	if _, err := os.Stat(manifestPath); err != nil {
 		manifestPath = validReleaseManifestPath(t)
-		artifactDir = filepath.Dir(manifestPath)
 	}
 	opts := pcs.ReleaseChainVerifyOptions{
 		RepoRoot:         repoRoot(t),

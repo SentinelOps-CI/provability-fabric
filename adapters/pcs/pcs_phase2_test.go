@@ -15,10 +15,8 @@ import (
 
 func pcsCoreExamples(t *testing.T, name string) string {
 	t.Helper()
-	root := repoRoot(t)
 	candidates := []string{
-		filepath.Join(root, "..", "pcs-core", "examples", name),
-		filepath.Join(os.Getenv("PCS_CORE_PATH"), "examples", name),
+		filepath.Join(pcsCoreRoot(t), "examples", name),
 	}
 	for _, c := range candidates {
 		if c == "" {
@@ -202,9 +200,9 @@ func TestReleaseChainValidationResultValidatesAgainstPCSCore(t *testing.T) {
 }
 
 func TestReleaseChainResultStatusProofCheckedOnValidChain(t *testing.T) {
-	artifactDir := filepath.Join(repoRoot(t), "..", "pcs-core", "examples", "labtrust-release")
-	if _, err := os.Stat(artifactDir); err != nil {
-		artifactDir = filepath.Dir(validReleaseManifestPath(t))
+	artifactDir := labtrustReleaseArtifactDir(t)
+	if _, err := os.Stat(filepath.Join(artifactDir, "trace.json")); err != nil {
+		t.Skip("full labtrust-release artifact dir required (pcs-core examples/labtrust-release)")
 	}
 	manifestPath := filepath.Join(artifactDir, "release_manifest.v0.json")
 	if _, err := os.Stat(manifestPath); err != nil {
@@ -409,10 +407,8 @@ func TestPFHashMatchesPCSCoreSignedBundleVector(t *testing.T) {
 
 func pcsCoreHashVectorDir(t *testing.T, artifact string) string {
 	t.Helper()
-	root := repoRoot(t)
 	candidates := []string{
-		filepath.Join(root, "..", "pcs-core", "python", "tests", "hash_vectors", artifact),
-		filepath.Join(os.Getenv("PCS_CORE_PATH"), "python", "tests", "hash_vectors", artifact),
+		filepath.Join(pcsCoreRoot(t), "python", "tests", "hash_vectors", artifact),
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(filepath.Join(c, "input.json")); err == nil {

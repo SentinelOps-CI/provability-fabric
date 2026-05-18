@@ -4,6 +4,7 @@
 package pcs_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,7 +23,10 @@ func TestReleaseDeterministicSignIDsStable(t *testing.T) {
 }
 
 func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
-	rcSigned := filepath.Join(repoRoot(t), "..", "pcs-core", "examples", "labtrust-release", "signed_science_claim_bundle.json")
+	rcSigned := filepath.Join(pcsCoreRoot(t), "examples", "labtrust-release", "signed_science_claim_bundle.json")
+	if _, err := os.Stat(rcSigned); err != nil {
+		t.Skip("pcs-core labtrust-release signed fixture not available")
+	}
 	pfSigned := labtrustReleaseFixture(t, "signed_science_claim_bundle.json")
 	if pfHash, err1 := fileSHA256Hex(pfSigned); err1 == nil {
 		if rcHash, err2 := fileSHA256Hex(rcSigned); err2 == nil && pfHash == rcHash {

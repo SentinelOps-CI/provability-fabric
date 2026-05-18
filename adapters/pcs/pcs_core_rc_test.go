@@ -34,11 +34,7 @@ func fileSHA256Hex(path string) (string, error) {
 
 func pcsCoreRCDir(t *testing.T) string {
 	t.Helper()
-	base := os.Getenv("PCS_CORE_PATH")
-	if base == "" {
-		base = filepath.Join(repoRoot(t), "..", "pcs-core")
-	}
-	dir := filepath.Join(base, "examples", "labtrust-release")
+	dir := filepath.Join(pcsCoreRoot(t), "examples", "labtrust-release")
 	if _, err := os.Stat(dir); err != nil {
 		t.Skipf("pcs-core RC dir not present: %s", dir)
 	}
