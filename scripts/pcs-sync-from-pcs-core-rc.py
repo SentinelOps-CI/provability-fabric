@@ -13,6 +13,11 @@ PF_ARTIFACTS = (
     "signed_science_claim_bundle.json",
 )
 
+FORMAL_ARTIFACTS = (
+    "proof_obligation.v0.json",
+    "lean_check_result.v0.json",
+)
+
 PF_PROTOCOL_FROM_RC = (
     ("handoff_to_pf.json", "handoff_to_pf.json"),
     ("handoff_manifest.bundle_to_verifier.v0.json", "handoff_to_pf.json"),
@@ -101,6 +106,14 @@ def sha256_file(path: pathlib.Path) -> str:
     return "sha256:" + h.hexdigest()
 
 
+def sync_formal_artifacts(pf_release: pathlib.Path, root: pathlib.Path) -> None:
+    src_dir = root / "tests" / "pcs" / "fixtures" / "formal" / "labtrust"
+    for name in FORMAL_ARTIFACTS:
+        src = src_dir / name
+        if src.is_file():
+            (pf_release / name).write_bytes(src.read_bytes())
+
+
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parents[1]
     pcs_core = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else root.parent / "pcs-core"
@@ -145,7 +158,11 @@ def main() -> int:
             "invalid_stale_artifact.json",
         ],
         "regenerate": "make sync-pcs-rc-fixtures",
-        "artifact_hashes": {name: sha256_file(pf_release / name) for name in PF_ARTIFACTS},
+        "artifact_hashes": {
+            name: sha256_file(pf_release / name)
+            for name in (*PF_ARTIFACTS, *FORMAL_ARTIFACTS)
+            if (pf_release / name).is_file()
+        },
     }
     pf_manifest = {k: v for k, v in pf_manifest.items() if v is not None}
     pf_manifest_path.write_text(json.dumps(pf_manifest, indent=2) + "\n", encoding="utf-8")
@@ -171,6 +188,7 @@ def main() -> int:
     sm_report = canonical / "scientific_memory_import_report.json"
     if sm_report.is_file():
         (pf_release / "scientific_memory_import_report.json").write_bytes(sm_report.read_bytes())
+    sync_formal_artifacts(pf_release, root)
     prune_pf_release_manifest(pf_release)
     examples = pcs_core / "examples"
     for src_name, dst_name in PF_PROTOCOL_FALLBACK:

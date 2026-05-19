@@ -25,5 +25,14 @@
   ],
   "status_policy": "scientific_computation_reproducibility_v0.1",
   "signature_policy": "digest_v0",
-  "repair_hint_policy": "operational_v0"
+  "repair_hint_policy": "operational_v0",
+  "formal_checks": {
+    "required": true,
+    "required_obligations": [
+      "ComputationWitnessBindsResults",
+      "VerificationAdmitsBundle",
+      "SignedBundleAdmissible"
+    ],
+    "lean_check_status_required": "ProofChecked"
+  }
 }

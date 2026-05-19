@@ -388,6 +388,37 @@ func releaseModeValidateOpts(t *testing.T) pcs.ValidateOptions {
 	}
 }
 
+func releaseModeFormalValidateOpts(t *testing.T) pcs.ValidateOptions {
+	t.Helper()
+	opts := releaseModeValidateOpts(t)
+	profile, err := pcs.LoadAdmissionProfile("labtrust_qc_release")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm, err := pcs.LoadReleaseManifest(labtrustReleaseFixture(t, "release_manifest.v0.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.AdmissionProfile = profile
+	opts.ReleaseManifest = rm
+	opts.FormalChecks = loadFormalCheckInputs(t, "labtrust")
+	return opts
+}
+
+func loadFormalCheckInputs(t *testing.T, workflow string) pcs.FormalCheckInputs {
+	t.Helper()
+	dir := filepath.Join(repoRoot(t), "tests", "pcs", "fixtures", "formal", workflow)
+	in := pcs.FormalCheckInputs{
+		ProofObligationsPath: filepath.Join(dir, "proof_obligation.v0.json"),
+		LeanCheckResultPath:  filepath.Join(dir, "lean_check_result.v0.json"),
+	}
+	resolved, err := pcs.ResolveFormalCheckInputs(repoRoot(t), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved
+}
+
 func minimalRegistryForBundle(t *testing.T) *pcs.ArtifactRegistry {
 	t.Helper()
 	return loadArtifactRegistry(t)

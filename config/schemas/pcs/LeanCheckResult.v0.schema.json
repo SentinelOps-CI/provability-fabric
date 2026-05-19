@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/LeanCheckResult.v0.schema.json",
+  "title": "LeanCheckResult.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "check_id",
+    "proof_obligation_id",
+    "lean_module",
+    "lean_theorem",
+    "status",
+    "checked_at",
+    "lean_version",
+    "source_repo",
+    "source_commit",
+    "failure_reason",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "check_id": { "type": "string", "minLength": 1 },
+    "proof_obligation_id": { "type": "string", "minLength": 1 },
+    "lean_module": { "type": "string", "minLength": 1 },
+    "lean_theorem": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/lean_check_status" },
+    "checked_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "lean_version": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "failure_reason": { "type": "string" },
+    "obligation_results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/obligation_check_result" }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "lean_check_status": {
+      "type": "string",
+      "enum": ["ProofChecked", "Rejected", "Stale"]
+    },
+    "obligation_check_result": {
+      "type": "object",
+      "required": ["obligation_id", "kind", "status", "lean_theorem"],
+      "additionalProperties": false,
+      "properties": {
+        "obligation_id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "lean_theorem": { "type": "string", "minLength": 1 },
+        "failure_reason": { "type": "string" }
+      }
+    }
+  }
+}

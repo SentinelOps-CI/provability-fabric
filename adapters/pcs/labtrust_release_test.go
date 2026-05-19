@@ -44,7 +44,7 @@ func TestVerifyLabtrustReleaseCertifiedBundlePasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := releaseModeValidateOpts(t)
+	opts := releaseModeFormalValidateOpts(t)
 	result, err := pcs.VerifyScienceClaimBundle(path, bundle, opts)
 	if err != nil {
 		t.Fatal(err)

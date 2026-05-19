@@ -14,6 +14,7 @@ on:
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
       - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/pcs-formal-release-args.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
       - 'scripts/pcs-freeze-labtrust-release-invalid.py'
       - 'scripts/pcs-sync-from-pcs-core-rc.py'
@@ -38,6 +39,7 @@ on:
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
       - 'scripts/pcs-pf-clean-chain.sh'
+      - 'scripts/pcs-formal-release-args.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
       - 'scripts/pcs-freeze-labtrust-release-invalid.py'
       - 'scripts/pcs-sync-from-pcs-core-rc.py'
@@ -117,12 +119,32 @@ jobs:
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          read -ra FORMAL_ARGS < <(bash "$GITHUB_WORKSPACE/scripts/pcs-formal-release-args.sh" "$RELEASE")
           go run . verify science-claim \
             "$RELEASE/science_claim_bundle.certified.json" \
             --handoff "$RELEASE/handoff_to_pf.json" \
             --registry "$RELEASE/artifact_registry.json" \
             --admission-profile labtrust_qc_release \
-            --release-mode
+            --release-mode \
+            "${FORMAL_ARGS[@]}"
+
+      - name: Reject release-mode without Lean trust-envelope artifacts
+        run: |
+          cd core/cli/pf
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          export PF_SOURCE_COMMIT="$PF_COMMIT"
+          export PF_RELEASE_MODE=1
+          RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          if go run . verify science-claim \
+            "$RELEASE/science_claim_bundle.certified.json" \
+            --handoff "$RELEASE/handoff_to_pf.json" \
+            --registry "$RELEASE/artifact_registry.json" \
+            --admission-profile labtrust_qc_release \
+            --release-mode 2>&1 | tee "$RUNNER_TEMP/missing_formal.txt"; then
+            echo "expected release-mode without formal artifacts to fail"
+            exit 1
+          fi
+          grep -q missing_lean_check_result "$RUNNER_TEMP/missing_formal.txt"
 
       - name: pf verify release-chain (ReleaseManifest.v0)
         run: |
@@ -146,12 +168,14 @@ jobs:
             MANIFEST="$RELEASE/release_manifest.json"
           fi
           REGISTRY="$RELEASE/artifact_registry.json"
+          read -ra FORMAL_ARGS < <(bash "$GITHUB_WORKSPACE/scripts/pcs-formal-release-args.sh" "$RELEASE")
           go run . verify release-chain \
             --manifest "$MANIFEST" \
             --registry "$REGISTRY" \
             --artifact-dir "$RC_DIR" \
             --admission-profile labtrust_qc_release \
             --release-mode \
+            "${FORMAL_ARGS[@]}" \
             --out "$OUT"
           go run . validate release-chain-result "$OUT"
           grep -q '"status": "ProofChecked"' "$OUT"
@@ -161,6 +185,10 @@ jobs:
           grep -q 'registry_semantic_checks_executed' "$OUT"
           grep -q 'admission_profile_selected' "$OUT"
           grep -q 'registry\.' "$OUT"
+          grep -q 'formal.CertificateMatchesRuntime' "$OUT"
+          grep -q 'formal.VerificationAdmitsBundle' "$OUT"
+          grep -q 'formal.SignedBundleAdmissible' "$OUT"
+          grep -q 'formal_checks_executed' "$OUT"
 
       - name: Reject legacy pf_handoff in release mode
         run: |
@@ -209,6 +237,8 @@ jobs:
           pcs validate "$RELEASE/science_claim_bundle.certified.json"
           pcs validate "$RELEASE/verification_result.json"
           pcs validate "$RELEASE/signed_science_claim_bundle.json"
+          pcs validate "$RELEASE/proof_obligation.v0.json"
+          pcs validate "$RELEASE/lean_check_result.v0.json"
           pcs validate "$RELEASE/handoff_to_pf.json"
           pcs validate "$RELEASE/release_manifest.json"
           pcs validate "$RELEASE/release_chain_validation_result.json"
@@ -246,6 +276,53 @@ jobs:
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           go run . explain release-chain "$RELEASE/release_chain_validation_result.json" --json | tee "$RUNNER_TEMP/explain_rc.json"
           grep -q '"failed_count"' "$RUNNER_TEMP/explain_rc.json"
+
+      - name: pf explain formal Lean release-chain failure
+        run: |
+          cd core/cli/pf
+          python3 - <<'PY' > "$RUNNER_TEMP/formal_lean_rc.json"
+          import json
+          rc = {
+            "schema_version": "v0",
+            "validation_id": "validation-formal-lean-explain",
+            "release_id": "release-pcs-v0.1-labtrust-qc",
+            "release_candidate": "pcs-v0.1.0-rc1",
+            "validator": "Provability Fabric",
+            "validator_version": "0.1.0",
+            "checked_at": "2026-05-18T12:00:00Z",
+            "status": "Rejected",
+            "checks": [{
+              "check_id": "formal.CertificateMatchesRuntime",
+              "description": "Lean trust kernel established CertificateMatchesRuntime",
+              "status": "failed",
+              "details": {
+                "failure_code": "lean_check_failed",
+                "expected_predicate": "certificate.trace_hash = runtime_receipt.trace_hash",
+                "actual_values": {
+                  "certificate_trace_hash": "sha256:aaa",
+                  "runtime_receipt_trace_hash": "sha256:bbb"
+                },
+                "lean_theorem": "admissible_release_has_matching_trace_hash",
+                "obligation_id": "trace_hash_alignment",
+                "responsible_component": "pcs-core Lean trust kernel"
+              },
+              "registry_check_refs": [],
+              "responsible_component": "pcs-core Lean trust kernel"
+            }],
+            "deferred_registry_checks": [],
+            "artifacts_checked": 0,
+            "failure_codes": ["lean_check_failed"],
+            "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+            "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
+            "signature_or_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+          print(json.dumps(rc, indent=2))
+          PY
+          go run . explain release-chain "$RUNNER_TEMP/formal_lean_rc.json" 2>&1 | tee "$RUNNER_TEMP/explain_formal.txt"
+          grep -q 'CertificateMatchesRuntime' "$RUNNER_TEMP/explain_formal.txt"
+          grep -q 'trace_hash_alignment' "$RUNNER_TEMP/explain_formal.txt"
+          grep -q 'admissible_release_has_matching_trace_hash' "$RUNNER_TEMP/explain_formal.txt"
+          grep -qE '(Repair|repair:)' "$RUNNER_TEMP/explain_formal.txt"
 
       - name: Reject release-mode without admission profile
         run: |
@@ -369,12 +446,14 @@ jobs:
           export PF_RELEASE_MODE=1
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/computation-release"
           PROFILE="$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/scientific_computation_reproducibility.json"
+          read -ra FORMAL_ARGS < <(bash "$GITHUB_WORKSPACE/scripts/pcs-formal-release-args.sh" "$RELEASE")
           go run . verify science-claim \
             "$RELEASE/science_claim_bundle.certified.json" \
             --handoff "$RELEASE/handoff_to_pf.json" \
             --registry "$RELEASE/artifact_registry.json" \
             --admission-profile "$PROFILE" \
-            --release-mode
+            --release-mode \
+            "${FORMAL_ARGS[@]}"
 
       - name: pf verify computation release-chain (ReleaseManifest.v0)
         run: |
@@ -384,12 +463,14 @@ jobs:
           export PF_RELEASE_MODE=1
           OUT="$RUNNER_TEMP/computation_release_chain_validation_result.json"
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/computation-release"
+          read -ra FORMAL_ARGS < <(bash "$GITHUB_WORKSPACE/scripts/pcs-formal-release-args.sh" "$RELEASE")
           go run . verify release-chain \
             --manifest "$RELEASE/release_manifest.v0.json" \
             --registry "$RELEASE/artifact_registry.json" \
             --artifact-dir "$RELEASE" \
             --admission-profile scientific_computation_reproducibility \
             --release-mode \
+            "${FORMAL_ARGS[@]}" \
             --out "$OUT"
           go run . validate release-chain-result "$OUT"
           grep -q '"status": "ProofChecked"' "$OUT"
@@ -397,6 +478,8 @@ jobs:
           grep -q 'computation_witness_certificate_checked' "$OUT"
           grep -q 'registry_admission_passed' "$OUT"
           grep -q 'deferred_registry_checks' "$OUT"
+          grep -q 'formal.ComputationWitnessBindsResults' "$OUT"
+          grep -q 'formal_checks_executed' "$OUT"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

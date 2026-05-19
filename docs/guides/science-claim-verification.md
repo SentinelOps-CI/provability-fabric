@@ -56,8 +56,32 @@ In **release mode**, PF is the release-chain admission controller. Handoff and r
 | `--registry` | `ArtifactRegistry.v0` | Yes (defaults to `PCS_CORE_PATH/examples/artifact_registry.valid.json`) |
 | `--manifest` | `ReleaseManifest.v0` | When writing `--release-chain-result` |
 | `--release-chain-result` | Output `ReleaseChainValidationResult.v0` | Optional |
+| `--proof-obligations` | `ProofObligation.v0` from pcs-core Lean checks | Yes when admission profile sets `formal_checks.required` |
+| `--lean-check-result` | `LeanCheckResult.v0` from pcs-core Lean trust kernel | Yes when admission profile sets `formal_checks.required` |
+| `--admission-profile` | Built-in profile id (e.g. `labtrust_qc_release`) | Yes in release mode |
 
 Do **not** pass `ReleaseManifest.v0` to `--registry`; use `--manifest` for release-chain verify.
+
+### Lean trust-envelope (formal checks)
+
+Release admission profiles may require pcs-core Lean outputs. PF does **not** run Lean; it validates `ProofObligation.v0` and `LeanCheckResult.v0` and records `formal.<ObligationKind>` checks in `ReleaseChainValidationResult.v0`.
+
+```bash
+RELEASE=tests/pcs/fixtures/labtrust-release
+eval "$(bash scripts/pcs-formal-release-args.sh "$RELEASE")"
+
+pf verify science-claim "$RELEASE/science_claim_bundle.certified.json" \
+  --handoff "$RELEASE/handoff_to_pf.json" \
+  --registry "$RELEASE/artifact_registry.json" \
+  --admission-profile labtrust_qc_release \
+  --release-mode \
+  $FORMAL_ARGS \
+  --out "$RELEASE/verification_result.json"
+
+pf explain release-chain "$RELEASE/release_chain_validation_result.json"
+```
+
+Failure codes include `missing_lean_check_result`, `lean_check_failed`, `lean_obligation_mismatch`, `lean_release_id_mismatch`, and `unauthorized_lean_theorem`.
 
 Legacy `pf_handoff.json` is accepted only outside `--release-mode` (a warning is printed). Release mode fails with `legacy_handoff_forbidden_in_release_mode`.
 

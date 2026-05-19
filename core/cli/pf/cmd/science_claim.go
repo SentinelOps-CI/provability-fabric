@@ -72,6 +72,9 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, adm resolvedSci
 		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff); err != nil {
 			return pcs.VerificationResult{}, wrapAdmissionError(err)
 		}
+		if err := pcs.EnforceFormalCheckAdmission(adm.Profile, adm.Manifest, adm.Policy, adm.FormalChecks); err != nil {
+			return pcs.VerificationResult{}, wrapAdmissionError(err)
+		}
 		result := pcs.BuildComputationVerificationResult(bundle, opts)
 		if err := pcs.ValidatePFProvenanceCommit(result.SourceCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
 			return result, err
@@ -96,6 +99,7 @@ func writeReleaseChainResult(bundlePath string, result pcs.VerificationResult, a
 	opts.AllowSkippedRegistrySemantics = adm.Policy.AllowSkippedRegistrySemantics
 	opts.Registry = adm.Registry
 	opts.AdmissionProfile = adm.Profile
+	opts.FormalChecks = adm.FormalChecks
 	if adm.Manifest != nil {
 		if resolved, err := pcs.ResolveArtifactPath(bundlePath); err == nil {
 			opts.ArtifactDir = filepath.Dir(resolved)

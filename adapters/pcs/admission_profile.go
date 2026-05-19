@@ -43,6 +43,7 @@ type AdmissionProfile struct {
 	StatusPolicy                 string   `json:"status_policy"`
 	SignaturePolicy              string   `json:"signature_policy"`
 	RepairHintPolicy             string   `json:"repair_hint_policy"`
+	FormalChecks                 *AdmissionFormalChecks `json:"formal_checks,omitempty"`
 }
 
 func (p *AdmissionProfile) normalize() {

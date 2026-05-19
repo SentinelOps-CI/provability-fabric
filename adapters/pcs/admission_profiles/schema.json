@@ -61,6 +61,23 @@
     "repair_hint_policy": {
       "type": "string",
       "minLength": 1
+    },
+    "formal_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "required_obligations"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "required_obligations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "lean_check_status_required": {
+          "type": "string",
+          "enum": ["ProofChecked", "Rejected", "Stale"]
+        }
+      }
     }
   }
 }

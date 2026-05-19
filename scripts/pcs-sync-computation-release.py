@@ -14,6 +14,11 @@ PF_ARTIFACTS = (
     "signed_science_claim_bundle.json",
 )
 
+FORMAL_ARTIFACTS = (
+    "proof_obligation.v0.json",
+    "lean_check_result.v0.json",
+)
+
 PF_PROTOCOL = (
     ("handoff_to_pf.json", "handoff_to_pf.json"),
     ("handoff_manifest.bundle_to_verifier.v0.json", "handoff_to_pf.json"),
@@ -27,6 +32,14 @@ def sha256_file(path: pathlib.Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return "sha256:" + h.hexdigest()
+
+
+def sync_formal_artifacts(pf_release: pathlib.Path, root: pathlib.Path) -> None:
+    src_dir = root / "tests" / "pcs" / "fixtures" / "formal" / "computation"
+    for name in FORMAL_ARTIFACTS:
+        src = src_dir / name
+        if src.is_file():
+            (pf_release / name).write_bytes(src.read_bytes())
 
 
 def main() -> int:
@@ -64,6 +77,7 @@ def main() -> int:
         src = canonical / src_name
         if src.is_file():
             (pf_release / dst_name).write_bytes(src.read_bytes())
+    sync_formal_artifacts(pf_release, root)
     print(f"OK: synced computation-release fixtures from {canonical}")
     return 0
 

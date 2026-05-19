@@ -36,11 +36,22 @@ HANDOFF="${PF_HANDOFF:-${RELEASE_FIXTURES}/handoff_to_pf.json}"
 REGISTRY="${PF_REGISTRY:-${RELEASE_FIXTURES}/artifact_registry.json}"
 MANIFEST="${PF_MANIFEST:-${RELEASE_FIXTURES}/release_manifest.json}"
 
+PROOF_OBLIGATIONS="${RELEASE_FIXTURES}/proof_obligation.v0.json"
+LEAN_CHECK="${RELEASE_FIXTURES}/lean_check_result.v0.json"
+FORMAL_ARGS=()
+if [[ -f "${PROOF_OBLIGATIONS}" ]]; then
+  FORMAL_ARGS+=(--proof-obligations "${PROOF_OBLIGATIONS}")
+fi
+if [[ -f "${LEAN_CHECK}" ]]; then
+  FORMAL_ARGS+=(--lean-check-result "${LEAN_CHECK}")
+fi
+
 echo "== Provability Fabric: verify =="
 run_pf verify science-claim "${CERTIFIED}" \
   --release-mode \
   --handoff "${HANDOFF}" \
   --registry "${REGISTRY}" \
+  "${FORMAL_ARGS[@]}" \
   --out "${VR}"
 echo "== pcs-core: validate verification_result =="
 "${PCS}" validate "${VR}"
@@ -49,6 +60,7 @@ run_pf sign science-claim "${CERTIFIED}" \
   --release-mode \
   --handoff "${HANDOFF}" \
   --registry "${REGISTRY}" \
+  "${FORMAL_ARGS[@]}" \
   --out "${SIGNED}"
 echo "== pcs-core: validate signed bundle =="
 "${PCS}" validate "${SIGNED}"

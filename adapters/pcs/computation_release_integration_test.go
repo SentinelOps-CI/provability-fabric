@@ -80,6 +80,9 @@ func runComputationReleaseChain(t *testing.T, releaseMode bool) pcs.ReleaseChain
 		ReleaseMode:      releaseMode,
 		AdmissionProfile: profile,
 	}
+	if releaseMode {
+		opts.FormalChecks = loadFormalCheckInputs(t, "computation")
+	}
 	result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, opts)
 	if err != nil {
 		t.Fatal(err)

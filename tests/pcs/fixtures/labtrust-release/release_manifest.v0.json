@@ -9,7 +9,7 @@
     "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd",
     "certificate_id": "cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693",
     "certified_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
-    "signed_bundle_hash": "sha256:2fe8c786dc98b5dae912ad5ba12d5a672b22b2b1ae29330bceee19afe78d616e"
+    "signed_bundle_hash": "sha256:856469f22afc1b204933e38a4668da2309b02b082f48fc4e8f0220b49733e712"
   },
   "release_chain_validation_result": {
     "path": "release_chain_validation_result.v0.json",
@@ -17,7 +17,7 @@
   },
   "canonical_signed_bundle": {
     "path": "signed_science_claim_bundle.json",
-    "sha256": "sha256:2fe8c786dc98b5dae912ad5ba12d5a672b22b2b1ae29330bceee19afe78d616e"
+    "sha256": "sha256:856469f22afc1b204933e38a4668da2309b02b082f48fc4e8f0220b49733e712"
   },
   "canonical_claim_id": "claim-pcs-qc-release-v0.1",
   "limitations_notice": "PCS v0.1 demonstrates a proof-carrying simulated lab workflow; it does not claim clinical validity or production certification.",
@@ -66,7 +66,7 @@
       "producer": "Provability Fabric",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
       "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
-      "sha256": "sha256:2fe8c786dc98b5dae912ad5ba12d5a672b22b2b1ae29330bceee19afe78d616e"
+      "sha256": "sha256:856469f22afc1b204933e38a4668da2309b02b082f48fc4e8f0220b49733e712"
     },
     "verification_result.json": {
       "artifact_type": "VerificationResult.v0",
@@ -74,7 +74,7 @@
       "producer": "Provability Fabric",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
       "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
-      "sha256": "sha256:8929abf4c382ddb16f65cc978a13f558899c82b66f6fa625777fe06c968f5b29"
+      "sha256": "sha256:228527beff72973b5878e0ba696ff64d45b4b27e5a21c530f9b214407ec90f34"
     }
   },
   "release_status": "Validated",

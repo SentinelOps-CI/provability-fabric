@@ -49,6 +49,15 @@ func pfCLIEnv(extra ...string) []string {
 	return append(env, extra...)
 }
 
+func formalReleaseArgs(t *testing.T, root string) []string {
+	t.Helper()
+	dir := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
+	return []string{
+		"--proof-obligations", filepath.Join(dir, "proof_obligation.v0.json"),
+		"--lean-check-result", filepath.Join(dir, "lean_check_result.v0.json"),
+	}
+}
+
 func pfReleaseEnv(extra ...string) []string {
 	env := make([]string, 0, len(os.Environ())+1+len(extra))
 	for _, e := range os.Environ() {
@@ -307,8 +316,10 @@ func TestVerifyScienceClaimWithHandoffManifestCLI(t *testing.T) {
 		t.Fatal("fixture manifest missing pf_source_commit")
 	}
 	registry := filepath.Join(release, "artifact_registry.json")
-	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
-		"--handoff", handoff, "--registry", registry, "--admission-profile", "labtrust_qc_release", "--release-mode")
+	args := append([]string{"go", "run", ".", "verify", "science-claim", bundle,
+		"--handoff", handoff, "--registry", registry, "--admission-profile", "labtrust_qc_release", "--release-mode"},
+		formalReleaseArgs(t, root)...)
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d", "PCS_CORE_PATH="+filepath.Join(root, "..", "pcs-core"))
 	out, err := cmd.CombinedOutput()
@@ -326,11 +337,13 @@ func TestVerifyScienceClaimWithHandoffAndRegistryCLI(t *testing.T) {
 	if _, err := os.Stat(registry); err != nil {
 		t.Skip("artifact registry fixture not present")
 	}
-	cmd := exec.Command("go", "run", ".", "verify", "science-claim", bundle,
+	args := append([]string{"go", "run", ".", "verify", "science-claim", bundle,
 		"--handoff", handoff,
 		"--registry", registry,
 		"--admission-profile", "labtrust_qc_release",
-		"--release-mode")
+		"--release-mode"},
+		formalReleaseArgs(t, root)...)
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = pfDir(t)
 	cmd.Env = pfReleaseEnv("PF_SOURCE_COMMIT=0f659b90c80c46a6bbfd51b0d37ea723b032fb9d")
 	out, err := cmd.CombinedOutput()

@@ -129,6 +129,9 @@ func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
 }
 
 func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
+	if exp, ok := FormalFailureExplanation(c); ok {
+		return []FailureExplanation{exp}
+	}
 	fc, artifactPath, expected, actual, responsible, registryRef, handoffRef := releaseCheckExplanationFields(c)
 	if strings.HasPrefix(c.CheckID, "registry.") {
 		errMsg, _ := c.Details["error"].(string)

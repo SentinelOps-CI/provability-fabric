@@ -61,6 +61,11 @@ const (
 	FailureCodeEnvironmentDigestMismatch                = "environment_digest_mismatch"
 	FailureCodeRegistryCheckMissingResponsible      = "registry_check_missing_responsible_component"
 	FailureCodeRegistryCheckNotInResult             = "registry_check_not_in_release_chain_result"
+	FailureCodeMissingLeanCheckResult               = "missing_lean_check_result"
+	FailureCodeLeanCheckFailed                      = "lean_check_failed"
+	FailureCodeLeanObligationMismatch               = "lean_obligation_mismatch"
+	FailureCodeLeanReleaseIDMismatch                = "lean_release_id_mismatch"
+	FailureCodeUnauthorizedLeanTheorem              = "unauthorized_lean_theorem"
 )
 
 func withReason(code string, details map[string]any) map[string]any {

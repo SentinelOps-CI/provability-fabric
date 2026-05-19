@@ -76,13 +76,19 @@ $Registry = if ($env:PF_REGISTRY) { $env:PF_REGISTRY } else { Join-Path $Release
 
 function Step([string]$Msg) { Write-Host "== $Msg ==" }
 
+$ProofObligations = Join-Path $ReleaseFixtures "proof_obligation.v0.json"
+$LeanCheck = Join-Path $ReleaseFixtures "lean_check_result.v0.json"
+$FormalArgs = @()
+if (Test-Path $ProofObligations) { $FormalArgs += @("--proof-obligations", $ProofObligations) }
+if (Test-Path $LeanCheck) { $FormalArgs += @("--lean-check-result", $LeanCheck) }
+
 Step "Provability Fabric: verify"
-Invoke-Pf verify science-claim $Certified --release-mode --handoff $Handoff --registry $Registry --out $VR
+Invoke-Pf verify science-claim $Certified --release-mode --handoff $Handoff --registry $Registry @FormalArgs --out $VR
 Step "pcs-core: validate verification_result"
 Invoke-Expression "$Pcs validate `"$VR`""
 if ($LASTEXITCODE -ne 0) { throw "pcs-core validate verification_result failed" }
 Step "Provability Fabric: sign"
-Invoke-Pf sign science-claim $Certified --release-mode --handoff $Handoff --registry $Registry --out $Signed
+Invoke-Pf sign science-claim $Certified --release-mode --handoff $Handoff --registry $Registry @FormalArgs --out $Signed
 Step "pcs-core: validate signed bundle"
 Invoke-Expression "$Pcs validate `"$Signed`""
 if ($LASTEXITCODE -ne 0) { throw "pcs-core validate signed bundle failed" }

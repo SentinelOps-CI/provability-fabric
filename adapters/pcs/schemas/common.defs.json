@@ -246,6 +246,17 @@
     "limitations_notice": {
       "type": "string",
       "minLength": 1
+    },
+    "formal_check": {
+      "type": "object",
+      "required": ["check_id", "status", "artifact"],
+      "additionalProperties": false,
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/validation_check_status" },
+        "artifact": { "type": "string", "minLength": 1 },
+        "lean_theorem": { "type": "string", "minLength": 1 }
+      }
     }
   }
 }

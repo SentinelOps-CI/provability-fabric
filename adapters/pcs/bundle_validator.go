@@ -22,15 +22,22 @@ type ValidateOptions struct {
 	AllowMissingHandoff           bool
 	AllowSkippedRegistrySemantics bool
 	AdmissionProfile              *AdmissionProfile
+	ReleaseManifest               *ReleaseManifest
+	FormalChecks                  FormalCheckInputs
 }
 
 // VerifyScienceClaimBundle runs all required v0.1 checks and returns VerificationResult.
 func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opts ValidateOptions) (VerificationResult, error) {
-	if err := EnforceScienceClaimAdmission(ReleaseAdmissionPolicy{
+	policy := ReleaseAdmissionPolicy{
 		ReleaseMode:                   opts.ReleaseMode,
 		AllowMissingHandoff:           opts.AllowMissingHandoff,
 		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
-	}, opts.Handoff, opts.Registry, opts.AdmissionProfile); err != nil {
+		AllowMissingFormalChecks:      opts.FormalChecks.AllowMissingFormalChecks,
+	}
+	if err := EnforceScienceClaimAdmission(policy, opts.Handoff, opts.Registry, opts.AdmissionProfile); err != nil {
+		return VerificationResult{}, err
+	}
+	if err := EnforceFormalCheckAdmission(opts.AdmissionProfile, opts.ReleaseManifest, policy, opts.FormalChecks); err != nil {
 		return VerificationResult{}, err
 	}
 	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundlePath, bundle, opts.Handoff); err != nil {

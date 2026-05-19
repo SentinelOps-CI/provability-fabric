@@ -35,6 +35,8 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	var allowMissingHandoff bool
 	var allowSkippedRegistrySemantics bool
 	var admissionProfileID string
+	var proofObligationsPath string
+	var leanCheckResultPath string
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -53,6 +55,8 @@ func scienceClaimVerifyCmd() *cobra.Command {
 				LocalDev:                      localDev,
 				ReleaseMode:                   releaseMode,
 				BundlePath:                    bundlePath,
+				ProofObligationsPath:          proofObligationsPath,
+				LeanCheckResultPath:           leanCheckResultPath,
 			})
 			if err != nil {
 				return wrapAdmissionError(err)
@@ -119,5 +123,7 @@ func scienceClaimVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowMissingHandoff, "allow-missing-handoff-for-local-dev", false, "Allow verify without --handoff in release mode (local development only)")
 	cmd.Flags().BoolVar(&allowSkippedRegistrySemantics, "allow-skipped-registry-semantics", false, "Allow registry semantic checks PF does not execute (local development only)")
 	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id or filename (e.g. labtrust_qc_release); required in release mode")
+	cmd.Flags().StringVar(&proofObligationsPath, "proof-obligations", "", "ProofObligation.v0 JSON from pcs-core Lean checks (required in release mode when profile requires formal checks)")
+	cmd.Flags().StringVar(&leanCheckResultPath, "lean-check-result", "", "LeanCheckResult.v0 JSON from pcs-core Lean trust kernel (required in release mode when profile requires formal checks)")
 	return cmd
 }

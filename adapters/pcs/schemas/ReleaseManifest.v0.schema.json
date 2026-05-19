@@ -61,6 +61,12 @@
     "limitations_notice": {
       "$ref": "common.defs.json#/$defs/limitations_notice"
     },
+    "proof_obligation": {
+      "$ref": "common.defs.json#/$defs/manifest_path_ref"
+    },
+    "lean_check_result": {
+      "$ref": "common.defs.json#/$defs/manifest_path_ref"
+    },
     "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   }
 }

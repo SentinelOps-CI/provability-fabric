@@ -54,6 +54,10 @@
       "type": "string",
       "minLength": 1,
       "description": "When set, registry semantic-check coverage is scoped to this workflow profile."
+    },
+    "formal_checks": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/formal_check" }
     }
   }
 }

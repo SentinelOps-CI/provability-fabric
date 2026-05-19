@@ -19,6 +19,7 @@ type ReleaseAdmissionPolicy struct {
 	ReleaseMode                   bool
 	AllowMissingHandoff           bool
 	AllowSkippedRegistrySemantics bool
+	AllowMissingFormalChecks      bool
 }
 
 // IsLegacy reports whether the handoff was loaded from legacy pf_handoff.json.

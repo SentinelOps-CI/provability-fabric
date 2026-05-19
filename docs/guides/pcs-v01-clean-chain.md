@@ -105,6 +105,8 @@ make pcs-v01-pf-chain
 ./scripts/pcs-pf-clean-chain.sh tests/pcs/fixtures/labtrust-release
 ```
 
+The PF segment passes `--proof-obligations` and `--lean-check-result` from the release fixture directory when those files are present (see `scripts/pcs-formal-release-args.sh`).
+
 ## Environment variables
 
 | Variable | Default | Purpose |

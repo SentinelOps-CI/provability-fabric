@@ -68,6 +68,7 @@ type ReleaseChainVerifyOptions struct {
 	Registry                      *ArtifactRegistry
 	AllowSkippedRegistrySemantics bool
 	AdmissionProfile              *AdmissionProfile
+	FormalChecks                  FormalCheckInputs
 }
 
 // VerifyReleaseChainFromManifest validates manifest artifact pins and registry admission.
@@ -93,6 +94,14 @@ func VerifyReleaseChainFromManifest(manifestPath string, opts ReleaseChainVerify
 	baseDir := opts.ArtifactDir
 	if strings.TrimSpace(baseDir) == "" {
 		baseDir = filepath.Dir(resolved)
+	}
+	policy := ReleaseAdmissionPolicy{
+		ReleaseMode:                   opts.ReleaseMode,
+		AllowSkippedRegistrySemantics: opts.AllowSkippedRegistrySemantics,
+		AllowMissingFormalChecks:      opts.FormalChecks.AllowMissingFormalChecks,
+	}
+	if err := EnforceFormalCheckAdmission(opts.AdmissionProfile, manifest, policy, opts.FormalChecks); err != nil {
+		return ReleaseChainValidationResult{}, err
 	}
 	checks, failureCodes := runReleaseChainChecks(baseDir, manifest, opts)
 	return buildReleaseChainResult(manifest, checks, failureCodes, opts, manifestSchemaErr)
@@ -552,6 +561,7 @@ func buildReleaseChainResult(
 	if len(checks) == 0 {
 		checks = normalizeReleaseChainChecks(nil)
 	}
+	checks, failureCodes = AppendFormalReleaseChainChecks(opts.AdmissionProfile, manifest, opts.FormalChecks, checks, failureCodes)
 	status := StatusProofChecked
 	for _, c := range checks {
 		if c.Status == "failed" {
@@ -684,6 +694,9 @@ func responsibleComponentForReleaseCheck(id string, details map[string]any) stri
 			return r
 		}
 	}
+	if strings.HasPrefix(id, "formal.") {
+		return ComponentLeanTrustKernel
+	}
 	if strings.HasPrefix(id, "computation_") {
 		return ComponentScientificComputation
 	}
@@ -696,7 +709,8 @@ func responsibleComponentForReleaseCheck(id string, details map[string]any) stri
 	case "manifest_hashes_match", "producer_commits_match", "signed_input_bundle_hash_match",
 		"registry_admission_passed", "registry_artifact_registered", "registry_schema_matches",
 		"registry_producer_allowed", "registry_status_allowed", "registry_required_fields_present",
-		"registry_semantic_checks_executed", "science_claim_bundle_verification", "admission_profile_selected":
+		"registry_semantic_checks_executed", "science_claim_bundle_verification", "admission_profile_selected",
+		"formal_checks_executed":
 		return ComponentProvabilityFabric
 	default:
 		return ComponentProvabilityFabric

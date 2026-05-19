@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,14 +22,17 @@ type scienceClaimAdmissionInput struct {
 	LocalDev                      bool
 	ReleaseMode                   bool
 	BundlePath                    string
+	ProofObligationsPath          string
+	LeanCheckResultPath           string
 }
 
 type resolvedScienceClaimAdmission struct {
 	Handoff  *pcs.LoadedHandoff
 	Registry *pcs.ArtifactRegistry
 	Manifest *pcs.ReleaseManifest
-	Profile  *pcs.AdmissionProfile
-	Policy   pcs.ReleaseAdmissionPolicy
+	Profile      *pcs.AdmissionProfile
+	Policy       pcs.ReleaseAdmissionPolicy
+	FormalChecks pcs.FormalCheckInputs
 }
 
 func resolveScienceClaimAdmission(in scienceClaimAdmissionInput) (resolvedScienceClaimAdmission, error) {
@@ -90,6 +94,28 @@ func resolveScienceClaimAdmission(in scienceClaimAdmissionInput) (resolvedScienc
 	if err := pcs.EnforceScienceClaimAdmission(policy, out.Handoff, out.Registry, out.Profile); err != nil {
 		return out, err
 	}
+
+	repoRoot := ""
+	if wd, err := os.Getwd(); err == nil {
+		repoRoot, _ = pcs.FindRepoRoot(wd)
+	}
+	if repoRoot == "" && in.BundlePath != "" {
+		if abs, err := pcs.ResolveArtifactPath(in.BundlePath); err == nil {
+			repoRoot, _ = pcs.FindRepoRoot(filepath.Dir(abs))
+		}
+	}
+	formal := pcs.FormalCheckInputs{
+		ProofObligationsPath: in.ProofObligationsPath,
+		LeanCheckResultPath:  in.LeanCheckResultPath,
+	}
+	formal, err = pcs.ResolveFormalCheckInputs(repoRoot, formal)
+	if err != nil {
+		return out, err
+	}
+	if err := pcs.EnforceFormalCheckAdmission(out.Profile, out.Manifest, policy, formal); err != nil {
+		return out, err
+	}
+	out.FormalChecks = formal
 	return out, nil
 }
 
@@ -100,9 +126,11 @@ func applyAdmissionToValidateOpts(opts *pcs.ValidateOptions, adm resolvedScience
 	opts.Handoff = adm.Handoff
 	opts.Registry = adm.Registry
 	opts.AdmissionProfile = adm.Profile
+	opts.ReleaseManifest = adm.Manifest
+	opts.FormalChecks = adm.FormalChecks
 }
 
-func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admissionProfileID string, allowSkipped bool, localDev, releaseMode bool) (pcs.ReleaseChainVerifyOptions, *pcs.ArtifactRegistry, error) {
+func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admissionProfileID, proofObligationsPath, leanCheckResultPath string, allowSkipped bool, localDev, releaseMode bool) (pcs.ReleaseChainVerifyOptions, *pcs.ArtifactRegistry, error) {
 	if !releaseMode {
 		releaseMode = pcs.ReleaseModeFromEnv()
 	}
@@ -138,6 +166,35 @@ func resolveReleaseChainAdmission(manifestPath, registryPath, artifactDir, admis
 		return opts, nil, err
 	}
 	opts.AdmissionProfile = profile
+	if releaseMode && profile != nil && profile.FormalChecks != nil && profile.FormalChecks.Required {
+		repoRoot := opts.RepoRoot
+		formal := pcs.FormalCheckInputs{}
+		if strings.TrimSpace(proofObligationsPath) != "" {
+			formal.ProofObligationsPath = proofObligationsPath
+		} else if artifactDir != "" {
+			formal.ProofObligationsPath = filepath.Join(artifactDir, "proof_obligation.v0.json")
+		}
+		if strings.TrimSpace(leanCheckResultPath) != "" {
+			formal.LeanCheckResultPath = leanCheckResultPath
+		} else if artifactDir != "" {
+			formal.LeanCheckResultPath = filepath.Join(artifactDir, "lean_check_result.v0.json")
+		}
+		formal, err = pcs.ResolveFormalCheckInputs(repoRoot, formal)
+		if err != nil {
+			return opts, nil, err
+		}
+		manifest, mErr := pcs.LoadReleaseManifest(manifestPath)
+		if mErr != nil {
+			return opts, nil, mErr
+		}
+		if err := pcs.EnforceFormalCheckAdmission(profile, manifest, pcs.ReleaseAdmissionPolicy{
+			ReleaseMode:                   releaseMode,
+			AllowSkippedRegistrySemantics: allowSkipped,
+		}, formal); err != nil {
+			return opts, nil, err
+		}
+		opts.FormalChecks = formal
+	}
 	return opts, registry, nil
 }
 

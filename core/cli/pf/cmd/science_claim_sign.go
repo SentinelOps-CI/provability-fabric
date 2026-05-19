@@ -23,6 +23,8 @@ func scienceClaimSignCmd() *cobra.Command {
 	var jsonOut bool
 	var localDev bool
 	var releaseMode bool
+	var proofObligationsPath string
+	var leanCheckResultPath string
 
 	cmd := &cobra.Command{
 		Use:   "science-claim <bundle.json>",
@@ -52,6 +54,8 @@ func scienceClaimSignCmd() *cobra.Command {
 				LocalDev:                      localDev,
 				ReleaseMode:                   releaseMode,
 				BundlePath:                    bundlePath,
+				ProofObligationsPath:          proofObligationsPath,
+				LeanCheckResultPath:           leanCheckResultPath,
 			})
 			if err != nil {
 				return wrapAdmissionError(err)
@@ -123,6 +127,8 @@ func scienceClaimSignCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&localDev, "local-dev", false, "Allow 40-zero source_commit placeholder (local development only)")
 	cmd.Flags().BoolVar(&releaseMode, "release-mode", false, "Require handoff and ArtifactRegistry.v0; reject placeholder commits")
 	cmd.Flags().StringVar(&admissionProfileID, "admission-profile", "", "Admission profile id (e.g. labtrust_qc_release); required in release mode")
+	cmd.Flags().StringVar(&proofObligationsPath, "proof-obligations", "", "ProofObligation.v0 JSON (required in release mode when profile requires formal checks)")
+	cmd.Flags().StringVar(&leanCheckResultPath, "lean-check-result", "", "LeanCheckResult.v0 JSON (required in release mode when profile requires formal checks)")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }
