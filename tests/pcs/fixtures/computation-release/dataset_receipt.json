@@ -1,0 +1,21 @@
+{
+  "schema_version": "v0",
+  "dataset_id": "dataset-input-001",
+  "dataset_name": "conformance-input",
+  "dataset_version": "1.0.0",
+  "files": [
+    {
+      "path": "data/input.csv",
+      "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size_bytes": 123456,
+      "media_type": "text/csv"
+    }
+  ],
+  "aggregate_hash": "sha256:84c9037231eef6a1742c1d6d0a043878b4de8395397c168026450d8ca9e647e3",
+  "source_uri": "https://example.org/datasets/conformance-input/1.0.0",
+  "source_repo": "https://github.com/example/scientific-computation-runner",
+  "source_commit": "e555555555555555555555555555555555555555",
+  "license": "CC-BY-4.0",
+  "created_at": "2026-05-18T00:00:00Z",
+  "signature_or_digest": "sha256:4fdd6999e67eebcfec9f8f84800454614693fad9c4dbf5d887051025ce2cdeae"
+}

@@ -13,6 +13,7 @@
     "checked_at",
     "status",
     "checks",
+    "deferred_registry_checks",
     "artifacts_checked",
     "failure_codes",
     "source_repo",
@@ -34,6 +35,10 @@
       "minItems": 1,
       "items": { "$ref": "common.defs.json#/$defs/release_validation_check" }
     },
+    "deferred_registry_checks": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/deferred_registry_check" }
+    },
     "artifacts_checked": {
       "type": "integer",
       "minimum": 0
@@ -44,6 +49,11 @@
     },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
-    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "workflow_profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When set, registry semantic-check coverage is scoped to this workflow profile."
+    }
   }
 }

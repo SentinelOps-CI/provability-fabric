@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ConformanceReport.v0.schema.json",
+  "title": "ConformanceReport.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "suite",
+    "status",
+    "checks_passed",
+    "checks_failed",
+    "failures"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "suite": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed"]
+    },
+    "checks_passed": { "type": "integer", "minimum": 0 },
+    "checks_failed": { "type": "integer", "minimum": 0 },
+    "failures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conformance_failure" }
+    },
+    "report_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "suites_run": { "type": "integer", "minimum": 0 },
+    "results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conformance_suite_result" }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "conformance_failure": {
+      "type": "object",
+      "required": ["suite", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "suite": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "conformance_suite_result": {
+      "type": "object",
+      "required": ["suite", "status", "errors", "warnings", "checks_run"],
+      "additionalProperties": false,
+      "properties": {
+        "suite": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed"]
+        },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "checks_run": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -1,124 +1,118 @@
 {
-  "schema_version": "v0",
-  "verification_id": "verification-31ac5758-9219-47cf-b832-0ca8ae07a871",
   "bundle_id": "scb-pcs-qc-release-v0.1",
-  "verifier": "Provability Fabric",
-  "verifier_version": "0.1.0",
-  "status": "ProofChecked",
   "checks": [
     {
       "check_id": "science_claim_bundle_schema",
       "description": "Science claim bundle matches pcs-core JSON Schema (v0)",
-      "status": "passed",
       "details": {
         "schema": "config/schemas/pcs/ScienceClaimBundle.v0.schema.json"
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "claim_artifact_present",
       "description": "ClaimArtifact exists",
-      "status": "passed",
       "details": {
         "artifact": "claim_artifact",
         "present": true
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "assumption_set_present",
       "description": "AssumptionSet exists",
-      "status": "passed",
       "details": {
         "artifact": "assumption_set",
         "present": true
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "runtime_receipt_present",
       "description": "Exactly one RuntimeReceipt exists in runtime_receipts",
-      "status": "passed",
       "details": {
         "artifact": "runtime_receipts",
         "count": 1,
         "present": true
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "trace_certificate_present",
       "description": "At least one TraceCertificate exists in certificates",
-      "status": "passed",
       "details": {
         "artifact": "certificates",
         "count": 1,
         "present": true
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "evidence_bundle_present",
       "description": "EvidenceBundle exists",
-      "status": "passed",
       "details": {
         "artifact": "evidence_bundle",
         "present": true
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "assumption_set_ref_match",
       "description": "ClaimArtifact.assumption_set_ref matches AssumptionSet.assumption_set_id",
-      "status": "passed",
       "details": {
         "assumption_set_ref": "as-pcs-qc-release-v0.1"
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "runtime_trace_hash_present",
       "description": "RuntimeReceipt.trace_hash is non-empty",
-      "status": "passed",
       "details": {
         "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "trace_hash_alignment",
       "description": "TraceCertificate.trace_hash matches RuntimeReceipt.trace_hash",
-      "status": "passed",
       "details": {
         "certificate_count": 1,
         "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "certificate_status_checked",
       "description": "TraceCertificate.status is CertificateChecked",
-      "status": "passed",
       "details": {
         "certificate_count": 1,
         "status": "CertificateChecked"
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "status_transition_policy",
       "description": "PCS status transitions allow ProofChecked only from admissible certificate states",
-      "status": "passed",
-      "details": {}
+      "details": {},
+      "status": "passed"
     },
     {
       "check_id": "artifact_registry_admission",
       "description": "Bundle components match ArtifactRegistry.v0 admission rules",
-      "status": "passed",
       "details": {
-        "registry_id": "pcs-artifact-registry-v0.1"
-      }
+        "message": "registry not provided"
+      },
+      "status": "skipped"
     },
     {
       "check_id": "evidence_refs_complete",
       "description": "EvidenceBundle references claim, assumption set, receipt, and certificate",
-      "status": "passed",
       "details": {
         "assumption_set_refs": [
           "as-pcs-qc-release-v0.1"
         ],
         "certificate_refs": [
-          "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a"
+          "cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7"
         ],
         "claim_refs": [
           "claim-pcs-qc-release-v0.1"
@@ -126,40 +120,46 @@
         "runtime_receipt_refs": [
           "receipt-qc-release"
         ]
-      }
+      },
+      "status": "passed"
     },
     {
       "check_id": "artifact_not_stale",
       "description": "No required artifact has status Stale",
-      "status": "passed",
-      "details": {}
+      "details": {},
+      "status": "passed"
     },
     {
       "check_id": "source_provenance_present",
       "description": "source_repo and source_commit are present",
-      "status": "passed",
-      "details": {}
+      "details": {},
+      "status": "passed"
     },
     {
       "check_id": "signature_or_digest_present",
       "description": "signature_or_digest is present",
-      "status": "passed",
-      "details": {}
+      "details": {},
+      "status": "passed"
     },
     {
       "check_id": "source_commit_not_placeholder",
       "description": "source_commit is not the 40-zero placeholder unless local_dev = true",
-      "status": "passed",
-      "details": {}
+      "details": {},
+      "status": "passed"
     }
   ],
   "created_at": "2026-01-15T11:00:00Z",
+  "schema_version": "v0",
+  "signature_or_digest": "sha256:5dfc1b8fcf0649fc12371264e4bd27e71378e56acdf0c0803945d55baa533e4d",
+  "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-  "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
-  "signature_or_digest": "sha256:9ac3b0bd228e42c9525b1ade4fec3fd3277261866467cc8453da6cec1d60f885",
+  "status": "ProofChecked",
+  "verification_id": "verification-31ac5758-9219-47cf-b832-0ca8ae07a871",
   "verified_input": {
-    "bundle_hash": "sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536",
-    "certificate_id": "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a",
+    "bundle_hash": "sha256:bb740698a01c4e918ca0f346e5bfaed83e6665da8df84e931c0d50e03ce82ffe",
+    "certificate_id": "cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7",
     "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
-  }
+  },
+  "verifier": "Provability Fabric",
+  "verifier_version": "0.1.0"
 }

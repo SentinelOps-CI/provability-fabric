@@ -1,0 +1,28 @@
+{
+  "verification_id": "verify-scb-qc-release-v0.1",
+  "schema_version": "v0",
+  "bundle_id": "scb-qc-release-v0.1",
+  "verifier": "provability-fabric",
+  "verifier_version": "0.1.0",
+  "status": "ProofChecked",
+  "checks": [
+    {
+      "check_id": "schema-valid",
+      "description": "ScienceClaimBundle conforms to ScienceClaimBundle.v0 schema",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "check_id": "trace-hash-alignment",
+      "description": "Runtime receipt trace_hash matches certificate trace_hash",
+      "status": "passed",
+      "details": {
+        "trace_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    }
+  ],
+  "created_at": "2026-05-16T12:20:00Z",
+  "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+  "source_commit": "c333333333333333333333333333333333333333",
+  "signature_or_digest": "sha256:8d4741adf0e19b36b3796e0657f51ae73795cb6ce0d19585aacc78c1f17ae81f"
+}

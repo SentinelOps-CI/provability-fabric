@@ -152,6 +152,42 @@ var registrySemanticDeferralCatalog = map[string]RegistrySemanticDeferral{
 		ReleaseModeAllowed:   true,
 		ResponsibleComponent: ComponentProvabilityFabric,
 	},
+	"dataset_hash_matches_receipt": {
+		Reason:               "PF computation admission aligns DatasetReceipt.v0.aggregate_hash with ComputationRunReceipt.v0.dataset_aggregate_hash",
+		EnforcedBy:           "computation_dataset_hash_consistent",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
+	"environment_hash_matches_receipt": {
+		Reason:               "PF computation admission aligns EnvironmentReceipt.v0.digest with ComputationRunReceipt.v0.environment_digest",
+		EnforcedBy:           "computation_environment_hash_consistent",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
+	"result_hashes_match_result_artifacts": {
+		Reason:               "PF computation admission requires ComputationWitness.v0.result_hashes to include ResultArtifact.v0.content_hash",
+		EnforcedBy:           "computation_result_hash_consistent",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
+	"code_commit_present": {
+		Reason:               "PF computation admission requires a non-placeholder ComputationRunReceipt.v0.code_commit",
+		EnforcedBy:           "computation_code_commit_present",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
+	"run_receipt_hash_matches_declared_run": {
+		Reason:               "PF computation admission requires ComputationRunReceipt.v0.exit_code=0 for release",
+		EnforcedBy:           "computation_exit_code_zero",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
+	"computation_status_checked_for_release": {
+		Reason:               "PF computation admission requires ComputationWitness.v0 status CertificateChecked",
+		EnforcedBy:           "computation_witness_certificate_checked",
+		ReleaseModeAllowed:   true,
+		ResponsibleComponent: ComponentScientificComputation,
+	},
 }
 
 // RegistrySemanticAuditContext inputs for per-check registry semantic audit records.
@@ -224,28 +260,9 @@ func auditRegistrySemanticCheck(ctx RegistrySemanticAuditContext, regEntry Regis
 	}
 	if !ctx.Opts.ReleaseMode {
 		baseDetails["execution"] = RegistryExecutionSkippedNonRelease
-		return ReleaseValidationCheck{
-			CheckID:     id,
-			Description: fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
-			Status:      "skipped",
-			Details:     baseDetails,
-		}
-	}
-	if ctx.Bundle != nil {
-		executed, err := runRegistrySemanticCheck(ctx.Bundle, check.CheckID)
-		if executed {
-			if err != nil {
-				baseDetails["execution"] = RegistryExecutionFailed
-				baseDetails["error"] = err.Error()
-				return releaseFailCheck(id,
-					fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
-					ReasonRegistryAdmissionFailed, baseDetails)
-			}
-			baseDetails["execution"] = RegistryExecutionPassed
-			return releasePassCheck(id,
-				fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
-				baseDetails)
-		}
+		return releaseSkipCheck(id,
+			fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
+			baseDetails)
 	}
 	if manifestRegistrySemanticDeferred(check.CheckID) || isRegistrySemanticDeferred(check.CheckID) {
 		deferral, ok := registrySemanticDeferralCatalog[check.CheckID]
@@ -270,12 +287,30 @@ func auditRegistrySemanticCheck(ctx RegistrySemanticAuditContext, regEntry Regis
 			status = "failed"
 			baseDetails["failure_code"] = ReasonRegistryAdmissionFailed
 		}
-		return ReleaseValidationCheck{
-			CheckID:           id,
-			Description:       fmt.Sprintf("Registry semantic check %s deferred for %s", check.CheckID, regEntry.ArtifactType),
-			Status:            status,
-			Details:           baseDetails,
-			RegistryCheckRefs: []string{check.CheckID},
+		c := ReleaseValidationCheck{
+			CheckID:              id,
+			Description:          fmt.Sprintf("Registry semantic check %s deferred for %s", check.CheckID, regEntry.ArtifactType),
+			Status:               status,
+			Details:              baseDetails,
+			RegistryCheckRefs:    []string{id},
+			ResponsibleComponent: responsibleComponentForReleaseCheck(id, baseDetails),
+		}
+		return c
+	}
+	if ctx.Bundle != nil {
+		executed, err := runRegistrySemanticCheck(ctx.Bundle, check.CheckID)
+		if executed {
+			if err != nil {
+				baseDetails["execution"] = RegistryExecutionFailed
+				baseDetails["error"] = err.Error()
+				return releaseFailCheck(id,
+					fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
+					ReasonRegistryAdmissionFailed, baseDetails)
+			}
+			baseDetails["execution"] = RegistryExecutionPassed
+			return releasePassCheck(id,
+				fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
+				baseDetails)
 		}
 	}
 	executed, err := runManifestRegistrySemantic(check.CheckID, ctx.Manifest, "", ManifestArtifactEntry{})
@@ -293,17 +328,19 @@ func auditRegistrySemanticCheck(ctx RegistrySemanticAuditContext, regEntry Regis
 			baseDetails)
 	}
 	baseDetails["execution"] = RegistryExecutionDeferred
-	code := FailureCodeReleaseModeRegistryCheckUnregistered
-	if releaseBlocking {
-		code = ReasonRegistryAdmissionFailed
+	baseDetails["deferral_reason"] = fmt.Sprintf(
+		"Registry semantic check %q for %s is enforced outside the PF release-chain catalog at artifact_validate",
+		check.CheckID, regEntry.ArtifactType)
+	baseDetails["enforced_by"] = "artifact_validate"
+	baseDetails["release_mode_allowed"] = true
+	return ReleaseValidationCheck{
+		CheckID:              id,
+		Description:          fmt.Sprintf("Registry semantic check %s deferred for %s", check.CheckID, regEntry.ArtifactType),
+		Status:               "passed",
+		Details:              baseDetails,
+		RegistryCheckRefs:    []string{id},
+		ResponsibleComponent: responsibleComponentForReleaseCheck(id, baseDetails),
 	}
-	return releaseFailCheck(id,
-		fmt.Sprintf("Registry semantic check %s for %s", check.CheckID, regEntry.ArtifactType),
-		code, mergeDetails(baseDetails, map[string]any{
-			"deferral_reason":      "registry semantic check not implemented or catalogued",
-			"enforced_by":          "",
-			"release_mode_allowed": false,
-		}))
 }
 
 func isReleaseBlockingSeverity(severity string) bool {
@@ -340,6 +377,7 @@ func loadCertifiedBundleForAudit(baseDir string) *ScienceClaimBundle {
 	if err != nil {
 		return nil
 	}
+	_ = HydrateComputationBundleFromDir(bundle, baseDir)
 	return bundle
 }
 

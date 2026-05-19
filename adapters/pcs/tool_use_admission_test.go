@@ -61,7 +61,7 @@ func TestLoadAdmissionProfileFromRepoPath(t *testing.T) {
 }
 
 func TestAdmissionProfilesMatchSchema(t *testing.T) {
-	for _, id := range []string{"labtrust_qc_release", "agent_tool_use_safety"} {
+	for _, id := range []string{"labtrust_qc_release", "agent_tool_use_safety", "scientific_computation_reproducibility"} {
 		p, err := pcs.LoadAdmissionProfile(id)
 		if err != nil {
 			t.Fatalf("profile %s: %v", id, err)

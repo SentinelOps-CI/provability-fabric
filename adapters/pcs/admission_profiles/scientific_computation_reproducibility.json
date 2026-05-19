@@ -1,0 +1,29 @@
+{
+  "profile_id": "scientific_computation_reproducibility",
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "description": "Scientific computation reproducibility: dataset, environment, run receipt, result artifact, and computation witness",
+  "accepted_bundle_artifact": "ScienceClaimBundle.v0",
+  "required_runtime_artifacts": [
+    "DatasetReceipt.v0",
+    "EnvironmentReceipt.v0",
+    "ComputationRunReceipt.v0",
+    "ResultArtifact.v0"
+  ],
+  "required_certificate_artifacts": [
+    "ComputationWitness.v0"
+  ],
+  "required_handoff_kinds": [
+    "bundle_to_verifier"
+  ],
+  "required_registry_checks": [
+    "dataset_hash_matches_receipt",
+    "environment_hash_matches_receipt",
+    "run_receipt_hash_matches_declared_run",
+    "result_hashes_match_result_artifacts",
+    "code_commit_present",
+    "computation_status_checked_for_release"
+  ],
+  "status_policy": "scientific_computation_reproducibility_v0.1",
+  "signature_policy": "digest_v0",
+  "repair_hint_policy": "operational_v0"
+}

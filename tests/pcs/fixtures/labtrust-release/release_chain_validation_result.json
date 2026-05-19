@@ -3,9 +3,10 @@
   "validation_id": "validation-pcs-v0.1-labtrust-qc-rc",
   "release_id": "release-pcs-v0.1-labtrust-qc",
   "release_candidate": "pcs-v0.1.0-rc1",
+  "workflow_profile_id": "labtrust.qc_release_v0.1",
   "validator": "pcs-core",
   "validator_version": "0.1.0",
-  "checked_at": "2026-05-17T22:32:01Z",
+  "checked_at": "2026-05-18T23:17:38Z",
   "status": "Rejected",
   "checks": [
     {
@@ -13,7 +14,8 @@
       "description": "RELEASE_FIXTURE_MANIFEST.json exists",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "artifact_files_present",
@@ -22,20 +24,18 @@
       "details": {},
       "registry_check_refs": [
         "ReleaseManifest.v0.artifact_hashes_match_files"
-      ]
+      ],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "manifest_hashes_match",
       "description": "Every artifact hash matches the manifest digest",
-      "status": "failed",
-      "details": {
-        "failure_code": "manifest_hash_mismatch",
-        "message": "science_claim_bundle.certified.json: manifest digest mismatch (expected sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833, got sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536)",
-        "artifact": "science_claim_bundle.certified.json"
-      },
+      "status": "passed",
+      "details": {},
       "registry_check_refs": [
         "ReleaseManifest.v0.artifact_hashes_match_files"
-      ]
+      ],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "forbidden_provenance_values",
@@ -44,70 +44,99 @@
       "details": {},
       "registry_check_refs": [
         "ReleaseManifest.v0.release_mode_commit_policy"
-      ]
+      ],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "runtime_receipt_labtrust_commit",
       "description": "runtime_receipt.json source_commit matches manifest.labtrust_gym_commit",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "labtrust_commit_mismatch",
+        "message": "signed_science_claim_bundle.science_claim_bundle: LabTrust source_commit 17ed831acfd775889ab497d11004cceb083a9c2d != manifest.labtrust_gym_commit 8369892d8872bc08ef5acb6cf503f38665c36733"
+      },
       "registry_check_refs": [
         "RuntimeReceipt.v0.source_commit_matches_release_manifest"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "pending_bundle_labtrust_commits",
       "description": "science_claim_bundle.pending.json LabTrust provenance matches manifest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "labtrust_commit_mismatch",
+        "message": "signed_science_claim_bundle.science_claim_bundle: LabTrust source_commit 17ed831acfd775889ab497d11004cceb083a9c2d != manifest.labtrust_gym_commit 8369892d8872bc08ef5acb6cf503f38665c36733"
+      },
       "registry_check_refs": [
         "ScienceClaimBundle.v0.non_empty_runtime_receipts"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "certified_bundle_labtrust_commits",
       "description": "science_claim_bundle.certified.json LabTrust provenance matches manifest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "labtrust_commit_mismatch",
+        "message": "signed_science_claim_bundle.science_claim_bundle: LabTrust source_commit 17ed831acfd775889ab497d11004cceb083a9c2d != manifest.labtrust_gym_commit 8369892d8872bc08ef5acb6cf503f38665c36733"
+      },
       "registry_check_refs": [
         "ScienceClaimBundle.v0.certified_bundle_has_certificate_when_checked"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "signed_bundle_nested_labtrust_commits",
       "description": "signed bundle nested science_claim_bundle LabTrust commits match manifest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "labtrust_commit_mismatch",
+        "message": "signed_science_claim_bundle.science_claim_bundle: LabTrust source_commit 17ed831acfd775889ab497d11004cceb083a9c2d != manifest.labtrust_gym_commit 8369892d8872bc08ef5acb6cf503f38665c36733"
+      },
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.embedded_bundle_passes_science_claim_semantics"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "trace_certificate_certifyedge_commit",
       "description": "trace_certificate.json source_commit matches manifest.certifyedge_commit",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certifyedge_commit_mismatch",
+        "message": "signed_science_claim_bundle.json: CertifyEdge source_commit 635fca3771ad54fe3f8b49d1bb77ee35d0680ddc != manifest.certifyedge_commit 11e079bc643b9e813c1a5516dc6d4db1d60a3f8a"
+      },
       "registry_check_refs": [
         "TraceCertificate.v0.source_commit_matches_release_manifest"
-      ]
+      ],
+      "responsible_component": "CertifyEdge"
     },
     {
       "check_id": "certified_bundle_certifyedge_commits",
       "description": "certified bundle CertifyEdge provenance matches manifest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certifyedge_commit_mismatch",
+        "message": "signed_science_claim_bundle.json: CertifyEdge source_commit 635fca3771ad54fe3f8b49d1bb77ee35d0680ddc != manifest.certifyedge_commit 11e079bc643b9e813c1a5516dc6d4db1d60a3f8a"
+      },
       "registry_check_refs": [
         "ScienceClaimBundle.v0.certified_bundle_has_certificate_when_checked"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "signed_bundle_certifyedge_commits",
       "description": "signed bundle CertifyEdge provenance matches manifest",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certifyedge_commit_mismatch",
+        "message": "signed_science_claim_bundle.json: CertifyEdge source_commit 635fca3771ad54fe3f8b49d1bb77ee35d0680ddc != manifest.certifyedge_commit 11e079bc643b9e813c1a5516dc6d4db1d60a3f8a"
+      },
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.embedded_bundle_passes_science_claim_semantics"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "verification_result_pf_commit",
@@ -116,7 +145,8 @@
       "details": {},
       "registry_check_refs": [
         "VerificationResult.v0.verified_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "signed_bundle_pf_commit",
@@ -125,7 +155,8 @@
       "details": {},
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "verification_nested_pf_commits",
@@ -134,7 +165,8 @@
       "details": {},
       "registry_check_refs": [
         "VerificationResult.v0.failed_checks_block_import_ready_status"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "signed_nested_pf_commits",
@@ -143,75 +175,108 @@
       "details": {},
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "scientific_memory_source_commit",
       "description": "Scientific Memory report source_commit matches manifest",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "scientific_memory_pin_commit",
       "description": "Scientific Memory report scientific_memory_commit matches manifest",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "certificate_id_trace_certificate",
       "description": "certificate_id on trace_certificate is present and consistent",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "TraceCertificate.v0.status_is_certificate_checked_for_release"
-      ]
+      ],
+      "responsible_component": "CertifyEdge"
     },
     {
       "check_id": "certificate_id_certified_bundle",
       "description": "certificate_id matches on certified bundle certificates",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "ScienceClaimBundle.v0.certified_bundle_has_certificate_when_checked"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "certificate_id_claim_refs",
       "description": "certificate_id referenced from certified claim_artifact",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "EvidenceBundle.v0.certificate_refs_resolve"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "certificate_id_evidence_refs",
       "description": "certificate_id referenced from certified evidence_bundle",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "EvidenceBundle.v0.certificate_refs_resolve"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "certificate_id_verification",
       "description": "certificate_id matches verification_result.verified_input",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "VerificationResult.v0.verified_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "certificate_id_signed_bundle",
       "description": "certificate_id matches signed bundle embedded certificates",
-      "status": "passed",
-      "details": {},
+      "status": "failed",
+      "details": {
+        "failure_code": "certificate_id_mismatch",
+        "message": "verification_result.verified_input.certificate_id: expected 'cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693', got 'cert-trace-a1b8ff9d-7d5f-489c-98b1-a3a630cb87d7'",
+        "artifact": "verification_result.json"
+      },
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "trace_hash_alignment",
@@ -221,7 +286,8 @@
       "registry_check_refs": [
         "RuntimeReceipt.v0.trace_hash_present",
         "TraceCertificate.v0.trace_hash_matches_runtime_receipt"
-      ]
+      ],
+      "responsible_component": "LabTrust-Gym"
     },
     {
       "check_id": "verified_input_bundle_hash",
@@ -229,11 +295,12 @@
       "status": "failed",
       "details": {
         "failure_code": "verified_input_hash_mismatch",
-        "message": "verified_input.bundle_hash sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536 != manifest certified bundle hash sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+        "message": "verified_input.bundle_hash sha256:bb740698a01c4e918ca0f346e5bfaed83e6665da8df84e931c0d50e03ce82ffe != manifest certified bundle hash sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
       },
       "registry_check_refs": [
         "VerificationResult.v0.verified_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "signed_input_bundle_hash",
@@ -241,32 +308,36 @@
       "status": "failed",
       "details": {
         "failure_code": "signed_input_hash_mismatch",
-        "message": "signed_input_bundle_hash sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536 != manifest certified bundle hash sha256:9b42d792199eb6f358d26f822699f0ed65bb4366eee306d4958d42121c656833"
+        "message": "signed_input_bundle_hash sha256:bb740698a01c4e918ca0f346e5bfaed83e6665da8df84e931c0d50e03ce82ffe != manifest certified bundle hash sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
       },
       "registry_check_refs": [
         "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
-      ]
+      ],
+      "responsible_component": "Provability Fabric"
     },
     {
       "check_id": "scientific_memory_import_passed",
       "description": "scientific_memory_import_report.verification_status is passed",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "scientific_memory_strict_import",
       "description": "scientific_memory_import_report.strict is true",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "scientific_memory_no_legacy",
       "description": "scientific_memory_import_report.allow_legacy is false and bundle_shape is pcs_core",
       "status": "passed",
       "details": {},
-      "registry_check_refs": []
+      "registry_check_refs": [],
+      "responsible_component": "pcs-core"
     },
     {
       "check_id": "pcs_artifact_schema_validation",
@@ -275,16 +346,28 @@
       "details": {},
       "registry_check_refs": [
         "ArtifactRegistry.v0.entries_cover_required_artifact_types"
-      ]
+      ],
+      "responsible_component": "pcs-core"
+    }
+  ],
+  "deferred_registry_checks": [
+    {
+      "registry_ref": "HandoffManifest.v0.handoff_input_hashes_when_validated",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Executed via pcs conformance run --suite handoff-manifest during release qualification."
     }
   ],
   "artifacts_checked": 8,
   "failure_codes": [
-    "manifest_hash_mismatch",
+    "certificate_id_mismatch",
+    "certifyedge_commit_mismatch",
+    "labtrust_commit_mismatch",
     "signed_input_hash_mismatch",
     "verified_input_hash_mismatch"
   ],
   "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
-  "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
-  "signature_or_digest": "sha256:d0d846296e549b1bd135487b7d31c8244d55f95253c7eeb58c7f102abee9ff23"
+  "source_commit": "5ed33a0f995df88392ee0fc849967e9c42038738",
+  "signature_or_digest": "sha256:85da9ec1b1bd98bca8a07b565f7ef2320f80f0b2a5474ca830c5b7b25581700b"
 }

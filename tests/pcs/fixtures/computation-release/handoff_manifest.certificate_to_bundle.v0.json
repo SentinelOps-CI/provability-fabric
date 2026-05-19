@@ -1,0 +1,27 @@
+{
+  "schema_version": "v0",
+  "handoff_id": "handoff-computation-witness-to-bundle",
+  "handoff_kind": "certificate_to_bundle",
+  "from_component": "CertifyEdge",
+  "to_component": "scientific-computation demo producer",
+  "created_at": "2026-05-18T12:00:00Z",
+  "source_repo": "https://github.com/fraware/CertifyEdge",
+  "source_commit": "b222222222222222222222222222222222222222",
+  "input_artifacts": {
+    "computation_witness.json": {
+      "artifact_type": "ComputationWitness.v0",
+      "sha256": "sha256:a86081703ca5bc521445cc5a38826adfc1ca55f87f52f35b3c429a2bbdaf13f9"
+    }
+  },
+  "expected_outputs": {
+    "science_claim_bundle.certified.json": {
+      "artifact_type": "ScienceClaimBundle.v0"
+    }
+  },
+  "invariants": {
+    "witness_id": "witness-sci-comp-repro-001",
+    "run_receipt_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828"
+  },
+  "status": "Validated",
+  "signature_or_digest": "sha256:e2170d91b655ae0d9ae9b8f6a18fa78f9801d76213bd8e5bfba577ac7599f501"
+}

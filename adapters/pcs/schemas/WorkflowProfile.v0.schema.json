@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/WorkflowProfile.v0.schema.json",
+  "title": "WorkflowProfile.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "workflow_id",
+    "domain",
+    "description",
+    "runtime_artifacts",
+    "certificate_artifacts",
+    "handoff_sequence",
+    "required_registry_entries",
+    "required_admission_profile",
+    "status_policy",
+    "failure_modes",
+    "limitations_notice",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "domain": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "runtime_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "certificate_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "handoff_sequence": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.defs.json#/$defs/handoff_kind" }
+    },
+    "required_registry_entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "required_admission_profile": { "type": "string", "minLength": 1 },
+    "status_policy": { "$ref": "#/$defs/workflow_status_policy" },
+    "failure_modes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "limitations_notice": { "$ref": "common.defs.json#/$defs/limitations_notice" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "workflow_status_policy": {
+      "type": "object",
+      "required": ["policy_id", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "policy_id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "allowed_terminal_statuses": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "forbidden_transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from_status", "to_status"],
+            "additionalProperties": false,
+            "properties": {
+              "from_status": { "type": "string", "minLength": 1 },
+              "to_status": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

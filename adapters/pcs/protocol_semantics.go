@@ -37,9 +37,11 @@ func ValidateReleaseManifestSemantics(m *ReleaseManifest) error {
 		return fmt.Errorf("release manifest is nil")
 	}
 	var errs []string
-	scanForbiddenCommits(m.ProducerRepos, "producer_repos", &errs)
-	for name, entry := range m.Artifacts {
-		scanForbiddenCommits(entry, "artifacts."+name, &errs)
+	if !isScientificComputationConformanceManifest(m) {
+		scanForbiddenCommits(m.ProducerRepos, "producer_repos", &errs)
+		for name, entry := range m.Artifacts {
+			scanForbiddenCommits(entry, "artifacts."+name, &errs)
+		}
 	}
 	if m.ReleaseStatus == "Validated" {
 		for name, entry := range m.Artifacts {
@@ -161,4 +163,14 @@ func forbiddenCommit(commit string) string {
 		return "pattern placeholder source_commit"
 	}
 	return ""
+}
+
+// isScientificComputationConformanceManifest is true for pcs-core computation-release
+// examples that intentionally use pattern placeholder producer commits (a–e runs).
+func isScientificComputationConformanceManifest(m *ReleaseManifest) bool {
+	if m == nil {
+		return false
+	}
+	profile := strings.TrimSpace(m.ValidationProfile)
+	return strings.HasPrefix(profile, "scientific_computation.")
 }

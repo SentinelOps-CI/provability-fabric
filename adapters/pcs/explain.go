@@ -154,7 +154,6 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 			RegenerateCmd:        "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --admission-profile labtrust_qc_release --release-mode",
 		}}
 	}
-	code := fc
 	switch c.CheckID {
 	case "manifest_hashes_match":
 		return []FailureExplanation{{
@@ -212,6 +211,13 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 		if act == "" {
 			act = c.Description
 		}
+		repairHint, _ := c.Details["repair_hint"].(string)
+		if repairHint == "" {
+			repairHint = computationReleaseChainRepair(fc, c.CheckID, c.Description)
+		}
+		if repairHint == "" {
+			repairHint = defaultReleaseChainRepair(fc, c.Description)
+		}
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,
 			FailureCode:          fc,
@@ -221,9 +227,32 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 			HandoffRef:           handoffRef,
 			Expected:             expected,
 			Actual:               act,
-			RepairHint:           defaultReleaseChainRepair(code, c.Description),
+			RepairHint:           repairHint,
 		}}
 	}
+}
+
+func computationReleaseChainRepair(code, checkID, desc string) string {
+	switch code {
+	case FailureCodeResultHashMismatch:
+		return computationRepairHint
+	case FailureCodeMissingCodeCommit:
+		return "Set ComputationRunReceipt.v0.code_commit to the git commit used for the run, then regenerate the run receipt and result artifacts."
+	case FailureCodeNonzeroExitCode:
+		return computationRepairHint
+	case FailureCodeEnvironmentDigestMismatch:
+		return "Align EnvironmentReceipt.v0.digest with ComputationRunReceipt.v0.environment_digest and the witness environment_digest field."
+	case FailureCodeRejectedComputationWitness:
+		return "Regenerate ComputationWitness.v0 with status CertificateChecked after recomputing and re-validating results."
+	case FailureCodeDatasetHashMismatch:
+		return "Ensure DatasetReceipt.v0.aggregate_hash matches ComputationRunReceipt.v0 and ComputationWitness.v0 dataset references."
+	case FailureCodeMissingDatasetReceipt, FailureCodeMissingEnvironmentReceipt, FailureCodeMissingComputationWitness:
+		return "Attach all computation artifacts listed in the scientific_computation_reproducibility admission profile before release admission."
+	}
+	if strings.HasPrefix(checkID, "computation_") {
+		return computationRepairHint
+	}
+	return ""
 }
 
 func responsibleComponentForReason(code string) string {
@@ -242,11 +271,15 @@ func responsibleComponentForReason(code string) string {
 func defaultVerificationRepair(code, desc string) string {
 	switch code {
 	case FailureCodeMissingAdmissionProfile:
-		return "Pass --admission-profile adapters/pcs/admission_profiles/labtrust_qc_release.json (or agent_tool_use_safety.json) with --release-mode."
+		return "Pass --admission-profile adapters/pcs/admission_profiles/labtrust_qc_release.json (or agent_tool_use_safety.json or scientific_computation_reproducibility.json) with --release-mode."
 	case FailureCodeUnknownAdmissionProfile:
-		return "Use a built-in profile id (labtrust_qc_release, agent_tool_use_safety) or a path to a valid AdmissionProfile.v0 JSON file."
+		return "Use a built-in profile id (labtrust_qc_release, agent_tool_use_safety, scientific_computation_reproducibility) or a path to a valid AdmissionProfile.v0 JSON file."
 	case FailureCodeAdmissionProfileWorkflowMismatch:
-		return "Select the admission profile that matches the bundle workflow_id (labtrust.qc_release_v0 vs agent_tool_use.safety_v0)."
+		return "Select the admission profile that matches the bundle workflow_id (labtrust.qc_release_v0, agent_tool_use.safety_v0, or scientific_computation.reproducibility_v0)."
+	case FailureCodeResultHashMismatch, FailureCodeMissingCodeCommit, FailureCodeNonzeroExitCode,
+		FailureCodeEnvironmentDigestMismatch, FailureCodeRejectedComputationWitness, FailureCodeDatasetHashMismatch,
+		FailureCodeMissingDatasetReceipt, FailureCodeMissingEnvironmentReceipt, FailureCodeMissingComputationWitness:
+		return computationReleaseChainRepair(code, "", desc)
 	case FailureCodeAdmissionProfileRequiredArtifactMissing:
 		return "Regenerate the bundle so all artifacts listed in the admission profile are present and typed correctly."
 	case FailureCodeMissingToolUseTrace, FailureCodeMissingToolUseCertificate:

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ComputationWitness.v0.schema.json",
+  "title": "ComputationWitness.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "witness_id",
+    "workflow_id",
+    "dataset_hash",
+    "environment_hash",
+    "run_receipt_hash",
+    "result_hashes",
+    "code_repo",
+    "code_commit",
+    "checker",
+    "checker_version",
+    "status",
+    "violations",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "witness_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "dataset_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "environment_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "run_receipt_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "result_hashes": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/hex_digest" }
+    },
+    "code_repo": { "type": "string", "format": "uri" },
+    "code_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "checker": { "type": "string", "minLength": 1 },
+    "checker_version": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/computation_witness_status" },
+    "violations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/computation_violation" }
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "computation_witness_status": {
+      "type": "string",
+      "enum": ["CertificateChecked", "Rejected", "Stale"]
+    },
+    "computation_violation": {
+      "type": "object",
+      "required": ["violation_id", "violation_type", "explanation"],
+      "additionalProperties": false,
+      "properties": {
+        "violation_id": { "type": "string", "minLength": 1 },
+        "violation_type": { "type": "string", "minLength": 1 },
+        "explanation": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -92,6 +92,10 @@ sync-pcs-rc-fixtures:
 	@$(ECHOOK) "Syncing PF labtrust-release fixtures from pcs-core RC..."
 	python scripts/pcs-sync-from-pcs-core-rc.py $(PCS_CORE_PATH)
 
+sync-pcs-computation-fixtures:
+	@$(ECHOOK) "Syncing PF computation-release fixtures from pcs-core..."
+	python scripts/pcs-sync-computation-release.py $(PCS_CORE_PATH)
+
 ifeq ($(OS),Windows_NT)
 test-pcs-rc-gate:
 	@$(ECHOOK) "PCS RC fixture lock tests..."

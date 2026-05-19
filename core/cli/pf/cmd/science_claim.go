@@ -68,6 +68,16 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, adm resolvedSci
 		}
 		return pcs.VerificationResult{}, fmt.Errorf("%s: full tool-use bundle verification is not implemented yet", pcs.FailureCodeToolUseReleaseNotImplemented)
 	}
+	if adm.Profile != nil && adm.Profile.IsComputationProfile() {
+		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff); err != nil {
+			return pcs.VerificationResult{}, wrapAdmissionError(err)
+		}
+		result := pcs.BuildComputationVerificationResult(bundle, opts)
+		if err := pcs.ValidatePFProvenanceCommit(result.SourceCommit, opts.ReleaseMode, opts.LocalDev); err != nil {
+			return result, err
+		}
+		return result, nil
+	}
 	result, err := pcs.VerifyScienceClaimBundle(resolved, bundle, opts)
 	if err != nil {
 		return result, wrapAdmissionError(err)

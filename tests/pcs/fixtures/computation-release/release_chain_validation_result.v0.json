@@ -1,0 +1,220 @@
+{
+  "schema_version": "v0",
+  "validation_id": "validation-pcs-v0.1-scientific-computation",
+  "release_id": "release-pcs-v0.1-scientific-computation",
+  "release_candidate": "pcs-v0.1-scientific-computation-conformance",
+  "workflow_profile_id": "scientific_computation.reproducibility_v0",
+  "validator": "pcs-core",
+  "validator_version": "0.1.0",
+  "checked_at": "2026-05-18T12:00:00Z",
+  "status": "ProofChecked",
+  "checks": [
+    {
+      "check_id": "computation_dataset_hash_alignment",
+      "description": "ComputationWitness dataset_hash matches DatasetReceipt",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.dataset_hash_matches_receipt"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_environment_hash_alignment",
+      "description": "ComputationWitness environment_hash matches EnvironmentReceipt",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.environment_hash_matches_receipt"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_run_receipt_hash_alignment",
+      "description": "ComputationWitness run_receipt_hash matches ComputationRunReceipt",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.run_receipt_hash_matches_declared_run"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_result_hashes_alignment",
+      "description": "ComputationWitness result_hashes match ResultArtifact",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.result_hashes_match_result_artifacts"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_code_commit_present",
+      "description": "ComputationWitness and run receipt carry non-zero code commits",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.code_commit_present"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_witness_status_checked",
+      "description": "ComputationWitness status is CertificateChecked",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.computation_status_checked_for_release"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_certifyedge_commit",
+      "description": "ComputationWitness source_commit matches release manifest",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.source_commit_matches_release_manifest"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "computation_witness_signature_valid",
+      "description": "ComputationWitness signature_or_digest is canonical",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.signature_or_digest_valid"
+      ],
+      "responsible_component": "CertifyEdge"
+    },
+    {
+      "check_id": "release_manifest_integrity",
+      "description": "Release manifest hashes and commit policy",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ReleaseManifest.v0.artifact_hashes_match_files",
+        "ReleaseManifest.v0.release_mode_commit_policy"
+      ],
+      "responsible_component": "pcs-core"
+    },
+    {
+      "check_id": "verification_and_signed_bundle_hashes",
+      "description": "Verification and signed bundle hash alignment",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "VerificationResult.v0.verified_input_bundle_hash_matches_certified",
+        "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
+      ],
+      "responsible_component": "Provability Fabric"
+    }
+  ],
+  "artifacts_checked": 9,
+  "failure_codes": [],
+  "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+  "source_commit": "d444444444444444444444444444444444444444",
+  "signature_or_digest": "sha256:77166b5a1299f16eb4d489882dcdca544c6473ede35cf35de81e302acfaa3ab3",
+  "deferred_registry_checks": [
+    {
+      "registry_ref": "HandoffManifest.v0.handoff_input_hashes_when_validated",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Executed via pcs conformance run --suite handoff-manifest during release qualification."
+    },
+    {
+      "registry_ref": "RuntimeReceipt.v0.trace_hash_present",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "LabTrust-Gym",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "ScienceClaimBundle.v0.certified_bundle_has_certificate_when_checked",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "LabTrust-Gym",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "ScienceClaimBundle.v0.non_empty_runtime_receipts",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "LabTrust-Gym",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "TraceCertificate.v0.trace_hash_matches_runtime_receipt",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "CertifyEdge",
+      "reason": "Verified during per-artifact validation of TraceCertificate against RuntimeReceipt."
+    },
+    {
+      "registry_ref": "VerificationResult.v0.failed_checks_block_import_ready_status",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "Provability Fabric",
+      "reason": "Verified during per-artifact validation of VerificationResult instances."
+    },
+    {
+      "registry_ref": "ComputationRunReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "ComputationRunReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Verified during per-artifact validation of nested AssumptionSet and SourceSpan instances."
+    },
+    {
+      "registry_ref": "DatasetReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "DatasetReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Verified during per-artifact validation of nested AssumptionSet and SourceSpan instances."
+    },
+    {
+      "registry_ref": "EnvironmentReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "EnvironmentReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Verified during per-artifact validation of nested AssumptionSet and SourceSpan instances."
+    },
+    {
+      "registry_ref": "ResultArtifact.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Executed outside the 30-check release-chain catalog at the cited enforcement location."
+    },
+    {
+      "registry_ref": "ResultArtifact.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "scientific-computation demo producer",
+      "reason": "Verified during per-artifact validation of nested AssumptionSet and SourceSpan instances."
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/EnvironmentReceipt.v0.schema.json",
+  "title": "EnvironmentReceipt.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "environment_id",
+    "environment_kind",
+    "os",
+    "architecture",
+    "language_runtimes",
+    "packages",
+    "container_image",
+    "container_digest",
+    "hardware_summary",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "environment_id": { "type": "string", "minLength": 1 },
+    "environment_kind": { "$ref": "#/$defs/environment_kind" },
+    "os": { "type": "string", "minLength": 1 },
+    "architecture": { "type": "string", "minLength": 1 },
+    "language_runtimes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "packages": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "container_image": { "type": "string" },
+    "container_digest": { "type": "string" },
+    "hardware_summary": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "environment_kind": {
+      "type": "string",
+      "enum": [
+        "local",
+        "container",
+        "nix",
+        "conda",
+        "uv",
+        "poetry",
+        "docker",
+        "reproducible-build",
+        "unknown"
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": "v0",
+  "handoff_id": "handoff-computation-runtime-to-certifyedge",
+  "handoff_kind": "runtime_to_certificate",
+  "from_component": "scientific-computation demo producer",
+  "to_component": "CertifyEdge",
+  "created_at": "2026-05-18T12:00:00Z",
+  "source_repo": "https://github.com/example/scientific-computation-runner",
+  "source_commit": "e555555555555555555555555555555555555555",
+  "input_artifacts": {
+    "dataset_receipt.json": {
+      "artifact_type": "DatasetReceipt.v0",
+      "sha256": "sha256:d54994e19c32caeb7508edbb73a14efc94341ffd93013873af527e180385dfec"
+    },
+    "environment_receipt.json": {
+      "artifact_type": "EnvironmentReceipt.v0",
+      "sha256": "sha256:6335e612b739e925d74ca94a39690380f8be7c9db836fcad4c8ff0ba8b6c98ae"
+    },
+    "computation_run_receipt.json": {
+      "artifact_type": "ComputationRunReceipt.v0",
+      "sha256": "sha256:c14b4fed421343459ad081e74f7b613b39b6bca803eca27ffde0fdda1a8dd12a"
+    },
+    "result_artifact.json": {
+      "artifact_type": "ResultArtifact.v0",
+      "sha256": "sha256:a38eeaab2b0cd104ac461b6a061bfa09e4f797253c27173107452a5acd9c42ed"
+    }
+  },
+  "expected_outputs": {
+    "computation_witness.json": {
+      "artifact_type": "ComputationWitness.v0"
+    }
+  },
+  "invariants": {
+    "run_receipt_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828",
+    "dataset_hash": "sha256:84c9037231eef6a1742c1d6d0a043878b4de8395397c168026450d8ca9e647e3"
+  },
+  "status": "Validated",
+  "signature_or_digest": "sha256:bafff8665c39e3662b34563a34671f518639fbb46853d889925a537a964c1b41"
+}

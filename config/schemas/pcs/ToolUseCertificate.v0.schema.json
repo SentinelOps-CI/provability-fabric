@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ToolUseCertificate.v0.schema.json",
+  "title": "ToolUseCertificate.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "certificate_id",
+    "trace_hash",
+    "policy_hash",
+    "property_id",
+    "checker",
+    "checker_version",
+    "status",
+    "violations",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "certificate_id": { "type": "string", "minLength": 1 },
+    "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "policy_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "property_id": { "type": "string", "minLength": 1 },
+    "checker": { "type": "string", "minLength": 1 },
+    "checker_version": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/tool_use_certificate_status" },
+    "violations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tool_use_violation" }
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "tool_use_certificate_status": {
+      "type": "string",
+      "enum": ["CertificateChecked", "Rejected", "Stale"]
+    },
+    "tool_use_violation": {
+      "type": "object",
+      "required": [
+        "violation_id",
+        "event_id",
+        "violation_type",
+        "tool_name",
+        "policy_ref",
+        "explanation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "violation_id": { "type": "string", "minLength": 1 },
+        "event_id": { "type": "string", "minLength": 1 },
+        "violation_type": { "type": "string", "minLength": 1 },
+        "tool_name": { "type": "string", "minLength": 1 },
+        "policy_ref": { "type": "string", "minLength": 1 },
+        "explanation": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

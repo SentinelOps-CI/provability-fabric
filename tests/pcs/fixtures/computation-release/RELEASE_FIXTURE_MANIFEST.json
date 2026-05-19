@@ -1,0 +1,22 @@
+{
+  "schema_version": "v0",
+  "release_candidate": "pcs-v0.1-scientific-computation-conformance",
+  "generated_at": "2026-05-18T12:00:00Z",
+  "workflow_profile_id": "scientific_computation.reproducibility_v0",
+  "pcs_core_commit": "d444444444444444444444444444444444444444",
+  "scientific_computation_commit": "e555555555555555555555555555555555555555",
+  "certifyedge_commit": "b222222222222222222222222222222222222222",
+  "provability_fabric_commit": "c333333333333333333333333333333333333333",
+  "scientific_memory_commit": "d444444444444444444444444444444444444444",
+  "artifacts": {
+    "dataset_receipt.json": "sha256:d54994e19c32caeb7508edbb73a14efc94341ffd93013873af527e180385dfec",
+    "environment_receipt.json": "sha256:6335e612b739e925d74ca94a39690380f8be7c9db836fcad4c8ff0ba8b6c98ae",
+    "computation_run_receipt.json": "sha256:c14b4fed421343459ad081e74f7b613b39b6bca803eca27ffde0fdda1a8dd12a",
+    "result_artifact.json": "sha256:a38eeaab2b0cd104ac461b6a061bfa09e4f797253c27173107452a5acd9c42ed",
+    "computation_witness.json": "sha256:a86081703ca5bc521445cc5a38826adfc1ca55f87f52f35b3c429a2bbdaf13f9",
+    "science_claim_bundle.certified.json": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d",
+    "verification_result.json": "sha256:62a27aa4a2378a8a1462a583e9e2aae350c8252b29e3450fe9a63034f90f6b31",
+    "signed_science_claim_bundle.json": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea",
+    "scientific_memory_import_report.json": "sha256:bf01de184c8670fb951179955863975f919770514301765246efef74845b8851"
+  }
+}

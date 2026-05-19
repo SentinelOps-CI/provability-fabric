@@ -4,10 +4,10 @@
   "claim_id": "claim-pcs-qc-release-v0.1",
   "certified_source": "pcs-core/examples/labtrust-release/science_claim_bundle.certified.json",
   "canonical_rc": "pcs-core/examples/labtrust-release",
-  "pf_source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
-  "labtrust_gym_commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de",
-  "certifyedge_commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc",
-  "scientific_memory_commit": "c4259a4cb79fe7b195fd156feb346c08fc334d33",
+  "pf_source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
+  "labtrust_gym_commit": "8369892d8872bc08ef5acb6cf503f38665c36733",
+  "certifyedge_commit": "11e079bc643b9e813c1a5516dc6d4db1d60a3f8a",
+  "scientific_memory_commit": "796bb99e5c86687a5142bd3a8aa802650722036f",
   "pf_outputs": [
     "verification_result.json",
     "signed_science_claim_bundle.json"
@@ -23,8 +23,8 @@
   ],
   "regenerate": "make sync-pcs-rc-fixtures",
   "artifact_hashes": {
-    "science_claim_bundle.certified.json": "sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536",
-    "verification_result.json": "sha256:2d16bb868550f1c5879e660ad69761314c0ca9d954bc98f7141ab78ac8c6a5e9",
-    "signed_science_claim_bundle.json": "sha256:ece9554a3edbe1d310144f443995f618c8648c258c6cb7e90376446e8dfb6a64"
+    "science_claim_bundle.certified.json": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+    "verification_result.json": "sha256:8929abf4c382ddb16f65cc978a13f558899c82b66f6fa625777fe06c968f5b29",
+    "signed_science_claim_bundle.json": "sha256:2fe8c786dc98b5dae912ad5ba12d5a672b22b2b1ae29330bceee19afe78d616e"
   }
 }

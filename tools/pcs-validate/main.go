@@ -55,6 +55,8 @@ func main() {
 		releaseDir := filepath.Join(dir, "fixtures", "labtrust-release")
 		failed += validateLabtrustReleaseFixtures(releaseDir, root, *localDev, &results)
 	}
+	failed += validateComputationFixtures(filepath.Join(dir, "fixtures", "computation"), root, &results)
+	failed += validateComputationReleaseFixtures(filepath.Join(dir, "fixtures", "computation-release"), root, &results)
 
 	if *jsonOut {
 		enc := json.NewEncoder(os.Stdout)
@@ -315,6 +317,82 @@ func validateSignedBundleExport(path, label, root string, results *[]validateRes
 	}
 	*results = append(*results, validateResult{File: label, Status: "schema_valid"})
 	return false
+}
+
+func validateComputationFixtures(dir, root string, results *[]validateResult) int {
+	if _, err := os.Stat(dir); err != nil {
+		return 0
+	}
+	var failed int
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if e.Name() != "valid_computation_bundle.json" {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		label := filepath.ToSlash(filepath.Join("fixtures", "computation", e.Name()))
+		bundle, err := pcs.LoadScienceClaimBundle(path)
+		if err != nil {
+			*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+			failed++
+			continue
+		}
+		if err := pcs.ValidateComputationProfileBundle(root, bundle); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			failed++
+			continue
+		}
+		*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+	}
+	return failed
+}
+
+func validateComputationReleaseFixtures(dir, root string, results *[]validateResult) int {
+	if _, err := os.Stat(dir); err != nil {
+		return 0
+	}
+	var failed int
+	certified := filepath.Join(dir, "science_claim_bundle.certified.json")
+	if _, err := os.Stat(certified); err == nil {
+		label := "fixtures/computation-release/science_claim_bundle.certified.json"
+		bundle, err := pcs.LoadScienceClaimBundle(certified)
+		if err != nil {
+			*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
+			failed++
+		} else if err := pcs.ValidateComputationProfileBundle(root, bundle); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			failed++
+		} else {
+			*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+		}
+	}
+	handoff := filepath.Join(dir, "handoff_to_pf.json")
+	if _, err := os.Stat(handoff); err == nil {
+		label := "fixtures/computation-release/handoff_to_pf.json"
+		if err := pcs.ValidateHandoffManifestFile(root, handoff); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			failed++
+		} else {
+			*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+		}
+	}
+	registry := filepath.Join(dir, "artifact_registry.json")
+	if _, err := os.Stat(registry); err == nil {
+		label := "fixtures/computation-release/artifact_registry.json"
+		if err := pcs.ValidateArtifactRegistryFile(root, registry); err != nil {
+			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+			failed++
+		} else {
+			*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+		}
+	}
+	return failed
 }
 
 func shouldSkipFixtureName(name string) bool {

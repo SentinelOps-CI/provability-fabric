@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ResultArtifact.v0.schema.json",
+  "title": "ResultArtifact.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "result_id",
+    "result_kind",
+    "path",
+    "sha256",
+    "size_bytes",
+    "media_type",
+    "description",
+    "produced_by_run",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "result_id": { "type": "string", "minLength": 1 },
+    "result_kind": { "$ref": "#/$defs/result_kind" },
+    "path": { "type": "string", "minLength": 1 },
+    "sha256": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "media_type": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "produced_by_run": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "result_kind": {
+      "type": "string",
+      "enum": [
+        "table",
+        "figure",
+        "model",
+        "metric",
+        "proof",
+        "report",
+        "dataframe",
+        "simulation_output",
+        "other"
+      ]
+    }
+  }
+}

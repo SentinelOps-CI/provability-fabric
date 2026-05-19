@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
 
 func repoRoot(t *testing.T) string {
@@ -345,14 +347,17 @@ func TestVerifyReleaseChainCLI(t *testing.T) {
 	release := filepath.Join(root, "tests", "pcs", "fixtures", "labtrust-release")
 	manifest := filepath.Join(release, "release_manifest.json")
 	artifactDir := release
-	pcsCore := filepath.Join(root, "..", "pcs-core", "examples", "labtrust-release")
-	if _, err := os.Stat(filepath.Join(pcsCore, "science_claim_bundle.certified.json")); err == nil {
+	if _, err := os.Stat(filepath.Join(release, "release_manifest.v0.json")); err == nil {
+		manifest = filepath.Join(release, "release_manifest.v0.json")
+	} else if _, err := os.Stat(manifest); err != nil {
+		pcsCore := filepath.Join(root, "..", "pcs-core", "examples", "labtrust-release")
+		if _, err := os.Stat(filepath.Join(pcsCore, "science_claim_bundle.certified.json")); err != nil {
+			t.Skip("release manifest fixtures not present")
+		}
 		artifactDir = pcsCore
 		if _, err := os.Stat(filepath.Join(pcsCore, "release_manifest.v0.json")); err == nil {
 			manifest = filepath.Join(pcsCore, "release_manifest.v0.json")
 		}
-	} else if _, err := os.Stat(manifest); err != nil {
-		t.Skip("release manifest fixtures not present")
 	}
 	pfCommit := "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
 	if raw, err := os.ReadFile(filepath.Join(release, "FIXTURE_MANIFEST.json")); err == nil {
@@ -500,5 +505,42 @@ func TestExplainFailureCLI(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "Repair") && !strings.Contains(string(out), "repair:") {
 		t.Fatalf("expected repair hint in explain output: %s", out)
+	}
+}
+
+func TestExplainComputationReleaseChainCLI(t *testing.T) {
+	rcvr := pcs.ReleaseChainValidationResult{
+		Status: "Rejected",
+		Checks: []pcs.ReleaseValidationCheck{{
+			CheckID: "computation_result_hash_consistent",
+			Status:  "failed",
+			Details: map[string]any{
+				"failure_code":          pcs.FailureCodeResultHashMismatch,
+				"repair_hint":           "Re-run the computation with the declared code commit and regenerate ComputationRunReceipt.v0 and ResultArtifact.v0.",
+				"responsible_component": pcs.ComponentScientificComputation,
+			},
+			RegistryCheckRefs: []string{"result_hashes_match_result_artifacts"},
+		}},
+	}
+	rcPath := filepath.Join(t.TempDir(), "release_chain_validation_result.json")
+	raw, err := json.Marshal(rcvr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rcPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	explain := exec.Command("go", "run", ".", "explain", "release-chain", rcPath)
+	explain.Dir = pfDir(t)
+	out, err := explain.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected explain release-chain to exit non-zero: %s", out)
+	}
+	body := string(out)
+	if !strings.Contains(body, "result_hash_mismatch") && !strings.Contains(body, "computation_result_hash_consistent") {
+		t.Fatalf("expected computation failure in explain output: %s", body)
+	}
+	if !strings.Contains(body, "ComputationRunReceipt.v0") {
+		t.Fatalf("expected computation repair hint in explain output: %s", body)
 	}
 }

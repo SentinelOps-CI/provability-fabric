@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.dev/schemas/pcs/profiles/ScienceClaimBundle.computation.v0.schema.json",
+  "title": "ScienceClaimBundle.computation.v0",
+  "description": "PF profile schema for scientific_computation.reproducibility_v0 admission bundles (slim fixture shape).",
+  "type": "object",
+  "required": [
+    "bundle_id",
+    "schema_version",
+    "workflow_id",
+    "dataset_receipt",
+    "environment_receipt",
+    "computation_run_receipt",
+    "result_artifact",
+    "computation_witness",
+    "producer",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "bundle_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+    "workflow_id": { "const": "scientific_computation.reproducibility_v0" },
+    "dataset_receipt": {
+      "type": "object",
+      "required": ["schema_version", "aggregate_hash"],
+      "properties": {
+        "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+        "receipt_id": { "type": "string" },
+        "aggregate_hash": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "producer": { "type": "string" }
+      }
+    },
+    "environment_receipt": {
+      "type": "object",
+      "required": ["schema_version", "digest"],
+      "properties": {
+        "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+        "receipt_id": { "type": "string" },
+        "digest": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "producer": { "type": "string" }
+      }
+    },
+    "computation_run_receipt": {
+      "type": "object",
+      "required": ["schema_version", "run_id", "code_commit", "exit_code"],
+      "properties": {
+        "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+        "run_id": { "type": "string" },
+        "code_commit": { "$ref": "../common.defs.json#/$defs/git_commit" },
+        "exit_code": { "type": "integer" },
+        "dataset_aggregate_hash": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "environment_digest": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "producer": { "type": "string" }
+      }
+    },
+    "result_artifact": {
+      "type": "object",
+      "required": ["schema_version", "artifact_id", "content_hash"],
+      "properties": {
+        "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+        "artifact_id": { "type": "string" },
+        "content_hash": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "producer": { "type": "string" }
+      }
+    },
+    "computation_witness": {
+      "type": "object",
+      "required": ["schema_version", "certificate_id", "status", "result_hashes"],
+      "properties": {
+        "schema_version": { "$ref": "../common.defs.json#/$defs/schema_version" },
+        "certificate_id": { "type": "string" },
+        "status": { "type": "string" },
+        "result_hashes": {
+          "type": "array",
+          "items": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+          "minItems": 1
+        },
+        "dataset_aggregate_hash": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "environment_digest": { "$ref": "../common.defs.json#/$defs/hex_digest" },
+        "producer": { "type": "string" }
+      }
+    },
+    "producer": { "type": "string", "minLength": 1 },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "signature_or_digest": { "$ref": "../common.defs.json#/$defs/hex_digest" }
+  }
+}

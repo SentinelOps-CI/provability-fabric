@@ -1,0 +1,21 @@
+{
+  "schema_version": "v0",
+  "run_id": "run-sci-comp-001",
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "command": "python -m experiment.run --seed 42",
+  "code_repo": "https://github.com/example/scientific-computation-runner",
+  "code_commit": "e555555555555555555555555555555555555555",
+  "dataset_receipt_ref": "dataset-input-001",
+  "environment_receipt_ref": "env-repro-001",
+  "started_at": "2026-05-18T00:00:01Z",
+  "completed_at": "2026-05-18T00:00:10Z",
+  "exit_code": 0,
+  "stdout_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "stderr_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "result_artifact_refs": [
+    "result-metric-001"
+  ],
+  "source_repo": "https://github.com/example/scientific-computation-runner",
+  "source_commit": "e555555555555555555555555555555555555555",
+  "signature_or_digest": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828"
+}

@@ -31,11 +31,12 @@ var RequiredReleaseChainCheckIDs = []string{
 
 // ReleaseValidationCheck is a pcs-core release_validation_check entry.
 type ReleaseValidationCheck struct {
-	CheckID           string         `json:"check_id"`
-	Description       string         `json:"description"`
-	Status            string         `json:"status"`
-	Details           map[string]any `json:"details"`
-	RegistryCheckRefs []string       `json:"registry_check_refs"`
+	CheckID              string         `json:"check_id"`
+	Description          string         `json:"description"`
+	Status               string         `json:"status"`
+	Details              map[string]any `json:"details"`
+	RegistryCheckRefs    []string       `json:"registry_check_refs"`
+	ResponsibleComponent string         `json:"responsible_component"`
 }
 
 // ReleaseChainValidationResult is ReleaseChainValidationResult.v0 emitted by PF.
@@ -48,8 +49,9 @@ type ReleaseChainValidationResult struct {
 	ValidatorVersion  string                 `json:"validator_version"`
 	CheckedAt         string                 `json:"checked_at"`
 	Status            string                 `json:"status"`
-	Checks            []ReleaseValidationCheck `json:"checks"`
-	ArtifactsChecked  int                    `json:"artifacts_checked"`
+	Checks                 []ReleaseValidationCheck `json:"checks"`
+	DeferredRegistryChecks []DeferredRegistryCheck  `json:"deferred_registry_checks"`
+	ArtifactsChecked       int                      `json:"artifacts_checked"`
 	FailureCodes      []string               `json:"failure_codes"`
 	SourceRepo        string                 `json:"source_repo"`
 	SourceCommit      string                 `json:"source_commit"`
@@ -123,7 +125,7 @@ func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts Relea
 	byID := make(map[string]ReleaseValidationCheck)
 	var failureCodes []string
 
-	hashCheck, hashFailures := checkManifestHashesMatch(baseDir, manifest)
+	hashCheck, hashFailures := checkManifestHashesMatch(baseDir, manifest, opts.Registry)
 	byID["manifest_hashes_match"] = hashCheck
 	failureCodes = append(failureCodes, hashFailures...)
 
@@ -199,6 +201,9 @@ func runReleaseChainChecks(baseDir string, manifest *ReleaseManifest, opts Relea
 		failureCodes = append(failureCodes, FailureCodeRegistryCheckNotInResult)
 		checks = replaceCheck(checks, byID["registry_semantic_checks_executed"])
 	}
+	if opts.AdmissionProfile != nil && opts.AdmissionProfile.IsComputationProfile() {
+		checks, failureCodes = appendComputationReleaseChainChecks(checks, failureCodes, auditCtx.Bundle, opts.AdmissionProfile)
+	}
 	return checks, uniqueStrings(failureCodes)
 }
 
@@ -270,11 +275,20 @@ func normalizeReleaseChainChecks(byID map[string]ReleaseValidationCheck) []Relea
 	return out
 }
 
-func checkManifestHashesMatch(baseDir string, manifest *ReleaseManifest) (ReleaseValidationCheck, []string) {
+func checkManifestHashesMatch(baseDir string, manifest *ReleaseManifest, registry *ArtifactRegistry) (ReleaseValidationCheck, []string) {
 	var mismatches []map[string]any
 	for _, name := range pfReleaseChainArtifactNames(manifest) {
 		entry := manifest.Artifacts[name]
 		path := filepath.Join(baseDir, name)
+		if !fileExists(path) {
+			if registry != nil {
+				if _, ok := registry.entryByArtifactType(entry.ArtifactType); !ok {
+					continue // upstream capture pin without a PF fixture copy
+				}
+			}
+			mismatches = append(mismatches, map[string]any{"artifact": name, "error": "file not found"})
+			continue
+		}
 		digest, err := FileDigest(path)
 		if err != nil {
 			mismatches = append(mismatches, map[string]any{"artifact": name, "error": err.Error()})
@@ -578,8 +592,9 @@ func buildReleaseChainResult(
 		ValidatorVersion: ver,
 		CheckedAt:        checkedAt,
 		Status:           status,
-		Checks:           checks,
-		ArtifactsChecked: len(pfReleaseChainArtifactNames(manifest)),
+		Checks:                 checks,
+		DeferredRegistryChecks: BuildDeferredRegistryChecks(checks),
+		ArtifactsChecked:       len(pfReleaseChainArtifactNames(manifest)),
 		FailureCodes:     failureCodes,
 		SourceRepo:       VerifierSourceRepo,
 		SourceCommit:     sourceCommit,
@@ -621,6 +636,11 @@ func BuildReleaseChainValidationResultFromVerification(
 		checks, failureCodes = runReleaseChainChecks(artifactDir, manifest, opts)
 	}
 	checks, failureCodes = appendVerificationAdmissionChecks(checks, failureCodes, handoff, bundleResult, opts)
+	if opts.AdmissionProfile != nil && opts.AdmissionProfile.IsComputationProfile() && manifest != nil {
+		artifactDir := opts.ArtifactDir
+		bundle := loadCertifiedBundleForAudit(artifactDir)
+		checks, failureCodes = appendComputationReleaseChainChecks(checks, failureCodes, bundle, opts.AdmissionProfile)
+	}
 	return buildReleaseChainResult(manifest, checks, failureCodes, opts, nil)
 }
 
@@ -630,7 +650,8 @@ func releaseSkipCheck(id, description string, details map[string]any) ReleaseVal
 	}
 	return ReleaseValidationCheck{
 		CheckID: id, Description: description, Status: "skipped", Details: details,
-		RegistryCheckRefs: []string{},
+		RegistryCheckRefs:    []string{},
+		ResponsibleComponent: responsibleComponentForReleaseCheck(id, details),
 	}
 }
 
@@ -640,7 +661,8 @@ func releasePassCheck(id, description string, details map[string]any) ReleaseVal
 	}
 	return ReleaseValidationCheck{
 		CheckID: id, Description: description, Status: "passed", Details: details,
-		RegistryCheckRefs: registryCheckRefsFor(id),
+		RegistryCheckRefs:    registryCheckRefsFor(id),
+		ResponsibleComponent: responsibleComponentForReleaseCheck(id, details),
 	}
 }
 
@@ -651,7 +673,33 @@ func releaseFailCheck(id, description, failureCode string, details map[string]an
 	details["failure_code"] = failureCode
 	return ReleaseValidationCheck{
 		CheckID: id, Description: description, Status: "failed", Details: details,
-		RegistryCheckRefs: registryCheckRefsFor(id),
+		RegistryCheckRefs:    registryCheckRefsFor(id),
+		ResponsibleComponent: responsibleComponentForReleaseCheck(id, details),
+	}
+}
+
+func responsibleComponentForReleaseCheck(id string, details map[string]any) string {
+	if details != nil {
+		if r, ok := details["responsible_component"].(string); ok && strings.TrimSpace(r) != "" {
+			return r
+		}
+	}
+	if strings.HasPrefix(id, "computation_") {
+		return ComponentScientificComputation
+	}
+	if strings.HasPrefix(id, "registry.") {
+		return ComponentProvabilityFabric
+	}
+	switch id {
+	case "trace_hash_consistent", "certificate_id_consistent":
+		return ComponentLabTrustGym
+	case "manifest_hashes_match", "producer_commits_match", "signed_input_bundle_hash_match",
+		"registry_admission_passed", "registry_artifact_registered", "registry_schema_matches",
+		"registry_producer_allowed", "registry_status_allowed", "registry_required_fields_present",
+		"registry_semantic_checks_executed", "science_claim_bundle_verification", "admission_profile_selected":
+		return ComponentProvabilityFabric
+	default:
+		return ComponentProvabilityFabric
 	}
 }
 

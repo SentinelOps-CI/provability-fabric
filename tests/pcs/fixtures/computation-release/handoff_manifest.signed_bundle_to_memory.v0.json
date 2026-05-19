@@ -1,0 +1,27 @@
+{
+  "schema_version": "v0",
+  "handoff_id": "handoff-computation-signed-bundle-to-memory",
+  "handoff_kind": "signed_bundle_to_memory",
+  "from_component": "Provability Fabric",
+  "to_component": "Scientific Memory",
+  "created_at": "2026-05-18T12:00:00Z",
+  "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+  "source_commit": "c333333333333333333333333333333333333333",
+  "input_artifacts": {
+    "signed_science_claim_bundle.json": {
+      "artifact_type": "SignedScienceClaimBundle.v0",
+      "sha256": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea"
+    }
+  },
+  "expected_outputs": {
+    "scientific_memory_import_report.json": {
+      "artifact_type": "ScientificMemory.ImportReport.v0"
+    }
+  },
+  "invariants": {
+    "workflow_profile_id": "scientific_computation.reproducibility_v0",
+    "claim_id": "claim-qc-release-v0.1"
+  },
+  "status": "Validated",
+  "signature_or_digest": "sha256:68159cf6671e21245b197912e054410bf50e39b068e25c0eb66ecc73fca10250"
+}

@@ -105,6 +105,22 @@ func ValidateScienceClaimBundleValue(repoRoot string, bundle *ScienceClaimBundle
 	return ValidateDocumentAgainstSchema(repoRoot, "ScienceClaimBundle.v0.schema.json", doc)
 }
 
+// ValidateComputationProfileBundle validates slim computation-profile bundle JSON.
+func ValidateComputationProfileBundle(repoRoot string, bundle *ScienceClaimBundle) error {
+	if bundle == nil {
+		return fmt.Errorf("bundle is nil")
+	}
+	raw, err := json.Marshal(bundle)
+	if err != nil {
+		return err
+	}
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+	return ValidateDocumentAgainstSchema(repoRoot, "ScienceClaimBundle.computation.v0.schema.json", doc)
+}
+
 // ValidateScienceClaimBundleFile validates bundle bytes against ScienceClaimBundle.v0 schema.
 func ValidateScienceClaimBundleFile(repoRoot, bundlePath string) error {
 	data, err := os.ReadFile(bundlePath)

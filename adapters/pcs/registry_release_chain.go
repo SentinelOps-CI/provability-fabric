@@ -3,10 +3,6 @@
 
 package pcs
 
-import (
-	"strings"
-)
-
 // RegistryReleaseChainCheckIDs are registry admission checks in ReleaseChainValidationResult.v0.
 var RegistryReleaseChainCheckIDs = []string{
 	"registry_artifact_registered",
@@ -103,7 +99,7 @@ func checkRegistryProducerAllowed(manifest *ReleaseManifest, opts ReleaseChainVe
 		if !ok {
 			continue
 		}
-		if regEntry.Producer != "" && entry.Producer != "" && !strings.EqualFold(regEntry.Producer, entry.Producer) {
+		if entry.Producer != "" && !manifestProducerMatchesRegistryEntry(regEntry, entry.Producer) {
 			mismatches = append(mismatches, map[string]any{
 				"artifact": name, "expected": regEntry.Producer, "actual": entry.Producer,
 			})

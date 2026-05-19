@@ -99,6 +99,32 @@
       "type": "string",
       "enum": ["passed", "failed", "warning", "skipped"]
     },
+    "registry_check_coverage_status": {
+      "type": "string",
+      "enum": ["deferred", "skipped"]
+    },
+    "enforcement_location": {
+      "type": "string",
+      "enum": ["artifact_validate", "release_chain", "consumer", "registry_metadata"]
+    },
+    "deferred_registry_check": {
+      "type": "object",
+      "required": [
+        "registry_ref",
+        "status",
+        "enforcement_location",
+        "responsible_component",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "registry_ref": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/registry_check_coverage_status" },
+        "enforcement_location": { "$ref": "#/$defs/enforcement_location" },
+        "responsible_component": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
     "producer_repo_pin": {
       "type": "object",
       "required": ["repo", "commit"],
@@ -146,18 +172,27 @@
         "optional",
         "warning_only",
         "release_blocking",
+        "producer_responsible",
         "consumer_responsible",
-        "producer_responsible"
+        "validator_responsible"
       ]
     },
     "registry_semantic_check": {
       "type": "object",
-      "required": ["check_id", "severity", "responsible_component"],
+      "required": [
+        "check_id",
+        "severity",
+        "responsible_component",
+        "execution_required_in_release_mode",
+        "allowed_to_skip"
+      ],
       "additionalProperties": false,
       "properties": {
         "check_id": { "type": "string", "minLength": 1 },
         "severity": { "$ref": "#/$defs/semantic_check_severity" },
-        "responsible_component": { "type": "string", "minLength": 1 }
+        "responsible_component": { "type": "string", "minLength": 1 },
+        "execution_required_in_release_mode": { "type": "boolean" },
+        "allowed_to_skip": { "type": "boolean" }
       }
     },
     "release_validation_check": {
@@ -167,7 +202,8 @@
         "description",
         "status",
         "details",
-        "registry_check_refs"
+        "registry_check_refs",
+        "responsible_component"
       ],
       "additionalProperties": false,
       "properties": {
@@ -178,7 +214,8 @@
         "registry_check_refs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "responsible_component": { "type": "string", "minLength": 1 }
       }
     },
     "chain_root": {

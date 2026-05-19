@@ -43,6 +43,14 @@ func InferBundleWorkflowID(bundle *ScienceClaimBundle) string {
 	if bundle.ToolUseTrace != nil || bundle.ToolUseCertificate != nil {
 		return workflowAgentToolUseSafety
 	}
+	if inferComputationWorkflow(bundle) {
+		return workflowScientificComputationRepro
+	}
+	if bundle.VerificationPolicy != nil {
+		if w := strings.TrimSpace(bundle.VerificationPolicy.PolicyID); strings.HasPrefix(w, "scientific_computation") {
+			return workflowScientificComputationRepro
+		}
+	}
 	if len(bundle.Certificates) > 0 {
 		return workflowLabtrustQCRelease
 	}
@@ -55,6 +63,10 @@ func enforceAgentToolUseSafetyProfile(profile *AdmissionProfile, bundle *Science
 	}
 	if profile.AcceptedBundleArtifact != "" && profile.AcceptedBundleArtifact != "ScienceClaimBundle.v0" {
 		return fmt.Errorf("%s: profile %q accepts %s only", FailureCodeAdmissionProfileWorkflowMismatch, profile.ProfileID, profile.AcceptedBundleArtifact)
+	}
+	if inferComputationWorkflow(bundle) {
+		return fmt.Errorf("%s: bundle %q is scientific computation workflow %q, profile %q expects %q",
+			FailureCodeAdmissionProfileWorkflowMismatch, bundle.BundleID, InferBundleWorkflowID(bundle), profile.ProfileID, profile.WorkflowID)
 	}
 	if err := validateAdmissionProfileWorkflow(profile, bundle); err != nil {
 		return err

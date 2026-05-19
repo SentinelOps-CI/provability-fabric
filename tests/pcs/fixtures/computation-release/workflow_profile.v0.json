@@ -1,0 +1,59 @@
+{
+  "schema_version": "v0",
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "domain": "scientific_computation",
+  "description": "Proof-carrying computational reproducibility for declared inputs, environment, command, and results.",
+  "runtime_artifacts": [
+    "DatasetReceipt.v0",
+    "EnvironmentReceipt.v0",
+    "ComputationRunReceipt.v0",
+    "ResultArtifact.v0"
+  ],
+  "certificate_artifacts": [
+    "ComputationWitness.v0"
+  ],
+  "handoff_sequence": [
+    "runtime_to_certificate",
+    "certificate_to_bundle",
+    "bundle_to_verifier",
+    "signed_bundle_to_memory"
+  ],
+  "required_registry_entries": [
+    "DatasetReceipt.v0",
+    "EnvironmentReceipt.v0",
+    "ComputationRunReceipt.v0",
+    "ResultArtifact.v0",
+    "ComputationWitness.v0",
+    "ScienceClaimBundle.v0",
+    "VerificationResult.v0",
+    "SignedScienceClaimBundle.v0",
+    "ReleaseManifest.v0",
+    "HandoffManifest.v0",
+    "ReleaseChainValidationResult.v0",
+    "WorkflowProfile.v0"
+  ],
+  "required_admission_profile": "scientific_computation_reproducibility",
+  "status_policy": {
+    "policy_id": "pcs-v0.1-scientific-computation-lifecycle",
+    "description": "Computation witnesses require hash alignment before CertificateChecked export.",
+    "allowed_terminal_statuses": [
+      "Rejected",
+      "Stale"
+    ],
+    "forbidden_transitions": [
+      {
+        "from_status": "Rejected",
+        "to_status": "ProofChecked"
+      }
+    ]
+  },
+  "failure_modes": [
+    "dataset_hash_mismatch",
+    "environment_hash_mismatch",
+    "result_hash_mismatch",
+    "missing_code_commit",
+    "unreproducible_command"
+  ],
+  "limitations_notice": "This artifact is a proof-carrying computational reproducibility result. It verifies that declared inputs, environment metadata, code provenance, execution command, and result artifact hashes are internally consistent. It does not prove that the scientific model is true, that the dataset is unbiased, or that the result is externally valid.",
+  "signature_or_digest": "sha256:57ec645d429826df128e8226f8a5de20b8d13dee043dfec40c254b002c1b0420"
+}

@@ -32,7 +32,7 @@ func ValidateBundleAgainstRegistry(bundle *ScienceClaimBundle, registry *Artifac
 		if !ok {
 			return fmt.Errorf("unregistered artifact type %q", comp.artifactType)
 		}
-		if entry.Producer != "" && !strings.EqualFold(entry.Producer, comp.producer) {
+		if comp.producer != "" && !bundleProducerMatchesRegistryEntry(entry, comp.producer) {
 			return fmt.Errorf("producer mismatch for %s: registry %q bundle %q", comp.artifactType, entry.Producer, comp.producer)
 		}
 		if comp.schemaFile != "" && entry.Schema != "" && !schemaNamesMatch(entry.Schema, comp.schemaFile) {
@@ -108,6 +108,62 @@ func bundleRegistryComponents(bundle *ScienceClaimBundle) []bundleRegistryCompon
 			producer:     bundle.EvidenceBundle.Producer,
 			schemaFile:   "EvidenceBundle.v0.schema.json",
 			status:       evStatus,
+		})
+	}
+	if bundle.DatasetReceipt != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "DatasetReceipt.v0",
+			producer:     bundle.DatasetReceipt.Producer,
+			schemaFile:   "DatasetReceipt.v0.schema.json",
+			status:       bundleStatus(bundle),
+		})
+	}
+	if bundle.EnvironmentReceipt != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "EnvironmentReceipt.v0",
+			producer:     bundle.EnvironmentReceipt.Producer,
+			schemaFile:   "EnvironmentReceipt.v0.schema.json",
+			status:       bundleStatus(bundle),
+		})
+	}
+	if bundle.ComputationRunReceipt != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "ComputationRunReceipt.v0",
+			producer:     bundle.ComputationRunReceipt.Producer,
+			schemaFile:   "ComputationRunReceipt.v0.schema.json",
+			status:       bundleStatus(bundle),
+		})
+	}
+	if bundle.ResultArtifact != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "ResultArtifact.v0",
+			producer:     bundle.ResultArtifact.Producer,
+			schemaFile:   "ResultArtifact.v0.schema.json",
+			status:       bundleStatus(bundle),
+		})
+	}
+	if bundle.ComputationWitness != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "ComputationWitness.v0",
+			producer:     bundle.ComputationWitness.Producer,
+			schemaFile:   "ComputationWitness.v0.schema.json",
+			status:       bundle.ComputationWitness.Status,
+		})
+	}
+	if bundle.ToolUseTrace != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "ToolUseTrace.v0",
+			producer:     bundle.ToolUseTrace.Producer,
+			schemaFile:   "ToolUseTrace.v0.schema.json",
+			status:       bundleStatus(bundle),
+		})
+	}
+	if bundle.ToolUseCertificate != nil {
+		out = append(out, bundleRegistryComponent{
+			artifactType: "ToolUseCertificate.v0",
+			producer:     bundle.ToolUseCertificate.Producer,
+			schemaFile:   "ToolUseCertificate.v0.schema.json",
+			status:       bundle.ToolUseCertificate.Status,
 		})
 	}
 	return out
@@ -203,6 +259,61 @@ func runRegistrySemanticCheck(bundle *ScienceClaimBundle, checkID string) (execu
 		return true, nil
 	case "entries_cover_required_artifact_types", "source_commit_matches_release_manifest":
 		return true, nil
+	case "dataset_hash_matches_receipt":
+		if bundle.DatasetReceipt == nil || bundle.ComputationRunReceipt == nil {
+			return true, fmt.Errorf("dataset receipt or computation run receipt missing")
+		}
+		runHash := bundle.ComputationRunReceipt.DatasetAggregateHash
+		if runHash == "" {
+			runHash = bundle.DatasetReceipt.AggregateHash
+		}
+		if runHash != bundle.DatasetReceipt.AggregateHash {
+			return true, fmt.Errorf("run dataset_aggregate_hash %s != dataset receipt %s", runHash, bundle.DatasetReceipt.AggregateHash)
+		}
+		return true, nil
+	case "environment_hash_matches_receipt":
+		if bundle.EnvironmentReceipt == nil || bundle.ComputationRunReceipt == nil {
+			return true, fmt.Errorf("environment receipt or computation run receipt missing")
+		}
+		if bundle.ComputationRunReceipt.EnvironmentDigest != bundle.EnvironmentReceipt.Digest {
+			return true, fmt.Errorf("run environment_digest %s != environment receipt %s",
+				bundle.ComputationRunReceipt.EnvironmentDigest, bundle.EnvironmentReceipt.Digest)
+		}
+		return true, nil
+	case "result_hashes_match_result_artifacts":
+		if bundle.ResultArtifact == nil || bundle.ComputationWitness == nil {
+			return true, fmt.Errorf("result artifact or computation witness missing")
+		}
+		if !witnessResultHashesMatch(bundle.ComputationWitness.ResultHashes, bundle.ResultArtifact.ContentHash) {
+			return true, fmt.Errorf("witness result_hashes do not include result artifact content_hash")
+		}
+		return true, nil
+	case "code_commit_present":
+		if bundle.ComputationRunReceipt == nil {
+			return true, fmt.Errorf("computation run receipt missing")
+		}
+		cc := strings.TrimSpace(bundle.ComputationRunReceipt.CodeCommit)
+		if cc == "" || IsForbiddenPlaceholderCommit(cc) {
+			return true, fmt.Errorf("computation run receipt code_commit is missing or placeholder")
+		}
+		return true, nil
+	case "computation_status_checked_for_release":
+		if bundle.ComputationWitness == nil {
+			return true, fmt.Errorf("computation witness missing")
+		}
+		if bundle.ComputationWitness.Status != StatusCertificateChecked {
+			return true, fmt.Errorf("computation witness status %q (expected %q)",
+				bundle.ComputationWitness.Status, StatusCertificateChecked)
+		}
+		return true, nil
+	case "run_receipt_hash_matches_declared_run":
+		if bundle.ComputationRunReceipt == nil {
+			return true, fmt.Errorf("computation run receipt missing")
+		}
+		if bundle.ComputationRunReceipt.ExitCode != 0 {
+			return true, fmt.Errorf("computation run exit_code=%d", bundle.ComputationRunReceipt.ExitCode)
+		}
+		return true, nil
 	case "verified_input_bundle_hash_matches_certified",
 		"failed_checks_block_import_ready_status", "signed_input_bundle_hash_matches_certified",
 		"embedded_bundle_passes_science_claim_semantics", "release_mode_commit_policy",
@@ -250,7 +361,7 @@ func ValidateManifestAgainstRegistry(manifest *ReleaseManifest, registry *Artifa
 			// Upstream capture artifacts (e.g. LabTrust.Trace.v0) may appear in ReleaseManifest but outside ArtifactRegistry.v0.
 			continue
 		}
-		if regEntry.Producer != "" && entry.Producer != "" && !strings.EqualFold(regEntry.Producer, entry.Producer) {
+		if entry.Producer != "" && !manifestProducerMatchesRegistryEntry(regEntry, entry.Producer) {
 			return fmt.Errorf("manifest artifact %q producer %q does not match registry %q", name, entry.Producer, regEntry.Producer)
 		}
 		for _, check := range regEntry.SemanticChecks {
@@ -428,4 +539,30 @@ func jsonFieldPresent(obj any, field string) bool {
 		return strings.TrimSpace(s) != ""
 	}
 	return v != nil
+}
+
+func bundleProducerMatchesRegistryEntry(entry RegistryEntry, actual string) bool {
+	actual = strings.TrimSpace(actual)
+	if actual == "" {
+		return true
+	}
+	return entry.Producer == "" || strings.EqualFold(entry.Producer, actual)
+}
+
+// manifestProducerMatchesRegistryEntry also accepts schema_owner and allowed
+// runtime producers (pcs-core release manifests pin schema_owner as producer).
+func manifestProducerMatchesRegistryEntry(entry RegistryEntry, actual string) bool {
+	if bundleProducerMatchesRegistryEntry(entry, actual) {
+		return true
+	}
+	actual = strings.TrimSpace(actual)
+	for _, allowed := range entry.AllowedRuntimeProducers {
+		if strings.EqualFold(strings.TrimSpace(allowed), actual) {
+			return true
+		}
+	}
+	if entry.SchemaOwner != "" && strings.EqualFold(entry.SchemaOwner, actual) {
+		return true
+	}
+	return false
 }

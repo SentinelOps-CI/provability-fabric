@@ -1,0 +1,20 @@
+{
+  "schema_version": "v0",
+  "environment_id": "env-repro-001",
+  "environment_kind": "uv",
+  "os": "linux",
+  "architecture": "x86_64",
+  "language_runtimes": [
+    "python==3.12.3"
+  ],
+  "packages": [
+    "numpy==2.1.0",
+    "pandas==2.2.2"
+  ],
+  "container_image": "",
+  "container_digest": "",
+  "hardware_summary": "conformance-runner",
+  "source_repo": "https://github.com/example/scientific-computation-runner",
+  "source_commit": "e555555555555555555555555555555555555555",
+  "signature_or_digest": "sha256:3739a2ed0a132d5c55dc6e7f53dabca2c7e57cbb188962a0ce670762850f4e01"
+}

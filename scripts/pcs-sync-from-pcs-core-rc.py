@@ -20,11 +20,77 @@ PF_PROTOCOL_FROM_RC = (
     ("release_chain_validation_result.v0.json", "release_chain_validation_result.json"),
 )
 
+PF_PROTOCOL_ALSO_COPY = (
+    ("release_manifest.v0.json", "release_manifest.v0.json"),
+)
+
+# PF release-chain segment artifacts (upstream capture pins are pruned from synced manifests).
+PF_RELEASE_MANIFEST_ARTIFACTS = frozenset(
+    {
+        "science_claim_bundle.certified.json",
+        "verification_result.json",
+        "signed_science_claim_bundle.json",
+        "scientific_memory_import_report.json",
+    }
+)
+
 PF_PROTOCOL_FALLBACK = (
     ("handoff_manifest.valid.json", "handoff_to_pf.json"),
     ("release_manifest.valid.json", "release_manifest.json"),
     ("artifact_registry.valid.json", "artifact_registry.json"),
 )
+
+
+def refresh_handoff_to_pf(pf_release: pathlib.Path) -> None:
+    """Align handoff_to_pf.json invariants with the synced certified bundle."""
+    certified_path = pf_release / "science_claim_bundle.certified.json"
+    handoff_path = pf_release / "handoff_to_pf.json"
+    if not certified_path.is_file() or not handoff_path.is_file():
+        return
+    certified = json.loads(certified_path.read_text(encoding="utf-8"))
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    bundle_hash = sha256_file(certified_path)
+    cert_id = certified["certificates"][0]["certificate_id"]
+    trace_hash = certified["runtime_receipts"][0]["trace_hash"]
+    inv = handoff.setdefault("invariants", {})
+    inv["certified_bundle_hash"] = bundle_hash
+    inv["certificate_id"] = cert_id
+    inv["trace_hash"] = trace_hash
+    inp = handoff.setdefault("input_artifacts", {})
+    scb = inp.setdefault("science_claim_bundle.certified.json", {})
+    if isinstance(scb, dict):
+        scb["sha256"] = bundle_hash
+    handoff_path.write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
+
+
+def prune_pf_release_manifest(pf_release: pathlib.Path) -> None:
+    """Keep only PF-segment artifact pins; refresh chain_root from the certified bundle."""
+    certified_path = pf_release / "science_claim_bundle.certified.json"
+    if not certified_path.is_file():
+        return
+    certified = json.loads(certified_path.read_text(encoding="utf-8"))
+    bundle_hash = sha256_file(certified_path)
+    cert_id = certified["certificates"][0]["certificate_id"]
+    trace_hash = certified["runtime_receipts"][0]["trace_hash"]
+    for name in ("release_manifest.v0.json", "release_manifest.json"):
+        path = pf_release / name
+        if not path.is_file():
+            continue
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["artifacts"] = {
+            k: v
+            for k, v in manifest.get("artifacts", {}).items()
+            if k in PF_RELEASE_MANIFEST_ARTIFACTS
+        }
+        chain_root = manifest.setdefault("chain_root", {})
+        chain_root["certified_bundle_hash"] = bundle_hash
+        chain_root["certificate_id"] = cert_id
+        chain_root["trace_hash"] = trace_hash
+        signed = manifest["artifacts"].get("signed_science_claim_bundle.json", {}).get("sha256")
+        if signed:
+            chain_root["signed_bundle_hash"] = signed
+            manifest.setdefault("canonical_signed_bundle", {})["sha256"] = signed
+        path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 def sha256_file(path: pathlib.Path) -> str:
@@ -97,6 +163,15 @@ def main() -> int:
         src = canonical / src_name
         if src.is_file():
             (pf_release / dst_name).write_bytes(src.read_bytes())
+    refresh_handoff_to_pf(pf_release)
+    for src_name, dst_name in PF_PROTOCOL_ALSO_COPY:
+        src = canonical / src_name
+        if src.is_file():
+            (pf_release / dst_name).write_bytes(src.read_bytes())
+    sm_report = canonical / "scientific_memory_import_report.json"
+    if sm_report.is_file():
+        (pf_release / "scientific_memory_import_report.json").write_bytes(sm_report.read_bytes())
+    prune_pf_release_manifest(pf_release)
     examples = pcs_core / "examples"
     for src_name, dst_name in PF_PROTOCOL_FALLBACK:
         dst = pf_release / dst_name

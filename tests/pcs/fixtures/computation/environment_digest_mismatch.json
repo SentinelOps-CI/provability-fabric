@@ -1,0 +1,38 @@
+{
+  "bundle_id": "scb-computation-env-mismatch-v0",
+  "schema_version": "v0",
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "dataset_receipt": {
+    "schema_version": "v0",
+    "receipt_id": "ds-computation-001",
+    "aggregate_hash": "sha256:0111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "environment_receipt": {
+    "schema_version": "v0",
+    "digest": "sha256:0222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "computation_run_receipt": {
+    "schema_version": "v0",
+    "run_id": "run-computation-001",
+    "code_commit": "993a0e5d1214b7c1bd6e84475d771806950965dd",
+    "exit_code": 0,
+    "dataset_aggregate_hash": "sha256:0111111111111111111111111111111111111111111111111111111111111111",
+    "environment_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "result_artifact": {
+    "schema_version": "v0",
+    "artifact_id": "result-computation-001",
+    "content_hash": "sha256:0333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "computation_witness": {
+    "schema_version": "v0",
+    "certificate_id": "cw-computation-001",
+    "status": "CertificateChecked",
+    "result_hashes": [
+      "sha256:0333333333333333333333333333333333333333333333333333333333333333"
+    ]
+  },
+  "producer": "ScientificComputation",
+  "source_commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d",
+  "signature_or_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

@@ -1,0 +1,8 @@
+{
+  "profile": "computation-release-v0",
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "admission_profile": "scientific_computation_reproducibility",
+  "canonical_rc": "pcs-core/examples/computation-release",
+  "pf_source_commit": "c333333333333333333333333333333333333333",
+  "regenerate": "python3 scripts/pcs-sync-computation-release.py pcs-core"
+}

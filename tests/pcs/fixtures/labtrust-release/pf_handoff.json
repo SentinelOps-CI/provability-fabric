@@ -1,7 +1,7 @@
 {
   "schema_version": "v0",
   "certified_bundle": "science_claim_bundle.certified.json",
-  "certified_bundle_hash": "sha256:30b5b731a298922c41432de82c4ea407ec732f1e54f85b45ed9344ee5ec2c536",
-  "certificate_id": "cert-trace-886c95f0-5d63-42d6-aa13-5891c12c5a6a",
+  "certified_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+  "certificate_id": "cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693",
   "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
 }

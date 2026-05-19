@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ToolUseTrace.v0.schema.json",
+  "title": "ToolUseTrace.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "trace_id",
+    "workflow_id",
+    "agent_id",
+    "policy_id",
+    "policy_hash",
+    "started_at",
+    "completed_at",
+    "tool_calls",
+    "trace_hash",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "policy_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "started_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "completed_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "tool_calls": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tool_call" }
+    },
+    "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "authorization_status": {
+      "type": "string",
+      "enum": ["authorized", "rejected", "unknown", "policy_missing"]
+    },
+    "tool_call": {
+      "type": "object",
+      "required": [
+        "event_id",
+        "timestamp",
+        "tool_name",
+        "tool_category",
+        "input_hash",
+        "output_hash",
+        "authorization_status",
+        "policy_refs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "timestamp": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+        "tool_name": { "type": "string", "minLength": 1 },
+        "tool_category": { "type": "string", "minLength": 1 },
+        "input_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+        "output_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+        "authorization_status": { "$ref": "#/$defs/authorization_status" },
+        "policy_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

@@ -21,8 +21,9 @@ type RepairHintPolicy string
 
 const (
 	StatusPolicyLabtrustReleaseV01 StatusPolicy     = "labtrust_release_v0.1"
-	StatusPolicyToolUseSafetyV01   StatusPolicy     = "tool_use_safety_v0.1"
-	RepairHintPolicyOperationalV0  RepairHintPolicy = "operational_v0"
+	StatusPolicyToolUseSafetyV01              StatusPolicy     = "tool_use_safety_v0.1"
+	StatusPolicyScientificComputationReproV01 StatusPolicy     = "scientific_computation_reproducibility_v0.1"
+	RepairHintPolicyOperationalV0             RepairHintPolicy = "operational_v0"
 )
 
 // AdmissionProfile defines PF admission policy for a PCS workflow.
@@ -244,6 +245,14 @@ func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundl
 	if profile.IsToolUseProfile() {
 		return enforceAgentToolUseSafetyProfile(profile, bundle, handoff)
 	}
+	if profile.IsComputationProfile() {
+		if bundle != nil && strings.TrimSpace(bundlePath) != "" {
+			if resolved, err := ResolveArtifactPath(bundlePath); err == nil {
+				_ = HydrateComputationBundleFromDir(bundle, filepath.Dir(resolved))
+			}
+		}
+		return enforceScientificComputationProfile(profile, bundle, handoff)
+	}
 	return enforceLabtrustQCProfile(profile, bundle, handoff)
 }
 
@@ -259,6 +268,10 @@ func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBun
 	}
 	if bundle.ToolUseTrace != nil || bundle.ToolUseCertificate != nil {
 		return fmt.Errorf("%s: bundle %q is agent tool-use workflow %q, profile %q expects %q",
+			FailureCodeAdmissionProfileWorkflowMismatch, bundle.BundleID, InferBundleWorkflowID(bundle), profile.ProfileID, profile.WorkflowID)
+	}
+	if inferComputationWorkflow(bundle) {
+		return fmt.Errorf("%s: bundle %q is scientific computation workflow %q, profile %q expects %q",
 			FailureCodeAdmissionProfileWorkflowMismatch, bundle.BundleID, InferBundleWorkflowID(bundle), profile.ProfileID, profile.WorkflowID)
 	}
 	if err := enforceProfileHandoff(profile, handoff); err != nil {
@@ -347,6 +360,18 @@ func profileRegistryCheckSatisfied(req string, byID map[string]ReleaseValidation
 		aliases = append(aliases, "tool_use_certificate_status", "tool_use_certificate_not_rejected")
 	case "no_unauthorized_tool_calls":
 		aliases = append(aliases, "tool_use_authorization", "authorized_tool_calls_only")
+	case "dataset_hash_matches_receipt":
+		aliases = append(aliases, "computation_dataset_hash_consistent")
+	case "environment_hash_matches_receipt":
+		aliases = append(aliases, "computation_environment_hash_consistent")
+	case "result_hashes_match_result_artifacts":
+		aliases = append(aliases, "computation_result_hash_consistent")
+	case "code_commit_present":
+		aliases = append(aliases, "computation_code_commit_present")
+	case "computation_status_checked_for_release":
+		aliases = append(aliases, "computation_witness_certificate_checked")
+	case "run_receipt_hash_matches_declared_run":
+		aliases = append(aliases, "computation_exit_code_zero")
 	}
 	for _, id := range aliases {
 		c, ok := byID[id]
