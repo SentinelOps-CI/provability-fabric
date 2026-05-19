@@ -1,0 +1,51 @@
+{
+  "schema_version": "v0",
+  "obligation_id": "po-labtrust-qc-release-v0.1",
+  "release_id": "release-pcs-v0.1-labtrust-qc",
+  "workflow_id": "labtrust.qc_release_v0",
+  "obligations": [
+    {
+      "obligation_id": "trace_hash_alignment",
+      "kind": "CertificateMatchesRuntime",
+      "inputs": {
+        "certificate_trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd",
+        "runtime_receipt_trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
+      }
+    },
+    {
+      "obligation_id": "verification_admits_bundle",
+      "kind": "VerificationAdmitsBundle",
+      "inputs": {
+        "verification_status": "ProofChecked",
+        "verified_input_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+        "certified_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
+      }
+    },
+    {
+      "obligation_id": "signed_bundle_admissible",
+      "kind": "SignedBundleAdmissible",
+      "inputs": {
+        "signed_input_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+        "verified_input_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
+      }
+    }
+  ],
+  "source_artifacts": {
+    "science_claim_bundle": {
+      "path": "science_claim_bundle.certified.json",
+      "artifact_type": "ScienceClaimBundle.v0"
+    },
+    "verification_result": {
+      "path": "verification_result.json",
+      "artifact_type": "VerificationResult.v0"
+    },
+    "signed_science_claim_bundle": {
+      "path": "signed_science_claim_bundle.json",
+      "artifact_type": "SignedScienceClaimBundle.v0"
+    }
+  },
+  "lean_module": "PCS.Theorems",
+  "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+  "source_commit": "17e414501b3e1c58e8fbde1fe89a828440a945d9",
+  "signature_or_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

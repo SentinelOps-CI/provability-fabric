@@ -57,7 +57,7 @@ func InferBundleWorkflowID(bundle *ScienceClaimBundle) string {
 	return ""
 }
 
-func enforceAgentToolUseSafetyProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
+func enforceAgentToolUseSafetyProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff, releaseMode bool) error {
 	if bundle == nil {
 		return fmt.Errorf("%s: profile %q requires a science claim bundle", FailureCodeReleaseModeBundleRequired, profile.ProfileID)
 	}
@@ -71,8 +71,10 @@ func enforceAgentToolUseSafetyProfile(profile *AdmissionProfile, bundle *Science
 	if err := validateAdmissionProfileWorkflow(profile, bundle); err != nil {
 		return err
 	}
-	if err := enforceProfileHandoff(profile, handoff); err != nil {
-		return err
+	if releaseMode {
+		if err := enforceProfileHandoff(profile, handoff); err != nil {
+			return err
+		}
 	}
 	for _, rt := range profile.RequiredRuntimeArtifacts {
 		switch rt {

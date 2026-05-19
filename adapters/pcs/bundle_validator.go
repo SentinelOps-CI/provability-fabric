@@ -40,7 +40,7 @@ func VerifyScienceClaimBundle(bundlePath string, bundle *ScienceClaimBundle, opt
 	if err := EnforceFormalCheckAdmission(opts.AdmissionProfile, opts.ReleaseManifest, policy, opts.FormalChecks); err != nil {
 		return VerificationResult{}, err
 	}
-	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundlePath, bundle, opts.Handoff); err != nil {
+	if err := EnforceAdmissionProfile(opts.AdmissionProfile, bundlePath, bundle, opts.Handoff, opts.ReleaseMode); err != nil {
 		return VerificationResult{}, err
 	}
 	if opts.Handoff != nil {

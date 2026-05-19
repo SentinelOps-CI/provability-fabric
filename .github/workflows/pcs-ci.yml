@@ -23,8 +23,12 @@ on:
       - 'scripts/test-pcs-rc-gate.ps1'
       - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
+      - 'scripts/pcs-benchmark-admission.sh'
+      - 'scripts/materialize-admission-benchmark-cases.py'
+      - 'benchmarks/admission/**'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
+      - 'docs/guides/pcs-admission-benchmark.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - 'docs/guides/pcs-v01-clean-chain.md'
       - 'docs/releases/**'
@@ -48,8 +52,12 @@ on:
       - 'scripts/test-pcs-rc-gate.ps1'
       - 'scripts/_resolve_pf.sh'
       - 'scripts/run-pcs-v01-clean-chain.sh'
+      - 'scripts/pcs-benchmark-admission.sh'
+      - 'scripts/materialize-admission-benchmark-cases.py'
+      - 'benchmarks/admission/**'
       - 'justfile'
       - 'docs/guides/science-claim-verification.md'
+      - 'docs/guides/pcs-admission-benchmark.md'
       - 'docs/guides/proof-carrying-lab-workflow.md'
       - 'docs/guides/pcs-v01-clean-chain.md'
       - 'docs/releases/**'
@@ -480,6 +488,22 @@ jobs:
           grep -q 'deferred_registry_checks' "$OUT"
           grep -q 'formal.ComputationWitnessBindsResults' "$OUT"
           grep -q 'formal_checks_executed' "$OUT"
+
+      - name: PCS admission benchmarks (pf benchmark admission)
+        run: |
+          python3 "$GITHUB_WORKSPACE/scripts/materialize-admission-benchmark-cases.py"
+          REG="$PCS_CORE_PATH/examples/artifact_registry.valid.json"
+          OUT="$GITHUB_WORKSPACE/benchmark_runs"
+          cd "$GITHUB_WORKSPACE/core/cli/pf"
+          for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility; do
+            go run . benchmark admission \
+              --cases "$GITHUB_WORKSPACE/benchmarks/admission/${SUITE}" \
+              --registry "$REG" \
+              --out "${OUT}/${SUITE}_admission"
+          done
+          test -f "${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json"
+          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

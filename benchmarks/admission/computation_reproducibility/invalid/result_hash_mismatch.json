@@ -1,0 +1,11 @@
+{
+  "case_id": "result_hash_mismatch",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "result_hash_mismatch"
+  ],
+  "inputs": {
+    "bundle": "${repo}/tests/pcs/fixtures/computation/result_hash_mismatch.json"
+  }
+}

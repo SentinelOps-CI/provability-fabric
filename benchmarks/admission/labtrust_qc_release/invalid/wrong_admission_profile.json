@@ -1,0 +1,10 @@
+{
+  "case_id": "wrong_admission_profile",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "admission_profile_workflow_mismatch"
+  ],
+  "inputs": {},
+  "profile_id": "agent_tool_use_safety"
+}

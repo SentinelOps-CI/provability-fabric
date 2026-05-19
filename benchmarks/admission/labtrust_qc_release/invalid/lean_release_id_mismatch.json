@@ -1,0 +1,11 @@
+{
+  "case_id": "lean_release_id_mismatch",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "lean_release_id_mismatch"
+  ],
+  "inputs": {
+    "proof_obligations": "support/proof_obligation_release_mismatch.v0.json"
+  }
+}

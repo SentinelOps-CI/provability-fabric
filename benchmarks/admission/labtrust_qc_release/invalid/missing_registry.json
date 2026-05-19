@@ -1,0 +1,11 @@
+{
+  "case_id": "missing_registry",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "release_mode_registry_required"
+  ],
+  "inputs": {
+    "omit_registry": true
+  }
+}

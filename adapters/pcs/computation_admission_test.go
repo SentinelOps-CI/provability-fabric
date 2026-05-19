@@ -67,7 +67,7 @@ func TestValidComputationBundleAdmitted(t *testing.T) {
 	profile := loadComputationProfile(t)
 	path := computationFixture(t, "valid_computation_bundle.json")
 	bundle := loadComputationBundle(t, "valid_computation_bundle.json")
-	if err := EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t)); err != nil {
+	if err := EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t), true); err != nil {
 		t.Fatalf("expected valid computation bundle to pass: %v", err)
 	}
 }
@@ -135,7 +135,7 @@ func TestComputationAdmissionRejectsInvalidBundles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = EnforceAdmissionProfile(profile, path, bundle, handoff)
+			err = EnforceAdmissionProfile(profile, path, bundle, handoff, true)
 			if err == nil || !strings.Contains(err.Error(), tc.code) {
 				t.Fatalf("expected %s, got %v", tc.code, err)
 			}
@@ -150,7 +150,7 @@ func TestLabtrustProfileRejectsComputationBundle(t *testing.T) {
 	}
 	path := computationFixture(t, "valid_computation_bundle.json")
 	bundle := loadComputationBundle(t, "valid_computation_bundle.json")
-	err = EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t))
+	err = EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), FailureCodeAdmissionProfileWorkflowMismatch) {
 		t.Fatalf("expected admission_profile_workflow_mismatch, got %v", err)
 	}
@@ -234,7 +234,7 @@ func TestAgentToolUseRejectsComputationBundle(t *testing.T) {
 	}
 	path := computationFixture(t, "valid_computation_bundle.json")
 	bundle := loadComputationBundle(t, "valid_computation_bundle.json")
-	err = EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t))
+	err = EnforceAdmissionProfile(profile, path, bundle, computationHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), FailureCodeAdmissionProfileWorkflowMismatch) {
 		t.Fatalf("expected admission_profile_workflow_mismatch, got %v", err)
 	}

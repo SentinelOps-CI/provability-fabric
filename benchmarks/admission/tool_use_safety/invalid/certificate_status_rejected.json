@@ -1,0 +1,11 @@
+{
+  "case_id": "certificate_status_rejected",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "rejected_certificate.json"
+  },
+  "expect_failure_codes": [
+    "tool_use_certificate_rejected"
+  ]
+}

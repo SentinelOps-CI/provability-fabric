@@ -1,0 +1,8 @@
+{
+  "case_id": "valid_profile_shape",
+  "expect": "admit",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "valid_tool_use_profile_shape.json"
+  }
+}

@@ -105,7 +105,7 @@ func TestAgentToolUseRejectsLabtrustShapedBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeAdmissionProfileWorkflowMismatch) {
 		t.Fatalf("expected admission_profile_workflow_mismatch, got %v", err)
 	}
@@ -121,7 +121,7 @@ func TestLabtrustProfileRejectsToolUseBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeAdmissionProfileWorkflowMismatch) {
 		t.Fatalf("expected admission_profile_workflow_mismatch, got %v", err)
 	}
@@ -134,7 +134,7 @@ func TestAgentToolUseRejectsMissingCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err = pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeMissingToolUseCertificate) {
 		t.Fatalf("expected missing_tool_use_certificate, got %v", err)
 	}
@@ -144,7 +144,7 @@ func TestAgentToolUseRejectsRejectedCertificate(t *testing.T) {
 	profile := loadAgentToolUseProfile(t)
 	path := toolUseFixture(t, "rejected_certificate.json")
 	bundle, _ := pcs.LoadScienceClaimBundle(path)
-	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeToolUseCertificateRejected) {
 		t.Fatalf("expected tool_use_certificate_rejected, got %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAgentToolUseRejectsTraceHashMismatch(t *testing.T) {
 	profile := loadAgentToolUseProfile(t)
 	path := toolUseFixture(t, "trace_hash_mismatch.json")
 	bundle, _ := pcs.LoadScienceClaimBundle(path)
-	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeToolTraceHashMismatch) {
 		t.Fatalf("expected tool_trace_hash_mismatch, got %v", err)
 	}
@@ -164,7 +164,7 @@ func TestAgentToolUseRejectsPolicyHashMismatch(t *testing.T) {
 	profile := loadAgentToolUseProfile(t)
 	path := toolUseFixture(t, "policy_hash_mismatch.json")
 	bundle, _ := pcs.LoadScienceClaimBundle(path)
-	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodePolicyHashMismatch) {
 		t.Fatalf("expected policy_hash_mismatch, got %v", err)
 	}
@@ -174,7 +174,7 @@ func TestAgentToolUseRejectsUnauthorizedViolation(t *testing.T) {
 	profile := loadAgentToolUseProfile(t)
 	path := toolUseFixture(t, "unauthorized_violation.json")
 	bundle, _ := pcs.LoadScienceClaimBundle(path)
-	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t))
+	err := pcs.EnforceAdmissionProfile(profile, path, bundle, toolUseHandoff(t), true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeUnauthorizedToolCallViolation) {
 		t.Fatalf("expected unauthorized_tool_call_certificate_violation, got %v", err)
 	}
@@ -194,7 +194,7 @@ func TestAdmissionProfileLabtrustQCReleasePasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := pcs.EnforceAdmissionProfile(profile, path, bundle, handoff); err != nil {
+	if err := pcs.EnforceAdmissionProfile(profile, path, bundle, handoff, true); err != nil {
 		t.Fatalf("labtrust_qc_release profile should pass fixture bundle: %v", err)
 	}
 }

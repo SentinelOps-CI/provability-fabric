@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkRun.v0.schema.json",
+  "title": "BenchmarkRun.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "workflow",
+    "profile_id",
+    "started_at",
+    "completed_at",
+    "metrics",
+    "cases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "started_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "completed_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "metrics": { "$ref": "#/$defs/benchmark_metrics" },
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/benchmark_case_result" }
+    }
+  },
+  "$defs": {
+    "unit_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "benchmark_metrics": {
+      "type": "object",
+      "required": [
+        "valid_release_admission_rate",
+        "invalid_release_rejection_rate",
+        "failure_localization_accuracy",
+        "failure_code_accuracy",
+        "explain_output_completeness",
+        "registry_check_coverage",
+        "admission_profile_coverage",
+        "formal_check_enforcement_coverage"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "valid_release_admission_rate": { "$ref": "#/$defs/unit_rate" },
+        "invalid_release_rejection_rate": { "$ref": "#/$defs/unit_rate" },
+        "failure_localization_accuracy": { "$ref": "#/$defs/unit_rate" },
+        "failure_code_accuracy": { "$ref": "#/$defs/unit_rate" },
+        "explain_output_completeness": { "$ref": "#/$defs/unit_rate" },
+        "registry_check_coverage": { "$ref": "#/$defs/unit_rate" },
+        "admission_profile_coverage": { "$ref": "#/$defs/unit_rate" },
+        "formal_check_enforcement_coverage": { "$ref": "#/$defs/unit_rate" }
+      }
+    },
+    "benchmark_case_result": {
+      "type": "object",
+      "required": [
+        "case_id",
+        "kind",
+        "expect",
+        "outcome",
+        "passed",
+        "failure_code_match"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["valid", "invalid"] },
+        "expect": { "type": "string", "enum": ["admit", "reject"] },
+        "outcome": { "type": "string", "enum": ["admit", "reject", "error"] },
+        "passed": { "type": "boolean" },
+        "observed_failure_codes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expect_failure_codes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "failure_code_match": { "type": "boolean" },
+        "localization_match": { "type": "boolean" },
+        "explain_completeness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "verification_status": { "type": "string" },
+        "release_chain_status": { "type": "string" },
+        "error": { "type": "string" },
+        "release_chain_result_path": { "type": "string" }
+      }
+    }
+  }
+}

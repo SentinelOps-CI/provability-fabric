@@ -1,0 +1,12 @@
+{
+  "case_id": "wrong_admission_profile",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "profile_id": "labtrust_qc_release",
+  "expect_failure_codes": [
+    "admission_profile_workflow_mismatch"
+  ],
+  "inputs": {
+    "bundle": "missing_certificate.json"
+  }
+}

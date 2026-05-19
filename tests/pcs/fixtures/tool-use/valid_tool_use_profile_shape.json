@@ -1,0 +1,34 @@
+{
+  "bundle_id": "scb-tool-use-valid-shape-v0",
+  "schema_version": "v0",
+  "workflow_id": "agent_tool_use.safety_v0",
+  "tool_use_trace": {
+    "schema_version": "v0",
+    "trace_id": "trace-agent-valid",
+    "tool_trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "producer": "Agent-Runtime"
+  },
+  "tool_use_certificate": {
+    "schema_version": "v0",
+    "certificate_id": "cert-tool-valid",
+    "status": "CertificateChecked",
+    "tool_trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "policy_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "authorized_tool_calls": ["read_file"],
+    "producer": "ToolUse-Safety"
+  },
+  "runtime_receipts": [
+    {
+      "receipt_id": "rr-agent-valid",
+      "schema_version": "v0",
+      "run_id": "run-valid",
+      "status": "completed",
+      "trace_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "producer": "Agent-Runtime",
+      "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "producer": "Agent-Runtime",
+  "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

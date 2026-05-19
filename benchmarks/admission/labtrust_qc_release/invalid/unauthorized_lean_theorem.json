@@ -1,0 +1,11 @@
+{
+  "case_id": "unauthorized_lean_theorem",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "unauthorized_lean_theorem"
+  ],
+  "inputs": {
+    "lean_check_result": "support/lean_unauthorized_theorem.v0.json"
+  }
+}

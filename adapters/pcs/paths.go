@@ -110,6 +110,107 @@ func pathTailFromTestsPCS(userPath string) string {
 	return ""
 }
 
+// ResolveDirectoryPath returns an absolute path to an existing directory.
+// It accepts repo-relative paths the same way ResolveArtifactPath does for JSON files.
+func ResolveDirectoryPath(userPath string) (string, error) {
+	userPath = strings.TrimSpace(userPath)
+	if userPath == "" {
+		return "", fmt.Errorf("empty path")
+	}
+
+	try := func(p string) (string, bool) {
+		p = filepath.Clean(p)
+		st, err := os.Stat(p)
+		if err != nil || !st.IsDir() {
+			return "", false
+		}
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return p, true
+		}
+		return abs, true
+	}
+
+	wd, wdErr := os.Getwd()
+	if wdErr == nil {
+		if root, err := FindRepoRoot(wd); err == nil {
+			if p, ok := try(filepath.Join(root, userPath)); ok {
+				return p, nil
+			}
+		}
+	}
+	if p, ok := try(userPath); ok {
+		return p, nil
+	}
+	if abs, err := filepath.Abs(userPath); err == nil {
+		if p, ok := try(abs); ok {
+			return p, nil
+		}
+	}
+
+	if wdErr != nil {
+		return "", fmt.Errorf("directory not found: %s", userPath)
+	}
+
+	var candidates []string
+	if root, err := FindRepoRoot(wd); err == nil {
+		candidates = append(candidates, filepath.Join(root, userPath))
+	}
+	for dir := wd; ; {
+		candidates = append(candidates, filepath.Join(dir, userPath))
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	seen := make(map[string]struct{})
+	for _, c := range candidates {
+		c = filepath.Clean(c)
+		if _, dup := seen[c]; dup {
+			continue
+		}
+		seen[c] = struct{}{}
+		if p, ok := try(c); ok {
+			return p, nil
+		}
+	}
+
+	return "", fmt.Errorf("directory not found: %s (cwd: %s)", userPath, wd)
+}
+
+// ResolveBenchmarkOutputDir ensures a benchmark output directory exists and returns its absolute path.
+func ResolveBenchmarkOutputDir(userPath string) (string, error) {
+	userPath = strings.TrimSpace(userPath)
+	if userPath == "" {
+		return "", fmt.Errorf("empty output directory")
+	}
+	var resolved string
+	if filepath.IsAbs(userPath) {
+		resolved = filepath.Clean(userPath)
+	} else {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		if root, rerr := FindRepoRoot(wd); rerr == nil {
+			resolved = filepath.Join(root, userPath)
+		} else {
+			resolved = filepath.Join(wd, userPath)
+		}
+		resolved = filepath.Clean(resolved)
+	}
+	if err := os.MkdirAll(resolved, 0755); err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(resolved)
+	if err != nil {
+		return resolved, nil
+	}
+	return abs, nil
+}
+
 // ResolveOutputPath resolves an output file path (repo-relative when appropriate).
 func ResolveOutputPath(userPath string) (string, error) {
 	userPath = strings.TrimSpace(userPath)

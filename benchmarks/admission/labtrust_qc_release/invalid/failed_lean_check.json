@@ -1,0 +1,11 @@
+{
+  "case_id": "failed_lean_check",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "lean_check_failed"
+  ],
+  "inputs": {
+    "lean_check_result": "support/lean_check_failed.v0.json"
+  }
+}

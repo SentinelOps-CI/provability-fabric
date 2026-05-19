@@ -1,0 +1,14 @@
+{
+  "workflow_id": "scientific_computation.reproducibility_v0",
+  "profile_id": "scientific_computation_reproducibility",
+  "fixture_root": "${repo}/tests/pcs/fixtures/computation-release",
+  "defaults": {
+    "bundle": "science_claim_bundle.certified.json",
+    "handoff": "handoff_to_pf.json",
+    "registry": "artifact_registry.json",
+    "manifest": "release_manifest.v0.json",
+    "artifact_dir": ".",
+    "proof_obligations": "proof_obligation.v0.json",
+    "lean_check_result": "lean_check_result.v0.json"
+  }
+}

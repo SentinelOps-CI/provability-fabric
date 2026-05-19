@@ -1,0 +1,11 @@
+{
+  "case_id": "nonzero_exit_code",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "nonzero_exit_code"
+  ],
+  "inputs": {
+    "bundle": "${repo}/tests/pcs/fixtures/computation/nonzero_exit_code.json"
+  }
+}

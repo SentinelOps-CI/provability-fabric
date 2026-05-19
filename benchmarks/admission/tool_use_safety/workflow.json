@@ -1,0 +1,9 @@
+{
+  "workflow_id": "agent_tool_use.safety_v0",
+  "profile_id": "agent_tool_use_safety",
+  "fixture_root": "${repo}/tests/pcs/fixtures/tool-use",
+  "defaults": {
+    "bundle": "missing_certificate.json",
+    "registry": "${repo}/tests/pcs/fixtures/labtrust-release/artifact_registry.json"
+  }
+}

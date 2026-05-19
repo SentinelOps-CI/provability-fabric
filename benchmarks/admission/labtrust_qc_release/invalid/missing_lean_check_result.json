@@ -1,0 +1,11 @@
+{
+  "case_id": "missing_lean_check_result",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "missing_lean_check_result"
+  ],
+  "inputs": {
+    "omit_lean_check_result": true
+  }
+}

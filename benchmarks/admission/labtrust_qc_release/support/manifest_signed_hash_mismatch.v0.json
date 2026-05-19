@@ -1,0 +1,82 @@
+{
+  "schema_version": "v0",
+  "release_id": "release-pcs-v0.1-labtrust-qc",
+  "release_candidate": "pcs-v0.1.0-rc1",
+  "generated_at": "2026-05-18T21:29:17Z",
+  "validation_profile": "labtrust-v0.1-release-chain",
+  "workflow_profile_id": "labtrust.qc_release_v0.1",
+  "chain_root": {
+    "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd",
+    "certificate_id": "cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693",
+    "certified_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+    "signed_bundle_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "release_chain_validation_result": {
+    "path": "release_chain_validation_result.v0.json",
+    "sha256": "sha256:49c9508bcd082ebf38fc3aaf6dbd626d14d6403009ffc2d1a77c46211b161bd5"
+  },
+  "canonical_signed_bundle": {
+    "path": "signed_science_claim_bundle.json",
+    "sha256": "sha256:856469f22afc1b204933e38a4668da2309b02b082f48fc4e8f0220b49733e712"
+  },
+  "canonical_claim_id": "claim-pcs-qc-release-v0.1",
+  "limitations_notice": "PCS v0.1 demonstrates a proof-carrying simulated lab workflow; it does not claim clinical validity or production certification.",
+  "producer_repos": {
+    "pcs_core": {
+      "repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "commit": "17e414501b3e1c58e8fbde1fe89a828440a945d9"
+    },
+    "labtrust_gym": {
+      "repo": "https://github.com/fraware/LabTrust-Gym",
+      "commit": "17ed831acfd775889ab497d11004cceb083a9c2d"
+    },
+    "certifyedge": {
+      "repo": "https://github.com/fraware/CertifyEdge",
+      "commit": "635fca3771ad54fe3f8b49d1bb77ee35d0680ddc"
+    },
+    "provability_fabric": {
+      "repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f"
+    },
+    "scientific_memory": {
+      "repo": "https://github.com/fraware/scientific-memory",
+      "commit": "0e059e934bc95bcc4dc0cb6593b18b07a28529a2"
+    }
+  },
+  "artifacts": {
+    "science_claim_bundle.certified.json": {
+      "artifact_type": "ScienceClaimBundle.v0",
+      "schema": "ScienceClaimBundle.v0.schema.json",
+      "producer": "LabTrust-Gym",
+      "source_repo": "https://github.com/fraware/LabTrust-Gym",
+      "source_commit": "17ed831acfd775889ab497d11004cceb083a9c2d",
+      "sha256": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
+    },
+    "scientific_memory_import_report.json": {
+      "artifact_type": "ScientificMemory.ImportReport.v0",
+      "schema": "scientific_memory_import_report.json",
+      "producer": "Scientific Memory",
+      "source_repo": "https://github.com/fraware/scientific-memory",
+      "source_commit": "0e059e934bc95bcc4dc0cb6593b18b07a28529a2",
+      "sha256": "sha256:bd8808cdf87866bec0d6b991e7b9f613e0a0799d3d707583f13568bdb768ca5f"
+    },
+    "signed_science_claim_bundle.json": {
+      "artifact_type": "SignedScienceClaimBundle.v0",
+      "schema": "SignedScienceClaimBundle.v0.schema.json",
+      "producer": "Provability Fabric",
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
+      "sha256": "sha256:856469f22afc1b204933e38a4668da2309b02b082f48fc4e8f0220b49733e712"
+    },
+    "verification_result.json": {
+      "artifact_type": "VerificationResult.v0",
+      "schema": "VerificationResult.v0.schema.json",
+      "producer": "Provability Fabric",
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
+      "sha256": "sha256:228527beff72973b5878e0ba696ff64d45b4b27e5a21c530f9b214407ec90f34"
+    }
+  },
+  "release_status": "Validated",
+  "signature_or_digest": "sha256:5ab8e6b5d8a3abd13114073cda31247a617877081223db11acc854e6be9018a7"
+}

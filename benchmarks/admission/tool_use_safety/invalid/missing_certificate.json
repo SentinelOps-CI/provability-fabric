@@ -1,0 +1,11 @@
+{
+  "case_id": "missing_certificate",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "missing_certificate.json"
+  },
+  "expect_failure_codes": [
+    "missing_tool_use_certificate"
+  ]
+}

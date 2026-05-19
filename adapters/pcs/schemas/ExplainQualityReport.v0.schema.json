@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ExplainQualityReport.v0.schema.json",
+  "title": "ExplainQualityReport.v0",
+  "type": "object",
+  "required": ["schema_version", "run_id", "workflow", "cases", "mean_completeness"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "mean_completeness": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/explain_case" }
+    }
+  },
+  "$defs": {
+    "explain_case": {
+      "type": "object",
+      "required": ["case_id", "completeness", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "completeness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

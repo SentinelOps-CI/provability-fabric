@@ -108,7 +108,7 @@ func TestComputationProfileAdmitsPCSCoreReleaseBundle(t *testing.T) {
 	if err := pcs.HydrateComputationBundleFromDir(bundle, dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := pcs.EnforceAdmissionProfile(profile, bundlePath, bundle, handoff); err != nil {
+	if err := pcs.EnforceAdmissionProfile(profile, bundlePath, bundle, handoff, true); err != nil {
 		t.Fatalf("expected pcs-core computation release bundle to pass admission: %v", err)
 	}
 }
@@ -167,7 +167,7 @@ func TestComputationReleaseChainRejectsHashMismatchFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = pcs.EnforceAdmissionProfile(profile, path, bundle, handoff)
+	err = pcs.EnforceAdmissionProfile(profile, path, bundle, handoff, true)
 	if err == nil || !strings.Contains(err.Error(), pcs.FailureCodeResultHashMismatch) {
 		t.Fatalf("expected result_hash_mismatch, got %v", err)
 	}

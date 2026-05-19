@@ -207,3 +207,40 @@ func ValidateReleaseChainValidationResult(repoRoot string, result ReleaseChainVa
 	}
 	return ValidateReleaseChainValidationResultSemantics(&result)
 }
+
+// ValidateBenchmarkRun validates BenchmarkRun.v0 emitted by pf benchmark admission.
+func ValidateBenchmarkRun(repoRoot string, run BenchmarkRunV0) error {
+	return validateBenchmarkDoc(repoRoot, "BenchmarkRun.v0.schema.json", run)
+}
+
+// ValidateFailureLocalizationResult validates FailureLocalizationResult.v0.
+func ValidateFailureLocalizationResult(repoRoot string, report FailureLocalizationResultV0) error {
+	return validateBenchmarkDoc(repoRoot, "FailureLocalizationResult.v0.schema.json", report)
+}
+
+// ValidateCoverageReport validates CoverageReport.v0.
+func ValidateCoverageReport(repoRoot string, report CoverageReportV0) error {
+	return validateBenchmarkDoc(repoRoot, "CoverageReport.v0.schema.json", report)
+}
+
+// ValidateExplainQualityReport validates ExplainQualityReport.v0.
+func ValidateExplainQualityReport(repoRoot string, report ExplainQualityReportV0) error {
+	return validateBenchmarkDoc(repoRoot, "ExplainQualityReport.v0.schema.json", report)
+}
+
+// ValidateAdmissionBenchmarkCase validates admission_benchmark_case.v0 JSON.
+func ValidateAdmissionBenchmarkCase(repoRoot string, c AdmissionBenchmarkCase) error {
+	return validateBenchmarkDoc(repoRoot, "AdmissionBenchmarkCase.v0.schema.json", c)
+}
+
+func validateBenchmarkDoc(repoRoot, schemaFile string, v any) error {
+	var doc any
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	return ValidateDocumentAgainstSchema(repoRoot, schemaFile, doc)
+}

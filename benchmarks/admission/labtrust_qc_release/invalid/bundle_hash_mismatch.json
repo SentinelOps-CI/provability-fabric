@@ -1,0 +1,23 @@
+{
+  "case_id": "bundle_hash_mismatch",
+  "expect": "reject",
+  "verify_mode": "release_chain",
+  "expect_failure_codes": [
+    "signed_input_bundle_hash_match"
+  ],
+  "inputs": {
+    "artifact_dir": "support/release_bundle_hash_mismatch"
+  },
+  "localization": {
+    "check_id": "signed_input_bundle_hash_match",
+    "artifact_path": "signed_science_claim_bundle.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "artifact_path": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
+  }
+}

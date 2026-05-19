@@ -12,6 +12,7 @@ func RegisterPCSCommands(root *cobra.Command) {
 	root.AddCommand(inspectRootCmd())
 	root.AddCommand(migrateRootCmd())
 	root.AddCommand(validateRootCmd())
+	root.AddCommand(benchmarkRootCmd())
 }
 
 // RegisterScienceClaimSign adds pf sign science-claim to an existing sign command group.

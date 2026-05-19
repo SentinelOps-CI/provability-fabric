@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/CoverageReport.v0.schema.json",
+  "title": "CoverageReport.v0",
+  "type": "object",
+  "required": ["schema_version", "run_id", "workflow", "registry", "admission", "formal"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string", "minLength": 1 },
+    "registry": { "$ref": "#/$defs/registry_coverage" },
+    "admission": { "$ref": "#/$defs/admission_coverage" },
+    "formal": { "$ref": "#/$defs/formal_coverage" }
+  },
+  "$defs": {
+    "registry_coverage": {
+      "type": "object",
+      "required": [
+        "registered_artifacts_checked",
+        "required_fields_checked",
+        "allowed_statuses_checked",
+        "semantic_checks_executed",
+        "semantic_checks_deferred",
+        "semantic_checks_skipped",
+        "release_blocking_checks_passed",
+        "release_blocking_checks_failed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "registered_artifacts_checked": { "type": "integer", "minimum": 0 },
+        "required_fields_checked": { "type": "integer", "minimum": 0 },
+        "allowed_statuses_checked": { "type": "integer", "minimum": 0 },
+        "semantic_checks_executed": { "type": "integer", "minimum": 0 },
+        "semantic_checks_deferred": { "type": "integer", "minimum": 0 },
+        "semantic_checks_skipped": { "type": "integer", "minimum": 0 },
+        "release_blocking_checks_passed": { "type": "integer", "minimum": 0 },
+        "release_blocking_checks_failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "admission_coverage": {
+      "type": "object",
+      "required": ["profiles_exercised", "registry_checks_required", "registry_checks_observed"],
+      "additionalProperties": false,
+      "properties": {
+        "profiles_exercised": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "registry_checks_required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "registry_checks_observed": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "formal_coverage": {
+      "type": "object",
+      "required": [
+        "formal_checks_required",
+        "obligation_kinds_checked",
+        "formal_check_ids_observed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "formal_checks_required": { "type": "boolean" },
+        "obligation_kinds_checked": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "formal_check_ids_observed": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

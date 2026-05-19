@@ -1,0 +1,11 @@
+{
+  "case_id": "trace_hash_mismatch",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "trace_hash_mismatch.json"
+  },
+  "expect_failure_codes": [
+    "tool_trace_hash_mismatch"
+  ]
+}

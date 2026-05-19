@@ -1,0 +1,5 @@
+{
+  "case_id": "release_admission",
+  "expect": "admit",
+  "verify_mode": "science_claim"
+}

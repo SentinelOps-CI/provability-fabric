@@ -1,0 +1,11 @@
+{
+  "case_id": "unauthorized_tool_call",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "unauthorized_violation.json"
+  },
+  "expect_failure_codes": [
+    "unauthorized_tool_call_certificate_violation"
+  ]
+}

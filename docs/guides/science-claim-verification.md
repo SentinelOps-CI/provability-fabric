@@ -109,6 +109,17 @@ pf explain release-chain release_chain_validation_result.json
 
 Release-chain validation emits schema-valid `ReleaseChainValidationResult.v0` with check IDs including: `manifest_hashes_match`, `producer_commits_match`, `certificate_id_consistent`, `trace_hash_consistent`, `signed_input_bundle_hash_match`, `scientific_memory_import_passed`, `registry_artifact_registered`, `registry_schema_matches`, `registry_producer_allowed`, `registry_status_allowed`, `registry_required_fields_present`, `registry_semantic_checks_executed`, and `registry_admission_passed`.
 
+## Admission benchmark
+
+Measure PF as the PCS release admission controller (valid admits, invalid rejects, localization, explain quality, registry coverage). See [pcs-admission-benchmark.md](pcs-admission-benchmark.md).
+
+```bash
+pf benchmark admission \
+  --cases benchmarks/admission/labtrust_qc_release \
+  --registry ../pcs-core/examples/artifact_registry.valid.json \
+  --out benchmark_runs/labtrust_admission
+```
+
 ## Seventeen required checks
 
 | # | check_id | Description |

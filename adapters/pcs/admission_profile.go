@@ -231,7 +231,7 @@ func ValidateAdmissionProfile(p *AdmissionProfile) error {
 }
 
 // EnforceAdmissionProfile validates bundle and handoff against profile rules.
-func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
+func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundle *ScienceClaimBundle, handoff *LoadedHandoff, releaseMode bool) error {
 	if profile == nil {
 		return nil
 	}
@@ -244,7 +244,7 @@ func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundl
 		bundle = loaded
 	}
 	if profile.IsToolUseProfile() {
-		return enforceAgentToolUseSafetyProfile(profile, bundle, handoff)
+		return enforceAgentToolUseSafetyProfile(profile, bundle, handoff, releaseMode)
 	}
 	if profile.IsComputationProfile() {
 		if bundle != nil && strings.TrimSpace(bundlePath) != "" {
@@ -252,12 +252,12 @@ func EnforceAdmissionProfile(profile *AdmissionProfile, bundlePath string, bundl
 				_ = HydrateComputationBundleFromDir(bundle, filepath.Dir(resolved))
 			}
 		}
-		return enforceScientificComputationProfile(profile, bundle, handoff)
+		return enforceScientificComputationProfile(profile, bundle, handoff, releaseMode)
 	}
-	return enforceLabtrustQCProfile(profile, bundle, handoff)
+	return enforceLabtrustQCProfile(profile, bundle, handoff, releaseMode)
 }
 
-func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
+func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff, releaseMode bool) error {
 	if bundle == nil {
 		return fmt.Errorf("%s: profile %q requires a science claim bundle", FailureCodeReleaseModeBundleRequired, profile.ProfileID)
 	}
@@ -275,8 +275,10 @@ func enforceLabtrustQCProfile(profile *AdmissionProfile, bundle *ScienceClaimBun
 		return fmt.Errorf("%s: bundle %q is scientific computation workflow %q, profile %q expects %q",
 			FailureCodeAdmissionProfileWorkflowMismatch, bundle.BundleID, InferBundleWorkflowID(bundle), profile.ProfileID, profile.WorkflowID)
 	}
-	if err := enforceProfileHandoff(profile, handoff); err != nil {
-		return err
+	if releaseMode {
+		if err := enforceProfileHandoff(profile, handoff); err != nil {
+			return err
+		}
 	}
 	for _, rt := range profile.RequiredRuntimeArtifacts {
 		if rt == "RuntimeReceipt.v0" && bundle.PrimaryRuntimeReceipt() == nil {

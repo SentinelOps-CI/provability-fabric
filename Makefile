@@ -81,8 +81,18 @@ test-pcs:
 	cd core/cli/pf && go test ./cmd/... -count=1
 	@$(ECHOOK) "OK: PCS unit and CLI tests passed"
 
-test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures
-	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures)"
+ifeq ($(OS),Windows_NT)
+test-pcs-benchmark:
+	@$(ECHOOK) "PCS admission benchmarks..."
+	bash scripts/pcs-benchmark-admission.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-benchmark-admission.ps1
+else
+test-pcs-benchmark:
+	@$(ECHOOK) "PCS admission benchmarks..."
+	bash scripts/pcs-benchmark-admission.sh
+endif
+
+test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark
+	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures, admission benchmarks)"
 
 validate-pcs-fixtures:
 	@$(ECHOOK) "Validating PCS fixtures..."

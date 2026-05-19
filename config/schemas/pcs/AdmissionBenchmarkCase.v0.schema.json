@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/AdmissionBenchmarkCase.v0.schema.json",
+  "title": "AdmissionBenchmarkCase.v0",
+  "type": "object",
+  "required": ["case_id", "expect", "verify_mode"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "workflow": { "type": "string" },
+    "profile_id": { "type": "string" },
+    "kind": { "type": "string", "enum": ["valid", "invalid"] },
+    "expect": { "type": "string", "enum": ["admit", "reject"] },
+    "expect_failure_codes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "verify_mode": {
+      "type": "string",
+      "enum": ["science_claim", "release_chain", "admission_gate"]
+    },
+    "inputs": { "$ref": "#/$defs/benchmark_inputs" },
+    "localization": { "$ref": "#/$defs/localization" },
+    "explain_requirements": { "$ref": "#/$defs/explain_requirements" }
+  },
+  "$defs": {
+    "benchmark_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bundle": { "type": "string" },
+        "handoff": { "type": "string" },
+        "registry": { "type": "string" },
+        "manifest": { "type": "string" },
+        "artifact_dir": { "type": "string" },
+        "proof_obligations": { "type": "string" },
+        "lean_check_result": { "type": "string" },
+        "omit_handoff": { "type": "boolean" },
+        "omit_registry": { "type": "boolean" },
+        "omit_formal": { "type": "boolean" },
+        "omit_proof_obligations": { "type": "boolean" },
+        "omit_lean_check_result": { "type": "boolean" }
+      }
+    },
+    "localization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "artifact_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "explain_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "failure_code": { "type": "boolean" },
+        "artifact_path": { "type": "boolean" },
+        "expected": { "type": "boolean" },
+        "actual": { "type": "boolean" },
+        "responsible_component": { "type": "boolean" },
+        "repair_hint": { "type": "boolean" },
+        "registry_check_ref": { "type": "boolean" },
+        "handoff_ref": { "type": "boolean" },
+        "formal_theorem": { "type": "boolean" }
+      }
+    }
+  }
+}

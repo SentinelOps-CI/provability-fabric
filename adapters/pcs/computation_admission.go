@@ -96,7 +96,7 @@ func inferComputationWorkflow(bundle *ScienceClaimBundle) bool {
 		bundle.ComputationWitness != nil
 }
 
-func enforceScientificComputationProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff) error {
+func enforceScientificComputationProfile(profile *AdmissionProfile, bundle *ScienceClaimBundle, handoff *LoadedHandoff, releaseMode bool) error {
 	if bundle == nil {
 		return fmt.Errorf("%s: profile %q requires a science claim bundle", FailureCodeReleaseModeBundleRequired, profile.ProfileID)
 	}
@@ -112,8 +112,10 @@ func enforceScientificComputationProfile(profile *AdmissionProfile, bundle *Scie
 	if err := validateAdmissionProfileWorkflow(profile, bundle); err != nil {
 		return err
 	}
-	if err := enforceProfileHandoff(profile, handoff); err != nil {
-		return err
+	if releaseMode {
+		if err := enforceProfileHandoff(profile, handoff); err != nil {
+			return err
+		}
 	}
 	if bundle.DatasetReceipt == nil {
 		return fmt.Errorf("%s: missing DatasetReceipt.v0", FailureCodeMissingDatasetReceipt)
@@ -204,7 +206,7 @@ func witnessResultHashesMatch(hashes []string, contentHash string) bool {
 
 // ValidateComputationBundleAdmission runs profile admission rules and returns the first failure code.
 func ValidateComputationBundleAdmission(bundle *ScienceClaimBundle, profile *AdmissionProfile, handoff *LoadedHandoff) string {
-	if err := enforceScientificComputationProfile(profile, bundle, handoff); err != nil {
+	if err := enforceScientificComputationProfile(profile, bundle, handoff, true); err != nil {
 		return extractFailureCode(err.Error())
 	}
 	return ""

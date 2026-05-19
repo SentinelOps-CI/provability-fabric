@@ -182,8 +182,13 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 	case "signed_input_bundle_hash_match":
 		exp, _ := c.Details["expected"].(string)
 		act, _ := c.Details["actual"].(string)
+		fc, _, _, _, _, _, _ := releaseCheckExplanationFields(c)
+		if fc == "" {
+			fc = "PCS_SIGNED_INPUT_HASH_MISMATCH"
+		}
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,
+			FailureCode:          fc,
 			ArtifactPath:         "signed_science_claim_bundle.json",
 			ResponsibleComponent: ComponentProvabilityFabric,
 			Expected:             exp,

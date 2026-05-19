@@ -1,0 +1,12 @@
+{
+  "case_id": "trace_hash_mismatch",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "PCS_TRACE_HASH_MISMATCH"
+  ],
+  "inputs": {
+    "bundle": "invalid_mismatched_trace_hash.json",
+    "omit_handoff": true
+  }
+}

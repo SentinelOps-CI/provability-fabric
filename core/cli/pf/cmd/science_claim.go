@@ -63,13 +63,13 @@ func verifyBundle(bundlePath string, localDev, releaseMode bool, adm resolvedSci
 	}
 	applyAdmissionToValidateOpts(&opts, adm)
 	if adm.Profile != nil && adm.Profile.IsToolUseProfile() {
-		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff); err != nil {
+		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff, releaseMode); err != nil {
 			return pcs.VerificationResult{}, wrapAdmissionError(err)
 		}
 		return pcs.VerificationResult{}, fmt.Errorf("%s: full tool-use bundle verification is not implemented yet", pcs.FailureCodeToolUseReleaseNotImplemented)
 	}
 	if adm.Profile != nil && adm.Profile.IsComputationProfile() {
-		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff); err != nil {
+		if err := pcs.EnforceAdmissionProfile(adm.Profile, resolved, bundle, adm.Handoff, releaseMode); err != nil {
 			return pcs.VerificationResult{}, wrapAdmissionError(err)
 		}
 		if err := pcs.EnforceFormalCheckAdmission(adm.Profile, adm.Manifest, adm.Policy, adm.FormalChecks); err != nil {

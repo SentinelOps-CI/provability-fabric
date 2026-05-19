@@ -1,0 +1,11 @@
+{
+  "case_id": "registry_disallowed_status",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "PCS_REGISTRY_ADMISSION_FAILED"
+  ],
+  "inputs": {
+    "registry": "support/registry_disallowed_status.json"
+  }
+}

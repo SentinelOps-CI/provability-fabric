@@ -1,0 +1,14 @@
+{
+  "workflow_id": "labtrust_qc_release",
+  "profile_id": "labtrust_qc_release",
+  "fixture_root": "${repo}/tests/pcs/fixtures/labtrust-release",
+  "defaults": {
+    "bundle": "science_claim_bundle.certified.json",
+    "handoff": "handoff_to_pf.json",
+    "registry": "artifact_registry.json",
+    "manifest": "release_manifest.v0.json",
+    "artifact_dir": ".",
+    "proof_obligations": "proof_obligation.v0.json",
+    "lean_check_result": "lean_check_result.v0.json"
+  }
+}

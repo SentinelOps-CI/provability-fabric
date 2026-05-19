@@ -1,0 +1,11 @@
+{
+  "case_id": "policy_hash_mismatch",
+  "expect": "reject",
+  "verify_mode": "admission_gate",
+  "inputs": {
+    "bundle": "policy_hash_mismatch.json"
+  },
+  "expect_failure_codes": [
+    "policy_hash_mismatch"
+  ]
+}

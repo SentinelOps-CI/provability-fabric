@@ -1,0 +1,1146 @@
+{
+  "schema_version": "v0",
+  "registry_id": "pcs-artifact-registry-v0.1",
+  "registry_version": "0.1.0",
+  "entries": {
+    "AssumptionSet.v0": {
+      "artifact_type": "AssumptionSet.v0",
+      "schema": "schemas/AssumptionSet.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "HumanReviewed",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "assumption_set_id",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "SourceSpan.v0": {
+      "artifact_type": "SourceSpan.v0",
+      "schema": "schemas/SourceSpan.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "Extracted",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "source_span_id",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ClaimArtifact.v0": {
+      "artifact_type": "ClaimArtifact.v0",
+      "schema": "schemas/ClaimArtifact.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "CertificateChecked",
+        "ProofChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_id",
+        "assumption_set_ref",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "assumption_set_ref_present",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "CertifyEdge"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "RuntimeReceipt.v0": {
+      "artifact_type": "RuntimeReceipt.v0",
+      "schema": "schemas/RuntimeReceipt.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "RuntimeObserved",
+        "RuntimeChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "receipt_id",
+        "trace_hash",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "trace_hash_present",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "source_commit_matches_release_manifest",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "TraceCertificate.v0": {
+      "artifact_type": "TraceCertificate.v0",
+      "schema": "schemas/TraceCertificate.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "CertifyEdge",
+      "allowed_runtime_producers": [
+        "CertifyEdge"
+      ],
+      "producer": "CertifyEdge",
+      "allowed_statuses": [
+        "CertificatePending",
+        "CertificateChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "certificate_id",
+        "trace_hash",
+        "spec_hash",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "trace_hash_matches_runtime_receipt",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "status_is_certificate_checked_for_release",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "source_commit_matches_release_manifest",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "LabTrust-Gym",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "EvidenceBundle.v0": {
+      "artifact_type": "EvidenceBundle.v0",
+      "schema": "schemas/EvidenceBundle.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "CertificateChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "bundle_id",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "certificate_refs_resolve",
+          "severity": "producer_responsible",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "CertifyEdge"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ScienceClaimBundle.v0": {
+      "artifact_type": "ScienceClaimBundle.v0",
+      "schema": "schemas/ScienceClaimBundle.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "CertificateChecked",
+        "ProofChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "bundle_id",
+        "assumption_set",
+        "runtime_receipts",
+        "status",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "non_empty_runtime_receipts",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "certified_bundle_has_certificate_when_checked",
+          "severity": "release_blocking",
+          "responsible_component": "LabTrust-Gym",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "VerificationResult.v0": {
+      "artifact_type": "VerificationResult.v0",
+      "schema": "schemas/VerificationResult.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "Provability Fabric",
+      "allowed_runtime_producers": [
+        "Provability Fabric"
+      ],
+      "producer": "Provability Fabric",
+      "allowed_statuses": [
+        "ProofChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "verification_id",
+        "status",
+        "verified_input",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "verified_input_bundle_hash_matches_certified",
+          "severity": "release_blocking",
+          "responsible_component": "Provability Fabric",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "failed_checks_block_import_ready_status",
+          "severity": "release_blocking",
+          "responsible_component": "Provability Fabric",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "SignedScienceClaimBundle.v0": {
+      "artifact_type": "SignedScienceClaimBundle.v0",
+      "schema": "schemas/SignedScienceClaimBundle.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "Provability Fabric",
+      "allowed_runtime_producers": [
+        "Provability Fabric"
+      ],
+      "producer": "Provability Fabric",
+      "allowed_statuses": [
+        "ProofChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "signed_bundle_id",
+        "signed_input_bundle_hash",
+        "science_claim_bundle",
+        "verification_result",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "signed_input_bundle_hash_matches_certified",
+          "severity": "release_blocking",
+          "responsible_component": "Provability Fabric",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "embedded_bundle_passes_science_claim_semantics",
+          "severity": "producer_responsible",
+          "responsible_component": "Provability Fabric",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ReleaseManifest.v0": {
+      "artifact_type": "ReleaseManifest.v0",
+      "schema": "schemas/ReleaseManifest.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Rejected",
+        "Stale",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "release_id",
+        "release_candidate",
+        "validation_profile",
+        "producer_repos",
+        "artifacts",
+        "release_status",
+        "chain_root",
+        "release_chain_validation_result",
+        "canonical_signed_bundle",
+        "canonical_claim_id",
+        "limitations_notice",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "release_mode_commit_policy",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "artifact_hashes_match_files",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "HandoffManifest.v0": {
+      "artifact_type": "HandoffManifest.v0",
+      "schema": "schemas/HandoffManifest.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Rejected",
+        "Stale",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "handoff_id",
+        "handoff_kind",
+        "input_artifacts",
+        "expected_outputs",
+        "invariants",
+        "status",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "handoff_input_hashes_when_validated",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ComponentReleaseFragment.v0": {
+      "artifact_type": "ComponentReleaseFragment.v0",
+      "schema": "schemas/ComponentReleaseFragment.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "LabTrust-Gym",
+      "allowed_runtime_producers": [
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "producer": "LabTrust-Gym",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Rejected",
+        "Stale",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "component",
+        "source_repo",
+        "source_commit",
+        "artifacts",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "component_artifacts_match_release_pins",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "LabTrust-Gym",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ReleaseChainValidationResult.v0": {
+      "artifact_type": "ReleaseChainValidationResult.v0",
+      "schema": "schemas/ReleaseChainValidationResult.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "ProofChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "validation_id",
+        "release_id",
+        "status",
+        "checks",
+        "artifacts_checked",
+        "failure_codes",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "status_matches_check_outcomes",
+          "severity": "validator_responsible",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ToolUseTrace.v0": {
+      "artifact_type": "ToolUseTrace.v0",
+      "schema": "schemas/ToolUseTrace.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "agent-tool-use demo producer",
+      "allowed_runtime_producers": [
+        "agent-tool-use demo producer"
+      ],
+      "producer": "agent-tool-use demo producer",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "trace_id",
+        "workflow_id",
+        "agent_id",
+        "policy_id",
+        "policy_hash",
+        "started_at",
+        "completed_at",
+        "tool_calls",
+        "trace_hash",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "trace_hash_present",
+          "severity": "release_blocking",
+          "responsible_component": "agent-tool-use demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "no_unknown_authorization_status",
+          "severity": "release_blocking",
+          "responsible_component": "agent-tool-use demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ToolUseCertificate.v0": {
+      "artifact_type": "ToolUseCertificate.v0",
+      "schema": "schemas/ToolUseCertificate.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "CertifyEdge",
+      "allowed_runtime_producers": [
+        "CertifyEdge"
+      ],
+      "producer": "CertifyEdge",
+      "allowed_statuses": [
+        "CertificateChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "certificate_id",
+        "trace_hash",
+        "policy_hash",
+        "property_id",
+        "checker",
+        "checker_version",
+        "status",
+        "violations",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "tool_trace_hash_matches_certificate",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "policy_hash_matches_certificate",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "certificate_status_checked_for_release",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "no_unauthorized_tool_calls",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "source_commit_matches_release_manifest",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "WorkflowProfile.v0": {
+      "artifact_type": "WorkflowProfile.v0",
+      "schema": "schemas/WorkflowProfile.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "workflow_id",
+        "domain",
+        "description",
+        "runtime_artifacts",
+        "certificate_artifacts",
+        "handoff_sequence",
+        "required_registry_entries",
+        "required_admission_profile",
+        "status_policy",
+        "failure_modes",
+        "limitations_notice",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "required_registry_entries_registered",
+          "severity": "required",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "DatasetReceipt.v0": {
+      "artifact_type": "DatasetReceipt.v0",
+      "schema": "schemas/DatasetReceipt.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "scientific-computation demo producer",
+      "allowed_runtime_producers": [
+        "scientific-computation demo producer"
+      ],
+      "producer": "scientific-computation demo producer",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "dataset_id",
+        "dataset_name",
+        "dataset_version",
+        "files",
+        "aggregate_hash",
+        "source_uri",
+        "source_repo",
+        "source_commit",
+        "license",
+        "created_at",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "EnvironmentReceipt.v0": {
+      "artifact_type": "EnvironmentReceipt.v0",
+      "schema": "schemas/EnvironmentReceipt.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "scientific-computation demo producer",
+      "allowed_runtime_producers": [
+        "scientific-computation demo producer"
+      ],
+      "producer": "scientific-computation demo producer",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "environment_id",
+        "environment_kind",
+        "os",
+        "architecture",
+        "language_runtimes",
+        "packages",
+        "container_image",
+        "container_digest",
+        "hardware_summary",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ComputationRunReceipt.v0": {
+      "artifact_type": "ComputationRunReceipt.v0",
+      "schema": "schemas/ComputationRunReceipt.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "scientific-computation demo producer",
+      "allowed_runtime_producers": [
+        "scientific-computation demo producer"
+      ],
+      "producer": "scientific-computation demo producer",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "run_id",
+        "workflow_id",
+        "command",
+        "code_repo",
+        "code_commit",
+        "dataset_receipt_ref",
+        "environment_receipt_ref",
+        "started_at",
+        "completed_at",
+        "exit_code",
+        "stdout_hash",
+        "stderr_hash",
+        "result_artifact_refs",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ResultArtifact.v0": {
+      "artifact_type": "ResultArtifact.v0",
+      "schema": "schemas/ResultArtifact.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "scientific-computation demo producer",
+      "allowed_runtime_producers": [
+        "scientific-computation demo producer"
+      ],
+      "producer": "scientific-computation demo producer",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeObserved",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "result_id",
+        "result_kind",
+        "path",
+        "sha256",
+        "size_bytes",
+        "media_type",
+        "description",
+        "produced_by_run",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "source_commit_not_placeholder",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "scientific-computation demo producer",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ComputationWitness.v0": {
+      "artifact_type": "ComputationWitness.v0",
+      "schema": "schemas/ComputationWitness.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "CertifyEdge",
+      "allowed_runtime_producers": [
+        "CertifyEdge"
+      ],
+      "producer": "CertifyEdge",
+      "allowed_statuses": [
+        "CertificateChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "witness_id",
+        "workflow_id",
+        "dataset_hash",
+        "environment_hash",
+        "run_receipt_hash",
+        "result_hashes",
+        "code_repo",
+        "code_commit",
+        "checker",
+        "checker_version",
+        "status",
+        "violations",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "dataset_hash_matches_receipt",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "environment_hash_matches_receipt",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "run_receipt_hash_matches_declared_run",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "result_hashes_match_result_artifacts",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "code_commit_present",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "computation_status_checked_for_release",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "source_commit_matches_release_manifest",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "signature_or_digest_valid",
+          "severity": "release_blocking",
+          "responsible_component": "CertifyEdge",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "Provability Fabric",
+        "Scientific Memory",
+        "pcs-core"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "ArtifactRegistry.v0": {
+      "artifact_type": "ArtifactRegistry.v0",
+      "schema": "schemas/ArtifactRegistry.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "registry_id",
+        "registry_version",
+        "entries",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "entries_cover_required_artifact_types",
+          "severity": "required",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "LabTrust-Gym",
+        "CertifyEdge",
+        "Provability Fabric",
+        "Scientific Memory"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    }
+  },
+  "signature_or_digest": "sha256:0e3dd30e9ad79be29be23ebf363d52c38f9a07081b003757299194877805e366"
+}

@@ -1,0 +1,5 @@
+{
+  "case_id": "release_chain",
+  "expect": "admit",
+  "verify_mode": "release_chain"
+}

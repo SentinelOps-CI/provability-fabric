@@ -1,0 +1,11 @@
+{
+  "case_id": "legacy_handoff_in_release_mode",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "legacy_handoff_forbidden_in_release_mode"
+  ],
+  "inputs": {
+    "handoff": "pf_handoff.json"
+  }
+}
