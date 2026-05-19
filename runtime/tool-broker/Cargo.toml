@@ -19,7 +19,7 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
+metrics-exporter-prometheus = "0.18"
 
 [dev-dependencies]
 futures = "0.3"
