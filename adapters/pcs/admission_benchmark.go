@@ -77,6 +77,7 @@ type AdmissionBenchmarkOptions struct {
 	ValidatorVersion string
 	OutDir           string
 	RunID            string
+	ValidateBundle   bool // re-validate bundle after write (pcs validate gate)
 }
 
 // AdmissionBenchmarkCaseResult is one executed case outcome.
@@ -249,14 +250,16 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 		if !cr.Passed {
 			exitCode = 1
 		}
-		pcsExplain := buildPCSExplainQualityReport(c, cr, rcvr, vr, opts.SourceCommit, suiteID, workflow.WorkflowID)
+		pcsExplain := ExportPCSExplainQualityReport(ExportPCSExplainQualityCaseInput{
+			Case: c, Result: cr, RCVR: rcvr, VR: vr,
+			SuiteID: suiteID, WorkflowID: workflow.WorkflowID, SourceCommit: opts.SourceCommit,
+		})
 		if pcsExplain != nil {
 			explain = explainFromPCSReport(pcsExplain)
 			cr.ExplainCompleteness = pcsExplain.QualityScore
-			if c.Kind == "invalid" {
-				cr.Passed = cr.Passed && pcsExplain.QualityScore >= 0.8
-			}
-		} else if explain == nil && c.ExplainRequirements != nil {
+		}
+		cr.Passed = admissionCasePassed(c, cr, pcsExplain)
+		if pcsExplain == nil && explain == nil && c.ExplainRequirements != nil {
 			explain = scoreExplainQualityLegacy(c, rcvr, vr)
 		}
 		executions = append(executions, benchmarkCaseExecution{
@@ -324,8 +327,27 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 		if err := writeAdmissionBenchmarkBundle(repoRoot, opts.OutDir, bundle, executions); err != nil {
 			return run, locReport, covReport, explainReport, err
 		}
+		if opts.ValidateBundle {
+			if err := ValidateAdmissionBenchmarkBundleDir(repoRoot, opts.OutDir); err != nil {
+				return run, locReport, covReport, explainReport, fmt.Errorf("benchmark bundle validation: %w", err)
+			}
+		}
 	}
 	return run, locReport, covReport, explainReport, nil
+}
+
+func admissionCasePassed(c AdmissionBenchmarkCase, cr AdmissionBenchmarkCaseResult, pcsExplain *PCSExplainQualityReport) bool {
+	base := outcomeMatchesExpect(c.Expect, cr.Outcome) && cr.FailureCodeMatch
+	if c.Localization != nil {
+		base = base && cr.LocalizationMatch
+	}
+	if c.Kind == "invalid" && c.ExplainRequirements != nil {
+		if pcsExplain == nil {
+			return false
+		}
+		return base && pcsExplain.QualityScore >= 0.8
+	}
+	return base
 }
 
 func buildBenchmarkCommandLine(c AdmissionBenchmarkCase, workflow AdmissionBenchmarkWorkflow, opts AdmissionBenchmarkOptions) string {
@@ -705,15 +727,9 @@ func executeAdmissionBenchmarkCase(
 	if c.ExplainRequirements != nil && rcvr != nil && rcvr.Status == StatusRejected {
 		explain = scoreExplainQuality(c, *rcvr)
 		cr.ExplainCompleteness = explain.Completeness
-		if c.Kind == "invalid" {
-			cr.Passed = cr.Passed && explain.Completeness >= 0.8
-		}
 	} else if c.ExplainRequirements != nil && vr != nil && !VerificationPassed(*vr) {
 		explain = scoreExplainQualityFromVerification(c, *vr)
 		cr.ExplainCompleteness = explain.Completeness
-		if c.Kind == "invalid" {
-			cr.Passed = cr.Passed && explain.Completeness >= 0.8
-		}
 	}
 	return cr, rcvr, vr, loc, explain
 }

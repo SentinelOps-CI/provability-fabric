@@ -23,7 +23,9 @@ var RequiredAdmissionInvalidCaseIDs = []string{
 	"registry_wrong_producer",
 	"registry_disallowed_status",
 	"missing_proof_obligation",
+	"missing_lean_check_result",
 	"failed_lean_check",
+	"unauthorized_lean_theorem",
 	"result_hash_mismatch",
 	"missing_code_commit",
 	"nonzero_exit_code",
@@ -180,6 +182,11 @@ func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBund
 		return err
 	}
 
+	ingest := buildPCSBenchIngest(bundle, dir, executions)
+	if err := writePCSBenchIngest(repoRoot, dir, ingest); err != nil {
+		return err
+	}
+
 	// PF-internal suite summary for backward-compatible tooling.
 	if bundle.InternalSuite.RunID != "" {
 		suitePath := filepath.Join(dir, "admission_benchmark_suite.v0.json")
@@ -249,6 +256,7 @@ func ValidateAdmissionBenchmarkBundleDir(repoRoot, dir string) error {
 		"failure_localization_result.v0.json",
 		"coverage_report.v0.json",
 		"explain_quality_report.v0.json",
+		"pcs_bench_ingest.v0.json",
 		"commands.json",
 		filepath.Join("logs", "run.log"),
 	}
@@ -306,6 +314,21 @@ func ValidateAdmissionBenchmarkBundleDir(repoRoot, dir string) error {
 		if _, err := os.Stat(runPath); err != nil {
 			return fmt.Errorf("benchmark report references missing run artifact %s: %w", ref.Path, err)
 		}
+	}
+	ingestPath := filepath.Join(dir, "pcs_bench_ingest.v0.json")
+	ingestData, err := os.ReadFile(ingestPath)
+	if err != nil {
+		return err
+	}
+	var ingest PCSBenchIngestV0
+	if err := json.Unmarshal(ingestData, &ingest); err != nil {
+		return err
+	}
+	if err := ValidatePCSBenchIngest(repoRoot, ingest); err != nil {
+		return err
+	}
+	if ingest.BenchmarkReport.ReportID != report.ReportID {
+		return fmt.Errorf("pcs_bench_ingest benchmark_report.report_id mismatch")
 	}
 	return nil
 }

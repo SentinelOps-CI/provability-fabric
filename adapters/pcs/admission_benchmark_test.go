@@ -173,6 +173,36 @@ func TestAdmissionBenchmarkComputationSuite(t *testing.T) {
 	}
 }
 
+func TestLoadPCSBenchIngestFromDir(t *testing.T) {
+	root := repoRoot(t)
+	casesDir := filepath.Join(root, "benchmarks", "admission", "labtrust_qc_release")
+	reg := validArtifactRegistryPath(t)
+	out := t.TempDir()
+	_, _, _, _, err := pcs.RunAdmissionBenchmark(pcs.AdmissionBenchmarkOptions{
+		RepoRoot:       root,
+		CasesDir:       casesDir,
+		RegistryPath:   reg,
+		OutDir:         out,
+		ValidateBundle: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ingest, err := pcs.LoadPCSBenchIngestFromDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ingest.BenchmarkReport.ReportID == "" {
+		t.Fatal("ingest missing benchmark_report.report_id")
+	}
+	if len(ingest.BenchmarkRuns) == 0 {
+		t.Fatal("ingest missing benchmark_runs")
+	}
+	if ingest.Logs.RunLog == "" {
+		t.Fatal("ingest missing logs.run_log")
+	}
+}
+
 func lastValidRCVR(run pcs.BenchmarkRunV0) bool {
 	for _, c := range run.Cases {
 		if c.Kind == "valid" && c.ReleaseChainStatus == pcs.StatusProofChecked {

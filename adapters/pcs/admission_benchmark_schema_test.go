@@ -34,11 +34,11 @@ func TestAdmissionBenchmarkOutputsMatchPCSSchema(t *testing.T) {
 	}
 	for _, name := range []string{
 		"benchmark_report.v0.json",
-		"benchmark_report.v0.json",
 		"benchmark_run.v0.json",
 		"failure_localization_result.v0.json",
 		"coverage_report.v0.json",
 		"explain_quality_report.v0.json",
+		"pcs_bench_ingest.v0.json",
 		"commands.json",
 	} {
 		if _, err := os.Stat(filepath.Join(out, name)); err != nil {
@@ -78,4 +78,56 @@ func TestAdmissionBenchmarkOutputsMatchPCSSchema(t *testing.T) {
 	validateFile(filepath.Join(out, "failure_localization_result.v0.json"), "FailureLocalizationResult.v0.schema.json")
 	validateFile(filepath.Join(out, "coverage_report.v0.json"), "CoverageReport.v0.schema.json")
 	validateFile(filepath.Join(out, "explain_quality_report.v0.json"), "ExplainQualityReport.v0.schema.json")
+	validateFile(filepath.Join(out, "pcs_bench_ingest.v0.json"), "PCSBenchIngest.v0.schema.json")
+}
+
+func TestExportPCSExplainQualityReportMatchesSchema(t *testing.T) {
+	root := repoRoot(t)
+	casesDir := filepath.Join(root, "benchmarks", "admission", "formal_trust_kernel", "invalid")
+	entries, err := os.ReadDir(casesDir)
+	if err != nil {
+		t.Skip("formal benchmark cases not materialized")
+	}
+	var caseData pcs.AdmissionBenchmarkCase
+	for _, e := range entries {
+		if e.Name() == "failed_lean_check.json" {
+			raw, err := os.ReadFile(filepath.Join(casesDir, e.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(raw, &caseData); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	if caseData.CaseID == "" {
+		t.Skip("failed_lean_check case missing")
+	}
+	caseData.Kind = "invalid"
+	report := pcs.ExportPCSExplainQualityReport(pcs.ExportPCSExplainQualityCaseInput{
+		Case:         caseData,
+		Result:       pcs.AdmissionBenchmarkCaseResult{CaseID: caseData.CaseID, Kind: "invalid", Error: "lean_check_failed: lean check status Rejected (expected ProofChecked)"},
+		SuiteID:      "formal-trust-kernel-v0",
+		WorkflowID:   "formal_trust_kernel.enforcement_v0",
+		SourceCommit: pcs.ResolveSourceCommit(),
+	})
+	if report == nil {
+		t.Fatal("expected explain report")
+	}
+	if err := pcs.ValidatePCSExplainQualityReport(root, *report); err != nil {
+		t.Fatal(err)
+	}
+	if !containsSection(report.RequiredSections, "formal_checks") {
+		t.Fatalf("expected formal_checks section, got %v", report.RequiredSections)
+	}
+}
+
+func containsSection(sections []string, want string) bool {
+	for _, s := range sections {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }

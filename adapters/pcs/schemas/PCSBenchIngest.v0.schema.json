@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PCSBenchIngest.v0.schema.json",
+  "title": "PCSBenchIngest.v0",
+  "description": "Single-file manifest for pcs-bench to import PF admission benchmark bundles.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ingest_id",
+    "bundle_dir",
+    "benchmark_report",
+    "benchmark_runs",
+    "coverage_reports",
+    "explain_quality_reports",
+    "failure_localization_reports",
+    "commands",
+    "logs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "ingest_id": { "type": "string", "minLength": 1 },
+    "bundle_dir": { "type": "string", "minLength": 1 },
+    "benchmark_report": { "$ref": "BenchmarkReport.v0.schema.json" },
+    "benchmark_runs": {
+      "type": "array",
+      "items": { "$ref": "BenchmarkRun.v0.schema.json" }
+    },
+    "coverage_reports": {
+      "type": "array",
+      "items": { "$ref": "CoverageReport.v0.schema.json" }
+    },
+    "explain_quality_reports": {
+      "type": "array",
+      "items": { "$ref": "ExplainQualityReport.v0.schema.json" }
+    },
+    "failure_localization_reports": {
+      "type": "array",
+      "items": { "$ref": "FailureLocalizationResult.v0.schema.json" }
+    },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "common.defs.json#/$defs/benchmark_command_entry" }
+    },
+    "logs": { "$ref": "#/$defs/benchmark_logs" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "benchmark_logs": {
+      "type": "object",
+      "required": ["run_log"],
+      "additionalProperties": false,
+      "properties": {
+        "run_log": { "type": "string", "minLength": 1 },
+        "case_logs": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

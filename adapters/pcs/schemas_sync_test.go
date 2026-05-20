@@ -65,6 +65,27 @@ func TestSchemaMirrorMatchesPCSCore(t *testing.T) {
 	}
 }
 
+func TestPFExtensionSchemasMirrored(t *testing.T) {
+	root := repoRoot(t)
+	for _, name := range []string{
+		"AdmissionBenchmarkCase.v0.schema.json",
+		"PCSBenchIngest.v0.schema.json",
+	} {
+		configPath := filepath.Join(root, "config", "schemas", "pcs", name)
+		embedded, ok := pcs.ReadEmbeddedSchemaForTest(name)
+		if !ok {
+			t.Fatalf("embedded schema missing %s", name)
+		}
+		configBytes, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("config schema missing %s: %v", name, err)
+		}
+		if hash(configBytes) != hash([]byte(embedded)) {
+			t.Fatalf("PF extension schema drift: %s", name)
+		}
+	}
+}
+
 func hash(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])

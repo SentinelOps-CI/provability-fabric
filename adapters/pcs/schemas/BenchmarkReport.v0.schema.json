@@ -9,6 +9,7 @@
     "benchmark_suite_id",
     "runs",
     "metrics",
+    "metric_summaries",
     "summary",
     "coverage",
     "failures",
@@ -28,7 +29,11 @@
     "metrics": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+      "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_id" }
+    },
+    "metric_summaries": {
+      "type": "array",
+      "items": { "$ref": "MetricSummary.v0.schema.json" }
     },
     "summary": { "$ref": "#/$defs/benchmark_summary" },
     "coverage": { "$ref": "#/$defs/benchmark_coverage_block" },
@@ -125,7 +130,18 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
-        }
+        },
+        "execution_mode": {
+          "type": "string",
+          "enum": ["live", "simulate", "hybrid", "dry_run"]
+        },
+        "evidence_grade": {
+          "type": "string",
+          "enum": ["release", "developer"]
+        },
+        "live_cases": { "type": "integer", "minimum": 0 },
+        "simulated_cases": { "type": "integer", "minimum": 0 },
+        "hybrid_fallback_cases": { "type": "integer", "minimum": 0 }
       }
     },
     "benchmark_coverage_block": {

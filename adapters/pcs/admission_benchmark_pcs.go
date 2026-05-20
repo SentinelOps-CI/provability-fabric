@@ -60,9 +60,25 @@ type PCSCoverageReport struct {
 	SchemaVersion     string         `json:"schema_version"`
 	CoverageID        string         `json:"coverage_id"`
 	Metric            string         `json:"metric"`
+	MetricID          string         `json:"metric_id,omitempty"`
 	Numerator         float64        `json:"numerator"`
 	Denominator       float64        `json:"denominator"`
 	CoverageRatio     float64        `json:"coverage_ratio"`
+	Details           map[string]any `json:"details"`
+	SourceRepo        string         `json:"source_repo"`
+	SourceCommit      string         `json:"source_commit"`
+	SignatureOrDigest string         `json:"signature_or_digest"`
+}
+
+// PCSMetricSummary matches pcs-core MetricSummary.v0.
+type PCSMetricSummary struct {
+	SchemaVersion     string         `json:"schema_version"`
+	MetricID          string         `json:"metric_id"`
+	Score             float64        `json:"score"`
+	Applicability     string         `json:"applicability"`
+	Numerator         float64        `json:"numerator"`
+	Denominator       float64        `json:"denominator"`
+	Reason            string         `json:"reason"`
 	Details           map[string]any `json:"details"`
 	SourceRepo        string         `json:"source_repo"`
 	SourceCommit      string         `json:"source_commit"`
@@ -76,9 +92,11 @@ type PCSBenchmarkReport struct {
 	BenchmarkSuiteID  string                      `json:"benchmark_suite_id"`
 	Runs              []PCSBenchmarkReportRunRef  `json:"runs"`
 	Metrics           []string                    `json:"metrics"`
+	MetricSummaries   []PCSMetricSummary          `json:"metric_summaries"`
 	Summary           PCSBenchmarkSummary         `json:"summary"`
 	Coverage          PCSBenchmarkCoverageBlock   `json:"coverage"`
 	Failures          []PCSBenchmarkFailureEntry  `json:"failures"`
+	ProducerID        string                      `json:"producer_id,omitempty"`
 	SourceRepo        string                      `json:"source_repo"`
 	SourceCommit      string                      `json:"source_commit"`
 	SignatureOrDigest string                      `json:"signature_or_digest"`
@@ -372,12 +390,15 @@ func buildPCSFailureLocalization(
 	}
 }
 
-func explainAdmissionError(msg string) FailureExplanation {
+func explainAdmissionError(msg string, expectCodes []string) FailureExplanation {
 	fe := FailureExplanation{
 		Actual:               msg,
 		RepairHint:           msg,
 		ResponsibleComponent: ComponentLeanTrustKernel,
 		ArtifactPath:         formalCheckArtifactPath,
+	}
+	if len(expectCodes) > 0 {
+		fe.Expected = strings.Join(expectCodes, ", ")
 	}
 	for _, code := range allAdmissionFailureCodes() {
 		if strings.Contains(msg, code) {
@@ -391,17 +412,14 @@ func explainAdmissionError(msg string) FailureExplanation {
 	return fe
 }
 
+// explainSectionIDForRequirement maps PF explain fields to pcs-core ExplainQualityReport section IDs.
 func explainSectionIDForRequirement(field string) string {
 	switch field {
-	case "failure_code", "registry_check_ref":
+	case "failure_code", "registry_check_ref", "expected", "actual":
 		return "verification"
 	case "artifact_path":
-		return "lineage"
-	case "expected", "actual":
-		return "hashes"
-	case "responsible_component":
 		return "provenance"
-	case "repair_hint":
+	case "responsible_component", "repair_hint":
 		return "repair_hints"
 	case "handoff_ref":
 		return "handoffs"
@@ -434,7 +452,7 @@ func buildPCSExplainQualityReport(
 	} else if vr != nil {
 		explanations = ExplainVerificationFailures(*vr)
 	} else if strings.TrimSpace(cr.Error) != "" {
-		explanations = []FailureExplanation{explainAdmissionError(cr.Error)}
+		explanations = []FailureExplanation{explainAdmissionError(cr.Error, c.ExpectFailureCodes)}
 	}
 	wantCheck := ""
 	if c.Localization != nil {
@@ -466,8 +484,14 @@ func buildPCSExplainQualityReport(
 		{"handoff_ref", target.HandoffRef != "", target.HandoffRef},
 	}
 	if req.FormalTheorem {
-		combined := target.RepairHint + target.Actual + target.Expected
-		ok := strings.Contains(combined, "theorem") || strings.Contains(combined, "admissible_") || strings.Contains(combined, "witness")
+		combined := strings.ToLower(target.RepairHint + target.Actual + target.Expected + target.FailureCode)
+		ok := strings.Contains(combined, "theorem") || strings.Contains(combined, "admissible_") ||
+			strings.Contains(combined, "witness") || strings.Contains(combined, "lean check") ||
+			strings.Contains(combined, "proofobligation") || strings.Contains(combined, "leancheckresult") ||
+			strings.Contains(combined, strings.ToLower(FailureCodeLeanCheckFailed)) ||
+			strings.Contains(combined, strings.ToLower(FailureCodeUnauthorizedLeanTheorem)) ||
+			strings.Contains(combined, strings.ToLower(FailureCodeLeanReleaseIDMismatch)) ||
+			strings.Contains(combined, strings.ToLower(FailureCodeMissingLeanCheckResult))
 		fieldChecks = append(fieldChecks, struct {
 			reqField string
 			present  bool
@@ -576,79 +600,66 @@ func containsString(ss []string, want string) bool {
 	return false
 }
 
+func newPCSCoverageReport(suiteID, sourceCommit, key, metricName, metricID string, ratio float64, details map[string]any) PCSCoverageReport {
+	if details == nil {
+		details = map[string]any{}
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	if ratio < 0 {
+		ratio = 0
+	}
+	return PCSCoverageReport{
+		SchemaVersion:     SchemaVersionV0,
+		CoverageID:        suiteID + "-" + key,
+		Metric:            metricName,
+		MetricID:          metricID,
+		Numerator:         ratio,
+		Denominator:       1,
+		CoverageRatio:     ratio,
+		Details:           details,
+		SourceRepo:        VerifierSourceRepo,
+		SourceCommit:      sourceCommit,
+		SignatureOrDigest: digestCoverage(suiteID, metricID, ratio),
+	}
+}
+
 func buildPCSCoverageReports(
 	suiteID, sourceCommit string,
 	metrics BenchmarkRunMetrics,
 	cov AdmissionCoverageSnapshot,
 ) map[string]PCSCoverageReport {
-	out := map[string]PCSCoverageReport{}
-	out["registry_coverage"] = PCSCoverageReport{
-		SchemaVersion: SchemaVersionV0,
-		CoverageID:    suiteID + "-registry",
-		Metric:        "registry_coverage",
-		Numerator:     metrics.RegistryCheckCoverage,
-		Denominator:   1,
-		CoverageRatio: metrics.RegistryCheckCoverage,
-		Details: map[string]any{
-			"registered_artifacts_checked": cov.RegisteredArtifactsChecked,
-			"semantic_checks_executed":     cov.SemanticChecksExecuted,
-			"semantic_checks_deferred":     cov.SemanticChecksDeferred,
-			"semantic_checks_skipped":      cov.SemanticChecksSkipped,
-		},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      sourceCommit,
-		SignatureOrDigest: digestCoverage(suiteID, "registry_coverage", metrics.RegistryCheckCoverage),
-	}
-	out["formal_check_coverage"] = PCSCoverageReport{
-		SchemaVersion: SchemaVersionV0,
-		CoverageID:    suiteID + "-formal",
-		Metric:        "formal_check_coverage",
-		Numerator:     metrics.FormalCheckEnforcementCoverage,
-		Denominator:   1,
-		CoverageRatio: metrics.FormalCheckEnforcementCoverage,
-		Details:       map[string]any{"formal_checks_required": cov.FormalChecksRequired},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      sourceCommit,
-		SignatureOrDigest: digestCoverage(suiteID, "formal_check_coverage", metrics.FormalCheckEnforcementCoverage),
-	}
 	releaseRate := (metrics.ValidReleaseAdmissionRate + metrics.InvalidReleaseRejectionRate) / 2
-	out["release_reproducibility"] = PCSCoverageReport{
-		SchemaVersion: SchemaVersionV0,
-		CoverageID:    suiteID + "-release",
-		Metric:        "release_reproducibility",
-		Numerator:     releaseRate,
-		Denominator:   1,
-		CoverageRatio: releaseRate,
-		Details:       map[string]any{},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      sourceCommit,
-		SignatureOrDigest: digestCoverage(suiteID, "release_reproducibility", releaseRate),
+	return map[string]PCSCoverageReport{
+		"registry_coverage": newPCSCoverageReport(
+			suiteID, sourceCommit, "registry", "registry_coverage", "registry_coverage_score",
+			metrics.RegistryCheckCoverage,
+			map[string]any{
+				"registered_artifacts_checked": cov.RegisteredArtifactsChecked,
+				"semantic_checks_executed":     cov.SemanticChecksExecuted,
+				"semantic_checks_deferred":     cov.SemanticChecksDeferred,
+				"semantic_checks_skipped":      cov.SemanticChecksSkipped,
+			},
+		),
+		"formal_check_coverage": newPCSCoverageReport(
+			suiteID, sourceCommit, "formal", "formal_check_coverage", "formal_check_coverage_score",
+			metrics.FormalCheckEnforcementCoverage,
+			map[string]any{"formal_checks_required": cov.FormalChecksRequired},
+		),
+		"release_reproducibility": newPCSCoverageReport(
+			suiteID, sourceCommit, "release", "release_reproducibility", "release_reproducibility_score",
+			releaseRate, map[string]any{},
+		),
+		"failure_localization": newPCSCoverageReport(
+			suiteID, sourceCommit, "floc", "failure_localization", "failure_localization_accuracy",
+			metrics.FailureLocalizationAccuracy, map[string]any{},
+		),
+		"certificate_completeness": newPCSCoverageReport(
+			suiteID, sourceCommit, "cert", "certificate_completeness", "certificate_completeness_score",
+			metrics.FailureCodeAccuracy, map[string]any{},
+		),
 	}
-	out["failure_localization"] = PCSCoverageReport{
-		SchemaVersion: SchemaVersionV0,
-		CoverageID:    suiteID + "-floc",
-		Metric:        "failure_localization",
-		Numerator:     metrics.FailureLocalizationAccuracy,
-		Denominator:   1,
-		CoverageRatio: metrics.FailureLocalizationAccuracy,
-		Details:       map[string]any{},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      sourceCommit,
-		SignatureOrDigest: digestCoverage(suiteID, "failure_localization", metrics.FailureLocalizationAccuracy),
-	}
-	out["certificate_completeness"] = PCSCoverageReport{
-		SchemaVersion: SchemaVersionV0,
-		CoverageID:    suiteID + "-cert",
-		Metric:        "certificate_completeness",
-		Numerator:     metrics.FailureCodeAccuracy,
-		Denominator:   1,
-		CoverageRatio: metrics.FailureCodeAccuracy,
-		Details:       map[string]any{},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      sourceCommit,
-		SignatureOrDigest: digestCoverage(suiteID, "certificate_completeness", metrics.FailureCodeAccuracy),
-	}
-	return out
 }
 
 func digestCoverage(suiteID, metric string, ratio float64) string {
@@ -676,6 +687,51 @@ func buildBenchmarkCoverageBlock(coverage map[string]PCSCoverageReport, reg, for
 		block.CertificateCompleteness = &certCopy
 	}
 	return block
+}
+
+func buildPCSMetricSummaries(metrics BenchmarkRunMetrics, sourceCommit string) []PCSMetricSummary {
+	releaseScore := (metrics.ValidReleaseAdmissionRate + metrics.InvalidReleaseRejectionRate) / 2
+	repairHint := metrics.ExplainOutputCompleteness
+	if repairHint > 1 {
+		repairHint = 1
+	}
+	specs := []struct {
+		id    string
+		score float64
+	}{
+		{"release_reproducibility_score", releaseScore},
+		{"failure_localization_accuracy", metrics.FailureLocalizationAccuracy},
+		{"certificate_completeness_score", metrics.FailureCodeAccuracy},
+		{"registry_coverage_score", metrics.RegistryCheckCoverage},
+		{"formal_check_coverage_score", metrics.FormalCheckEnforcementCoverage},
+		{"scientific_memory_interpretability_score", 1.0},
+		{"repair_hint_quality_score", repairHint},
+		{"cross_domain_portability_score", metrics.AdmissionProfileCoverage},
+	}
+	out := make([]PCSMetricSummary, 0, len(specs))
+	for _, spec := range specs {
+		score := spec.score
+		if score > 1 {
+			score = 1
+		}
+		if score < 0 {
+			score = 0
+		}
+		out = append(out, PCSMetricSummary{
+			SchemaVersion:     SchemaVersionV0,
+			MetricID:          spec.id,
+			Score:             score,
+			Applicability:     "measured",
+			Numerator:         score,
+			Denominator:       1,
+			Reason:            "pf benchmark admission",
+			Details:           map[string]any{"producer": "provability-fabric"},
+			SourceRepo:        VerifierSourceRepo,
+			SourceCommit:      sourceCommit,
+			SignatureOrDigest: digestCoverage("metric", spec.id, score),
+		})
+	}
+	return out
 }
 
 func buildPCSBenchmarkReport(
@@ -730,18 +786,21 @@ func buildPCSBenchmarkReport(
 	reg := coverage["registry_coverage"]
 	formal := coverage["formal_check_coverage"]
 	rel := coverage["release_reproducibility"]
+	metricIDs := []string{
+		"release_reproducibility_score",
+		"failure_localization_accuracy",
+		"certificate_completeness_score",
+		"registry_coverage_score",
+		"formal_check_coverage_score",
+	}
 	return PCSBenchmarkReport{
 		SchemaVersion:    SchemaVersionV0,
 		ReportID:         reportID,
 		BenchmarkSuiteID: suiteID,
 		Runs:             runRefs,
-		Metrics: []string{
-			"release_reproducibility",
-			"failure_localization",
-			"certificate_completeness",
-			"registry_coverage",
-			"formal_check_coverage",
-		},
+		Metrics:          metricIDs,
+		MetricSummaries:  buildPCSMetricSummaries(metrics, sourceCommit),
+		ProducerID:       "provability-fabric",
 		Summary: PCSBenchmarkSummary{
 			TotalCases:                     total,
 			PassedCases:                    passed,
