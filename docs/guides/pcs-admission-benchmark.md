@@ -9,6 +9,7 @@ Benchmark cases live under `benchmarks/admission/`:
 | Workflow | Directory | Profile |
 |----------|-----------|---------|
 | LabTrust QC release | `labtrust_qc_release/` | `labtrust_qc_release` |
+| Formal trust-kernel enforcement | `formal_trust_kernel/` | `labtrust_qc_release` (formal-focused invalid cases) |
 | Agent tool-use safety | `tool_use_safety/` | `agent_tool_use_safety` |
 | Scientific computation reproducibility | `computation_reproducibility/` | `scientific_computation_reproducibility` |
 
@@ -32,7 +33,8 @@ Single workflow:
 pf benchmark admission \
   --cases benchmarks/admission/labtrust_qc_release \
   --registry ../pcs-core/examples/artifact_registry.valid.json \
-  --out benchmark_runs/labtrust_admission
+  --out benchmark_runs/labtrust_admission \
+  --json-summary
 ```
 
 All workflows (CI / local gate):
@@ -55,16 +57,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-benchmark-admiss
 
 ## Outputs
 
-Each run writes schema-valid artifacts under `--out`:
+Each run writes a **pcs-core benchmark bundle** under `--out` (validated against `config/schemas/pcs/`):
 
-| File | Schema |
-|------|--------|
-| `benchmark_run.v0.json` | `BenchmarkRun.v0.schema.json` |
-| `failure_localization_result.v0.json` | `FailureLocalizationResult.v0.schema.json` |
-| `coverage_report.v0.json` | `CoverageReport.v0.schema.json` |
-| `explain_quality_report.v0.json` | `ExplainQualityReport.v0.schema.json` |
+| Path | Schema | Role |
+|------|--------|------|
+| `benchmark_report.v0.json` | `BenchmarkReport.v0` | Suite aggregate (summary, coverage block, run refs) |
+| `benchmark_run.v0.json` | `BenchmarkRun.v0` (array) | Per-case runs |
+| `failure_localization_result.v0.json` | `FailureLocalizationResult.v0` (array) | Per invalid-case localization |
+| `coverage_report.v0.json` | `CoverageReport.v0` (array) | Per-metric coverage |
+| `explain_quality_report.v0.json` | `ExplainQualityReport.v0` (array) | Per invalid-case explain scoring |
+| `commands.json` | — | Command log for reproducibility |
+| `logs/run.log` | — | Case outcome log |
+| `runs/<case_id>/` | — | Per-case copies of run / explain / FLR artifacts |
+| `admission_benchmark_suite.v0.json` | PF-internal | Suite metrics + case outcomes (legacy PF summary) |
 
-### Metrics (`benchmark_run.v0.json` → `metrics`)
+Use `--json-summary` to print a compact JSON summary (metrics + pass/fail counts) on stdout.
+
+### Metrics (`admission_benchmark_suite.v0.json` → `metrics`)
 
 | Metric | Meaning |
 |--------|---------|
@@ -77,9 +86,9 @@ Each run writes schema-valid artifacts under `--out`:
 | `admission_profile_coverage` | Profile + registry check exercise on valid release-chain runs |
 | `formal_check_enforcement_coverage` | Formal invalid cases rejected with expected codes |
 
-### Registry coverage (`coverage_report.v0.json` → `registry`)
+### Registry coverage
 
-Counts from the valid release-chain RCVR:
+PF-internal `coverage_report` in `admission_benchmark_suite.v0.json` and pcs-core `CoverageReport.v0` metrics in the bundle `coverage_report.v0.json` array include registry counters from the valid release-chain RCVR:
 
 - `registered_artifacts_checked`
 - `required_fields_checked`
@@ -89,11 +98,21 @@ Counts from the valid release-chain RCVR:
 
 ### Explain quality
 
-For invalid release-chain cases with `explain_requirements`, the runner scores `pf explain release-chain` JSON (via `BuildExplainReleaseChainReport`) for failure code, artifact path, expected/actual values, responsible component, repair hints, and optional registry/handoff/formal references.
+For invalid cases with `explain_requirements`, PF emits pcs-core `ExplainQualityReport.v0` per case, scoring explain sections (`verification`, `hashes`, `handoffs`, `formal_checks`, `repair_hints`, etc.) mapped from failure code, artifact path, expected/actual values, responsible component, repair hints, and optional registry/handoff/formal references.
+
+Formal trust-kernel enforcement (proof obligations, Lean checks, theorem references) is exercised primarily in the **LabTrust QC release** workflow invalid cases (`missing_proof_obligation`, `failed_lean_check`, etc.).
 
 ## pcs-bench integration
 
-Downstream **pcs-bench** (or CI dashboards) should ingest the four `*.v0.json` files per workflow. Schemas are in `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/` for offline validation.
+Downstream **pcs-bench** should ingest `benchmark_report.v0.json` plus the root `*.v0.json` arrays and `runs/` tree. Schemas are synced from pcs-core into `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/`.
+
+Validate a bundle directory in Go tests or tooling:
+
+```go
+pcs.ValidateAdmissionBenchmarkBundleDir(repoRoot, bundleDir)
+```
+
+Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs` (`admission_benchmark_bundle.go`).
 
 Minimum gate thresholds (current PF tests):
 

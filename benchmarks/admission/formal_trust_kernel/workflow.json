@@ -1,0 +1,14 @@
+{
+  "workflow_id": "formal_trust_kernel.enforcement_v0",
+  "profile_id": "labtrust_qc_release",
+  "fixture_root": "${repo}/benchmarks/admission/labtrust_qc_release",
+  "defaults": {
+    "bundle": "${repo}/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json",
+    "handoff": "${repo}/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json",
+    "registry": "${repo}/tests/pcs/fixtures/labtrust-release/artifact_registry.json",
+    "manifest": "${repo}/tests/pcs/fixtures/labtrust-release/release_manifest.v0.json",
+    "artifact_dir": "${repo}/tests/pcs/fixtures/labtrust-release",
+    "proof_obligations": "${repo}/tests/pcs/fixtures/labtrust-release/proof_obligation.v0.json",
+    "lean_check_result": "${repo}/tests/pcs/fixtures/labtrust-release/lean_check_result.v0.json"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ConformanceRun.v0.schema.json",
+  "title": "ConformanceRun.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "suite",
+    "status",
+    "checks_passed",
+    "checks_failed",
+    "failures",
+    "started_at",
+    "completed_at",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "suite": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed"]
+    },
+    "checks_passed": { "type": "integer", "minimum": 0 },
+    "checks_failed": { "type": "integer", "minimum": 0 },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["message"],
+        "additionalProperties": false,
+        "properties": {
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "started_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "completed_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "report_path": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "case_id": "unauthorized_lean_theorem",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "unauthorized_lean_theorem"
+  ],
+  "inputs": {
+    "lean_check_result": "${repo}/benchmarks/admission/labtrust_qc_release/support/lean_unauthorized_theorem.v0.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "artifact_path": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true,
+    "registry_check_ref": true,
+    "formal_theorem": true
+  }
+}

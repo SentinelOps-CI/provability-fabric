@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ProfileCoverageReport.v0.schema.json",
+  "title": "ProfileCoverageReport.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "coverage_id",
+    "workflow_profile_id",
+    "producer_id",
+    "artifact_types_required",
+    "artifact_types_covered",
+    "semantic_checks_required",
+    "semantic_checks_covered",
+    "handoff_steps_required",
+    "handoff_steps_covered",
+    "numerator",
+    "denominator",
+    "coverage_ratio",
+    "details",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "coverage_id": { "type": "string", "minLength": 1 },
+    "workflow_profile_id": { "type": "string", "minLength": 1 },
+    "producer_id": { "$ref": "common.defs.json#/$defs/benchmark_producer_id" },
+    "suite_id": { "type": "string", "minLength": 1 },
+    "artifact_types_required": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "artifact_types_covered": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "semantic_checks_required": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "semantic_checks_covered": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "handoff_steps_required": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "handoff_steps_covered": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "numerator": { "type": "number", "minimum": 0 },
+    "denominator": { "type": "number", "minimum": 0 },
+    "coverage_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

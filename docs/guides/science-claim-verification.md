@@ -117,7 +117,8 @@ Measure PF as the PCS release admission controller (valid admits, invalid reject
 pf benchmark admission \
   --cases benchmarks/admission/labtrust_qc_release \
   --registry ../pcs-core/examples/artifact_registry.valid.json \
-  --out benchmark_runs/labtrust_admission
+  --out benchmark_runs/labtrust_admission \
+  --json-summary
 ```
 
 ## Seventeen required checks

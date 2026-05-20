@@ -1,0 +1,21 @@
+{
+  "case_id": "failed_lean_check",
+  "expect": "reject",
+  "verify_mode": "science_claim",
+  "expect_failure_codes": [
+    "lean_check_failed"
+  ],
+  "inputs": {
+    "lean_check_result": "${repo}/benchmarks/admission/labtrust_qc_release/support/lean_check_failed.v0.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "artifact_path": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true,
+    "registry_check_ref": true,
+    "formal_theorem": true
+  }
+}

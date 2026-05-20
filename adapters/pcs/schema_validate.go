@@ -208,23 +208,28 @@ func ValidateReleaseChainValidationResult(repoRoot string, result ReleaseChainVa
 	return ValidateReleaseChainValidationResultSemantics(&result)
 }
 
-// ValidateBenchmarkRun validates BenchmarkRun.v0 emitted by pf benchmark admission.
-func ValidateBenchmarkRun(repoRoot string, run BenchmarkRunV0) error {
+// ValidatePCSBenchmarkRun validates a per-case pcs-core BenchmarkRun.v0.
+func ValidatePCSBenchmarkRun(repoRoot string, run PCSBenchmarkRun) error {
 	return validateBenchmarkDoc(repoRoot, "BenchmarkRun.v0.schema.json", run)
 }
 
-// ValidateFailureLocalizationResult validates FailureLocalizationResult.v0.
-func ValidateFailureLocalizationResult(repoRoot string, report FailureLocalizationResultV0) error {
+// ValidatePCSBenchmarkReport validates pcs-core BenchmarkReport.v0.
+func ValidatePCSBenchmarkReport(repoRoot string, report PCSBenchmarkReport) error {
+	return validateBenchmarkDoc(repoRoot, "BenchmarkReport.v0.schema.json", report)
+}
+
+// ValidatePCSFailureLocalizationResult validates pcs-core FailureLocalizationResult.v0.
+func ValidatePCSFailureLocalizationResult(repoRoot string, report PCSFailureLocalizationResult) error {
 	return validateBenchmarkDoc(repoRoot, "FailureLocalizationResult.v0.schema.json", report)
 }
 
-// ValidateCoverageReport validates CoverageReport.v0.
-func ValidateCoverageReport(repoRoot string, report CoverageReportV0) error {
+// ValidatePCSCoverageReport validates pcs-core CoverageReport.v0 (single metric).
+func ValidatePCSCoverageReport(repoRoot string, report PCSCoverageReport) error {
 	return validateBenchmarkDoc(repoRoot, "CoverageReport.v0.schema.json", report)
 }
 
-// ValidateExplainQualityReport validates ExplainQualityReport.v0.
-func ValidateExplainQualityReport(repoRoot string, report ExplainQualityReportV0) error {
+// ValidatePCSExplainQualityReport validates pcs-core ExplainQualityReport.v0.
+func ValidatePCSExplainQualityReport(repoRoot string, report PCSExplainQualityReport) error {
 	return validateBenchmarkDoc(repoRoot, "ExplainQualityReport.v0.schema.json", report)
 }
 

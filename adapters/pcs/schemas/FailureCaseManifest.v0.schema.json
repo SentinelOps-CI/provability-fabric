@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/FailureCaseManifest.v0.schema.json",
+  "title": "FailureCaseManifest.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "case_id",
+    "task_id",
+    "failure_code",
+    "responsible_component",
+    "repair_hint_kind",
+    "message",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "manifest_id": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "failure_code": { "type": "string", "minLength": 1 },
+    "responsible_component": {
+      "$ref": "common.defs.json#/$defs/benchmark_responsible_component"
+    },
+    "repair_hint_kind": {
+      "$ref": "common.defs.json#/$defs/benchmark_repair_hint_kind"
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "artifact": { "type": "string", "minLength": 1 },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

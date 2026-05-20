@@ -3,29 +3,37 @@
   "$id": "https://pcs.sentinelops.ci/schemas/FailureLocalizationResult.v0.schema.json",
   "title": "FailureLocalizationResult.v0",
   "type": "object",
-  "required": ["schema_version", "run_id", "workflow", "cases"],
+  "required": [
+    "schema_version",
+    "result_id",
+    "run_id",
+    "case_id",
+    "expected_failure_code",
+    "observed_failure_code",
+    "expected_responsible_component",
+    "observed_responsible_component",
+    "localized_correctly",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "result_id": { "type": "string", "minLength": 1 },
     "run_id": { "type": "string", "minLength": 1 },
-    "workflow": { "type": "string", "minLength": 1 },
-    "cases": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/localization_case" }
-    }
-  },
-  "$defs": {
-    "localization_case": {
-      "type": "object",
-      "required": ["case_id", "artifact_path_match", "passed"],
-      "additionalProperties": false,
-      "properties": {
-        "case_id": { "type": "string", "minLength": 1 },
-        "expected_check_id": { "type": "string" },
-        "observed_check_id": { "type": "string" },
-        "artifact_path_match": { "type": "boolean" },
-        "passed": { "type": "boolean" }
-      }
-    }
+    "case_id": { "type": "string", "minLength": 1 },
+    "expected_failure_code": { "type": "string" },
+    "observed_failure_code": { "type": "string" },
+    "expected_responsible_component": {
+      "$ref": "common.defs.json#/$defs/benchmark_responsible_component"
+    },
+    "observed_responsible_component": {
+      "$ref": "common.defs.json#/$defs/benchmark_responsible_component"
+    },
+    "localized_correctly": { "type": "boolean" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   }
 }

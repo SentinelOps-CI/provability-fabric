@@ -2,14 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcs.sentinelops.ci/schemas/AdmissionBenchmarkCase.v0.schema.json",
   "title": "AdmissionBenchmarkCase.v0",
+  "description": "Provability-Fabric admission benchmark case manifest (benchmarks/admission/<workflow>/valid|invalid/*.json).",
   "type": "object",
   "required": ["case_id", "expect", "verify_mode"],
   "additionalProperties": false,
   "properties": {
     "case_id": { "type": "string", "minLength": 1 },
-    "workflow": { "type": "string" },
-    "profile_id": { "type": "string" },
+    "workflow": { "type": "string", "minLength": 1 },
     "kind": { "type": "string", "enum": ["valid", "invalid"] },
+    "profile_id": { "type": "string", "minLength": 1 },
     "expect": { "type": "string", "enum": ["admit", "reject"] },
     "expect_failure_codes": {
       "type": "array",
@@ -19,12 +20,12 @@
       "type": "string",
       "enum": ["science_claim", "release_chain", "admission_gate"]
     },
-    "inputs": { "$ref": "#/$defs/benchmark_inputs" },
-    "localization": { "$ref": "#/$defs/localization" },
-    "explain_requirements": { "$ref": "#/$defs/explain_requirements" }
+    "inputs": { "$ref": "#/$defs/admission_benchmark_inputs" },
+    "localization": { "$ref": "#/$defs/admission_benchmark_localization" },
+    "explain_requirements": { "$ref": "#/$defs/admission_benchmark_explain_req" }
   },
   "$defs": {
-    "benchmark_inputs": {
+    "admission_benchmark_inputs": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -42,15 +43,15 @@
         "omit_lean_check_result": { "type": "boolean" }
       }
     },
-    "localization": {
+    "admission_benchmark_localization": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "check_id": { "type": "string", "minLength": 1 },
-        "artifact_path": { "type": "string", "minLength": 1 }
+        "check_id": { "type": "string" },
+        "artifact_path": { "type": "string" }
       }
     },
-    "explain_requirements": {
+    "admission_benchmark_explain_req": {
       "type": "object",
       "additionalProperties": false,
       "properties": {

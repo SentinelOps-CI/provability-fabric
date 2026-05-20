@@ -79,7 +79,7 @@ function Invoke-Pf {
     if ($LASTEXITCODE -ne 0) { throw "pf failed: $($Remaining -join ' ')" }
 }
 
-$Suites = @('labtrust_qc_release', 'tool_use_safety', 'computation_reproducibility')
+$Suites = @('labtrust_qc_release', 'tool_use_safety', 'computation_reproducibility', 'formal_trust_kernel')
 $Failed = 0
 foreach ($Suite in $Suites) {
     $Out = Join-Path $OutRoot "${Suite}_admission"

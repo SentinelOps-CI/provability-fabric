@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkMetricRegistry.v0.schema.json",
+  "title": "BenchmarkMetricRegistry.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_id",
+    "registry_version",
+    "metrics",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "registry_id": { "type": "string", "minLength": 1 },
+    "registry_version": { "type": "string", "minLength": 1 },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/metric_definition" }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "metric_definition": {
+      "type": "object",
+      "required": [
+        "metric_id",
+        "numerator",
+        "denominator",
+        "applicability",
+        "failure_interpretation",
+        "minimum_recommended_threshold"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metric_id": { "$ref": "common.defs.json#/$defs/benchmark_metric_id" },
+        "display_name": { "type": "string", "minLength": 1 },
+        "numerator": { "type": "string", "minLength": 1 },
+        "denominator": { "type": "string", "minLength": 1 },
+        "applicability": { "$ref": "#/$defs/metric_applicability" },
+        "failure_interpretation": { "type": "string", "minLength": 1 },
+        "minimum_recommended_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "summary_field": { "type": "string", "minLength": 1 },
+        "legacy_metric_name": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+      }
+    },
+    "metric_applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflow_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "case_kinds": {
+          "type": "array",
+          "items": { "$ref": "common.defs.json#/$defs/benchmark_case_kind" }
+        },
+        "producers": {
+          "type": "array",
+          "items": { "$ref": "common.defs.json#/$defs/benchmark_producer_id" }
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

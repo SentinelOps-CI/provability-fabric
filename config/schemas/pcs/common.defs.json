@@ -257,6 +257,138 @@
         "artifact": { "type": "string", "minLength": 1 },
         "lean_theorem": { "type": "string", "minLength": 1 }
       }
+    },
+    "benchmark_case_kind": {
+      "type": "string",
+      "enum": [
+        "valid_release",
+        "invalid_hash_mismatch",
+        "invalid_certificate",
+        "invalid_handoff",
+        "invalid_registry",
+        "invalid_formal_check",
+        "invalid_import",
+        "invalid_render",
+        "stale_release"
+      ]
+    },
+    "benchmark_responsible_component": {
+      "type": "string",
+      "enum": [
+        "runtime_producer",
+        "certificate_producer",
+        "verifier",
+        "registry",
+        "formal_kernel",
+        "scientific_memory",
+        "release_manifest",
+        "handoff",
+        "hashing",
+        "unknown"
+      ]
+    },
+    "benchmark_repair_hint_kind": {
+      "type": "string",
+      "enum": [
+        "align_provenance",
+        "align_hash",
+        "align_certificate_id",
+        "align_handoff",
+        "fix_registry_entry",
+        "rerun_verification",
+        "rerun_formal_check",
+        "fix_import_report",
+        "fix_render",
+        "none",
+        "unknown"
+      ]
+    },
+    "benchmark_metric_name": {
+      "type": "string",
+      "enum": [
+        "release_reproducibility",
+        "failure_localization",
+        "certificate_completeness",
+        "registry_coverage",
+        "formal_check_coverage",
+        "scientific_memory_interpretability",
+        "repair_hint_quality",
+        "cross_domain_portability"
+      ]
+    },
+    "benchmark_metric_id": {
+      "type": "string",
+      "enum": [
+        "release_reproducibility_score",
+        "failure_localization_accuracy",
+        "certificate_completeness_score",
+        "registry_coverage_score",
+        "formal_check_coverage_score",
+        "scientific_memory_interpretability_score",
+        "repair_hint_quality_score",
+        "cross_domain_portability_score"
+      ]
+    },
+    "benchmark_producer_id": {
+      "type": "string",
+      "enum": [
+        "pcs-core",
+        "pcs-bench",
+        "provability-fabric",
+        "certifyedge",
+        "labtrust-gym",
+        "scientific-memory"
+      ]
+    },
+    "explain_quality_section_id": {
+      "type": "string",
+      "enum": [
+        "provenance",
+        "hashes",
+        "handoffs",
+        "verification",
+        "formal_checks",
+        "limitations",
+        "lineage",
+        "repair_hints"
+      ]
+    },
+    "benchmark_observed_status": {
+      "type": "string",
+      "enum": ["passed", "failed", "skipped", "error"]
+    },
+    "benchmark_input_artifact_ref": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "artifact_type": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "benchmark_command_entry": {
+      "type": "object",
+      "required": ["command", "exit_code"],
+      "additionalProperties": false,
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "exit_code": { "type": "integer" },
+        "stdout_digest": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
+    "conformance_run_ref": {
+      "type": "object",
+      "required": ["suite", "run_id"],
+      "additionalProperties": false,
+      "properties": {
+        "suite": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed"]
+        }
+      }
     }
   }
 }

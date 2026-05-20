@@ -495,15 +495,17 @@ jobs:
           REG="$PCS_CORE_PATH/examples/artifact_registry.valid.json"
           OUT="$GITHUB_WORKSPACE/benchmark_runs"
           cd "$GITHUB_WORKSPACE/core/cli/pf"
-          for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility; do
+          for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility formal_trust_kernel; do
             go run . benchmark admission \
               --cases "$GITHUB_WORKSPACE/benchmarks/admission/${SUITE}" \
               --registry "$REG" \
               --out "${OUT}/${SUITE}_admission"
           done
+          test -f "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json"
-          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85"
+          test -f "${OUT}/formal_trust_kernel_admission/explain_quality_report.v0.json"
+          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

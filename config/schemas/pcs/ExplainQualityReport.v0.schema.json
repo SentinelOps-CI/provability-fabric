@@ -3,38 +3,68 @@
   "$id": "https://pcs.sentinelops.ci/schemas/ExplainQualityReport.v0.schema.json",
   "title": "ExplainQualityReport.v0",
   "type": "object",
-  "required": ["schema_version", "run_id", "workflow", "cases", "mean_completeness"],
+  "required": [
+    "schema_version",
+    "report_id",
+    "suite_id",
+    "case_id",
+    "producer_id",
+    "required_sections",
+    "sections",
+    "sections_present_count",
+    "sections_required_count",
+    "quality_score",
+    "gaps",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
-    "run_id": { "type": "string", "minLength": 1 },
-    "workflow": { "type": "string", "minLength": 1 },
-    "mean_completeness": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1
-    },
-    "cases": {
+    "report_id": { "type": "string", "minLength": 1 },
+    "suite_id": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "producer_id": { "$ref": "common.defs.json#/$defs/benchmark_producer_id" },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "required_sections": {
       "type": "array",
-      "items": { "$ref": "#/$defs/explain_case" }
-    }
+      "minItems": 1,
+      "items": { "$ref": "common.defs.json#/$defs/explain_quality_section_id" }
+    },
+    "sections": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/section_quality" }
+    },
+    "sections_present_count": { "type": "integer", "minimum": 0 },
+    "sections_required_count": { "type": "integer", "minimum": 0 },
+    "quality_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "gaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/quality_gap" }
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   },
   "$defs": {
-    "explain_case": {
+    "section_quality": {
       "type": "object",
-      "required": ["case_id", "completeness", "fields"],
+      "required": ["present", "score"],
       "additionalProperties": false,
       "properties": {
-        "case_id": { "type": "string", "minLength": 1 },
-        "completeness": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "fields": {
-          "type": "object",
-          "additionalProperties": { "type": "boolean" }
-        }
+        "present": { "type": "boolean" },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "notes": { "type": "string" }
+      }
+    },
+    "quality_gap": {
+      "type": "object",
+      "required": ["section_id", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "section_id": { "$ref": "common.defs.json#/$defs/explain_quality_section_id" },
+        "message": { "type": "string", "minLength": 1 }
       }
     }
   }

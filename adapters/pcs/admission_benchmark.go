@@ -97,8 +97,9 @@ type AdmissionBenchmarkCaseResult struct {
 	ReleaseChainResultPath string   `json:"release_chain_result_path,omitempty"`
 }
 
-// BenchmarkRunV0 is benchmark_run.v0 emitted by pf benchmark admission.
-type BenchmarkRunV0 struct {
+// AdmissionBenchmarkSuiteV0 is the PF-internal suite summary (metrics + case outcomes).
+// pcs-bench consumes per-case BenchmarkRun.v0 and BenchmarkReport.v0 from the output bundle.
+type AdmissionBenchmarkSuiteV0 struct {
 	SchemaVersion string                     `json:"schema_version"`
 	RunID         string                     `json:"run_id"`
 	Workflow      string                     `json:"workflow"`
@@ -185,27 +186,30 @@ type ExplainQualityCaseScore struct {
 	Fields       map[string]bool    `json:"fields"`
 }
 
-// RunAdmissionBenchmark executes all cases under casesDir and writes benchmark artifacts to OutDir.
-func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (BenchmarkRunV0, FailureLocalizationResultV0, CoverageReportV0, ExplainQualityReportV0, error) {
+// BenchmarkRunV0 is an alias kept for tests and CLI metrics display.
+type BenchmarkRunV0 = AdmissionBenchmarkSuiteV0
+
+// RunAdmissionBenchmark executes all cases under casesDir and writes a pcs-core benchmark bundle to OutDir.
+func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSuiteV0, FailureLocalizationResultV0, CoverageReportV0, ExplainQualityReportV0, error) {
 	if strings.TrimSpace(opts.CasesDir) == "" {
-		return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("cases directory is required")
+		return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("cases directory is required")
 	}
 	workflowPath := filepath.Join(opts.CasesDir, "workflow.json")
 	workflowData, err := os.ReadFile(workflowPath)
 	if err != nil {
-		return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("read workflow.json: %w", err)
+		return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("read workflow.json: %w", err)
 	}
 	var workflow AdmissionBenchmarkWorkflow
 	if err := json.Unmarshal(workflowData, &workflow); err != nil {
-		return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("parse workflow.json: %w", err)
+		return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("parse workflow.json: %w", err)
 	}
 	cases, err := loadAdmissionBenchmarkCases(opts.CasesDir, workflow)
 	if err != nil {
-		return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, err
+		return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, err
 	}
 	opts.BenchmarkRoot = opts.CasesDir
 	if len(cases) == 0 {
-		return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("no benchmark cases found under %s", opts.CasesDir)
+		return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, fmt.Errorf("no benchmark cases found under %s", opts.CasesDir)
 	}
 
 	started := time.Now().UTC()
@@ -224,6 +228,9 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (BenchmarkRunV0, Fail
 	var locCases []FailureLocalizationCaseResult
 	var explainCases []ExplainQualityCaseScore
 	var lastRCVR *ReleaseChainValidationResult
+	var executions []benchmarkCaseExecution
+	suiteID := suiteIDFromWorkflow(workflow.WorkflowID)
+	taskID := taskIDFromWorkflow(workflow.WorkflowID)
 
 	for _, c := range cases {
 		profileID := c.ProfileID
@@ -232,9 +239,32 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (BenchmarkRunV0, Fail
 		}
 		profile, err := LoadAdmissionProfile(profileID)
 		if err != nil {
-			return BenchmarkRunV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, err
+			return AdmissionBenchmarkSuiteV0{}, FailureLocalizationResultV0{}, CoverageReportV0{}, ExplainQualityReportV0{}, err
 		}
-		cr, rcvr, loc, explain := executeAdmissionBenchmarkCase(opts, workflow, profile, c, opts.CasesDir)
+		started := time.Now()
+		cr, rcvr, vr, loc, explain := executeAdmissionBenchmarkCase(opts, workflow, profile, c, opts.CasesDir)
+		completed := time.Now()
+		cmd := buildBenchmarkCommandLine(c, workflow, opts)
+		exitCode := 0
+		if !cr.Passed {
+			exitCode = 1
+		}
+		pcsExplain := buildPCSExplainQualityReport(c, cr, rcvr, vr, opts.SourceCommit, suiteID, workflow.WorkflowID)
+		if pcsExplain != nil {
+			explain = explainFromPCSReport(pcsExplain)
+			cr.ExplainCompleteness = pcsExplain.QualityScore
+			if c.Kind == "invalid" {
+				cr.Passed = cr.Passed && pcsExplain.QualityScore >= 0.8
+			}
+		} else if explain == nil && c.ExplainRequirements != nil {
+			explain = scoreExplainQualityLegacy(c, rcvr, vr)
+		}
+		executions = append(executions, benchmarkCaseExecution{
+			Case: c, Result: cr, RCVR: rcvr, VR: vr, Loc: loc, Explain: explain,
+			PCSExplain: pcsExplain, Started: started, Completed: completed,
+			Command: cmd, ExitCode: exitCode,
+			LogLines: []string{fmt.Sprintf("case=%s outcome=%s passed=%v", cr.CaseID, cr.Outcome, cr.Passed)},
+		})
 		results = append(results, cr)
 		if loc != nil {
 			locCases = append(locCases, *loc)
@@ -250,7 +280,7 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (BenchmarkRunV0, Fail
 	baseProfile, _ := LoadAdmissionProfile(workflow.ProfileID)
 	covReport := buildCoverageReport(runID, workflow, baseProfile, lastRCVR)
 	metrics := enrichBenchmarkMetrics(computeBenchmarkMetrics(results, explainCases), covReport, results)
-	run := BenchmarkRunV0{
+	run := AdmissionBenchmarkSuiteV0{
 		SchemaVersion: SchemaVersionV0,
 		RunID:         runID,
 		Workflow:      workflow.WorkflowID,
@@ -285,11 +315,138 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (BenchmarkRunV0, Fail
 		repoRoot, _ = FindRepoRoot(opts.CasesDir)
 	}
 	if opts.OutDir != "" {
-		if err := writeAdmissionBenchmarkOutputs(repoRoot, opts.OutDir, run, locReport, covReport, explainReport); err != nil {
+		covSnap := admissionCoverageSnapshotFromInternal(covReport)
+		bundle, err := assemblePCSBenchmarkBundle(runID, suiteID, taskID, workflow, opts, executions, metrics, covSnap)
+		if err != nil {
+			return run, locReport, covReport, explainReport, err
+		}
+		bundle.InternalSuite = run
+		if err := writeAdmissionBenchmarkBundle(repoRoot, opts.OutDir, bundle, executions); err != nil {
 			return run, locReport, covReport, explainReport, err
 		}
 	}
 	return run, locReport, covReport, explainReport, nil
+}
+
+func buildBenchmarkCommandLine(c AdmissionBenchmarkCase, workflow AdmissionBenchmarkWorkflow, opts AdmissionBenchmarkOptions) string {
+	parts := []string{"pf", "benchmark", "admission", "--cases", opts.CasesDir}
+	if opts.RegistryPath != "" {
+		parts = append(parts, "--registry", opts.RegistryPath)
+	}
+	parts = append(parts, fmt.Sprintf("# case=%s mode=%s profile=%s", c.CaseID, c.VerifyMode, c.ProfileID))
+	_ = workflow
+	return strings.Join(parts, " ")
+}
+
+func explainFromPCSReport(r *PCSExplainQualityReport) *ExplainQualityCaseScore {
+	if r == nil {
+		return nil
+	}
+	fields := map[string]bool{}
+	for id, sec := range r.Sections {
+		fields[id] = sec.Present
+	}
+	return &ExplainQualityCaseScore{
+		CaseID:       r.CaseID,
+		Completeness: r.QualityScore,
+		Fields:       fields,
+	}
+}
+
+func scoreExplainQualityLegacy(c AdmissionBenchmarkCase, rcvr *ReleaseChainValidationResult, vr *VerificationResult) *ExplainQualityCaseScore {
+	if rcvr != nil {
+		return scoreExplainQuality(c, *rcvr)
+	}
+	if vr != nil {
+		return scoreExplainQualityFromVerification(c, *vr)
+	}
+	return nil
+}
+
+func scoreExplainQualityFromVerification(c AdmissionBenchmarkCase, vr VerificationResult) *ExplainQualityCaseScore {
+	req := c.ExplainRequirements
+	if req == nil {
+		return nil
+	}
+	explanations := ExplainVerificationFailures(vr)
+	var target FailureExplanation
+	if len(explanations) > 0 {
+		target = explanations[0]
+	}
+	fields := map[string]bool{}
+	var score, total float64
+	check := func(required bool, present bool, name string) {
+		if !required {
+			return
+		}
+		total++
+		fields[name] = present
+		if present {
+			score++
+		}
+	}
+	check(req.FailureCode, target.FailureCode != "", "failure_code")
+	check(req.ArtifactPath, target.ArtifactPath != "", "artifact_path")
+	check(req.Expected, target.Expected != "", "expected")
+	check(req.Actual, target.Actual != "", "actual")
+	check(req.ResponsibleComponent, target.ResponsibleComponent != "", "responsible_component")
+	check(req.RepairHint, target.RepairHint != "", "repair_hint")
+	check(req.RegistryCheckRef, target.RegistryCheckRef != "", "registry_check_ref")
+	check(req.HandoffRef, target.HandoffRef != "", "handoff_ref")
+	if req.FormalTheorem {
+		combined := target.RepairHint + target.Actual + target.Expected
+		check(true, strings.Contains(combined, "theorem") || strings.Contains(combined, "admissible_") || strings.Contains(combined, "witness"), "formal_theorem")
+	}
+	completeness := 1.0
+	if total > 0 {
+		completeness = score / total
+	}
+	return &ExplainQualityCaseScore{CaseID: c.CaseID, Completeness: completeness, Fields: fields}
+}
+
+func admissionCoverageSnapshotFromInternal(cov CoverageReportV0) AdmissionCoverageSnapshot {
+	return AdmissionCoverageSnapshot{
+		RegisteredArtifactsChecked: cov.Registry.RegisteredArtifactsChecked,
+		SemanticChecksExecuted:     cov.Registry.SemanticChecksExecuted,
+		SemanticChecksDeferred:     cov.Registry.SemanticChecksDeferred,
+		SemanticChecksSkipped:      cov.Registry.SemanticChecksSkipped,
+		FormalChecksRequired:       cov.Formal.FormalChecksRequired,
+	}
+}
+
+func assemblePCSBenchmarkBundle(
+	runID, suiteID, taskID string,
+	workflow AdmissionBenchmarkWorkflow,
+	opts AdmissionBenchmarkOptions,
+	executions []benchmarkCaseExecution,
+	metrics BenchmarkRunMetrics,
+	cov AdmissionCoverageSnapshot,
+) (PCSBenchmarkBundle, error) {
+	var runs []PCSBenchmarkRun
+	flrs := []PCSFailureLocalizationResult{}
+	explains := []PCSExplainQualityReport{}
+	var commands []PCSBenchmarkCommandEntry
+	for _, ex := range executions {
+		run := buildPCSBenchmarkRun(ex, suiteID, taskID, opts.SourceCommit)
+		runs = append(runs, run)
+		commands = append(commands, run.Commands...)
+		if flr := buildPCSFailureLocalization(ex, taskID, opts.SourceCommit); flr != nil {
+			flrs = append(flrs, *flr)
+		}
+		if ex.PCSExplain != nil {
+			explains = append(explains, *ex.PCSExplain)
+		}
+	}
+	coverage := buildPCSCoverageReports(suiteID, opts.SourceCommit, metrics, cov)
+	report := buildPCSBenchmarkReport(suiteID, runID, opts.SourceCommit, executions, metrics, coverage)
+	return PCSBenchmarkBundle{
+		Report:               report,
+		Runs:                 runs,
+		FailureLocalizations: flrs,
+		ExplainQuality:       explains,
+		CoverageByMetric:     coverage,
+		Commands:             commands,
+	}, nil
 }
 
 func loadAdmissionBenchmarkCases(casesDir string, workflow AdmissionBenchmarkWorkflow) ([]AdmissionBenchmarkCase, error) {
@@ -345,7 +502,7 @@ func executeAdmissionBenchmarkCase(
 	profile *AdmissionProfile,
 	c AdmissionBenchmarkCase,
 	casesDir string,
-) (AdmissionBenchmarkCaseResult, *ReleaseChainValidationResult, *FailureLocalizationCaseResult, *ExplainQualityCaseScore) {
+) (AdmissionBenchmarkCaseResult, *ReleaseChainValidationResult, *VerificationResult, *FailureLocalizationCaseResult, *ExplainQualityCaseScore) {
 	cr := AdmissionBenchmarkCaseResult{
 		CaseID:             c.CaseID,
 		Kind:               c.Kind,
@@ -376,7 +533,7 @@ func executeAdmissionBenchmarkCase(
 			cr.Outcome = "error"
 			cr.Error = err.Error()
 			cr.Passed = false
-			return cr, nil, nil, nil
+			return cr, nil, nil, nil, nil
 		}
 		handoff = loaded
 	}
@@ -387,7 +544,7 @@ func executeAdmissionBenchmarkCase(
 			cr.Outcome = "error"
 			cr.Error = err.Error()
 			cr.Passed = false
-			return cr, nil, nil, nil
+			return cr, nil, nil, nil, nil
 		}
 		registry = reg
 	}
@@ -398,10 +555,11 @@ func executeAdmissionBenchmarkCase(
 			cr.Outcome = "error"
 			cr.Error = err.Error()
 			cr.Passed = false
-			return cr, nil, nil, nil
+			return cr, nil, nil, nil, nil
 		}
 		manifest = m
 	}
+	var vr *VerificationResult
 	formal := FormalCheckInputs{}
 	if !in.OmitFormal {
 		if !in.OmitProofObligations && strings.TrimSpace(in.ProofObligations) != "" {
@@ -474,10 +632,12 @@ func executeAdmissionBenchmarkCase(
 				if admErr := EnforceAdmissionProfile(profile, bundlePath, bundle, handoff, releaseMode); admErr != nil {
 					err = admErr
 				} else {
-					vr := BuildComputationVerificationResult(bundle, ValidateOptions{ReleaseMode: releaseMode, Registry: registry})
-					cr.VerificationStatus = vr.Status
-					if !VerificationPassed(vr) {
-						err = fmt.Errorf("verification status %s", vr.Status)
+					vrResult := BuildComputationVerificationResult(bundle, ValidateOptions{ReleaseMode: releaseMode, Registry: registry})
+					vr = &vrResult
+					cr.VerificationStatus = vrResult.Status
+					if !VerificationPassed(vrResult) {
+						err = fmt.Errorf("verification status %s", vrResult.Status)
+						cr.ObservedFailureCodes = failureCodesFromVerification(vrResult)
 					}
 				}
 			} else if profile.IsToolUseProfile() {
@@ -499,12 +659,13 @@ func executeAdmissionBenchmarkCase(
 					ReleaseManifest:     manifest,
 					FormalChecks:        formal,
 				}
-				var vr VerificationResult
-				vr, err = VerifyScienceClaimBundle(bundlePath, bundle, vOpts)
-				cr.VerificationStatus = vr.Status
-				if err == nil && !VerificationPassed(vr) {
-					err = fmt.Errorf("verification status %s", vr.Status)
-					cr.ObservedFailureCodes = failureCodesFromVerification(vr)
+				var vrResult VerificationResult
+				vrResult, err = VerifyScienceClaimBundle(bundlePath, bundle, vOpts)
+				vr = &vrResult
+				cr.VerificationStatus = vrResult.Status
+				if err == nil && !VerificationPassed(vrResult) {
+					err = fmt.Errorf("verification status %s", vrResult.Status)
+					cr.ObservedFailureCodes = failureCodesFromVerification(vrResult)
 				}
 			}
 		}
@@ -515,6 +676,7 @@ func executeAdmissionBenchmarkCase(
 	}
 	if err != nil {
 		cr.Outcome = "reject"
+		cr.Error = err.Error()
 	} else {
 		cr.Outcome = "admit"
 	}
@@ -546,8 +708,14 @@ func executeAdmissionBenchmarkCase(
 		if c.Kind == "invalid" {
 			cr.Passed = cr.Passed && explain.Completeness >= 0.8
 		}
+	} else if c.ExplainRequirements != nil && vr != nil && !VerificationPassed(*vr) {
+		explain = scoreExplainQualityFromVerification(c, *vr)
+		cr.ExplainCompleteness = explain.Completeness
+		if c.Kind == "invalid" {
+			cr.Passed = cr.Passed && explain.Completeness >= 0.8
+		}
 	}
-	return cr, rcvr, loc, explain
+	return cr, rcvr, vr, loc, explain
 }
 
 func mergeBenchmarkInputs(workflow AdmissionBenchmarkWorkflow, overrides AdmissionBenchmarkInputs) AdmissionBenchmarkInputs {
@@ -1027,33 +1195,3 @@ func buildCoverageReport(runID string, workflow AdmissionBenchmarkWorkflow, prof
 	return cov
 }
 
-func writeAdmissionBenchmarkOutputs(repoRoot, dir string, run BenchmarkRunV0, loc FailureLocalizationResultV0, cov CoverageReportV0, explain ExplainQualityReportV0) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	write := func(name, schema string, v any) error {
-		if repoRoot != "" {
-			if err := validateBenchmarkDoc(repoRoot, schema, v); err != nil {
-				return fmt.Errorf("validate %s: %w", name, err)
-			}
-		}
-		data, err := json.MarshalIndent(v, "", "  ")
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(dir, name), data, 0644)
-	}
-	if err := write("benchmark_run.v0.json", "BenchmarkRun.v0.schema.json", run); err != nil {
-		return err
-	}
-	if err := write("failure_localization_result.v0.json", "FailureLocalizationResult.v0.schema.json", loc); err != nil {
-		return err
-	}
-	if err := write("coverage_report.v0.json", "CoverageReport.v0.schema.json", cov); err != nil {
-		return err
-	}
-	if err := write("explain_quality_report.v0.json", "ExplainQualityReport.v0.schema.json", explain); err != nil {
-		return err
-	}
-	return nil
-}

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkTask.v0.schema.json",
+  "title": "BenchmarkTask.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "workflow_id",
+    "domain",
+    "description",
+    "input_case_set",
+    "expected_outputs",
+    "metrics",
+    "success_criteria",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "domain": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "input_case_set": { "$ref": "#/$defs/case_set_ref" },
+    "expected_outputs": { "$ref": "#/$defs/expected_outputs" },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+    },
+    "success_criteria": { "$ref": "#/$defs/success_criteria" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "case_set_ref": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "case_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "expected_outputs": {
+      "type": "object",
+      "required": ["report_artifact_type"],
+      "additionalProperties": false,
+      "properties": {
+        "report_artifact_type": {
+          "type": "string",
+          "const": "BenchmarkReport.v0"
+        },
+        "minimum_pass_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "success_criteria": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "minimum_pass_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minimum_failure_localization_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_formal_check_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_registry_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

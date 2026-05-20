@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkRegistry.v0.schema.json",
+  "title": "BenchmarkRegistry.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_id",
+    "registry_version",
+    "suites",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "registry_id": { "type": "string", "minLength": 1 },
+    "registry_version": { "type": "string", "minLength": 1 },
+    "suites": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/benchmark_suite_entry" }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "benchmark_suite_entry": {
+      "type": "object",
+      "required": [
+        "suite_id",
+        "workflow_ids",
+        "required_artifacts",
+        "valid_cases",
+        "invalid_cases",
+        "metrics",
+        "minimum_passing_thresholds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "suite_id": { "type": "string", "minLength": 1 },
+        "workflow_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "valid_cases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "invalid_cases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+        },
+        "minimum_passing_thresholds": { "$ref": "#/$defs/passing_thresholds" },
+        "task_id": { "type": "string", "minLength": 1 },
+        "fixture_root": { "type": "string", "minLength": 1 }
+      }
+    },
+    "passing_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimum_pass_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minimum_failure_localization_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_formal_check_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_registry_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_scientific_memory_render_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

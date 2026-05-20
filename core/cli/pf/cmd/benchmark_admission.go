@@ -18,11 +18,12 @@ func benchmarkAdmissionCmd() *cobra.Command {
 	var outDir string
 	var runID string
 	var jsonOut bool
+	var jsonSummary bool
 
 	cmd := &cobra.Command{
 		Use:   "admission",
 		Short: "Run PCS release admission benchmark cases",
-		Long: `Execute valid/invalid admission cases under benchmarks/admission/<workflow> and emit benchmark_run.v0.json, failure_localization_result.v0.json, coverage_report.v0.json, and explain_quality_report.v0.json.`,
+		Long: `Execute valid/invalid admission cases under benchmarks/admission/<workflow> and emit a pcs-core benchmark bundle (benchmark_report.v0.json, benchmark_run.v0.json, failure_localization_result.v0.json, coverage_report.v0.json, explain_quality_report.v0.json, commands.json, logs/, runs/).`,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			casesDir, err := cmd.Flags().GetString("cases")
@@ -77,7 +78,13 @@ func benchmarkAdmissionCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if jsonOut {
+			if jsonSummary {
+				raw, mErr := pcs.FormatBenchmarkAdmissionSummaryJSON(run, out)
+				if mErr != nil {
+					return mErr
+				}
+				fmt.Print(raw)
+			} else if jsonOut {
 				raw, mErr := pcs.FormatExplainReportJSON(run)
 				if mErr != nil {
 					return mErr
@@ -115,6 +122,7 @@ func benchmarkAdmissionCmd() *cobra.Command {
 	cmd.Flags().StringVar(&registryPath, "registry", "", "ArtifactRegistry.v0 path (defaults to PCS_CORE_PATH/examples/artifact_registry.valid.json)")
 	cmd.Flags().StringVar(&outDir, "out", "", "Output directory for benchmark_run.v0.json and related reports")
 	cmd.Flags().StringVar(&runID, "run-id", "", "Optional benchmark run id")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit benchmark_run.v0.json on stdout")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit admission_benchmark_suite.v0.json on stdout (legacy)")
+	cmd.Flags().BoolVar(&jsonSummary, "json-summary", false, "Emit compact JSON summary on stdout")
 	return cmd
 }

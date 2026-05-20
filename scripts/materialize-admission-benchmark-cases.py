@@ -56,6 +56,11 @@ def main() -> int:
         "responsible_component": True,
         "repair_hint": True,
     }
+    explain_formal = {
+        **explain_full,
+        "registry_check_ref": True,
+        "formal_theorem": True,
+    }
 
     reg = json.loads((lt / "artifact_registry.json").read_text(encoding="utf-8"))
     reg_bad_prod = copy.deepcopy(reg)
@@ -136,6 +141,14 @@ def main() -> int:
             None,
         ),
         (
+            "rejected_certificate",
+            {"bundle": "invalid_rejected_certificate.json", "omit_handoff": True},
+            ["PCS_CERTIFICATE_REJECTED"],
+            "science_claim",
+            None,
+            None,
+        ),
+        (
             "trace_hash_mismatch",
             {"bundle": "invalid_mismatched_trace_hash.json", "omit_handoff": True},
             ["PCS_TRACE_HASH_MISMATCH"],
@@ -176,6 +189,65 @@ def main() -> int:
         if mode == "release_chain":
             body["explain_requirements"] = explain_full
         write_case(bench_lt, "invalid", name, body)
+
+    bench_formal = ROOT / "benchmarks/admission/formal_trust_kernel"
+    bench_formal.mkdir(parents=True, exist_ok=True)
+    lt_defaults = {
+        "bundle": "${repo}/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json",
+        "handoff": "${repo}/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json",
+        "registry": "${repo}/tests/pcs/fixtures/labtrust-release/artifact_registry.json",
+        "manifest": "${repo}/tests/pcs/fixtures/labtrust-release/release_manifest.v0.json",
+        "artifact_dir": "${repo}/tests/pcs/fixtures/labtrust-release",
+        "proof_obligations": "${repo}/tests/pcs/fixtures/labtrust-release/proof_obligation.v0.json",
+        "lean_check_result": "${repo}/tests/pcs/fixtures/labtrust-release/lean_check_result.v0.json",
+    }
+    (bench_formal / "workflow.json").write_text(
+        json.dumps(
+            {
+                "workflow_id": "formal_trust_kernel.enforcement_v0",
+                "profile_id": "labtrust_qc_release",
+                "fixture_root": "${repo}/benchmarks/admission/labtrust_qc_release",
+                "defaults": lt_defaults,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    write_case(
+        bench_formal,
+        "valid",
+        "formal_release_admission",
+        {"case_id": "formal_release_admission", "expect": "admit", "verify_mode": "science_claim"},
+    )
+    support_prefix = "${repo}/benchmarks/admission/labtrust_qc_release/support"
+    formal_invalid = [
+        ("missing_proof_obligation", {"omit_proof_obligations": True}, ["missing_lean_check_result"]),
+        ("missing_lean_check_result", {"omit_lean_check_result": True}, ["missing_lean_check_result"]),
+        ("missing_formal_check", {"omit_formal": True}, ["missing_lean_check_result"]),
+        ("failed_lean_check", {"lean_check_result": f"{support_prefix}/lean_check_failed.v0.json"}, ["lean_check_failed"]),
+        ("failed_lean_theorem", {"lean_check_result": f"{support_prefix}/lean_check_failed.v0.json"}, ["lean_check_failed"]),
+        ("unauthorized_lean_theorem", {"lean_check_result": f"{support_prefix}/lean_unauthorized_theorem.v0.json"}, ["unauthorized_lean_theorem"]),
+        (
+            "lean_release_id_mismatch",
+            {"proof_obligations": f"{support_prefix}/proof_obligation_release_mismatch.v0.json"},
+            ["lean_release_id_mismatch"],
+        ),
+    ]
+    for name, inp, codes in formal_invalid:
+        write_case(
+            bench_formal,
+            "invalid",
+            name,
+            {
+                "case_id": name,
+                "expect": "reject",
+                "verify_mode": "science_claim",
+                "expect_failure_codes": codes,
+                "inputs": inp,
+                "explain_requirements": explain_formal,
+            },
+        )
 
     bench_tu = ROOT / "benchmarks/admission/tool_use_safety"
     bench_tu.mkdir(parents=True, exist_ok=True)

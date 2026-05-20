@@ -37,7 +37,7 @@ mkdir -p "${OUT_ROOT}"
 
 FAILED=0
 TOTAL=0
-for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility; do
+for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility formal_trust_kernel; do
   TOTAL=$((TOTAL + 1))
   OUT="${OUT_ROOT}/${SUITE}_admission"
   echo "==> pf benchmark admission --cases benchmarks/admission/${SUITE}"
