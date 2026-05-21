@@ -35,6 +35,9 @@ var RequiredAdmissionInvalidCaseIDs = []string{
 // writeAdmissionBenchmarkBundle emits a pcs-core benchmark bundle for pcs-bench ingestion.
 // When pcsCoreRoot is non-empty, per-artifact validation uses pcs-core/schemas.
 func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCSBenchmarkBundle, executions []benchmarkCaseExecution) error {
+	workflow := bundle.Workflow
+	profile := bundle.Profile
+	covReport := bundle.CovReport
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -162,6 +165,10 @@ func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCS
 		file string
 		key  string
 	}{
+		{"registry_coverage_report.v0.json", "registry_coverage"},
+		{"formal_check_coverage_report.v0.json", "formal_check_coverage"},
+		{"admission_profile_coverage_report.v0.json", "admission_profile_coverage"},
+		{"release_reproducibility_coverage_report.v0.json", "release_reproducibility"},
 		{"registry.coverage_report.v0.json", "registry_coverage"},
 		{"formal_checks.coverage_report.v0.json", "formal_check_coverage"},
 		{"admission_profile.profile_coverage_report.v0.json", "admission_profile_coverage"},
@@ -172,6 +179,21 @@ func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCS
 				return fmt.Errorf("write coverage/%s: %w", spec.file, err)
 			}
 		}
+	}
+	profileCov := buildPCSProfileCoverageReport(
+		workflow,
+		profile,
+		covReport,
+		bundle.Report.BenchmarkSuiteID,
+		bundle.Report.SourceCommit,
+		bundle.Report.Summary.RegistryCoverage,
+	)
+	if err := writeDoc(
+		filepath.Join(coverageDir, "admission_profile.profile_coverage_report.v0.json"),
+		"ProfileCoverageReport.v0.schema.json",
+		profileCov,
+	); err != nil {
+		return fmt.Errorf("write profile coverage: %w", err)
 	}
 
 	cmdData, err := json.MarshalIndent(bundle.Commands, "", "  ")
@@ -227,7 +249,7 @@ func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCS
 		return err
 	}
 
-	ingest := buildPCSBenchIngest(bundle, dir, executions)
+	ingest := buildPCSBenchIngest(bundle, workflow, profile, covReport, dir, executions)
 	if err := writePCSBenchIngest(repoRoot, pcsCoreRoot, dir, ingest); err != nil {
 		return err
 	}
@@ -260,24 +282,28 @@ func mustJSONDoc(v any) any {
 
 // FormatBenchmarkAdmissionSummaryJSON returns a compact JSON summary for --json-summary.
 func FormatBenchmarkAdmissionSummaryJSON(run AdmissionBenchmarkSuiteV0, outDir string) (string, error) {
-	summary := map[string]any{
-		"run_id":                            run.RunID,
-		"workflow":                          run.Workflow,
-		"profile_id":                        run.ProfileID,
-		"started_at":                        run.StartedAt,
-		"completed_at":                      run.CompletedAt,
-		"out_dir":                           outDir,
-		"metrics":                           run.Metrics,
-		"total_cases":                       len(run.Cases),
-		"passed_cases":                      0,
-		"failed_cases":                      0,
-	}
+	passed := 0
 	for _, c := range run.Cases {
 		if c.Passed {
-			summary["passed_cases"] = summary["passed_cases"].(int) + 1
-		} else {
-			summary["failed_cases"] = summary["failed_cases"].(int) + 1
+			passed++
 		}
+	}
+	ingestPath := filepath.Join(outDir, "pcs_bench_ingest.v0.json")
+	summary := map[string]any{
+		"producer_id":                     "provability-fabric",
+		"suite_id":                        suiteIDFromWorkflow(run.Workflow),
+		"workflow_id":                     run.Workflow,
+		"cases_run":                       len(run.Cases),
+		"cases_passed":                    passed,
+		"failure_localization_accuracy":   run.Metrics.FailureLocalizationAccuracy,
+		"explain_quality_score":           run.Metrics.ExplainOutputCompleteness,
+		"registry_coverage_score":         run.Metrics.RegistryCheckCoverage,
+		"formal_check_coverage_score":     run.Metrics.FormalCheckEnforcementCoverage,
+		"pcs_bench_ingest_path":           ingestPath,
+		"run_id":                          run.RunID,
+		"profile_id":                      run.ProfileID,
+		"out_dir":                         outDir,
+		"metrics":                         run.Metrics,
 	}
 	raw, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -393,16 +419,25 @@ func validateAdmissionBenchmarkBundleDir(repoRoot, pcsCoreRoot, dir string) erro
 	if err := json.Unmarshal(ingestData, &ingest); err != nil {
 		return err
 	}
-	if err := validateOne("PCSBenchIngest.v0.schema.json", mustJSONDoc(ingest)); err != nil {
-		return fmt.Errorf("pcs_bench_ingest: %w", err)
+	if err := validateOne("PcsBenchIngest.v0.schema.json", mustJSONDoc(ingest)); err != nil {
+		if err2 := validateOne("PCSBenchIngest.v0.schema.json", mustJSONDoc(ingest)); err2 != nil {
+			return fmt.Errorf("pcs_bench_ingest: %w", err)
+		}
 	}
-	if ingest.BenchmarkReport.ReportID != report.ReportID {
-		return fmt.Errorf("pcs_bench_ingest benchmark_report.report_id mismatch")
+	if ingest.SuiteID != report.BenchmarkSuiteID {
+		return fmt.Errorf("pcs_bench_ingest suite_id mismatch")
+	}
+	if ingest.ProducerID != "provability-fabric" {
+		return fmt.Errorf("pcs_bench_ingest producer_id must be provability-fabric")
+	}
+	if err := ValidatePCSBenchIngestSemantics(ingest); err != nil {
+		return fmt.Errorf("pcs_bench_ingest semantics: %w", err)
 	}
 	for _, spec := range []string{
-		"coverage/registry.coverage_report.v0.json",
-		"coverage/formal_checks.coverage_report.v0.json",
-		"coverage/admission_profile.profile_coverage_report.v0.json",
+		"coverage/registry_coverage_report.v0.json",
+		"coverage/formal_check_coverage_report.v0.json",
+		"coverage/admission_profile_coverage_report.v0.json",
+		"coverage/release_reproducibility_coverage_report.v0.json",
 	} {
 		if _, err := os.Stat(filepath.Join(dir, spec)); err != nil {
 			return fmt.Errorf("bundle missing normalized %s: %w", spec, err)

@@ -69,7 +69,6 @@ func TestPFExtensionSchemasMirrored(t *testing.T) {
 	root := repoRoot(t)
 	for _, name := range []string{
 		"AdmissionBenchmarkCase.v0.schema.json",
-		"PCSBenchIngest.v0.schema.json",
 	} {
 		configPath := filepath.Join(root, "config", "schemas", "pcs", name)
 		embedded, ok := pcs.ReadEmbeddedSchemaForTest(name)

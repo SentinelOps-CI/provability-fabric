@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkSuiteManifest.v0.schema.json",
+  "title": "BenchmarkSuiteManifest.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "suite_id",
+    "task_id",
+    "workflow_id",
+    "case_count",
+    "case_ids",
+    "cases",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "suite_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "case_count": { "type": "integer", "minimum": 0 },
+    "case_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/manifest_case_entry" }
+    },
+    "coverage_report": { "type": "string", "minLength": 1 },
+    "generator": { "type": "string", "minLength": 1 },
+    "generator_version": { "type": "string", "minLength": 1 },
+    "seed": { "type": "integer" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "manifest_case_entry": {
+      "type": "object",
+      "required": ["case_id", "gallery_case_id", "path", "polarity"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "gallery_case_id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "polarity": {
+          "type": "string",
+          "enum": ["valid", "invalid"]
+        }
+      }
+    }
+  }
+}

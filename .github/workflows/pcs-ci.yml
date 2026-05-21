@@ -508,13 +508,16 @@ jobs:
           test -f "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json"
           test -f "${OUT}/formal_trust_kernel_admission/explain_quality_report.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/registry.coverage_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/formal_checks.coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/registry_coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/formal_check_coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/admission_profile_coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/release_reproducibility_coverage_report.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/coverage/admission_profile.profile_coverage_report.v0.json"
           test -d "${OUT}/labtrust_qc_release_admission/explain_quality"
           test -d "${OUT}/labtrust_qc_release_admission/failure_localization"
           test -f "${OUT}/labtrust_qc_release_admission/failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json"
-          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85"
+          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85; assert m['failure_localization_accuracy']>=0.85"
+          test -f "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
           cd "$GITHUB_WORKSPACE"
           go run ./tools/pcs-validate \
             "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json" \
@@ -522,6 +525,18 @@ jobs:
             "${OUT}/labtrust_qc_release_admission/explain_quality_report.v0.json" \
             "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
           go run ./tools/pcs-validate --benchmark-bundle "${OUT}/labtrust_qc_release_admission" --pcs-core "$PCS_CORE_PATH"
+          pip install -q -e "${PCS_CORE_PATH}/python"
+          pcs validate "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
+          pcs validate "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
+          cd "$GITHUB_WORKSPACE/core/cli/pf"
+          go run . benchmark admission \
+            --cases "$GITHUB_WORKSPACE/benchmarks/admission/labtrust_qc_release" \
+            --registry "$REG" \
+            --out "$RUNNER_TEMP/json_summary_smoke" \
+            --validate-pcs-core-output "$PCS_CORE_PATH" \
+            --json-summary | tee "$RUNNER_TEMP/admission_summary.json"
+          grep -q '"producer_id": "provability-fabric"' "$RUNNER_TEMP/admission_summary.json"
+          grep -q '"pcs_bench_ingest_path"' "$RUNNER_TEMP/admission_summary.json"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

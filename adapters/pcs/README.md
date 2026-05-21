@@ -71,7 +71,7 @@ PF is the reference **release admission controller** benchmark runner. It emits 
 
 - `benchmark_report.v0.json`, `benchmark_run.v0.json`, `failure_localization_result.v0.json`, `coverage_report.v0.json`, `explain_quality_report.v0.json`
 - Normalized paths: `explain_quality/`, `failure_localization/`, `coverage/`, `runs/`, `logs/`
-- `pcs_bench_ingest.v0.json` — single-file import manifest for **pcs-bench**
+- `pcs_bench_ingest.v0.json` — **PcsBenchIngest.v0** import manifest for **pcs-bench** (embedded runs/coverage/explain/FLR/profile coverage, `artifact_refs`, semantic validation)
 
 ```bash
 python scripts/materialize-admission-benchmark-cases.py

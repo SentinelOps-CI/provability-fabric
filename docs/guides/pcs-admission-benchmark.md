@@ -82,16 +82,18 @@ Each run writes a **pcs-core benchmark bundle** under `--out` (validated against
 | `explain_quality_report.v0.json` | `ExplainQualityReport.v0` (array) | Per invalid-case explain scoring |
 | `explain_quality/<case_id>.explain_quality_report.v0.json` | `ExplainQualityReport.v0` | Per-case pcs-core explain export |
 | `failure_localization/<case_id>.failure_localization_result.v0.json` | `FailureLocalizationResult.v0` | Per-case failure localization |
-| `coverage/registry.coverage_report.v0.json` | `CoverageReport.v0` | Registry coverage |
-| `coverage/formal_checks.coverage_report.v0.json` | `CoverageReport.v0` | Formal-check coverage |
-| `coverage/admission_profile.profile_coverage_report.v0.json` | `CoverageReport.v0` | Admission profile coverage |
+| `coverage/registry_coverage_report.v0.json` | `CoverageReport.v0` | Registry coverage |
+| `coverage/formal_check_coverage_report.v0.json` | `CoverageReport.v0` | Formal-check coverage |
+| `coverage/admission_profile_coverage_report.v0.json` | `CoverageReport.v0` | Admission profile coverage |
+| `coverage/release_reproducibility_coverage_report.v0.json` | `CoverageReport.v0` | Release reproducibility coverage |
+| `coverage/admission_profile.profile_coverage_report.v0.json` | `ProfileCoverageReport.v0` | Profile-level coverage (also in ingest `profile_coverage_reports`) |
 | `commands.json` | — | Command log for reproducibility |
 | `logs/run.log` | — | Case outcome log |
 | `runs/<case_id>/` | — | Per-case copies of run / explain / FLR artifacts |
-| `pcs_bench_ingest.v0.json` | `PCSBenchIngest.v0` | **Single-file pcs-bench import** (embedded report, runs, coverage, explain, FLR, commands, log paths) |
+| `pcs_bench_ingest.v0.json` | `PcsBenchIngest.v0` | **Single-file pcs-bench import** (`producer_id`, `suite_id`, `workflow_id`, runs, coverage, explain, FLR, profile coverage, commands, logs, optional `artifact_refs`) |
 | `admission_benchmark_suite.v0.json` | PF-internal | Suite metrics + case outcomes (legacy PF summary) |
 
-Use `--json-summary` to print a compact JSON summary (metrics + pass/fail counts) on stdout.
+Use `--json-summary` to print a compact JSON summary on stdout (`producer_id`, `suite_id`, `workflow_id`, `cases_run`, `cases_passed`, `failure_localization_accuracy`, `explain_quality_score`, `registry_coverage_score`, `formal_check_coverage_score`, `pcs_bench_ingest_path`, plus legacy `metrics` / `run_id` fields).
 
 ### Metrics (`admission_benchmark_suite.v0.json` → `metrics`)
 
@@ -99,7 +101,7 @@ Use `--json-summary` to print a compact JSON summary (metrics + pass/fail counts
 |--------|---------|
 | `valid_release_admission_rate` | Share of `valid/` cases that admitted |
 | `invalid_release_rejection_rate` | Share of `invalid/` cases that rejected with matching codes |
-| `failure_localization_accuracy` | Share of localized invalid cases where the failed RCVR check matches `localization.check_id` |
+| `failure_localization_accuracy` | Share of localized invalid cases where observed check ID, responsible component (`hashing`, `handoff`, `scientific_memory`, …), and artifact path match `localization` |
 | `failure_code_accuracy` | Share of invalid cases whose observed codes match `expect_failure_codes` |
 | `explain_output_completeness` | Mean explain field completeness for release-chain invalid cases |
 | `registry_check_coverage` | Required profile registry checks observed in RCVR |
@@ -118,13 +120,13 @@ PF-internal `coverage_report` in `admission_benchmark_suite.v0.json` and pcs-cor
 
 ### Explain quality
 
-For invalid cases with `explain_requirements`, PF emits pcs-core `ExplainQualityReport.v0` per case, scoring explain sections (`verification`, `hashes`, `handoffs`, `formal_checks`, `repair_hints`, etc.) mapped from failure code, artifact path, expected/actual values, responsible component, repair hints, and optional registry/handoff/formal references.
+For invalid cases with `explain_requirements`, PF emits pcs-core `ExplainQualityReport.v0` per case with all canonical sections (`provenance`, `hashes`, `handoffs`, `verification`, `formal_checks`, `limitations`, `lineage`, `repair_hints`), scored from failure code, artifact path, expected/actual values, responsible component, repair hints, and optional registry/handoff/formal references.
 
 Formal trust-kernel enforcement (proof obligations, Lean checks, theorem references) is exercised primarily in the **LabTrust QC release** workflow invalid cases (`missing_proof_obligation`, `failed_lean_check`, etc.).
 
 ## pcs-bench integration
 
-Downstream **pcs-bench** should read **`pcs_bench_ingest.v0.json`** (embedded `benchmark_report`, runs, coverage, explain, failure localization, commands, log paths, `source_repo`, `source_commit`, `signature_or_digest`). The same artifacts are also laid out on disk under normalized paths (`explain_quality/`, `coverage/`, `runs/`, `logs/`). Schemas are synced from pcs-core into `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/`.
+Downstream **pcs-bench** should read **`pcs_bench_ingest.v0.json`** (`PcsBenchIngest.v0`: runs, `coverage_reports`, `explain_quality_reports`, `failure_localization_reports`, `profile_coverage_reports`, `commands`, `logs`, provenance). The same artifacts are also laid out on disk under normalized paths (`explain_quality/`, `coverage/`, `runs/`, `logs/`, plus `benchmark_report.v0.json` for suite aggregates). Schemas are synced from pcs-core into `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/`.
 
 Use `--validate-pcs-core-output /path/to/pcs-core` to validate every normalized artifact against the canonical pcs-core `schemas/` tree (in addition to `--validate` against PF’s synced copy).
 
@@ -140,6 +142,14 @@ bash scripts/pf.sh validate benchmark-bundle benchmark_runs/labtrust_admission
 
 `--validate` on `pf benchmark admission` runs the same bundle gate after every write.
 
+Refresh the committed reference ingest after changing benchmark emit logic or labtrust cases:
+
+```bash
+bash scripts/export-pcs-benchmark-ingest-reference.sh
+```
+
+CI checks that `benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json` exists and passes `pcs validate`.
+
 Explain export uses `pcs.ExportPCSExplainQualityReport` with PF field → pcs-core section mapping (`verification`, `provenance`, `repair_hints`, `handoffs`, `formal_checks`).
 
 Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs`.
@@ -153,11 +163,15 @@ Minimum gate thresholds (current PF tests):
 
 | Step | Status |
 |------|--------|
-| PCS-native explain export (`ExportPCSExplainQualityReport`, `explain_quality/<case>.explain_quality_report.v0.json`) | Done |
-| PCS-native coverage (`coverage/registry|formal_checks|admission_profile.*.json`) | Done |
-| `pcs_bench_ingest.v0.json` stable manifest | Done |
-| `pf benchmark admission --validate` + `--validate-pcs-core-output` | Done |
+| PCS-native explain export (`ExportPCSExplainQualityReport`, all eight canonical sections, per-case files under `explain_quality/`) | Done |
+| PCS-native coverage (`coverage/registry_coverage_report.v0.json`, `formal_check_coverage_report.v0.json`, `admission_profile_coverage_report.v0.json`, `release_reproducibility_coverage_report.v0.json`, `ProfileCoverageReport.v0`) | Done |
+| `pcs_bench_ingest.v0.json` (`PcsBenchIngest.v0` with embedded arrays + `artifact_refs` digests aligned to embedded `signature_or_digest`) | Done |
+| Go semantic gate (`ValidatePCSBenchIngestSemantics`, mirrors pcs-core `validate_pcs_bench_ingest_semantics`) | Done |
+| `pf benchmark admission --validate` + `--validate-pcs-core-output` + optional `pcs validate pcs_bench_ingest.v0.json` | Done |
+| `--json-summary` with producer/suite/workflow metrics and `pcs_bench_ingest_path` | Done |
+| Failure localization gold standard (check-aware components, artifact-path alignment, per-case `failure_localization/`) | Done |
 | Required invalid failure families (`RequiredAdmissionInvalidCaseIDs`, incl. `scientific_memory_import_failure`) | Done |
+| Committed reference ingest (`benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json`, `pcs validate` + `TestExportPCSBenchIngestReferenceArtifact`) | Done |
 
 ## Adding cases
 

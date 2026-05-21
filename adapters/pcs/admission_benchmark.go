@@ -93,6 +93,7 @@ type AdmissionBenchmarkCaseResult struct {
 	ExpectFailureCodes     []string `json:"expect_failure_codes,omitempty"`
 	FailureCodeMatch       bool     `json:"failure_code_match"`
 	LocalizationMatch      bool     `json:"localization_match"`
+	LocalizationRequired   bool     `json:"localization_required,omitempty"`
 	ExplainCompleteness    float64  `json:"explain_completeness"`
 	VerificationStatus     string   `json:"verification_status,omitempty"`
 	ReleaseChainStatus     string   `json:"release_chain_status,omitempty"`
@@ -325,6 +326,9 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 		if err != nil {
 			return run, locReport, covReport, explainReport, err
 		}
+		bundle.Workflow = workflow
+		bundle.Profile = baseProfile
+		bundle.CovReport = covReport
 		bundle.InternalSuite = run
 		pcsCoreRoot := strings.TrimSpace(opts.ValidatePCSCoreOutput)
 		if err := writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, opts.OutDir, bundle, executions); err != nil {
@@ -728,6 +732,9 @@ func executeAdmissionBenchmarkCase(
 	cr.FailureCodeMatch = failureCodesMatch(c.ExpectFailureCodes, cr.ObservedFailureCodes)
 	cr.Passed = outcomeMatchesExpect(c.Expect, cr.Outcome) && cr.FailureCodeMatch
 
+	if c.Localization != nil {
+		cr.LocalizationRequired = true
+	}
 	var loc *FailureLocalizationCaseResult
 	if c.Localization != nil && rcvr != nil {
 		loc = scoreLocalization(c, *rcvr)
@@ -744,6 +751,9 @@ func executeAdmissionBenchmarkCase(
 			Passed:          cr.FailureCodeMatch,
 		}
 		cr.LocalizationMatch = loc.Passed
+	}
+	if !cr.LocalizationRequired {
+		cr.LocalizationMatch = true
 	}
 
 	var explain *ExplainQualityCaseScore
@@ -972,7 +982,15 @@ func scoreLocalization(c AdmissionBenchmarkCase, rcvr ReleaseChainValidationResu
 		} else {
 			loc.ArtifactPathMatch = true
 		}
-		loc.Passed = loc.ObservedCheckID != "" && loc.ArtifactPathMatch
+		wantComponent := expectedResponsibleComponentForCase(c)
+		observedComponent := responsibleComponentForCheckID(chk.CheckID)
+		if observedComponent == "unknown" || (observedComponent == "verifier" && wantComponent != "verifier") {
+			if mapped := mapResponsibleComponent(chk.ResponsibleComponent); mapped != "unknown" {
+				observedComponent = mapped
+			}
+		}
+		loc.Passed = loc.ObservedCheckID != "" && loc.ArtifactPathMatch &&
+			wantComponent == observedComponent
 		return loc
 	}
 	loc.Passed = false
@@ -1047,9 +1065,11 @@ func computeBenchmarkMetrics(results []AdmissionBenchmarkCaseResult, explain []E
 			if r.FailureCodeMatch {
 				codePass++
 			}
-			locTotal++
-			if r.LocalizationMatch {
-				locPass++
+			if r.LocalizationRequired {
+				locTotal++
+				if r.LocalizationMatch {
+					locPass++
+				}
 			}
 		}
 	}

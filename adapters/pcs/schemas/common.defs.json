@@ -375,7 +375,36 @@
         "stale",
         "import_failed",
         "render_failed",
-        "formal_failed"
+        "query_failed",
+        "comparison_failed",
+        "formal_failed",
+        "certificate_rejected",
+        "unknown"
+      ]
+    },
+    "nullable_benchmark_system_outcome": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/benchmark_system_outcome" }
+      ]
+    },
+    "benchmark_detection_layer": {
+      "type": "string",
+      "enum": [
+        "runtime",
+        "certificate",
+        "verifier",
+        "registry",
+        "formal_kernel",
+        "scientific_memory",
+        "release_manifest",
+        "handoff",
+        "hashing",
+        "labtrust",
+        "certifyedge",
+        "provability_fabric",
+        "pcs_core",
+        "unknown"
       ]
     },
     "metric_summary_applicability": {
@@ -429,6 +458,22 @@
         "artifact_type": { "type": "string", "minLength": 1 },
         "role": { "type": "string", "minLength": 1 }
       }
+    },
+    "benchmark_artifact_ref_type": {
+      "type": "string",
+      "enum": [
+        "BenchmarkCase.v0",
+        "BenchmarkRun.v0",
+        "CoverageReport.v0",
+        "FailureLocalizationResult.v0",
+        "ExplainQualityReport.v0",
+        "ProfileCoverageReport.v0",
+        "MetricSummary.v0"
+      ]
+    },
+    "benchmark_artifact_ref_role": {
+      "type": "string",
+      "enum": ["producer_export", "ingest_bundle", "primary"]
     },
     "benchmark_command_entry": {
       "type": "object",

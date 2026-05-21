@@ -175,6 +175,9 @@ type PCSBenchmarkBundle struct {
 	ExplainQuality      []PCSExplainQualityReport
 	CoverageByMetric    map[string]PCSCoverageReport
 	Commands            []PCSBenchmarkCommandEntry
+	Workflow            AdmissionBenchmarkWorkflow
+	Profile             *AdmissionProfile
+	CovReport           CoverageReportV0
 	InternalSuite       AdmissionBenchmarkSuiteV0
 }
 
@@ -232,7 +235,7 @@ func mapResponsibleComponent(component string) string {
 		return "certificate_producer"
 	case "pcs-core":
 		return "registry"
-	case "scientific_memory", "ScientificMemory":
+	case "scientific_memory", "ScientificMemory", "Scientific Memory":
 		return "scientific_memory"
 	default:
 		if strings.Contains(strings.ToLower(component), "handoff") {
@@ -324,24 +327,73 @@ func digestBenchmarkRun(runID, taskID, caseID, status, failureCode string) strin
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
+func responsibleComponentForCheckID(checkID string) string {
+	lower := strings.ToLower(checkID)
+	switch {
+	case strings.Contains(lower, "hash"), strings.Contains(lower, "digest"), strings.Contains(lower, "signed_input"),
+		strings.Contains(lower, "bundle_hash"), strings.Contains(lower, "trace_hash"), strings.Contains(lower, "manifest_hash"),
+		strings.Contains(lower, "result_hash"), strings.Contains(lower, "policy_hash"):
+		return "hashing"
+	case strings.HasPrefix(lower, "formal."), strings.Contains(lower, "lean"), strings.Contains(lower, "proof_obligation"):
+		return "formal_kernel"
+	case strings.Contains(lower, "handoff"), strings.Contains(lower, "bundle_to_verifier"):
+		return "handoff"
+	case strings.Contains(lower, "registry"), strings.Contains(lower, "artifact_registry"):
+		return "registry"
+	case strings.Contains(lower, "manifest"):
+		return "release_manifest"
+	case strings.Contains(lower, "certificate"), strings.Contains(lower, "trace_certificate"):
+		return "certificate_producer"
+	case strings.Contains(lower, "scientific_memory"):
+		return "scientific_memory"
+	default:
+		if comp := benchmarkFailureCodeToComponent(checkID); comp != "" {
+			return comp
+		}
+		return "verifier"
+	}
+}
+
+func expectedResponsibleComponentForCase(c AdmissionBenchmarkCase) string {
+	if c.Localization != nil && c.Localization.CheckID != "" {
+		return responsibleComponentForCheckID(c.Localization.CheckID)
+	}
+	for _, code := range c.ExpectFailureCodes {
+		if comp := benchmarkFailureCodeToComponent(code); comp != "" {
+			return comp
+		}
+	}
+	if expectsFormalFailure(c.ExpectFailureCodes) {
+		return "formal_kernel"
+	}
+	return "verifier"
+}
+
 func failureLocalizationComponents(ctx benchmarkCaseExecution) (expected, observed string) {
-	expected = "verifier"
-	observed = "unknown"
 	wantCheck := ""
+	wantArtifact := ""
 	if ctx.Case.Localization != nil {
 		wantCheck = ctx.Case.Localization.CheckID
+		wantArtifact = ctx.Case.Localization.ArtifactPath
 	}
+	expected = expectedResponsibleComponentForCase(ctx.Case)
+	observed = "unknown"
 	if ctx.RCVR != nil {
 		for _, c := range ctx.RCVR.Checks {
 			if c.Status != "failed" {
 				continue
 			}
-			mapped := mapResponsibleComponent(c.ResponsibleComponent)
-			if wantCheck == "" || c.CheckID == wantCheck {
-				observed = mapped
-				if wantCheck != "" {
-					return expected, observed
+			if wantCheck != "" && c.CheckID != wantCheck {
+				continue
+			}
+			observed = responsibleComponentForCheckID(c.CheckID)
+			if observed == "unknown" || observed == "verifier" {
+				if mapped := mapResponsibleComponent(c.ResponsibleComponent); mapped != "unknown" {
+					observed = mapped
 				}
+			}
+			if wantCheck != "" {
+				break
 			}
 		}
 	}
@@ -353,11 +405,14 @@ func failureLocalizationComponents(ctx benchmarkCaseExecution) (expected, observ
 			}
 		}
 	}
-	if strings.Contains(strings.ToLower(firstObservedFailureCode(ctx.Case.ExpectFailureCodes)), "lean") ||
-		strings.Contains(strings.ToLower(firstObservedFailureCode(ctx.Result.ObservedFailureCodes)), "lean") ||
-		strings.Contains(strings.ToLower(firstObservedFailureCode(ctx.Case.ExpectFailureCodes)), "formal") {
-		expected = "formal_kernel"
+	if observed == "unknown" && wantArtifact != "" {
+		if strings.Contains(wantArtifact, "handoff") {
+			observed = "handoff"
+		} else if strings.Contains(wantArtifact, "registry") {
+			observed = "registry"
+		}
 	}
+	_ = wantArtifact
 	return expected, observed
 }
 
@@ -372,8 +427,23 @@ func buildPCSFailureLocalization(
 	runID := fmt.Sprintf("bench-run-%s", cr.CaseID)
 	resultID := fmt.Sprintf("flr-%s", cr.CaseID)
 	expectedFC := firstObservedFailureCode(cr.ExpectFailureCodes)
+	if ctx.Case.Localization != nil && ctx.Case.Localization.CheckID != "" {
+		expectedFC = ctx.Case.Localization.CheckID
+	}
 	observedFC := firstObservedFailureCode(cr.ObservedFailureCodes)
+	if ctx.RCVR != nil && ctx.Case.Localization != nil && ctx.Case.Localization.CheckID != "" {
+		for _, chk := range ctx.RCVR.Checks {
+			if chk.Status == "failed" && chk.CheckID == ctx.Case.Localization.CheckID {
+				observedFC = chk.CheckID
+				break
+			}
+		}
+	}
 	expectedResp, observedResp := failureLocalizationComponents(ctx)
+	localized := cr.FailureCodeMatch && expectedResp == observedResp && observedResp != "unknown"
+	if ctx.Loc != nil {
+		localized = localized && ctx.Loc.Passed
+	}
 	return &PCSFailureLocalizationResult{
 		SchemaVersion:                SchemaVersionV0,
 		ResultID:                     resultID,
@@ -383,7 +453,7 @@ func buildPCSFailureLocalization(
 		ObservedFailureCode:          observedFC,
 		ExpectedResponsibleComponent: expectedResp,
 		ObservedResponsibleComponent: observedResp,
-		LocalizedCorrectly:           cr.FailureCodeMatch && (ctx.Loc == nil || ctx.Loc.Passed),
+		LocalizedCorrectly:           localized,
 		SourceRepo:                   VerifierSourceRepo,
 		SourceCommit:                 sourceCommit,
 		SignatureOrDigest:            digestBenchmarkRun(resultID, runID, cr.CaseID, "flr", observedFC),
@@ -503,7 +573,7 @@ func buildPCSExplainQualityReport(
 		return nil
 	}
 	req := c.ExplainRequirements
-	required := []string{}
+	required := append([]string(nil), CanonicalExplainQualitySections...)
 	sections := map[string]PCSExplainSectionScore{}
 	gaps := []PCSExplainQualityGap{}
 
@@ -515,10 +585,8 @@ func buildPCSExplainQualityReport(
 		explanations = ExplainVerificationFailures(*vr)
 	}
 	fallback := explainAdmissionError(cr.Error, c.ExpectFailureCodes)
-	if strings.TrimSpace(cr.Error) != "" {
-		if len(explanations) == 0 {
-			explanations = []FailureExplanation{fallback}
-		}
+	if strings.TrimSpace(cr.Error) != "" && len(explanations) == 0 {
+		explanations = []FailureExplanation{fallback}
 	}
 	wantCheck := ""
 	if c.Localization != nil {
@@ -526,67 +594,73 @@ func buildPCSExplainQualityReport(
 	}
 	target := pickFailureExplanation(explanations, c.ExpectFailureCodes, wantCheck, fallback)
 
-	fieldChecks := []struct {
-		reqField string
-		present  bool
-		note     string
-	}{
-		{"failure_code", target.FailureCode != "", target.FailureCode},
-		{"artifact_path", target.ArtifactPath != "", target.ArtifactPath},
-		{"expected", target.Expected != "", target.Expected},
-		{"actual", target.Actual != "", target.Actual},
-		{"responsible_component", target.ResponsibleComponent != "", target.ResponsibleComponent},
-		{"repair_hint", target.RepairHint != "", target.RepairHint},
-		{"registry_check_ref", target.RegistryCheckRef != "", target.RegistryCheckRef},
-		{"handoff_ref", target.HandoffRef != "", target.HandoffRef},
+	combined := strings.ToLower(
+		target.RepairHint + target.Actual + target.Expected + target.FailureCode +
+			target.ArtifactPath + target.RegistryCheckRef + target.HandoffRef,
+	)
+	hashFailure := false
+	for _, code := range c.ExpectFailureCodes {
+		if strings.Contains(strings.ToLower(code), "hash") || strings.Contains(strings.ToLower(code), "mismatch") {
+			hashFailure = true
+			break
+		}
 	}
-	if req.FormalTheorem {
-		combined := strings.ToLower(target.RepairHint + target.Actual + target.Expected + target.FailureCode)
-		ok := strings.Contains(combined, "theorem") || strings.Contains(combined, "admissible_") ||
-			strings.Contains(combined, "witness") || strings.Contains(combined, "lean check") ||
-			strings.Contains(combined, "proofobligation") || strings.Contains(combined, "leancheckresult") ||
-			strings.Contains(combined, strings.ToLower(FailureCodeLeanCheckFailed)) ||
-			strings.Contains(combined, strings.ToLower(FailureCodeUnauthorizedLeanTheorem)) ||
-			strings.Contains(combined, strings.ToLower(FailureCodeLeanReleaseIDMismatch)) ||
-			strings.Contains(combined, strings.ToLower(FailureCodeMissingLeanCheckResult))
-		fieldChecks = append(fieldChecks, struct {
-			reqField string
-			present  bool
-			note     string
-		}{"formal_theorem", ok, combined})
+	hasHashEvidence := strings.Contains(combined, "sha256:") ||
+		strings.Contains(combined, "hash") ||
+		strings.Contains(combined, "digest")
+	formalOK := strings.Contains(combined, "theorem") || strings.Contains(combined, "admissible_") ||
+		strings.Contains(combined, "witness") || strings.Contains(combined, "lean") ||
+		strings.Contains(combined, "proofobligation") || strings.Contains(combined, "leancheckresult")
+	if !req.FormalTheorem && !expectsFormalFailure(c.ExpectFailureCodes) {
+		formalOK = true
+	}
+	handoffOK := target.HandoffRef != "" || !req.HandoffRef
+	limitationsNote := "admission profile bounds"
+	if rcvr != nil {
+		for _, chk := range rcvr.Checks {
+			if chk.Status == "skipped" || chk.Status == "warning" {
+				limitationsNote = fmt.Sprintf("deferred or skipped check %s", chk.CheckID)
+				break
+			}
+		}
 	}
 
-	for _, fc := range fieldChecks {
-		if !requirementEnabled(req, fc.reqField) {
-			continue
-		}
-		sectionID := explainSectionIDForRequirement(fc.reqField)
-		if !containsString(required, sectionID) {
-			required = append(required, sectionID)
-		}
+	sectionSpecs := []struct {
+		id      string
+		present bool
+		note    string
+	}{
+		{"provenance",
+			target.ArtifactPath != "" || target.HandoffRef != "" || target.ResponsibleComponent != "" || target.RegistryCheckRef != "",
+			target.ArtifactPath},
+		{"hashes", hasHashEvidence || !hashFailure, combined},
+		{"handoffs", handoffOK, target.HandoffRef},
+		{"verification",
+			target.FailureCode != "" ||
+				target.Expected != "" ||
+				target.Actual != "" ||
+				target.RegistryCheckRef != "",
+			target.FailureCode},
+		{"formal_checks", formalOK, combined},
+		{"limitations", true, limitationsNote},
+		{"lineage", sourceCommit != "", sourceCommit},
+		{"repair_hints", requirementEnabled(req, "repair_hint") && target.RepairHint != "", target.RepairHint},
+	}
+	for _, spec := range sectionSpecs {
 		score := 0.0
-		if fc.present {
+		if spec.present {
 			score = 1.0
 		} else {
 			gaps = append(gaps, PCSExplainQualityGap{
-				SectionID: sectionID,
-				Message:   fmt.Sprintf("missing %s in explain output", fc.reqField),
+				SectionID: spec.id,
+				Message:   fmt.Sprintf("missing evidence for explain section %s", spec.id),
 			})
 		}
-		prev := sections[sectionID]
-		prev.Present = prev.Present || fc.present
-		if score > prev.Score {
-			prev.Score = score
+		sections[spec.id] = PCSExplainSectionScore{
+			Present: spec.present,
+			Score:   score,
+			Notes:   spec.note,
 		}
-		if fc.note != "" {
-			prev.Notes = fc.note
-		}
-		sections[sectionID] = prev
-	}
-
-	if len(required) == 0 {
-		required = []string{"verification"}
-		sections["verification"] = PCSExplainSectionScore{Present: false, Score: 0}
 	}
 	requiredCount := len(required)
 	var presentCount int
@@ -605,21 +679,21 @@ func buildPCSExplainQualityReport(
 
 	reportID := fmt.Sprintf("explain-quality-%s", c.CaseID)
 	return &PCSExplainQualityReport{
-		SchemaVersion:         SchemaVersionV0,
-		ReportID:              reportID,
-		SuiteID:               suiteID,
-		CaseID:                c.CaseID,
-		ProducerID:            "provability-fabric",
-		WorkflowID:            workflowID,
-		RequiredSections:      required,
-		Sections:              sections,
+		SchemaVersion:          SchemaVersionV0,
+		ReportID:               reportID,
+		SuiteID:                suiteID,
+		CaseID:                 c.CaseID,
+		ProducerID:             "provability-fabric",
+		WorkflowID:             workflowID,
+		RequiredSections:       required,
+		Sections:               sections,
 		SectionsPresentCount:   presentCount,
 		SectionsRequiredCount:  requiredCount,
-		QualityScore:          quality,
-		Gaps:                  gaps,
-		SourceRepo:            VerifierSourceRepo,
-		SourceCommit:          sourceCommit,
-		SignatureOrDigest:     digestBenchmarkRun(reportID, suiteID, c.CaseID, "explain", fmt.Sprintf("%f", quality)),
+		QualityScore:           quality,
+		Gaps:                   gaps,
+		SourceRepo:             VerifierSourceRepo,
+		SourceCommit:           sourceCommit,
+		SignatureOrDigest:      digestBenchmarkRun(reportID, suiteID, c.CaseID, "explain", fmt.Sprintf("%f", quality)),
 	}
 }
 

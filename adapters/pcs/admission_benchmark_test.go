@@ -76,9 +76,10 @@ func TestAdmissionBenchmarkLabtrustSuite(t *testing.T) {
 	}
 	for _, path := range []string{
 		"pcs_bench_ingest.v0.json",
-		"coverage/registry.coverage_report.v0.json",
-		"coverage/formal_checks.coverage_report.v0.json",
-		"coverage/admission_profile.profile_coverage_report.v0.json",
+		"coverage/registry_coverage_report.v0.json",
+		"coverage/formal_check_coverage_report.v0.json",
+		"coverage/admission_profile_coverage_report.v0.json",
+		"coverage/release_reproducibility_coverage_report.v0.json",
 		"failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json",
 	} {
 		if _, err := os.Stat(filepath.Join(out, path)); err != nil {
@@ -89,8 +90,14 @@ func TestAdmissionBenchmarkLabtrustSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if ingest.ProducerID != "provability-fabric" {
+		t.Fatalf("ingest producer_id=%q", ingest.ProducerID)
+	}
 	if len(ingest.ExplainQualityReports) == 0 {
 		t.Fatal("expected explain quality reports in ingest manifest")
+	}
+	if len(ingest.ProfileCoverageReports) == 0 {
+		t.Fatal("expected profile_coverage_reports in ingest manifest")
 	}
 	for _, eq := range ingest.ExplainQualityReports {
 		if eq.QualityScore < 0.8 {
@@ -262,14 +269,14 @@ func TestLoadPCSBenchIngestFromDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ingest.BenchmarkReport.ReportID == "" {
-		t.Fatal("ingest missing benchmark_report.report_id")
+	if ingest.SuiteID == "" || ingest.WorkflowID == "" {
+		t.Fatal("ingest missing suite_id or workflow_id")
 	}
 	if len(ingest.BenchmarkRuns) == 0 {
 		t.Fatal("ingest missing benchmark_runs")
 	}
-	if ingest.Logs.RunLog == "" {
-		t.Fatal("ingest missing logs.run_log")
+	if len(ingest.Logs) == 0 {
+		t.Fatal("ingest missing logs")
 	}
 }
 

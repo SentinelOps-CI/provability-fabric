@@ -95,6 +95,10 @@ validate-pcs-benchmark-bundle:
 	@$(ECHOOK) "Validate PCS admission benchmark bundle (labtrust)..."
 	bash scripts/pcs-validate-benchmark-bundle.sh benchmark_runs/labtrust_admission
 
+export-pcs-benchmark-ingest-reference:
+	@$(ECHOOK) "Materialize labtrust PcsBenchIngest reference artifact..."
+	bash scripts/export-pcs-benchmark-ingest-reference.sh
+
 test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle
 	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures, admission benchmarks)"
 

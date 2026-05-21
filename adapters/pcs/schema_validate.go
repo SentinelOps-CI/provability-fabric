@@ -131,7 +131,6 @@ func pcsCoreHasSchema(pcsCoreRoot, schemaFile string) bool {
 
 // pfOnlyBenchmarkSchemas are validated against PF embedded schemas (not shipped in pcs-core).
 var pfOnlyBenchmarkSchemas = map[string]struct{}{
-	"PCSBenchIngest.v0.schema.json":         {},
 	"AdmissionBenchmarkCase.v0.schema.json": {},
 }
 

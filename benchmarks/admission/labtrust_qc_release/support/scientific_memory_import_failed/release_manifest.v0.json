@@ -58,7 +58,7 @@
       "producer": "Scientific Memory",
       "source_repo": "https://github.com/fraware/scientific-memory",
       "source_commit": "0e059e934bc95bcc4dc0cb6593b18b07a28529a2",
-      "sha256": "sha256:14c8718aaf342dfc9b061df76aa01369c9dc7f49b1ad97e4316df10aa29aefc5"
+      "sha256": "sha256:20d0b89df791d99dc33be2fc37bb477e2ebdd158defd704e9fe4e2290fd6dc72"
     },
     "signed_science_claim_bundle.json": {
       "artifact_type": "SignedScienceClaimBundle.v0",

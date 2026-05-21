@@ -764,9 +764,13 @@ func responsibleComponentForReleaseCheck(id string, details map[string]any) stri
 		return ComponentProvabilityFabric
 	}
 	switch id {
+	case "scientific_memory_import_passed":
+		return "ScientificMemory"
 	case "trace_hash_consistent", "certificate_id_consistent":
 		return ComponentLabTrustGym
-	case "manifest_hashes_match", "producer_commits_match", "signed_input_bundle_hash_match",
+	case "manifest_hashes_match", "signed_input_bundle_hash_match":
+		return "hashing"
+	case "producer_commits_match",
 		"registry_admission_passed", "registry_artifact_registered", "registry_schema_matches",
 		"registry_producer_allowed", "registry_status_allowed", "registry_required_fields_present",
 		"registry_semantic_checks_executed", "science_claim_bundle_verification", "admission_profile_selected",

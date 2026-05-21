@@ -77,4 +77,9 @@ elif [[ -d "${ROOT}/../pcs-core/schemas" ]]; then
 fi
 "${PCS_VALIDATE_BUNDLE[@]}"
 
+if command -v pcs >/dev/null 2>&1; then
+  echo "==> pcs validate ${BUNDLE_DIR}/pcs_bench_ingest.v0.json (schema + semantics)"
+  pcs validate "${BUNDLE_DIR}/pcs_bench_ingest.v0.json"
+fi
+
 echo "OK: PCS benchmark bundle validated at ${BUNDLE_DIR}"

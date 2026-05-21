@@ -13,27 +13,69 @@ import (
 	"strings"
 )
 
-// PCSBenchIngestLogs lists log paths relative to bundle_dir.
-type PCSBenchIngestLogs struct {
-	RunLog   string            `json:"run_log"`
-	CaseLogs map[string]string `json:"case_logs,omitempty"`
+// CanonicalExplainQualitySections are required pcs-core ExplainQualityReport.v0 sections for PF admission.
+var CanonicalExplainQualitySections = []string{
+	"provenance",
+	"hashes",
+	"handoffs",
+	"verification",
+	"formal_checks",
+	"limitations",
+	"lineage",
+	"repair_hints",
 }
 
-// PCSBenchIngestV0 is the single-file manifest pcs-bench reads when importing PF outputs.
+// PCSBenchmarkArtifactRef matches pcs-core BenchmarkArtifactRef.v0.
+type PCSBenchmarkArtifactRef struct {
+	SchemaVersion     string `json:"schema_version"`
+	ArtifactType      string `json:"artifact_type"`
+	Path              string `json:"path"`
+	SHA256            string `json:"sha256"`
+	Role              string `json:"role"`
+	SourceRepo        string `json:"source_repo"`
+	SourceCommit      string `json:"source_commit"`
+	SignatureOrDigest string `json:"signature_or_digest"`
+}
+
+// PCSProfileCoverageReport matches pcs-core ProfileCoverageReport.v0.
+type PCSProfileCoverageReport struct {
+	SchemaVersion           string         `json:"schema_version"`
+	CoverageID              string         `json:"coverage_id"`
+	WorkflowProfileID       string         `json:"workflow_profile_id"`
+	ProducerID              string         `json:"producer_id"`
+	SuiteID                 string         `json:"suite_id,omitempty"`
+	ArtifactTypesRequired   []string       `json:"artifact_types_required"`
+	ArtifactTypesCovered    []string       `json:"artifact_types_covered"`
+	SemanticChecksRequired  []string       `json:"semantic_checks_required"`
+	SemanticChecksCovered   []string       `json:"semantic_checks_covered"`
+	HandoffStepsRequired    []string       `json:"handoff_steps_required"`
+	HandoffStepsCovered     []string       `json:"handoff_steps_covered"`
+	Numerator               float64        `json:"numerator"`
+	Denominator             float64        `json:"denominator"`
+	CoverageRatio           float64        `json:"coverage_ratio"`
+	Details                 map[string]any `json:"details"`
+	SourceRepo              string         `json:"source_repo"`
+	SourceCommit            string         `json:"source_commit"`
+	SignatureOrDigest       string         `json:"signature_or_digest"`
+}
+
+// PCSBenchIngestV0 is the pcs-core PcsBenchIngest.v0 manifest for pcs-bench ingestion.
 type PCSBenchIngestV0 struct {
-	SchemaVersion              string                           `json:"schema_version"`
-	IngestID                   string                           `json:"ingest_id"`
-	BundleDir                  string                           `json:"bundle_dir"`
-	BenchmarkReport            PCSBenchmarkReport               `json:"benchmark_report"`
-	BenchmarkRuns              []PCSBenchmarkRun                `json:"benchmark_runs"`
-	CoverageReports            []PCSCoverageReport              `json:"coverage_reports"`
-	ExplainQualityReports      []PCSExplainQualityReport        `json:"explain_quality_reports"`
-	FailureLocalizationReports []PCSFailureLocalizationResult   `json:"failure_localization_reports"`
-	Commands                   []PCSBenchmarkCommandEntry       `json:"commands"`
-	Logs                       PCSBenchIngestLogs               `json:"logs"`
-	SourceRepo                 string                           `json:"source_repo,omitempty"`
-	SourceCommit               string                           `json:"source_commit,omitempty"`
-	SignatureOrDigest          string                           `json:"signature_or_digest,omitempty"`
+	SchemaVersion              string                     `json:"schema_version"`
+	ProducerID                 string                     `json:"producer_id"`
+	SuiteID                    string                     `json:"suite_id"`
+	WorkflowID                 string                     `json:"workflow_id"`
+	BenchmarkRuns              []PCSBenchmarkRun          `json:"benchmark_runs"`
+	CoverageReports            []PCSCoverageReport        `json:"coverage_reports"`
+	ExplainQualityReports      []PCSExplainQualityReport  `json:"explain_quality_reports"`
+	FailureLocalizationReports []PCSFailureLocalizationResult `json:"failure_localization_reports"`
+	ProfileCoverageReports     []PCSProfileCoverageReport `json:"profile_coverage_reports"`
+	Commands                   []PCSBenchmarkCommandEntry `json:"commands"`
+	Logs                       []string                   `json:"logs"`
+	ArtifactRefs               []PCSBenchmarkArtifactRef  `json:"artifact_refs,omitempty"`
+	SourceRepo                 string                     `json:"source_repo"`
+	SourceCommit               string                     `json:"source_commit"`
+	SignatureOrDigest          string                     `json:"signature_or_digest"`
 }
 
 // ExportPCSExplainQualityCaseInput carries per-case state for pcs-core ExplainQualityReport.v0 export.
@@ -60,10 +102,94 @@ func ExportPCSExplainQualityReport(in ExportPCSExplainQualityCaseInput) *PCSExpl
 	)
 }
 
-func buildPCSBenchIngest(bundle PCSBenchmarkBundle, bundleDir string, executions []benchmarkCaseExecution) PCSBenchIngestV0 {
+func buildPCSBenchmarkArtifactRef(artifactType, relPath, contentDigest, sourceCommit string) PCSBenchmarkArtifactRef {
+	refID := fmt.Sprintf("ref-%s-%s", artifactType, filepath.Base(relPath))
+	return PCSBenchmarkArtifactRef{
+		SchemaVersion:     SchemaVersionV0,
+		ArtifactType:      artifactType,
+		Path:              relPath,
+		SHA256:            contentDigest,
+		Role:              "producer_export",
+		SourceRepo:        VerifierSourceRepo,
+		SourceCommit:      sourceCommit,
+		SignatureOrDigest: digestBenchmarkRun(refID, artifactType, relPath, "ref", contentDigest),
+	}
+}
+
+func buildPCSProfileCoverageReport(
+	workflow AdmissionBenchmarkWorkflow,
+	profile *AdmissionProfile,
+	cov CoverageReportV0,
+	suiteID, sourceCommit string,
+	ratio float64,
+) PCSProfileCoverageReport {
+	requiredArtifacts := []string{}
+	coveredArtifacts := []string{}
+	requiredHandoffs := []string{}
+	coveredHandoffs := []string{}
+	if profile != nil {
+		for _, k := range profile.RequiredHandoffKinds {
+			requiredHandoffs = append(requiredHandoffs, string(k))
+		}
+	}
+	if profile != nil && len(profile.RequiredHandoffKinds) > 0 {
+		coveredHandoffs = append(coveredHandoffs, requiredHandoffs...)
+	}
+	requiredChecks := cov.Admission.RegistryChecksRequired
+	if requiredChecks == nil {
+		requiredChecks = []string{}
+	}
+	coveredChecks := cov.Admission.RegistryChecksObserved
+	if coveredChecks == nil {
+		coveredChecks = []string{}
+	}
+	numerator := float64(len(coveredChecks) + len(coveredArtifacts) + len(coveredHandoffs))
+	denominator := float64(len(requiredChecks) + len(requiredArtifacts) + len(requiredHandoffs))
+	if denominator < 1 {
+		denominator = 1
+	}
+	if ratio <= 0 {
+		ratio = numerator / denominator
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	return PCSProfileCoverageReport{
+		SchemaVersion:          SchemaVersionV0,
+		CoverageID:             suiteID + "-profile-coverage",
+		WorkflowProfileID:      workflow.ProfileID,
+		ProducerID:             "provability-fabric",
+		SuiteID:                suiteID,
+		ArtifactTypesRequired:  requiredArtifacts,
+		ArtifactTypesCovered:   coveredArtifacts,
+		SemanticChecksRequired: requiredChecks,
+		SemanticChecksCovered:  coveredChecks,
+		HandoffStepsRequired:   requiredHandoffs,
+		HandoffStepsCovered:    coveredHandoffs,
+		Numerator:              numerator,
+		Denominator:            denominator,
+		CoverageRatio:          ratio,
+		Details: map[string]any{
+			"profiles_exercised": cov.Admission.ProfilesExercised,
+			"workflow_id":        workflow.WorkflowID,
+		},
+		SourceRepo:        VerifierSourceRepo,
+		SourceCommit:      sourceCommit,
+		SignatureOrDigest: digestCoverage(suiteID, "profile_coverage", ratio),
+	}
+}
+
+func buildPCSBenchIngest(
+	bundle PCSBenchmarkBundle,
+	workflow AdmissionBenchmarkWorkflow,
+	profile *AdmissionProfile,
+	covReport CoverageReportV0,
+	bundleDir string,
+	executions []benchmarkCaseExecution,
+) PCSBenchIngestV0 {
 	coverage := make([]PCSCoverageReport, 0, len(bundle.CoverageByMetric))
-	for _, m := range []string{"registry_coverage", "formal_check_coverage", "admission_profile_coverage", "release_reproducibility", "failure_localization", "certificate_completeness"} {
-		if c, ok := bundle.CoverageByMetric[m]; ok {
+	for _, key := range []string{"registry_coverage", "formal_check_coverage", "admission_profile_coverage", "release_reproducibility"} {
+		if c, ok := bundle.CoverageByMetric[key]; ok {
 			coverage = append(coverage, c)
 		}
 	}
@@ -83,39 +209,132 @@ func buildPCSBenchIngest(bundle PCSBenchmarkBundle, bundleDir string, executions
 	if commands == nil {
 		commands = []PCSBenchmarkCommandEntry{}
 	}
-	caseLogs := map[string]string{}
+	logLines := []string{}
 	for _, ex := range executions {
-		caseLogs[ex.Case.CaseID] = filepath.Join("logs", ex.Case.CaseID+".log")
+		line := strings.Join(ex.LogLines, "\n")
+		if line == "" {
+			line = fmt.Sprintf("case=%s outcome=%s passed=%v", ex.Case.CaseID, ex.Result.Outcome, ex.Result.Passed)
+		}
+		logLines = append(logLines, line)
 	}
-	ingestID := bundle.Report.ReportID
-	if ingestID == "" {
-		ingestID = "pcs-bench-ingest-" + bundle.Report.BenchmarkSuiteID
-	}
-	sum := sha256.Sum256([]byte(ingestID + bundleDir + bundle.Report.SignatureOrDigest))
-	return PCSBenchIngestV0{
+	profileCov := buildPCSProfileCoverageReport(
+		workflow,
+		profile,
+		covReport,
+		suiteIDFromWorkflow(workflow.WorkflowID),
+		bundle.Report.SourceCommit,
+		bundle.Report.Summary.RegistryCoverage,
+	)
+	refs := buildPCSBenchIngestArtifactRefs(bundleDir, coverage, explains, profileCov, flrs)
+	ingest := PCSBenchIngestV0{
 		SchemaVersion:              SchemaVersionV0,
-		IngestID:                   ingestID,
-		BundleDir:                  ".",
-		BenchmarkReport:            bundle.Report,
+		ProducerID:                 "provability-fabric",
+		SuiteID:                    bundle.Report.BenchmarkSuiteID,
+		WorkflowID:                 workflow.WorkflowID,
 		BenchmarkRuns:              runs,
 		CoverageReports:            coverage,
 		ExplainQualityReports:      explains,
 		FailureLocalizationReports: flrs,
+		ProfileCoverageReports:     []PCSProfileCoverageReport{profileCov},
 		Commands:                   commands,
-		Logs: PCSBenchIngestLogs{
-			RunLog:   "logs/run.log",
-			CaseLogs: caseLogs,
-		},
-		SourceRepo:        VerifierSourceRepo,
-		SourceCommit:      bundle.Report.SourceCommit,
-		SignatureOrDigest: "sha256:" + hex.EncodeToString(sum[:]),
+		Logs:                       logLines,
+		ArtifactRefs:               refs,
+		SourceRepo:                 VerifierSourceRepo,
+		SourceCommit:               bundle.Report.SourceCommit,
+	}
+	ingest.SignatureOrDigest = digestPCSBenchIngest(ingest)
+	return ingest
+}
+
+func digestPCSBenchIngest(ingest PCSBenchIngestV0) string {
+	copy := ingest
+	copy.SignatureOrDigest = ""
+	raw, err := json.Marshal(copy)
+	if err != nil {
+		sum := sha256.Sum256([]byte(ingest.SuiteID + ingest.WorkflowID))
+		return "sha256:" + hex.EncodeToString(sum[:])
+	}
+	sum := sha256.Sum256(raw)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func coverageReportExportPath(metric, metricID string) string {
+	switch metric {
+	case "registry_coverage":
+		return "coverage/registry_coverage_report.v0.json"
+	case "formal_check_coverage":
+		return "coverage/formal_check_coverage_report.v0.json"
+	case "cross_domain_portability":
+		return "coverage/admission_profile_coverage_report.v0.json"
+	case "release_reproducibility":
+		return "coverage/release_reproducibility_coverage_report.v0.json"
+	}
+	switch metricID {
+	case "registry_coverage_score":
+		return "coverage/registry_coverage_report.v0.json"
+	case "formal_check_coverage_score":
+		return "coverage/formal_check_coverage_report.v0.json"
+	case "cross_domain_portability_score":
+		return "coverage/admission_profile_coverage_report.v0.json"
+	case "release_reproducibility_score":
+		return "coverage/release_reproducibility_coverage_report.v0.json"
+	default:
+		return ""
 	}
 }
 
+func buildPCSBenchIngestArtifactRefs(
+	bundleDir string,
+	coverage []PCSCoverageReport,
+	explains []PCSExplainQualityReport,
+	profileCov PCSProfileCoverageReport,
+	flrs []PCSFailureLocalizationResult,
+) []PCSBenchmarkArtifactRef {
+	refs := []PCSBenchmarkArtifactRef{}
+	for _, cov := range coverage {
+		rel := coverageReportExportPath(cov.Metric, cov.MetricID)
+		if rel == "" || cov.SignatureOrDigest == "" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(bundleDir, rel)); err != nil {
+			continue
+		}
+		refs = append(refs, buildPCSBenchmarkArtifactRef(
+			"CoverageReport.v0", rel, cov.SignatureOrDigest, cov.SourceCommit,
+		))
+	}
+	profilePath := "coverage/admission_profile.profile_coverage_report.v0.json"
+	if profileCov.SignatureOrDigest != "" {
+		if _, err := os.Stat(filepath.Join(bundleDir, profilePath)); err == nil {
+			refs = append(refs, buildPCSBenchmarkArtifactRef(
+				"ProfileCoverageReport.v0", profilePath, profileCov.SignatureOrDigest, profileCov.SourceCommit,
+			))
+		}
+	}
+	for _, eq := range explains {
+		rel := filepath.Join("explain_quality", eq.CaseID+".explain_quality_report.v0.json")
+		refs = append(refs, buildPCSBenchmarkArtifactRef(
+			"ExplainQualityReport.v0", rel, eq.SignatureOrDigest, eq.SourceCommit,
+		))
+	}
+	for _, flr := range flrs {
+		rel := filepath.Join("failure_localization", flr.CaseID+".failure_localization_result.v0.json")
+		refs = append(refs, buildPCSBenchmarkArtifactRef(
+			"FailureLocalizationResult.v0", rel, flr.SignatureOrDigest, flr.SourceCommit,
+		))
+	}
+	return refs
+}
+
 func writePCSBenchIngest(repoRoot, pcsCoreRoot, dir string, ingest PCSBenchIngestV0) error {
+	if err := ValidatePCSBenchIngestSemantics(ingest); err != nil {
+		return fmt.Errorf("pcs_bench_ingest semantics: %w", err)
+	}
 	doc := mustJSONDoc(ingest)
-	if err := ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, "PCSBenchIngest.v0.schema.json", doc); err != nil {
-		return fmt.Errorf("validate pcs_bench_ingest.v0.json: %w", err)
+	if err := ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, "PcsBenchIngest.v0.schema.json", doc); err != nil {
+		if err2 := ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, "PCSBenchIngest.v0.schema.json", doc); err2 != nil {
+			return fmt.Errorf("validate pcs_bench_ingest.v0.json: %w", err)
+		}
 	}
 	data, err := json.MarshalIndent(ingest, "", "  ")
 	if err != nil {
@@ -126,7 +345,11 @@ func writePCSBenchIngest(repoRoot, pcsCoreRoot, dir string, ingest PCSBenchInges
 
 // ValidatePCSBenchIngest validates pcs_bench_ingest.v0.json.
 func ValidatePCSBenchIngest(repoRoot string, ingest PCSBenchIngestV0) error {
-	return validateBenchmarkDoc(repoRoot, "PCSBenchIngest.v0.schema.json", ingest)
+	doc := mustJSONDoc(ingest)
+	if err := validateBenchmarkDoc(repoRoot, "PcsBenchIngest.v0.schema.json", doc); err != nil {
+		return validateBenchmarkDoc(repoRoot, "PCSBenchIngest.v0.schema.json", doc)
+	}
+	return nil
 }
 
 // BenchmarkArtifactSchemaForFile returns the pcs-core schema file for a benchmark bundle artifact path.
@@ -144,8 +367,17 @@ func BenchmarkArtifactSchemaForFile(name string) (string, error) {
 	case "failure_localization_result.v0.json":
 		return "FailureLocalizationResult.v0.schema.json", nil
 	case "pcs_bench_ingest.v0.json":
-		return "PCSBenchIngest.v0.schema.json", nil
+		return "PcsBenchIngest.v0.schema.json", nil
 	default:
+		if strings.HasSuffix(base, ".pcs_bench_ingest.reference.json") {
+			return "PcsBenchIngest.v0.schema.json", nil
+		}
+		if strings.HasSuffix(base, "coverage_report.v0.json") {
+			return "CoverageReport.v0.schema.json", nil
+		}
+		if strings.HasSuffix(base, "profile_coverage_report.v0.json") {
+			return "ProfileCoverageReport.v0.schema.json", nil
+		}
 		return "", fmt.Errorf("unknown benchmark artifact %q", base)
 	}
 }

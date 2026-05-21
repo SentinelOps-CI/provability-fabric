@@ -100,7 +100,7 @@ func TestAdmissionBenchmarkOutputsMatchPCSSchema(t *testing.T) {
 	validateFile(filepath.Join(out, "failure_localization_result.v0.json"), "FailureLocalizationResult.v0.schema.json")
 	validateFile(filepath.Join(out, "coverage_report.v0.json"), "CoverageReport.v0.schema.json")
 	validateFile(filepath.Join(out, "explain_quality_report.v0.json"), "ExplainQualityReport.v0.schema.json")
-	validateFile(filepath.Join(out, "pcs_bench_ingest.v0.json"), "PCSBenchIngest.v0.schema.json")
+	validateFile(filepath.Join(out, "pcs_bench_ingest.v0.json"), "PcsBenchIngest.v0.schema.json")
 }
 
 func TestExportPCSExplainQualityReportTraceHashMismatch(t *testing.T) {
@@ -210,8 +210,10 @@ func TestExportPCSExplainQualityReportMatchesSchema(t *testing.T) {
 	if err := pcs.ValidatePCSExplainQualityReport(root, *report); err != nil {
 		t.Fatal(err)
 	}
-	if !containsSection(report.RequiredSections, "formal_checks") {
-		t.Fatalf("expected formal_checks section, got %v", report.RequiredSections)
+	for _, section := range pcs.CanonicalExplainQualitySections {
+		if !containsSection(report.RequiredSections, section) {
+			t.Fatalf("expected section %s, got %v", section, report.RequiredSections)
+		}
 	}
 }
 

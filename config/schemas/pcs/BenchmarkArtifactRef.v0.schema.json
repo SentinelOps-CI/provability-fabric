@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkArtifactRef.v0.schema.json",
+  "title": "BenchmarkArtifactRef.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "path",
+    "sha256",
+    "role",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "$ref": "common.defs.json#/$defs/benchmark_artifact_ref_type" },
+    "path": { "type": "string", "minLength": 1 },
+    "sha256": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "role": { "$ref": "common.defs.json#/$defs/benchmark_artifact_ref_role" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}
