@@ -29,10 +29,13 @@ if (-not $OutRoot) {
 }
 New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
 
+$Mat = Join-Path $Root "scripts\materialize-admission-benchmark-cases.py"
 if (Get-Command python -ErrorAction SilentlyContinue) {
-    python (Join-Path $Root "scripts\materialize-admission-benchmark-cases.py")
+    $env:PCS_BENCHMARK_QUIET = "1"
+    python $Mat --quiet
 } elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
-    python3 (Join-Path $Root "scripts\materialize-admission-benchmark-cases.py")
+    $env:PCS_BENCHMARK_QUIET = "1"
+    python3 $Mat --quiet
 } else {
     throw "python or python3 required to materialize benchmark cases"
 }
@@ -79,16 +82,24 @@ function Invoke-Pf {
     if ($LASTEXITCODE -ne 0) { throw "pf failed: $($Remaining -join ' ')" }
 }
 
+$ValidateArgs = @('--validate')
+if ($env:PCS_CORE_PATH -and (Test-Path (Join-Path $env:PCS_CORE_PATH 'schemas'))) {
+    $ValidateArgs += @('--validate-pcs-core-output', $env:PCS_CORE_PATH)
+} elseif (Test-Path (Join-Path $Root '..\pcs-core\schemas')) {
+    $ValidateArgs += @('--validate-pcs-core-output', (Resolve-Path (Join-Path $Root '..\pcs-core')).Path)
+}
+
 $Suites = @('labtrust_qc_release', 'tool_use_safety', 'computation_reproducibility', 'formal_trust_kernel')
 $Failed = 0
 foreach ($Suite in $Suites) {
     $Out = Join-Path $OutRoot "${Suite}_admission"
-    Write-Host "==> pf benchmark admission --cases benchmarks/admission/$Suite"
+    Write-Host "==> pf benchmark admission --cases benchmarks/admission/$Suite ($ValidateArgs)"
     try {
         Invoke-Pf benchmark admission `
             --cases "benchmarks/admission/$Suite" `
             --registry $Registry `
-            --out "benchmark_runs/${Suite}_admission"
+            --out "benchmark_runs/${Suite}_admission" `
+            @ValidateArgs
     } catch {
         Write-Host $_
         $Failed++

@@ -95,8 +95,23 @@ func explainVerificationCheck(c VerificationCheck) []FailureExplanation {
 	code, _ := c.Details["reason_code"].(string)
 	switch c.CheckID {
 	case "trace_hash_alignment":
+		fc := code
+		if fc == "" {
+			fc = ReasonTraceHashMismatch
+		}
+		actual := c.Description
+		if rt, ok := c.Details["runtime_receipt_trace_hash"].(string); ok {
+			if ct, ok2 := c.Details["trace_certificate_trace_hash"].(string); ok2 {
+				actual = fmt.Sprintf("runtime_receipt.trace_hash=%s trace_certificate.trace_hash=%s", rt, ct)
+			}
+		} else if msg, ok := c.Details["message"].(string); ok {
+			actual = msg
+		}
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,
+			FailureCode:          fc,
+			Expected:             "TraceCertificate.trace_hash matches RuntimeReceipt.trace_hash",
+			Actual:               actual,
 			ResponsibleComponent: ComponentLabTrustGym,
 			RepairHint:           "Re-export trace and runtime receipt from LabTrust, re-run CertifyEdge, and re-attach the certificate.",
 			RegenerateCmd:        "labtrust export-trace ... && certifyedge emit-pcs-certificate --handoff handoff_to_certifyedge.json --out trace_certificate.json && labtrust attach-certificate ...",
@@ -158,6 +173,35 @@ func explainReleaseChainCheck(c ReleaseValidationCheck) []FailureExplanation {
 		}}
 	}
 	switch c.CheckID {
+	case "scientific_memory_import_passed":
+		fc, artifactPath, expected, actual, responsible, registryRef, handoffRef := releaseCheckExplanationFields(c)
+		if fc == "" {
+			fc = FailureCodeScientificMemoryImportFailed
+		}
+		if expected == "" {
+			expected = "scientific_memory_import_report.verification_status passed with strict pcs_core import"
+		}
+		if actual == "" {
+			if msg, ok := c.Details["verification_status"].(string); ok {
+				actual = "verification_status=" + msg
+			} else if msg, ok := c.Details["error"].(string); ok {
+				actual = msg
+			} else {
+				actual = c.Description
+			}
+		}
+		return []FailureExplanation{{
+			CheckID:              c.CheckID,
+			FailureCode:          fc,
+			ArtifactPath:         artifactPath,
+			Expected:             expected,
+			Actual:               actual,
+			ResponsibleComponent: responsible,
+			RegistryCheckRef:     registryRef,
+			HandoffRef:           handoffRef,
+			RepairHint:           "Re-run Scientific Memory import with strict pcs_core bundle shape and passed verification_status.",
+			RegenerateCmd:        "pf verify release-chain --manifest release_manifest.v0.json --registry artifact_registry.json --artifact-dir <dir> --release-mode",
+		}}
 	case "manifest_hashes_match":
 		return []FailureExplanation{{
 			CheckID:              c.CheckID,

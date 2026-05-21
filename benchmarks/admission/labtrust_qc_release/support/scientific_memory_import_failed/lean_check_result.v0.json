@@ -1,0 +1,34 @@
+{
+  "schema_version": "v0",
+  "check_id": "lean-check-labtrust-qc-release-v0.1",
+  "proof_obligation_id": "po-labtrust-qc-release-v0.1",
+  "lean_module": "PCS.Theorems",
+  "lean_theorem": "admissible_release_has_matching_trace_hash",
+  "status": "ProofChecked",
+  "checked_at": "2026-05-18T12:00:00Z",
+  "lean_version": "4.12.0",
+  "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+  "source_commit": "17e414501b3e1c58e8fbde1fe89a828440a945d9",
+  "failure_reason": "",
+  "obligation_results": [
+    {
+      "obligation_id": "trace_hash_alignment",
+      "kind": "CertificateMatchesRuntime",
+      "status": "passed",
+      "lean_theorem": "admissible_release_has_matching_trace_hash"
+    },
+    {
+      "obligation_id": "verification_admits_bundle",
+      "kind": "VerificationAdmitsBundle",
+      "status": "passed",
+      "lean_theorem": "admissible_release_has_verified_input_hash_equal_to_bundle_hash"
+    },
+    {
+      "obligation_id": "signed_bundle_admissible",
+      "kind": "SignedBundleAdmissible",
+      "status": "passed",
+      "lean_theorem": "admissible_release_has_signed_input_hash_equal_to_verified_input_hash"
+    }
+  ],
+  "signature_or_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+}

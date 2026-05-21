@@ -86,6 +86,63 @@ func ValidateDocumentAgainstSchema(repoRoot, schemaFile string, doc any) error {
 	return schema.Validate(doc)
 }
 
+func loadCompiledPCSCoreSchema(pcsCoreRoot, schemaFile string) (*jsonschema.Schema, error) {
+	schemaDir := filepath.Join(pcsCoreRoot, "schemas")
+	compiler := jsonschema.NewCompiler()
+	entries, err := os.ReadDir(schemaDir)
+	if err != nil {
+		return nil, fmt.Errorf("read pcs-core schemas: %w", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(schemaDir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		if err := registerSchemaResource(compiler, e.Name(), string(body)); err != nil {
+			return nil, fmt.Errorf("register pcs-core schema %s: %w", e.Name(), err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(schemaDir, schemaFile)); err != nil {
+		return nil, fmt.Errorf("pcs-core schema not found: %s", schemaFile)
+	}
+	return compiler.Compile(schemaFile)
+}
+
+// ValidateDocumentAgainstPCSCoreSchema validates data against schemas in pcs-core/schemas.
+func ValidateDocumentAgainstPCSCoreSchema(pcsCoreRoot, schemaFile string, doc any) error {
+	schema, err := loadCompiledPCSCoreSchema(pcsCoreRoot, schemaFile)
+	if err != nil {
+		return err
+	}
+	return schema.Validate(doc)
+}
+
+// pcsCoreHasSchema reports whether a schema file exists in pcs-core/schemas.
+func pcsCoreHasSchema(pcsCoreRoot, schemaFile string) bool {
+	if strings.TrimSpace(pcsCoreRoot) == "" {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(pcsCoreRoot, "schemas", schemaFile))
+	return err == nil && !st.IsDir()
+}
+
+// pfOnlyBenchmarkSchemas are validated against PF embedded schemas (not shipped in pcs-core).
+var pfOnlyBenchmarkSchemas = map[string]struct{}{
+	"PCSBenchIngest.v0.schema.json":         {},
+	"AdmissionBenchmarkCase.v0.schema.json": {},
+}
+
+// ValidateDocumentAgainstSchemaPreferPCSCore uses pcs-core/schemas when present, else PF embedded/config schemas.
+func ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, schemaFile string, doc any) error {
+	if _, pfOnly := pfOnlyBenchmarkSchemas[schemaFile]; !pfOnly && pcsCoreHasSchema(pcsCoreRoot, schemaFile) {
+		return ValidateDocumentAgainstPCSCoreSchema(pcsCoreRoot, schemaFile, doc)
+	}
+	return ValidateDocumentAgainstSchema(repoRoot, schemaFile, doc)
+}
+
 // ValidateScienceClaimBundleValue validates an in-memory bundle against ScienceClaimBundle.v0 schema.
 func ValidateScienceClaimBundleValue(repoRoot string, bundle *ScienceClaimBundle) error {
 	if bundle == nil {

@@ -114,7 +114,7 @@ Release-chain validation emits schema-valid `ReleaseChainValidationResult.v0` wi
 Measure PF as the PCS release admission controller (valid admits, invalid rejects, localization, explain quality, registry coverage). See [pcs-admission-benchmark.md](pcs-admission-benchmark.md).
 
 ```bash
-pf benchmark admission \
+bash scripts/pf.sh benchmark admission \
   --cases benchmarks/admission/labtrust_qc_release \
   --registry ../pcs-core/examples/artifact_registry.valid.json \
   --out benchmark_runs/labtrust_admission \

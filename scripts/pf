@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# pf on PATH: export PATH="$REPO_ROOT/scripts:$PATH" then run pf ...
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pf.sh" "$@"

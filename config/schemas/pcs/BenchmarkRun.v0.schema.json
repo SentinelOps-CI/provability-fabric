@@ -38,11 +38,26 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "observed_status": { "$ref": "common.defs.json#/$defs/benchmark_observed_status" },
-    "observed_failure_code": { "type": "string" },
+    "observed_failure_code": { "type": ["string", "null"] },
     "observed_responsible_component": {
-      "$ref": "common.defs.json#/$defs/benchmark_responsible_component"
+      "$ref": "common.defs.json#/$defs/nullable_benchmark_responsible_component"
     },
-    "observed_repair_hint": { "type": "string" },
+    "observed_repair_hint": { "type": ["string", "null"] },
+    "system_admission_outcome": {
+      "$ref": "common.defs.json#/$defs/system_admission_outcome"
+    },
+    "release_chain_status": {
+      "$ref": "common.defs.json#/$defs/release_chain_status"
+    },
+    "certificate_status": {
+      "$ref": "common.defs.json#/$defs/certificate_status_value"
+    },
+    "scientific_memory_import_status": {
+      "$ref": "common.defs.json#/$defs/scientific_memory_import_status"
+    },
+    "scientific_memory_render_status": {
+      "$ref": "common.defs.json#/$defs/scientific_memory_render_status"
+    },
     "duration_ms": { "type": "integer", "minimum": 0 },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },

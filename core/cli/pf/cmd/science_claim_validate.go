@@ -22,6 +22,7 @@ func validateRootCmd() *cobra.Command {
 	cmd.AddCommand(validateVerificationResultCmd())
 	cmd.AddCommand(validateSignedScienceClaimCmd())
 	registerPhase2ValidateCommands(cmd)
+	registerBenchmarkValidateCommands(cmd)
 	return cmd
 }
 

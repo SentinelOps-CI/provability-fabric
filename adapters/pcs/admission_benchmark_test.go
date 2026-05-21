@@ -49,18 +49,23 @@ func TestAdmissionBenchmarkLabtrustSuite(t *testing.T) {
 	reg := validArtifactRegistryPath(t)
 	out := t.TempDir()
 	run, _, cov, explain, err := pcs.RunAdmissionBenchmark(pcs.AdmissionBenchmarkOptions{
-		RepoRoot:     root,
-		CasesDir:     casesDir,
-		RegistryPath: reg,
-		OutDir:       out,
+		RepoRoot:            root,
+		CasesDir:            casesDir,
+		RegistryPath:        reg,
+		OutDir:              out,
+		ValidateBundle:      true,
+		RequireAllCasesPass: true,
 	})
 	if err != nil {
+		if len(failedCases(run)) > 0 {
+			t.Fatalf("%v: failed=%+v", err, failedCases(run))
+		}
 		t.Fatal(err)
 	}
 	if run.Metrics.ValidReleaseAdmissionRate < 1.0 {
 		t.Fatalf("valid admission rate=%v cases=%+v", run.Metrics.ValidReleaseAdmissionRate, failedCases(run))
 	}
-	if run.Metrics.InvalidReleaseRejectionRate < 0.85 {
+	if run.Metrics.InvalidReleaseRejectionRate < 1.0 {
 		t.Fatalf("invalid rejection rate=%v cases=%+v", run.Metrics.InvalidReleaseRejectionRate, failedCases(run))
 	}
 	if err := pcs.ValidateAdmissionBenchmarkBundleDir(root, out); err != nil {
@@ -68,6 +73,29 @@ func TestAdmissionBenchmarkLabtrustSuite(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "benchmark_report.v0.json")); err != nil {
 		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"pcs_bench_ingest.v0.json",
+		"coverage/registry.coverage_report.v0.json",
+		"coverage/formal_checks.coverage_report.v0.json",
+		"coverage/admission_profile.profile_coverage_report.v0.json",
+		"failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json",
+	} {
+		if _, err := os.Stat(filepath.Join(out, path)); err != nil {
+			t.Fatalf("missing bundle artifact %s: %v", path, err)
+		}
+	}
+	ingest, err := pcs.LoadPCSBenchIngestFromDir(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ingest.ExplainQualityReports) == 0 {
+		t.Fatal("expected explain quality reports in ingest manifest")
+	}
+	for _, eq := range ingest.ExplainQualityReports {
+		if eq.QualityScore < 0.8 {
+			t.Fatalf("case %s explain quality_score=%f below gate", eq.CaseID, eq.QualityScore)
+		}
 	}
 	if cov.Registry.SemanticChecksExecuted == 0 && lastValidRCVR(run) {
 		t.Fatal("expected registry semantic checks in coverage report")
@@ -171,6 +199,48 @@ func TestAdmissionBenchmarkComputationSuite(t *testing.T) {
 	if err := pcs.ValidateAdmissionBenchmarkBundleDir(root, out); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestScientificMemoryImportFailureReleaseChain(t *testing.T) {
+	root := repoRoot(t)
+	artifactDir := filepath.Join(root, "benchmarks", "admission", "labtrust_qc_release", "support", "scientific_memory_import_failed")
+	manifestPath := filepath.Join(artifactDir, "release_manifest.v0.json")
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Skip("scientific_memory_import_failed fixture not materialized")
+	}
+	reg := validArtifactRegistryPath(t)
+	result, err := pcs.VerifyReleaseChainFromManifest(manifestPath, pcs.ReleaseChainVerifyOptions{
+		RepoRoot:     root,
+		ArtifactDir:  artifactDir,
+		Registry:     loadRegistryForTest(t, reg),
+		ReleaseMode:  true,
+		SourceCommit: pcs.ResolveSourceCommit(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != pcs.StatusRejected {
+		t.Fatalf("status=%s want Rejected", result.Status)
+	}
+	found := false
+	for _, fc := range result.FailureCodes {
+		if fc == pcs.FailureCodeScientificMemoryImportFailed {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected %s in failure_codes=%v", pcs.FailureCodeScientificMemoryImportFailed, result.FailureCodes)
+	}
+}
+
+func loadRegistryForTest(t *testing.T, path string) *pcs.ArtifactRegistry {
+	t.Helper()
+	reg, err := pcs.LoadArtifactRegistry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reg
 }
 
 func TestLoadPCSBenchIngestFromDir(t *testing.T) {

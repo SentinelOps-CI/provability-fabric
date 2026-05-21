@@ -30,7 +30,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+      "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_id" }
     },
     "success_criteria": { "$ref": "#/$defs/success_criteria" },
     "source_repo": { "type": "string", "format": "uri" },

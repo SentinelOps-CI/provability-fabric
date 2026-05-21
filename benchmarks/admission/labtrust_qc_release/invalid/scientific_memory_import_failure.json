@@ -1,0 +1,24 @@
+{
+  "case_id": "scientific_memory_import_failure",
+  "expect": "reject",
+  "verify_mode": "release_chain",
+  "expect_failure_codes": [
+    "scientific_memory_import_failed"
+  ],
+  "inputs": {
+    "artifact_dir": "support/scientific_memory_import_failed",
+    "manifest": "support/scientific_memory_import_failed/release_manifest.v0.json"
+  },
+  "localization": {
+    "check_id": "scientific_memory_import_passed",
+    "artifact_path": "scientific_memory_import_report.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "artifact_path": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
+  }
+}

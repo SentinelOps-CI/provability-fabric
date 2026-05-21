@@ -11,6 +11,7 @@
     "case_kind",
     "input_artifacts",
     "expected_status",
+    "expected_system_outcome",
     "expected_failure_code",
     "expected_responsible_component",
     "expected_repair_hint_kind",
@@ -27,12 +28,17 @@
     "case_kind": { "$ref": "common.defs.json#/$defs/benchmark_case_kind" },
     "input_artifacts": { "$ref": "#/$defs/input_artifacts" },
     "expected_status": { "$ref": "common.defs.json#/$defs/benchmark_observed_status" },
-    "expected_failure_code": { "type": "string" },
+    "expected_system_outcome": {
+      "$ref": "common.defs.json#/$defs/benchmark_system_outcome"
+    },
+    "expected_failure_code": {
+      "type": ["string", "null"]
+    },
     "expected_responsible_component": {
-      "$ref": "common.defs.json#/$defs/benchmark_responsible_component"
+      "$ref": "common.defs.json#/$defs/nullable_benchmark_responsible_component"
     },
     "expected_repair_hint_kind": {
-      "$ref": "common.defs.json#/$defs/benchmark_repair_hint_kind"
+      "$ref": "common.defs.json#/$defs/nullable_benchmark_repair_hint_kind"
     },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },

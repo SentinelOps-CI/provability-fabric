@@ -26,6 +26,8 @@ func main() {
 	localDev := flag.Bool("local-dev", false, "Allow 40-zero source_commit placeholder")
 	labtrust := flag.Bool("labtrust", true, "Also validate tests/pcs/fixtures/labtrust canonical fixtures")
 	jsonOut := flag.Bool("json", false, "Emit machine-readable summary")
+	benchmarkBundle := flag.String("benchmark-bundle", "", "Validate a pf benchmark admission output directory")
+	pcsCoreRoot := flag.String("pcs-core", "", "When validating a benchmark bundle, use schemas from this pcs-core checkout")
 	flag.Parse()
 
 	root := *repoRoot
@@ -47,7 +49,58 @@ func main() {
 	dir = filepath.Clean(dir)
 
 	var results []validateResult
-	failed := validateBundleFixtures(dir, root, *localDev, &results)
+	var failed int
+
+	if *benchmarkBundle != "" {
+		bundleDir := *benchmarkBundle
+		if !filepath.IsAbs(bundleDir) {
+			bundleDir = filepath.Join(wd, bundleDir)
+		}
+		pcsCore := strings.TrimSpace(*pcsCoreRoot)
+		var err error
+		if pcsCore != "" {
+			err = pcs.ValidateBenchmarkBundleArtifactsWithPCSCore(root, pcsCore, bundleDir)
+		} else {
+			err = pcs.ValidateAdmissionBenchmarkBundleDir(root, bundleDir)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "benchmark bundle: %v\n", err)
+			os.Exit(1)
+		}
+		if !*jsonOut {
+			fmt.Printf("OK: benchmark bundle %s\n", bundleDir)
+		}
+	}
+
+	for _, arg := range flag.Args() {
+		path := arg
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(wd, path)
+		}
+		label := arg
+		if err := pcs.ValidateBenchmarkArtifactFile(root, path); err != nil {
+			results = append(results, validateResult{File: label, Status: "failed", Error: err.Error()})
+			failed++
+			continue
+		}
+		results = append(results, validateResult{File: label, Status: "ok"})
+		if !*jsonOut {
+			fmt.Printf("%s: ok\n", label)
+		}
+	}
+	if flag.NArg() > 0 || *benchmarkBundle != "" {
+		if failed > 0 {
+			os.Exit(1)
+		}
+		if flag.NArg() > 0 && !*jsonOut {
+			fmt.Printf("OK: validated %d benchmark artifact(s)\n", flag.NArg())
+		}
+		if *benchmarkBundle != "" || flag.NArg() > 0 {
+			return
+		}
+	}
+
+	failed = validateBundleFixtures(dir, root, *localDev, &results)
 
 	if *labtrust {
 		labtrustDir := filepath.Join(dir, "fixtures", "labtrust")

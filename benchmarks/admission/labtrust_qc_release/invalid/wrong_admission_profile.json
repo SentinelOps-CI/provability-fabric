@@ -6,5 +6,12 @@
     "admission_profile_workflow_mismatch"
   ],
   "inputs": {},
-  "profile_id": "agent_tool_use_safety"
+  "profile_id": "agent_tool_use_safety",
+  "explain_requirements": {
+    "failure_code": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
+  }
 }

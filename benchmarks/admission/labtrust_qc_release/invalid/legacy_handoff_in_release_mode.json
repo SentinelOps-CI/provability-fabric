@@ -7,5 +7,12 @@
   ],
   "inputs": {
     "handoff": "pf_handoff.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
   }
 }

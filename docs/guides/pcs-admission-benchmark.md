@@ -27,15 +27,29 @@ python scripts/materialize-admission-benchmark-cases.py
 
 ## Run benchmarks
 
-Single workflow:
+If `pf` is not on your PATH (common on Git Bash / Windows), use the repo wrapper (builds `core/cli/pf/pf.exe` when Go is available):
 
 ```bash
-pf benchmark admission \
+bash scripts/pf.sh benchmark admission \
   --cases benchmarks/admission/labtrust_qc_release \
   --registry ../pcs-core/examples/artifact_registry.valid.json \
   --out benchmark_runs/labtrust_admission \
+  --validate \
+  --validate-pcs-core-output ../pcs-core \
   --json-summary
 ```
+
+Or from `core/cli/pf` with Go on PATH:
+
+```bash
+cd core/cli/pf && go run . benchmark admission \
+  --cases ../../benchmarks/admission/labtrust_qc_release \
+  --registry ../../../pcs-core/examples/artifact_registry.valid.json \
+  --out ../../benchmark_runs/labtrust_admission \
+  --validate
+```
+
+When `pf` is installed globally, the same flags work as `pf benchmark admission ...`.
 
 All workflows (CI / local gate):
 
@@ -49,7 +63,7 @@ Or via Make:
 make test-pcs-benchmark
 ```
 
-On Windows (Git Bash without `go` on PATH), the shell script builds `core/cli/pf/pf.exe` automatically. You can also run:
+On Windows (Git Bash), `bash scripts/pf.sh` builds `core/cli/pf/pf.exe` automatically when Go is installed. Benchmark shell scripts use the same resolver. You can also run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-benchmark-admission.ps1
@@ -66,9 +80,15 @@ Each run writes a **pcs-core benchmark bundle** under `--out` (validated against
 | `failure_localization_result.v0.json` | `FailureLocalizationResult.v0` (array) | Per invalid-case localization |
 | `coverage_report.v0.json` | `CoverageReport.v0` (array) | Per-metric coverage |
 | `explain_quality_report.v0.json` | `ExplainQualityReport.v0` (array) | Per invalid-case explain scoring |
+| `explain_quality/<case_id>.explain_quality_report.v0.json` | `ExplainQualityReport.v0` | Per-case pcs-core explain export |
+| `failure_localization/<case_id>.failure_localization_result.v0.json` | `FailureLocalizationResult.v0` | Per-case failure localization |
+| `coverage/registry.coverage_report.v0.json` | `CoverageReport.v0` | Registry coverage |
+| `coverage/formal_checks.coverage_report.v0.json` | `CoverageReport.v0` | Formal-check coverage |
+| `coverage/admission_profile.profile_coverage_report.v0.json` | `CoverageReport.v0` | Admission profile coverage |
 | `commands.json` | — | Command log for reproducibility |
 | `logs/run.log` | — | Case outcome log |
 | `runs/<case_id>/` | — | Per-case copies of run / explain / FLR artifacts |
+| `pcs_bench_ingest.v0.json` | `PCSBenchIngest.v0` | **Single-file pcs-bench import** (embedded report, runs, coverage, explain, FLR, commands, log paths) |
 | `admission_benchmark_suite.v0.json` | PF-internal | Suite metrics + case outcomes (legacy PF summary) |
 
 Use `--json-summary` to print a compact JSON summary (metrics + pass/fail counts) on stdout.
@@ -104,26 +124,46 @@ Formal trust-kernel enforcement (proof obligations, Lean checks, theorem referen
 
 ## pcs-bench integration
 
-Downstream **pcs-bench** should ingest `benchmark_report.v0.json` plus the root `*.v0.json` arrays and `runs/` tree. Schemas are synced from pcs-core into `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/`.
+Downstream **pcs-bench** should read **`pcs_bench_ingest.v0.json`** (embedded `benchmark_report`, runs, coverage, explain, failure localization, commands, log paths, `source_repo`, `source_commit`, `signature_or_digest`). The same artifacts are also laid out on disk under normalized paths (`explain_quality/`, `coverage/`, `runs/`, `logs/`). Schemas are synced from pcs-core into `config/schemas/pcs/` and embedded in `adapters/pcs/schemas/`.
 
-Validate a bundle directory in Go tests or tooling:
+Use `--validate-pcs-core-output /path/to/pcs-core` to validate every normalized artifact against the canonical pcs-core `schemas/` tree (in addition to `--validate` against PF’s synced copy).
 
-```go
-pcs.ValidateAdmissionBenchmarkBundleDir(repoRoot, bundleDir)
+Validate a bundle directory (CI / local gate):
+
+```bash
+make validate-pcs-benchmark-bundle
+# or (pcs validate compatible):
+bash scripts/pcs-validate-benchmark-bundle.sh benchmark_runs/labtrust_admission
+# or:
+bash scripts/pf.sh validate benchmark-bundle benchmark_runs/labtrust_admission
 ```
 
-Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs` (`admission_benchmark_bundle.go`).
+`--validate` on `pf benchmark admission` runs the same bundle gate after every write.
+
+Explain export uses `pcs.ExportPCSExplainQualityReport` with PF field → pcs-core section mapping (`verification`, `provenance`, `repair_hints`, `handoffs`, `formal_checks`).
+
+Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs`.
 
 Minimum gate thresholds (current PF tests):
 
-- LabTrust: invalid rejection rate ≥ 0.85, valid admission rate = 1.0
+- LabTrust: **all cases pass** (`RequireAllCasesPass`), invalid rejection rate = 1.0, valid admission rate = 1.0, per-case explain quality_score ≥ 0.8 when required
 - Tool-use / computation: invalid rejection rate ≥ 0.80
+
+### Definition of done (PCS benchmark reference)
+
+| Step | Status |
+|------|--------|
+| PCS-native explain export (`ExportPCSExplainQualityReport`, `explain_quality/<case>.explain_quality_report.v0.json`) | Done |
+| PCS-native coverage (`coverage/registry|formal_checks|admission_profile.*.json`) | Done |
+| `pcs_bench_ingest.v0.json` stable manifest | Done |
+| `pf benchmark admission --validate` + `--validate-pcs-core-output` | Done |
+| Required invalid failure families (`RequiredAdmissionInvalidCaseIDs`, incl. `scientific_memory_import_failure`) | Done |
 
 ## Adding cases
 
 1. Add or extend fixtures under `tests/pcs/fixtures/`.
 2. Add a case entry in `scripts/materialize-admission-benchmark-cases.py`.
 3. Run `python scripts/materialize-admission-benchmark-cases.py`.
-4. Run `make test-pcs-benchmark` or the single-suite `pf benchmark admission` command.
+4. Run `make test-pcs-benchmark`, `bash scripts/pcs-benchmark-admission.sh`, or a single suite via `bash scripts/pf.sh benchmark admission ...`.
 
 Invalid cases should set `expect_failure_codes` to PCS reason codes (e.g. `PCS_CERTIFICATE_REJECTED`) or release-chain check IDs (e.g. `signed_input_bundle_hash_match`) depending on `verify_mode`.

@@ -8,5 +8,12 @@
   "inputs": {
     "bundle": "invalid_mismatched_trace_hash.json",
     "omit_handoff": true
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
   }
 }

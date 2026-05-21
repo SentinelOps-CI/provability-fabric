@@ -84,14 +84,18 @@ test-pcs:
 ifeq ($(OS),Windows_NT)
 test-pcs-benchmark:
 	@$(ECHOOK) "PCS admission benchmarks..."
-	bash scripts/pcs-benchmark-admission.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-benchmark-admission.ps1
+	@bash scripts/pcs-benchmark-admission.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-benchmark-admission.ps1
 else
 test-pcs-benchmark:
 	@$(ECHOOK) "PCS admission benchmarks..."
-	bash scripts/pcs-benchmark-admission.sh
+	@bash scripts/pcs-benchmark-admission.sh
 endif
 
-test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark
+validate-pcs-benchmark-bundle:
+	@$(ECHOOK) "Validate PCS admission benchmark bundle (labtrust)..."
+	bash scripts/pcs-validate-benchmark-bundle.sh benchmark_runs/labtrust_admission
+
+test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle
 	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures, admission benchmarks)"
 
 validate-pcs-fixtures:

@@ -7,5 +7,12 @@
   ],
   "inputs": {
     "registry": "support/registry_disallowed_status.json"
+  },
+  "explain_requirements": {
+    "failure_code": true,
+    "expected": true,
+    "actual": true,
+    "responsible_component": true,
+    "repair_hint": true
   }
 }

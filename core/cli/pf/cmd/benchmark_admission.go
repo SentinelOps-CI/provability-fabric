@@ -19,6 +19,8 @@ func benchmarkAdmissionCmd() *cobra.Command {
 	var runID string
 	var jsonOut bool
 	var jsonSummary bool
+	var validateBundle bool
+	var validatePCSCore string
 
 	cmd := &cobra.Command{
 		Use:   "admission",
@@ -66,14 +68,23 @@ func benchmarkAdmissionCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			pcsCoreOut := strings.TrimSpace(validatePCSCore)
+			if pcsCoreOut != "" {
+				if resolved, pErr := pcs.ResolveArtifactPath(pcsCoreOut); pErr == nil {
+					pcsCoreOut = resolved
+				}
+			}
 			run, loc, cov, explain, err := pcs.RunAdmissionBenchmark(pcs.AdmissionBenchmarkOptions{
-				RepoRoot:         repoRoot,
-				CasesDir:         resolvedCases,
-				RegistryPath:     regPath,
-				SourceCommit:     sourceCommit,
-				ValidatorVersion: pcs.DefaultVerifierVersion,
-				OutDir:           out,
-				RunID:            runID,
+				RepoRoot:              repoRoot,
+				CasesDir:              resolvedCases,
+				RegistryPath:          regPath,
+				SourceCommit:          sourceCommit,
+				ValidatorVersion:      pcs.DefaultVerifierVersion,
+				OutDir:                out,
+				RunID:                 runID,
+				ValidateBundle:        validateBundle || pcsCoreOut != "",
+				ValidatePCSCoreOutput: pcsCoreOut,
+				RequireAllCasesPass:   validateBundle || pcsCoreOut != "",
 			})
 			if err != nil {
 				return err
@@ -103,15 +114,6 @@ func benchmarkAdmissionCmd() *cobra.Command {
 				fmt.Printf("formal_check_enforcement_coverage: %.3f\n", run.Metrics.FormalCheckEnforcementCoverage)
 				fmt.Printf("wrote %s\n", out)
 			}
-			failed := 0
-			for _, c := range run.Cases {
-				if !c.Passed {
-					failed++
-				}
-			}
-			if failed > 0 {
-				return cliExit(ExitVerificationFailed, fmt.Errorf("%d/%d benchmark cases failed", failed, len(run.Cases)))
-			}
 			_ = loc
 			_ = cov
 			_ = explain
@@ -124,5 +126,7 @@ func benchmarkAdmissionCmd() *cobra.Command {
 	cmd.Flags().StringVar(&runID, "run-id", "", "Optional benchmark run id")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit admission_benchmark_suite.v0.json on stdout (legacy)")
 	cmd.Flags().BoolVar(&jsonSummary, "json-summary", false, "Emit compact JSON summary on stdout")
+	cmd.Flags().BoolVar(&validateBundle, "validate", false, "Validate output bundle against PF pcs schemas after write")
+	cmd.Flags().StringVar(&validatePCSCore, "validate-pcs-core-output", "", "Validate normalized bundle against pcs-core/schemas (path to pcs-core checkout)")
 	return cmd
 }

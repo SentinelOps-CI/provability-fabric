@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // PCSBenchIngestLogs lists log paths relative to bundle_dir.
@@ -61,7 +62,7 @@ func ExportPCSExplainQualityReport(in ExportPCSExplainQualityCaseInput) *PCSExpl
 
 func buildPCSBenchIngest(bundle PCSBenchmarkBundle, bundleDir string, executions []benchmarkCaseExecution) PCSBenchIngestV0 {
 	coverage := make([]PCSCoverageReport, 0, len(bundle.CoverageByMetric))
-	for _, m := range []string{"registry_coverage", "formal_check_coverage", "release_reproducibility", "failure_localization", "certificate_completeness"} {
+	for _, m := range []string{"registry_coverage", "formal_check_coverage", "admission_profile_coverage", "release_reproducibility", "failure_localization", "certificate_completeness"} {
 		if c, ok := bundle.CoverageByMetric[m]; ok {
 			coverage = append(coverage, c)
 		}
@@ -111,11 +112,10 @@ func buildPCSBenchIngest(bundle PCSBenchmarkBundle, bundleDir string, executions
 	}
 }
 
-func writePCSBenchIngest(repoRoot, dir string, ingest PCSBenchIngestV0) error {
-	if repoRoot != "" {
-		if err := ValidateDocumentAgainstSchema(repoRoot, "PCSBenchIngest.v0.schema.json", mustJSONDoc(ingest)); err != nil {
-			return fmt.Errorf("validate pcs_bench_ingest.v0.json: %w", err)
-		}
+func writePCSBenchIngest(repoRoot, pcsCoreRoot, dir string, ingest PCSBenchIngestV0) error {
+	doc := mustJSONDoc(ingest)
+	if err := ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, "PCSBenchIngest.v0.schema.json", doc); err != nil {
+		return fmt.Errorf("validate pcs_bench_ingest.v0.json: %w", err)
 	}
 	data, err := json.MarshalIndent(ingest, "", "  ")
 	if err != nil {
@@ -199,6 +199,14 @@ func LoadPCSBenchIngestFromDir(dir string) (PCSBenchIngestV0, error) {
 
 // ValidateBenchmarkBundleArtifacts validates standard pcs-core benchmark JSON files (pcs validate compatible).
 func ValidateBenchmarkBundleArtifacts(repoRoot, dir string) error {
+	return ValidateBenchmarkBundleArtifactsWithPCSCore(repoRoot, "", dir)
+}
+
+// ValidateBenchmarkBundleArtifactsWithPCSCore validates bundle artifacts; when pcsCoreRoot is set, uses pcs-core/schemas.
+func ValidateBenchmarkBundleArtifactsWithPCSCore(repoRoot, pcsCoreRoot, dir string) error {
+	if strings.TrimSpace(pcsCoreRoot) != "" {
+		return ValidateAdmissionBenchmarkBundlePCSCore(pcsCoreRoot, dir)
+	}
 	for _, name := range []string{
 		"benchmark_report.v0.json",
 		"coverage_report.v0.json",

@@ -29,10 +29,12 @@ var RequiredAdmissionInvalidCaseIDs = []string{
 	"result_hash_mismatch",
 	"missing_code_commit",
 	"nonzero_exit_code",
+	"scientific_memory_import_failure",
 }
 
 // writeAdmissionBenchmarkBundle emits a pcs-core benchmark bundle for pcs-bench ingestion.
-func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBundle, executions []benchmarkCaseExecution) error {
+// When pcsCoreRoot is non-empty, per-artifact validation uses pcs-core/schemas.
+func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCSBenchmarkBundle, executions []benchmarkCaseExecution) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -46,10 +48,14 @@ func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBund
 	}
 
 	validateDoc := func(schema string, v any) error {
-		if repoRoot == "" || schema == "" {
+		if schema == "" {
 			return nil
 		}
-		return ValidateDocumentAgainstSchema(repoRoot, schema, mustJSONDoc(v))
+		doc := mustJSONDoc(v)
+		if repoRoot == "" && strings.TrimSpace(pcsCoreRoot) == "" {
+			return nil
+		}
+		return ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, schema, doc)
 	}
 	writeDoc := func(path, schema string, v any) error {
 		if err := validateDoc(schema, v); err != nil {
@@ -97,7 +103,7 @@ func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBund
 		return err
 	}
 	coverageList := make([]PCSCoverageReport, 0, len(bundle.CoverageByMetric))
-	for _, m := range []string{"registry_coverage", "formal_check_coverage", "release_reproducibility", "failure_localization", "certificate_completeness"} {
+	for _, m := range []string{"registry_coverage", "formal_check_coverage", "admission_profile_coverage", "release_reproducibility", "failure_localization", "certificate_completeness"} {
 		if c, ok := bundle.CoverageByMetric[m]; ok {
 			if err := validateDoc("CoverageReport.v0.schema.json", c); err != nil {
 				return fmt.Errorf("validate coverage %s: %w", m, err)
@@ -127,6 +133,45 @@ func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBund
 	}
 	if err := os.WriteFile(filepath.Join(dir, "explain_quality_report.v0.json"), eqData, 0644); err != nil {
 		return err
+	}
+	explainDir := filepath.Join(dir, "explain_quality")
+	if err := os.MkdirAll(explainDir, 0755); err != nil {
+		return err
+	}
+	for _, eq := range explains {
+		name := fmt.Sprintf("%s.explain_quality_report.v0.json", eq.CaseID)
+		if err := writeDoc(filepath.Join(explainDir, name), "ExplainQualityReport.v0.schema.json", eq); err != nil {
+			return fmt.Errorf("write explain_quality/%s: %w", name, err)
+		}
+	}
+	flrDir := filepath.Join(dir, "failure_localization")
+	if err := os.MkdirAll(flrDir, 0755); err != nil {
+		return err
+	}
+	for _, flr := range flrs {
+		name := fmt.Sprintf("%s.failure_localization_result.v0.json", flr.CaseID)
+		if err := writeDoc(filepath.Join(flrDir, name), "FailureLocalizationResult.v0.schema.json", flr); err != nil {
+			return fmt.Errorf("write failure_localization/%s: %w", name, err)
+		}
+	}
+	coverageDir := filepath.Join(dir, "coverage")
+	if err := os.MkdirAll(coverageDir, 0755); err != nil {
+		return err
+	}
+	normalizedCoverage := []struct {
+		file string
+		key  string
+	}{
+		{"registry.coverage_report.v0.json", "registry_coverage"},
+		{"formal_checks.coverage_report.v0.json", "formal_check_coverage"},
+		{"admission_profile.profile_coverage_report.v0.json", "admission_profile_coverage"},
+	}
+	for _, spec := range normalizedCoverage {
+		if c, ok := bundle.CoverageByMetric[spec.key]; ok {
+			if err := writeDoc(filepath.Join(coverageDir, spec.file), "CoverageReport.v0.schema.json", c); err != nil {
+				return fmt.Errorf("write coverage/%s: %w", spec.file, err)
+			}
+		}
 	}
 
 	cmdData, err := json.MarshalIndent(bundle.Commands, "", "  ")
@@ -183,7 +228,7 @@ func writeAdmissionBenchmarkBundle(repoRoot, dir string, bundle PCSBenchmarkBund
 	}
 
 	ingest := buildPCSBenchIngest(bundle, dir, executions)
-	if err := writePCSBenchIngest(repoRoot, dir, ingest); err != nil {
+	if err := writePCSBenchIngest(repoRoot, pcsCoreRoot, dir, ingest); err != nil {
 		return err
 	}
 
@@ -243,12 +288,36 @@ func FormatBenchmarkAdmissionSummaryJSON(run AdmissionBenchmarkSuiteV0, outDir s
 
 // ValidateAdmissionBenchmarkBundleDir validates a written pcs-core benchmark bundle (pcs-bench ingestion gate).
 func ValidateAdmissionBenchmarkBundleDir(repoRoot, dir string) error {
-	if repoRoot == "" {
+	return validateAdmissionBenchmarkBundleDir(repoRoot, "", dir)
+}
+
+// ValidateAdmissionBenchmarkBundlePCSCore validates bundle artifacts against pcs-core/schemas.
+func ValidateAdmissionBenchmarkBundlePCSCore(pcsCoreRoot, dir string) error {
+	if strings.TrimSpace(pcsCoreRoot) == "" {
+		var err error
+		pcsCoreRoot, err = ResolvePCSCoreRoot(dir)
+		if err != nil {
+			return err
+		}
+	}
+	return validateAdmissionBenchmarkBundleDir("", pcsCoreRoot, dir)
+}
+
+func validateAdmissionBenchmarkBundleDir(repoRoot, pcsCoreRoot, dir string) error {
+	if repoRoot == "" && pcsCoreRoot == "" {
 		var err error
 		repoRoot, err = FindRepoRoot(dir)
 		if err != nil {
 			return err
 		}
+	}
+	if repoRoot == "" && pcsCoreRoot != "" {
+		if r, err := FindRepoRoot(dir); err == nil {
+			repoRoot = r
+		}
+	}
+	validateOne := func(schema string, doc any) error {
+		return ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, schema, doc)
 	}
 	required := []string{
 		"benchmark_report.v0.json",
@@ -276,10 +345,10 @@ func ValidateAdmissionBenchmarkBundleDir(repoRoot, dir string) error {
 		}
 		arr, ok := doc.([]any)
 		if !ok {
-			return ValidateDocumentAgainstSchema(repoRoot, schema, doc)
+			return validateOne(schema, doc)
 		}
 		for i, item := range arr {
-			if err := ValidateDocumentAgainstSchema(repoRoot, schema, item); err != nil {
+			if err := validateOne(schema, item); err != nil {
 				return fmt.Errorf("%s[%d]: %w", filepath.Base(path), i, err)
 			}
 		}
@@ -324,11 +393,38 @@ func ValidateAdmissionBenchmarkBundleDir(repoRoot, dir string) error {
 	if err := json.Unmarshal(ingestData, &ingest); err != nil {
 		return err
 	}
-	if err := ValidatePCSBenchIngest(repoRoot, ingest); err != nil {
-		return err
+	if err := validateOne("PCSBenchIngest.v0.schema.json", mustJSONDoc(ingest)); err != nil {
+		return fmt.Errorf("pcs_bench_ingest: %w", err)
 	}
 	if ingest.BenchmarkReport.ReportID != report.ReportID {
 		return fmt.Errorf("pcs_bench_ingest benchmark_report.report_id mismatch")
+	}
+	for _, spec := range []string{
+		"coverage/registry.coverage_report.v0.json",
+		"coverage/formal_checks.coverage_report.v0.json",
+		"coverage/admission_profile.profile_coverage_report.v0.json",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, spec)); err != nil {
+			return fmt.Errorf("bundle missing normalized %s: %w", spec, err)
+		}
+	}
+	for _, eq := range ingest.ExplainQualityReports {
+		perCase := filepath.Join(dir, "explain_quality", eq.CaseID+".explain_quality_report.v0.json")
+		if _, err := os.Stat(perCase); err != nil {
+			return fmt.Errorf("bundle missing %s: %w", perCase, err)
+		}
+		if err := validateOne("ExplainQualityReport.v0.schema.json", mustJSONDoc(eq)); err != nil {
+			return fmt.Errorf("validate %s: %w", perCase, err)
+		}
+	}
+	for _, flr := range ingest.FailureLocalizationReports {
+		perCase := filepath.Join(dir, "failure_localization", flr.CaseID+".failure_localization_result.v0.json")
+		if _, err := os.Stat(perCase); err != nil {
+			return fmt.Errorf("bundle missing %s: %w", perCase, err)
+		}
+		if err := validateOne("FailureLocalizationResult.v0.schema.json", mustJSONDoc(flr)); err != nil {
+			return fmt.Errorf("validate %s: %w", perCase, err)
+		}
 	}
 	return nil
 }

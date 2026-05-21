@@ -2,9 +2,11 @@
 """Materialize benchmarks/admission case JSON from PF fixtures."""
 from __future__ import annotations
 
+import argparse
 import copy
 import hashlib
 import json
+import os
 import pathlib
 import shutil
 import sys
@@ -27,6 +29,15 @@ def write_case(base: pathlib.Path, kind: str, name: str, body: dict) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Materialize benchmarks/admission case JSON from PF fixtures.")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Only print the OK line (for benchmark shell scripts).",
+    )
+    args = parser.parse_args()
+    quiet = args.quiet or bool(os.environ.get("PCS_BENCHMARK_QUIET"))
+
     lt = ROOT / "tests/pcs/fixtures/labtrust-release"
     bench_lt = ROOT / "benchmarks/admission/labtrust_qc_release"
     support = bench_lt / "support"
@@ -51,6 +62,13 @@ def main() -> int:
     explain_full = {
         "failure_code": True,
         "artifact_path": True,
+        "expected": True,
+        "actual": True,
+        "responsible_component": True,
+        "repair_hint": True,
+    }
+    explain_science = {
+        "failure_code": True,
         "expected": True,
         "actual": True,
         "responsible_component": True,
@@ -124,6 +142,33 @@ def main() -> int:
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
 
+    sm_fail_dir = support / "scientific_memory_import_failed"
+    if sm_fail_dir.exists():
+        shutil.rmtree(sm_fail_dir)
+    sm_fail_dir.mkdir(parents=True)
+    for name in (
+        "science_claim_bundle.certified.json",
+        "signed_science_claim_bundle.json",
+        "release_manifest.v0.json",
+        "handoff_to_pf.json",
+        "artifact_registry.json",
+        "proof_obligation.v0.json",
+        "lean_check_result.v0.json",
+        "scientific_memory_import_report.json",
+        "verification_result.json",
+    ):
+        shutil.copy2(lt / name, sm_fail_dir / name)
+    sm_fail = json.loads((sm_fail_dir / "scientific_memory_import_report.json").read_text(encoding="utf-8"))
+    sm_fail["verification_status"] = "failed"
+    sm_path = sm_fail_dir / "scientific_memory_import_report.json"
+    sm_path.write_text(json.dumps(sm_fail, indent=2) + "\n", encoding="utf-8")
+    sm_manifest = json.loads((sm_fail_dir / "release_manifest.v0.json").read_text(encoding="utf-8"))
+    sm_digest = file_digest(sm_path)
+    sm_manifest["artifacts"]["scientific_memory_import_report.json"]["sha256"] = sm_digest
+    (sm_fail_dir / "release_manifest.v0.json").write_text(
+        json.dumps(sm_manifest, indent=2) + "\n", encoding="utf-8"
+    )
+
     write_case(bench_lt, "valid", "release_admission", {"case_id": "release_admission", "expect": "admit", "verify_mode": "science_claim"})
     write_case(bench_lt, "valid", "release_chain", {"case_id": "release_chain", "expect": "admit", "verify_mode": "release_chain"})
 
@@ -164,6 +209,17 @@ def main() -> int:
             {"check_id": "signed_input_bundle_hash_match", "artifact_path": "signed_science_claim_bundle.json"},
             None,
         ),
+        (
+            "scientific_memory_import_failure",
+            {
+                "artifact_dir": "support/scientific_memory_import_failed",
+                "manifest": "support/scientific_memory_import_failed/release_manifest.v0.json",
+            },
+            ["scientific_memory_import_failed"],
+            "release_chain",
+            {"check_id": "scientific_memory_import_passed", "artifact_path": "scientific_memory_import_report.json"},
+            None,
+        ),
         ("registry_wrong_producer", {"registry": "support/registry_wrong_producer.json"}, ["PCS_REGISTRY_ADMISSION_FAILED"], "science_claim", None, None),
         ("registry_disallowed_status", {"registry": "support/registry_disallowed_status.json"}, ["PCS_REGISTRY_ADMISSION_FAILED"], "science_claim", None, None),
         ("missing_formal_check", {"omit_formal": True}, ["missing_lean_check_result"], "science_claim", None, None),
@@ -188,6 +244,27 @@ def main() -> int:
             body["localization"] = loc
         if mode == "release_chain":
             body["explain_requirements"] = explain_full
+        elif mode == "science_claim" and name in {
+            "missing_handoff",
+            "legacy_handoff_in_release_mode",
+            "missing_registry",
+            "wrong_admission_profile",
+            "rejected_certificate",
+            "certificate_status_rejected",
+            "trace_hash_mismatch",
+            "registry_wrong_producer",
+            "registry_disallowed_status",
+            "missing_proof_obligation",
+            "missing_lean_check_result",
+            "failed_lean_check",
+            "failed_lean_theorem",
+            "unauthorized_lean_theorem",
+            "lean_release_id_mismatch",
+            "missing_formal_check",
+        }:
+            body["explain_requirements"] = explain_science
+            if name in {"missing_proof_obligation", "missing_lean_check_result", "failed_lean_check", "failed_lean_theorem", "unauthorized_lean_theorem", "lean_release_id_mismatch", "missing_formal_check"}:
+                body["explain_requirements"] = explain_formal
         write_case(bench_lt, "invalid", name, body)
 
     bench_formal = ROOT / "benchmarks/admission/formal_trust_kernel"
@@ -344,6 +421,22 @@ def main() -> int:
         )
 
     print("OK: benchmark admission cases materialized")
+    if quiet:
+        return 0
+    reg = "tests/pcs/fixtures/labtrust-release/artifact_registry.json"
+    print()
+    print("pf is not on PATH by default. From repo root, use one of:")
+    print('  export PATH="$PWD/scripts:$PATH"   # then: pf benchmark admission ...')
+    print("  bash scripts/pf.sh benchmark admission \\")
+    print("    --cases benchmarks/admission/labtrust_qc_release \\")
+    print(f"    --registry {reg} \\")
+    print("    --out benchmark_runs/labtrust_admission --validate")
+    print("  bash scripts/pf.sh validate benchmark-bundle benchmark_runs/labtrust_admission")
+    print()
+    print("Or run the full gate (from repo root):")
+    print("  make test-pcs-benchmark")
+    print("  bash scripts/pcs-validate-benchmark-bundle.sh")
+    print("  cd adapters/pcs && go test . -run TestAdmissionBenchmark -count=1 -timeout 3m")
     return 0
 
 

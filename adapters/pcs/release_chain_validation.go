@@ -428,6 +428,61 @@ func checkSignedInputBundleHashMatch(baseDir string, manifest *ReleaseManifest) 
 		map[string]any{"signed_input_bundle_hash": signed.SignedInputBundleHash}), nil
 }
 
+func validateScientificMemoryImportSemantics(path string) (ReleaseValidationCheck, []string) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"Scientific Memory import report semantics",
+			ReasonArtifactMissing,
+			map[string]any{"error": err.Error()}), []string{ReasonArtifactMissing}
+	}
+	var report map[string]any
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"Scientific Memory import report semantics",
+			ReasonSchemaInvalid,
+			map[string]any{"error": err.Error()}), []string{ReasonSchemaInvalid}
+	}
+	status, _ := report["verification_status"].(string)
+	const smArtifact = "scientific_memory_import_report.json"
+	if status != "passed" {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"scientific_memory_import_report.verification_status must be passed",
+			FailureCodeScientificMemoryImportFailed,
+			map[string]any{
+				"failure_code":          FailureCodeScientificMemoryImportFailed,
+				"artifact_path":         smArtifact,
+				"verification_status": status,
+				"expected":              "passed",
+				"actual":                status,
+			}), []string{FailureCodeScientificMemoryImportFailed}
+	}
+	if strict, ok := report["strict"].(bool); !ok || !strict {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"scientific_memory_import_report.strict must be true",
+			FailureCodeScientificMemoryImportFailed,
+			map[string]any{"failure_code": FailureCodeScientificMemoryImportFailed, "artifact_path": smArtifact, "strict": report["strict"]}),
+			[]string{FailureCodeScientificMemoryImportFailed}
+	}
+	if legacy, ok := report["allow_legacy"].(bool); ok && legacy {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"scientific_memory_import_report.allow_legacy must be false",
+			FailureCodeLegacyImportDetected,
+			map[string]any{"failure_code": FailureCodeLegacyImportDetected, "artifact_path": smArtifact, "allow_legacy": legacy}),
+			[]string{FailureCodeLegacyImportDetected}
+	}
+	if shape, _ := report["bundle_shape"].(string); shape != "pcs_core" {
+		return releaseFailCheck("scientific_memory_import_passed",
+			"scientific_memory_import_report.bundle_shape must be pcs_core",
+			FailureCodeLegacyImportDetected,
+			map[string]any{"failure_code": FailureCodeLegacyImportDetected, "artifact_path": smArtifact, "bundle_shape": shape}),
+			[]string{FailureCodeLegacyImportDetected}
+	}
+	return releasePassCheck("scientific_memory_import_passed",
+		"Scientific Memory import report semantics validated",
+		map[string]any{"verification_status": status}), nil
+}
+
 func checkScientificMemoryImportPassed(baseDir string, manifest *ReleaseManifest, opts ReleaseChainVerifyOptions) (ReleaseValidationCheck, []string) {
 	const name = "scientific_memory_import_report.json"
 	entry, inManifest := manifest.Artifacts[name]
@@ -461,6 +516,11 @@ func checkScientificMemoryImportPassed(baseDir string, manifest *ReleaseManifest
 				"Scientific Memory import report hash matches manifest pin",
 				"PCS_MANIFEST_HASH_MISMATCH",
 				map[string]any{"expected": entry.SHA256, "actual": digest}), []string{"PCS_MANIFEST_HASH_MISMATCH"}
+		}
+		if opts.ReleaseMode {
+			if semCheck, semFailures := validateScientificMemoryImportSemantics(path); semCheck.Status == "failed" {
+				return semCheck, semFailures
+			}
 		}
 		return releasePassCheck("scientific_memory_import_passed",
 			"Scientific Memory import report hash matches manifest pin",

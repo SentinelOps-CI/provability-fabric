@@ -499,13 +499,29 @@ jobs:
             go run . benchmark admission \
               --cases "$GITHUB_WORKSPACE/benchmarks/admission/${SUITE}" \
               --registry "$REG" \
-              --out "${OUT}/${SUITE}_admission"
+              --out "${OUT}/${SUITE}_admission" \
+              --validate \
+              --validate-pcs-core-output "$PCS_CORE_PATH"
           done
           test -f "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json"
           test -f "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json"
           test -f "${OUT}/formal_trust_kernel_admission/explain_quality_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/registry.coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/formal_checks.coverage_report.v0.json"
+          test -f "${OUT}/labtrust_qc_release_admission/coverage/admission_profile.profile_coverage_report.v0.json"
+          test -d "${OUT}/labtrust_qc_release_admission/explain_quality"
+          test -d "${OUT}/labtrust_qc_release_admission/failure_localization"
+          test -f "${OUT}/labtrust_qc_release_admission/failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json"
           python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85"
+          cd "$GITHUB_WORKSPACE"
+          go run ./tools/pcs-validate \
+            "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json" \
+            "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json" \
+            "${OUT}/labtrust_qc_release_admission/explain_quality_report.v0.json" \
+            "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
+          go run ./tools/pcs-validate --benchmark-bundle "${OUT}/labtrust_qc_release_admission" --pcs-core "$PCS_CORE_PATH"
 
       - name: CLI smoke (verify, sign, inspect)
         run: |

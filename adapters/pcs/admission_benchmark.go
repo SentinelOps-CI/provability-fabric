@@ -76,8 +76,10 @@ type AdmissionBenchmarkOptions struct {
 	SourceCommit     string
 	ValidatorVersion string
 	OutDir           string
-	RunID            string
-	ValidateBundle   bool // re-validate bundle after write (pcs validate gate)
+	RunID                 string
+	ValidateBundle        bool   // re-validate bundle after write (PF config/schemas/pcs gate)
+	ValidatePCSCoreOutput string // pcs-core checkout; validate bundle against pcs-core/schemas
+	RequireAllCasesPass   bool   // return error when any benchmark case fails (CI strict gate)
 }
 
 // AdmissionBenchmarkCaseResult is one executed case outcome.
@@ -324,7 +326,8 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 			return run, locReport, covReport, explainReport, err
 		}
 		bundle.InternalSuite = run
-		if err := writeAdmissionBenchmarkBundle(repoRoot, opts.OutDir, bundle, executions); err != nil {
+		pcsCoreRoot := strings.TrimSpace(opts.ValidatePCSCoreOutput)
+		if err := writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, opts.OutDir, bundle, executions); err != nil {
 			return run, locReport, covReport, explainReport, err
 		}
 		if opts.ValidateBundle {
@@ -332,8 +335,28 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 				return run, locReport, covReport, explainReport, fmt.Errorf("benchmark bundle validation: %w", err)
 			}
 		}
+		if pcsCoreRoot != "" {
+			if err := ValidateAdmissionBenchmarkBundlePCSCore(pcsCoreRoot, opts.OutDir); err != nil {
+				return run, locReport, covReport, explainReport, fmt.Errorf("pcs-core benchmark bundle validation: %w", err)
+			}
+		}
+	}
+	if opts.RequireAllCasesPass {
+		if failed, total := countFailedBenchmarkCases(results); failed > 0 {
+			return run, locReport, covReport, explainReport, fmt.Errorf("%d/%d benchmark cases failed", failed, total)
+		}
 	}
 	return run, locReport, covReport, explainReport, nil
+}
+
+func countFailedBenchmarkCases(results []AdmissionBenchmarkCaseResult) (failed, total int) {
+	total = len(results)
+	for _, c := range results {
+		if !c.Passed {
+			failed++
+		}
+	}
+	return failed, total
 }
 
 func admissionCasePassed(c AdmissionBenchmarkCase, cr AdmissionBenchmarkCaseResult, pcsExplain *PCSExplainQualityReport) bool {
@@ -893,6 +916,8 @@ func allAdmissionFailureCodes() []string {
 		FailureCodeLeanObligationMismatch,
 		FailureCodeLeanReleaseIDMismatch,
 		FailureCodeUnauthorizedLeanTheorem,
+		FailureCodeScientificMemoryImportFailed,
+		FailureCodeLegacyImportDetected,
 		ReasonRegistryAdmissionFailed,
 		"PCS_MANIFEST_HASH_MISMATCH",
 		"certificate_id_mismatch",

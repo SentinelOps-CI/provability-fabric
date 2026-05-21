@@ -66,6 +66,8 @@ const (
 	FailureCodeLeanObligationMismatch               = "lean_obligation_mismatch"
 	FailureCodeLeanReleaseIDMismatch                = "lean_release_id_mismatch"
 	FailureCodeUnauthorizedLeanTheorem              = "unauthorized_lean_theorem"
+	FailureCodeScientificMemoryImportFailed         = "scientific_memory_import_failed"
+	FailureCodeLegacyImportDetected                 = "legacy_import_detected"
 )
 
 func withReason(code string, details map[string]any) map[string]any {

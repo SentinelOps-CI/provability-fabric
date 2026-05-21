@@ -65,10 +65,29 @@ Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-
 | `paths.go` | Repo-root path resolution for `tests/pcs/` |
 | `schemas/*.json` | Embedded pcs-core mirror |
 
+## PCS admission benchmarks (pcs-bench)
+
+PF is the reference **release admission controller** benchmark runner. It emits a pcs-core bundle under `--out`:
+
+- `benchmark_report.v0.json`, `benchmark_run.v0.json`, `failure_localization_result.v0.json`, `coverage_report.v0.json`, `explain_quality_report.v0.json`
+- Normalized paths: `explain_quality/`, `failure_localization/`, `coverage/`, `runs/`, `logs/`
+- `pcs_bench_ingest.v0.json` — single-file import manifest for **pcs-bench**
+
+```bash
+python scripts/materialize-admission-benchmark-cases.py
+bash scripts/pf.sh benchmark admission \
+  --cases benchmarks/admission/labtrust_qc_release \
+  --registry tests/pcs/fixtures/labtrust-release/artifact_registry.json \
+  --out benchmark_runs/labtrust_admission \
+  --validate --validate-pcs-core-output ../pcs-core
+```
+
+See [docs/guides/pcs-admission-benchmark.md](../../docs/guides/pcs-admission-benchmark.md).
+
 ## Tests
 
 ```bash
 cd adapters/pcs && go test ./... -count=1
 ```
 
-Set `PCS_CORE_PATH` for `TestSchemaMirrorMatchesPCSCore`.
+Set `PCS_CORE_PATH` for `TestSchemaMirrorMatchesPCSCore` and `TestBenchmarkBundleValidatesAgainstPCSCore`.

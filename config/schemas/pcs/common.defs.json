@@ -316,6 +316,16 @@
         "cross_domain_portability"
       ]
     },
+    "benchmark_metric_applicability": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "not_applicable",
+        "insufficient_cases",
+        "skipped",
+        "failed_to_measure"
+      ]
+    },
     "benchmark_metric_id": {
       "type": "string",
       "enum": [
@@ -356,6 +366,59 @@
     "benchmark_observed_status": {
       "type": "string",
       "enum": ["passed", "failed", "skipped", "error"]
+    },
+    "benchmark_system_outcome": {
+      "type": "string",
+      "enum": [
+        "admitted",
+        "rejected",
+        "stale",
+        "import_failed",
+        "render_failed",
+        "formal_failed"
+      ]
+    },
+    "metric_summary_applicability": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "not_applicable",
+        "insufficient_cases",
+        "skipped",
+        "failed_to_measure"
+      ]
+    },
+    "system_admission_outcome": {
+      "type": "string",
+      "enum": ["admitted", "rejected", "deferred", "not_evaluated"]
+    },
+    "release_chain_status": {
+      "type": "string",
+      "enum": ["valid", "invalid", "not_applicable"]
+    },
+    "certificate_status_value": {
+      "type": "string",
+      "enum": ["CertificateChecked", "Rejected", "Stale", "not_applicable"]
+    },
+    "scientific_memory_import_status": {
+      "type": "string",
+      "enum": ["passed", "failed", "not_applicable"]
+    },
+    "scientific_memory_render_status": {
+      "type": "string",
+      "enum": ["rendered", "incomplete", "not_applicable"]
+    },
+    "nullable_benchmark_responsible_component": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/benchmark_responsible_component" }
+      ]
+    },
+    "nullable_benchmark_repair_hint_kind": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/benchmark_repair_hint_kind" }
+      ]
     },
     "benchmark_input_artifact_ref": {
       "type": "object",

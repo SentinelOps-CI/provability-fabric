@@ -394,7 +394,7 @@ func explainAdmissionError(msg string, expectCodes []string) FailureExplanation 
 	fe := FailureExplanation{
 		Actual:               msg,
 		RepairHint:           msg,
-		ResponsibleComponent: ComponentLeanTrustKernel,
+		ResponsibleComponent: ComponentProvabilityFabric,
 		ArtifactPath:         formalCheckArtifactPath,
 	}
 	if len(expectCodes) > 0 {
@@ -406,10 +406,72 @@ func explainAdmissionError(msg string, expectCodes []string) FailureExplanation 
 			break
 		}
 	}
+	if fe.FailureCode == "" && len(expectCodes) > 0 {
+		fe.FailureCode = expectCodes[0]
+	}
+	if strings.Contains(msg, FailureCodeReleaseModeHandoffRequired) ||
+		strings.Contains(msg, FailureCodeLegacyHandoffForbiddenInReleaseMode) {
+		fe.ResponsibleComponent = ComponentProvabilityFabric
+		fe.HandoffRef = "handoff_to_pf.json"
+		fe.ArtifactPath = "handoff_to_pf.json"
+	}
 	if strings.Contains(strings.ToLower(msg), "theorem") || strings.Contains(msg, "admissible_") {
 		fe.Expected = "authorized Lean theorem"
+		fe.ResponsibleComponent = ComponentLeanTrustKernel
 	}
 	return fe
+}
+
+func enrichFailureExplanation(fe, fallback FailureExplanation) FailureExplanation {
+	if fe.FailureCode == "" {
+		fe.FailureCode = fallback.FailureCode
+	}
+	if fe.Expected == "" {
+		fe.Expected = fallback.Expected
+	}
+	if fe.Actual == "" {
+		fe.Actual = fallback.Actual
+	}
+	if fe.ResponsibleComponent == "" {
+		fe.ResponsibleComponent = fallback.ResponsibleComponent
+	}
+	if fe.RepairHint == "" {
+		fe.RepairHint = fallback.RepairHint
+	}
+	if fe.ArtifactPath == "" {
+		fe.ArtifactPath = fallback.ArtifactPath
+	}
+	if fe.RegistryCheckRef == "" {
+		fe.RegistryCheckRef = fallback.RegistryCheckRef
+	}
+	if fe.HandoffRef == "" {
+		fe.HandoffRef = fallback.HandoffRef
+	}
+	return fe
+}
+
+func pickFailureExplanation(
+	explanations []FailureExplanation,
+	expectCodes []string,
+	wantCheck string,
+	fallback FailureExplanation,
+) FailureExplanation {
+	for _, fe := range explanations {
+		if wantCheck != "" && fe.CheckID == wantCheck {
+			return enrichFailureExplanation(fe, fallback)
+		}
+	}
+	for _, code := range expectCodes {
+		for _, fe := range explanations {
+			if fe.FailureCode == code || strings.Contains(fe.Actual, code) || strings.Contains(fe.RepairHint, code) {
+				return enrichFailureExplanation(fe, fallback)
+			}
+		}
+	}
+	if len(explanations) > 0 {
+		return enrichFailureExplanation(explanations[0], fallback)
+	}
+	return fallback
 }
 
 // explainSectionIDForRequirement maps PF explain fields to pcs-core ExplainQualityReport section IDs.
@@ -451,23 +513,18 @@ func buildPCSExplainQualityReport(
 		explanations = report.Failed
 	} else if vr != nil {
 		explanations = ExplainVerificationFailures(*vr)
-	} else if strings.TrimSpace(cr.Error) != "" {
-		explanations = []FailureExplanation{explainAdmissionError(cr.Error, c.ExpectFailureCodes)}
+	}
+	fallback := explainAdmissionError(cr.Error, c.ExpectFailureCodes)
+	if strings.TrimSpace(cr.Error) != "" {
+		if len(explanations) == 0 {
+			explanations = []FailureExplanation{fallback}
+		}
 	}
 	wantCheck := ""
 	if c.Localization != nil {
 		wantCheck = c.Localization.CheckID
 	}
-	var target FailureExplanation
-	for _, fe := range explanations {
-		if wantCheck != "" && fe.CheckID == wantCheck {
-			target = fe
-			break
-		}
-	}
-	if target.CheckID == "" && len(explanations) > 0 {
-		target = explanations[0]
-	}
+	target := pickFailureExplanation(explanations, c.ExpectFailureCodes, wantCheck, fallback)
 
 	fieldChecks := []struct {
 		reqField string
@@ -658,6 +715,10 @@ func buildPCSCoverageReports(
 		"certificate_completeness": newPCSCoverageReport(
 			suiteID, sourceCommit, "cert", "certificate_completeness", "certificate_completeness_score",
 			metrics.FailureCodeAccuracy, map[string]any{},
+		),
+		"admission_profile_coverage": newPCSCoverageReport(
+			suiteID, sourceCommit, "profile", "cross_domain_portability", "cross_domain_portability_score",
+			metrics.AdmissionProfileCoverage, map[string]any{"profile_id": "admission_profile"},
 		),
 	}
 }

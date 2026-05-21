@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/MetricSummary.v0.schema.json",
+  "title": "MetricSummary.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "metric_id",
+    "score",
+    "applicability",
+    "numerator",
+    "denominator",
+    "reason",
+    "details",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "metric_id": { "$ref": "common.defs.json#/$defs/benchmark_metric_id" },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "applicability": { "$ref": "common.defs.json#/$defs/metric_summary_applicability" },
+    "numerator": { "type": "number", "minimum": 0 },
+    "denominator": { "type": "number", "minimum": 0 },
+    "reason": { "type": "string" },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

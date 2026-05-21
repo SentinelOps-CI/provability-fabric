@@ -15,6 +15,9 @@ test-pcs-full:
 test-pcs-benchmark:
     bash "{{root}}/scripts/pcs-benchmark-admission.sh" || powershell -NoProfile -ExecutionPolicy Bypass -File "{{root}}/scripts/pcs-benchmark-admission.ps1"
 
+validate-pcs-benchmark-bundle:
+    bash "{{root}}/scripts/pcs-validate-benchmark-bundle.sh" "{{root}}/benchmark_runs/labtrust_admission"
+
 pcs-schema-diff:
     bash "{{root}}/scripts/pcs-schema-diff.sh" "{{pcs_core}}"
 

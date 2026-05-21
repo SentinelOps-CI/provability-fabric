@@ -58,7 +58,7 @@
         "metrics": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_name" }
+          "items": { "$ref": "common.defs.json#/$defs/benchmark_metric_id" }
         },
         "minimum_passing_thresholds": { "$ref": "#/$defs/passing_thresholds" },
         "task_id": { "type": "string", "minLength": 1 },
