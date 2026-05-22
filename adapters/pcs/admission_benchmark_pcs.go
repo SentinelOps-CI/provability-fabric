@@ -69,7 +69,7 @@ type PCSCoverageReport struct {
 	SignatureOrDigest string         `json:"signature_or_digest"`
 }
 
-// PCSMetricSummary matches pcs-core MetricSummary.v0.
+// PCSMetricSummary matches pcs-core MetricSummary.v0 (standalone artifact).
 type PCSMetricSummary struct {
 	SchemaVersion     string         `json:"schema_version"`
 	MetricID          string         `json:"metric_id"`
@@ -84,6 +84,16 @@ type PCSMetricSummary struct {
 	SignatureOrDigest string         `json:"signature_or_digest"`
 }
 
+// PCSBenchmarkReportMetricSummary is the BenchmarkReport.v0 metric_summaries[] row shape.
+type PCSBenchmarkReportMetricSummary struct {
+	Name          string   `json:"name"`
+	Score         *float64 `json:"score,omitempty"`
+	Applicability string   `json:"applicability"`
+	Reason        string   `json:"reason,omitempty"`
+	Numerator     int      `json:"numerator,omitempty"`
+	Denominator   int      `json:"denominator,omitempty"`
+}
+
 // PCSBenchmarkReport matches pcs-core BenchmarkReport.v0.
 type PCSBenchmarkReport struct {
 	SchemaVersion     string                      `json:"schema_version"`
@@ -91,7 +101,7 @@ type PCSBenchmarkReport struct {
 	BenchmarkSuiteID  string                      `json:"benchmark_suite_id"`
 	Runs              []PCSBenchmarkReportRunRef  `json:"runs"`
 	Metrics           []string                    `json:"metrics"`
-	MetricSummaries   []PCSMetricSummary          `json:"metric_summaries"`
+	MetricSummaries   []PCSBenchmarkReportMetricSummary `json:"metric_summaries"`
 	Summary           PCSBenchmarkSummary         `json:"summary"`
 	Coverage          PCSBenchmarkCoverageBlock   `json:"coverage"`
 	Failures          []PCSBenchmarkFailureEntry  `json:"failures"`
@@ -872,46 +882,47 @@ func buildBenchmarkCoverageBlock(coverage map[string]PCSCoverageReport, reg, for
 	return block
 }
 
-func buildPCSMetricSummaries(metrics BenchmarkRunMetrics, sourceCommit string) []PCSMetricSummary {
-	releaseScore := (metrics.ValidReleaseAdmissionRate + metrics.InvalidReleaseRejectionRate) / 2
-	repairHint := metrics.ExplainOutputCompleteness
-	if repairHint > 1 {
-		repairHint = 1
+func clampUnitScore(score float64) float64 {
+	if score > 1 {
+		return 1
 	}
+	if score < 0 {
+		return 0
+	}
+	return score
+}
+
+func buildPCSBenchmarkReportMetricSummaries(metrics BenchmarkRunMetrics) []PCSBenchmarkReportMetricSummary {
+	releaseScore := clampUnitScore((metrics.ValidReleaseAdmissionRate + metrics.InvalidReleaseRejectionRate) / 2)
+	repairHint := clampUnitScore(metrics.ExplainOutputCompleteness)
 	specs := []struct {
-		id    string
+		name  string
 		score float64
 	}{
 		{"release_reproducibility_score", releaseScore},
-		{"failure_localization_accuracy", metrics.FailureLocalizationAccuracy},
-		{"certificate_completeness_score", metrics.FailureCodeAccuracy},
-		{"registry_coverage_score", metrics.RegistryCheckCoverage},
-		{"formal_check_coverage_score", metrics.FormalCheckEnforcementCoverage},
+		{"failure_localization_accuracy", clampUnitScore(metrics.FailureLocalizationAccuracy)},
+		{"certificate_completeness_score", clampUnitScore(metrics.FailureCodeAccuracy)},
+		{"registry_coverage_score", clampUnitScore(metrics.RegistryCheckCoverage)},
+		{"formal_check_coverage_score", clampUnitScore(metrics.FormalCheckEnforcementCoverage)},
 		{"scientific_memory_interpretability_score", 1.0},
 		{"repair_hint_quality_score", repairHint},
-		{"cross_domain_portability_score", metrics.AdmissionProfileCoverage},
+		{"cross_domain_portability_score", clampUnitScore(metrics.AdmissionProfileCoverage)},
 	}
-	out := make([]PCSMetricSummary, 0, len(specs))
+	out := make([]PCSBenchmarkReportMetricSummary, 0, len(specs))
 	for _, spec := range specs {
 		score := spec.score
-		if score > 1 {
-			score = 1
+		scoreCopy := score
+		num := int(score + 0.5)
+		if num < 0 {
+			num = 0
 		}
-		if score < 0 {
-			score = 0
-		}
-		out = append(out, PCSMetricSummary{
-			SchemaVersion:     SchemaVersionV0,
-			MetricID:          spec.id,
-			Score:             score,
-			Applicability:     "measured",
-			Numerator:         score,
-			Denominator:       1,
-			Reason:            "pf benchmark admission",
-			Details:           map[string]any{"producer": "provability-fabric"},
-			SourceRepo:        VerifierSourceRepo,
-			SourceCommit:      sourceCommit,
-			SignatureOrDigest: digestCoverage("metric", spec.id, score),
+		out = append(out, PCSBenchmarkReportMetricSummary{
+			Name:          spec.name,
+			Score:         &scoreCopy,
+			Applicability: "measured",
+			Reason:        "pf benchmark admission",
+			Numerator:     num,
+			Denominator:   1,
 		})
 	}
 	return out
@@ -982,7 +993,7 @@ func buildPCSBenchmarkReport(
 		BenchmarkSuiteID: suiteID,
 		Runs:             runRefs,
 		Metrics:          metricIDs,
-		MetricSummaries:  buildPCSMetricSummaries(metrics, sourceCommit),
+		MetricSummaries:  buildPCSBenchmarkReportMetricSummaries(metrics),
 		ProducerID:       "provability-fabric",
 		Summary: PCSBenchmarkSummary{
 			TotalCases:                     total,

@@ -38,11 +38,19 @@ Pop-Location
 $Ingest = Join-Path $Out "pcs_bench_ingest.v0.json"
 if (-not (Test-Path $Ingest)) { Write-Error "missing $Ingest" }
 
+python -m pip install -q -e (Join-Path $PcsCore "python")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 python (Join-Path $Root "scripts\validate-pf-pcs-bench-ingest.py") `
   --ingest $Ingest `
   --bundle-dir $Out `
   --pcs-core $PcsCore `
   --release-grade
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+python (Join-Path $Root "scripts\pcs-bench-producer-contract-check.py") `
+  --ingest $Ingest `
+  --bundle-dir $Out
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (Get-Command pcs -ErrorAction SilentlyContinue) {

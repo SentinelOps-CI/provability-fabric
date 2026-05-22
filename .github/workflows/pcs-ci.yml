@@ -25,6 +25,8 @@ on:
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'scripts/pcs-benchmark-admission.sh'
       - 'scripts/pcs-bench-producer.sh'
+      - 'scripts/pcs-bench-validate-ingest.sh'
+      - 'scripts/pcs-bench-producer-contract-check.py'
       - 'scripts/validate-pf-pcs-bench-ingest.py'
       - 'scripts/materialize-admission-benchmark-cases.py'
       - 'benchmarks/admission/**'
@@ -56,6 +58,8 @@ on:
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'scripts/pcs-benchmark-admission.sh'
       - 'scripts/pcs-bench-producer.sh'
+      - 'scripts/pcs-bench-validate-ingest.sh'
+      - 'scripts/pcs-bench-producer-contract-check.py'
       - 'scripts/validate-pf-pcs-bench-ingest.py'
       - 'scripts/materialize-admission-benchmark-cases.py'
       - 'benchmarks/admission/**'
@@ -500,38 +504,55 @@ jobs:
           OUT="$GITHUB_WORKSPACE/benchmark_runs"
           cd "$GITHUB_WORKSPACE/core/cli/pf"
           for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility formal_trust_kernel; do
+            if [[ "${SUITE}" == "labtrust_qc_release" ]]; then
+              SUITE_OUT="labtrust_admission"
+            else
+              SUITE_OUT="${SUITE}_admission"
+            fi
             go run . benchmark admission \
               --cases "$GITHUB_WORKSPACE/benchmarks/admission/${SUITE}" \
               --registry "$REG" \
-              --out "${OUT}/${SUITE}_admission" \
+              --out "${OUT}/${SUITE_OUT}" \
               --validate \
               --validate-pcs-core-output "$PCS_CORE_PATH"
           done
-          test -f "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/benchmark_run.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json"
+          LABTRUST="${OUT}/labtrust_admission"
+          test -f "${LABTRUST}/benchmark_report.v0.json"
+          test -f "${LABTRUST}/benchmark_run.v0.json"
+          test -f "${LABTRUST}/coverage_report.v0.json"
           test -f "${OUT}/formal_trust_kernel_admission/explain_quality_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/registry_coverage_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/formal_check_coverage_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/admission_profile_coverage_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/release_reproducibility_coverage_report.v0.json"
-          test -f "${OUT}/labtrust_qc_release_admission/coverage/admission_profile.profile_coverage_report.v0.json"
-          test -d "${OUT}/labtrust_qc_release_admission/explain_quality"
-          test -d "${OUT}/labtrust_qc_release_admission/failure_localization"
-          test -f "${OUT}/labtrust_qc_release_admission/failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json"
-          python3 -c "import json; m=json.load(open('${OUT}/labtrust_qc_release_admission/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85; assert m['failure_localization_accuracy']>=0.85"
+          test -f "${LABTRUST}/pcs_bench_ingest.v0.json"
+          test -f "${LABTRUST}/coverage/registry_coverage_report.v0.json"
+          test -f "${LABTRUST}/coverage/formal_check_coverage_report.v0.json"
+          test -f "${LABTRUST}/coverage/admission_profile_coverage_report.v0.json"
+          test -f "${LABTRUST}/coverage/release_reproducibility_coverage_report.v0.json"
+          test -f "${LABTRUST}/coverage/admission_profile.profile_coverage_report.v0.json"
+          test -d "${LABTRUST}/explain_quality"
+          test -d "${LABTRUST}/failure_localization"
+          test -f "${LABTRUST}/failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json"
+          python3 -c "import json; m=json.load(open('${LABTRUST}/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85; assert m['failure_localization_accuracy']>=0.85"
           test -f "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
           cd "$GITHUB_WORKSPACE"
           go run ./tools/pcs-validate \
-            "${OUT}/labtrust_qc_release_admission/benchmark_report.v0.json" \
-            "${OUT}/labtrust_qc_release_admission/coverage_report.v0.json" \
-            "${OUT}/labtrust_qc_release_admission/explain_quality_report.v0.json" \
-            "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
-          go run ./tools/pcs-validate --benchmark-bundle "${OUT}/labtrust_qc_release_admission" --pcs-core "$PCS_CORE_PATH"
+            "${LABTRUST}/benchmark_report.v0.json" \
+            "${LABTRUST}/coverage_report.v0.json" \
+            "${LABTRUST}/explain_quality_report.v0.json" \
+            "${LABTRUST}/pcs_bench_ingest.v0.json"
+          go run ./tools/pcs-validate --benchmark-bundle "${LABTRUST}" --pcs-core "$PCS_CORE_PATH"
           pip install -q -e "${PCS_CORE_PATH}/python"
-          pcs validate "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json"
+          pcs validate "${LABTRUST}/pcs_bench_ingest.v0.json"
           pcs validate "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
+          python3 "$GITHUB_WORKSPACE/scripts/pcs-bench-producer-contract-check.py" \
+            --ingest "${LABTRUST}/pcs_bench_ingest.v0.json" \
+            --bundle-dir "${LABTRUST}"
+          python3 "$GITHUB_WORKSPACE/scripts/pcs-bench-producer-contract-check.py" \
+            --ingest "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json" \
+            --bundle-dir "${LABTRUST}"
+          bash "$GITHUB_WORKSPACE/scripts/pcs-bench-validate-ingest.sh" \
+            --input "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json" \
+            --bundle-dir "${LABTRUST}" \
+            --pcs-core "$PCS_CORE_PATH" \
+            --release-grade
           cd "$GITHUB_WORKSPACE/core/cli/pf"
           go run . benchmark admission \
             --cases "$GITHUB_WORKSPACE/benchmarks/admission/labtrust_qc_release" \
@@ -543,10 +564,10 @@ jobs:
           grep -q '"suite_id": "pf-labtrust-admission-v0"' "$RUNNER_TEMP/admission_summary.json"
           grep -q '"workflow_id": "hospital_lab.qc_release"' "$RUNNER_TEMP/admission_summary.json"
           grep -q '"pcs_bench_ingest_path"' "$RUNNER_TEMP/admission_summary.json"
-          python3 -c "import json; i=json.load(open('${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json')); assert i['suite_id']=='pf-labtrust-admission-v0'; assert i['workflow_id']=='hospital_lab.qc_release'; assert all('/' in r['path'] or '\\\\' not in r['path'] for r in i.get('artifact_refs',[]))"
-          python3 "$GITHUB_WORKSPACE/scripts/validate-pf-pcs-bench-ingest.py" \
-            --ingest "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json" \
-            --bundle-dir "${OUT}/labtrust_qc_release_admission" \
+          python3 -c "import json; i=json.load(open('${LABTRUST}/pcs_bench_ingest.v0.json')); assert i['suite_id']=='pf-labtrust-admission-v0'; assert i['workflow_id']=='hospital_lab.qc_release'; assert all('/' in r['path'] or '\\\\' not in r['path'] for r in i.get('artifact_refs',[])); assert 'benchmarks/admission/labtrust_qc_release' in i['commands'][0]['command']"
+          bash "$GITHUB_WORKSPACE/scripts/pcs-bench-validate-ingest.sh" \
+            --input "${LABTRUST}/pcs_bench_ingest.v0.json" \
+            --bundle-dir "${LABTRUST}" \
             --pcs-core "$PCS_CORE_PATH" \
             --release-grade
 

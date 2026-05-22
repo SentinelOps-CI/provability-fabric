@@ -48,15 +48,21 @@ run_pf benchmark admission \
 INGEST="${OUT}/pcs_bench_ingest.v0.json"
 test -f "${INGEST}"
 
-echo "==> pcs-core release-grade ingest validation"
-python3 "${ROOT}/scripts/validate-pf-pcs-bench-ingest.py" \
-  --ingest "${INGEST}" \
+PY="$(resolve_python)" || exit 1
+
+echo "==> pcs-bench validate-ingest (release-grade)"
+bash "${ROOT}/scripts/pcs-bench-validate-ingest.sh" \
+  --input "${INGEST}" \
   --bundle-dir "${OUT}" \
   --pcs-core "${PCS_CORE}" \
   --release-grade
 
+echo "==> PF producer contract check"
+"${PY}" "${ROOT}/scripts/pcs-bench-producer-contract-check.py" \
+  --ingest "${INGEST}" \
+  --bundle-dir "${OUT}"
+
 if command -v pcs >/dev/null 2>&1; then
-  (cd "${PCS_CORE}/python" && pip install -q -e .) 2>/dev/null || true
   echo "==> pcs validate ${INGEST}"
   pcs validate "${INGEST}"
 fi

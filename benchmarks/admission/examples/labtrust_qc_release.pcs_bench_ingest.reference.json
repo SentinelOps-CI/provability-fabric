@@ -9,11 +9,11 @@
       "run_id": "bench-run-bundle_hash_mismatch",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "bundle_hash_mismatch",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=bundle_hash_mismatch mode=release_chain profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=bundle_hash_mismatch mode=release_chain profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -24,9 +24,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 52,
+      "duration_ms": 64,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:26b6265b1c207908c7318bee8e257428241880c9991e0327fc1b31d8ed1b5c83"
     },
     {
@@ -34,11 +34,11 @@
       "run_id": "bench-run-certificate_status_rejected",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "certificate_status_rejected",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=certificate_status_rejected mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=certificate_status_rejected mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -49,9 +49,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 51,
+      "duration_ms": 52,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:14aadd28f6f611a1f651c36ceab5a99a1ced69f221dc868c8af58e29aa5ee9c8"
     },
     {
@@ -59,197 +59,11 @@
       "run_id": "bench-run-failed_lean_check",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "failed_lean_check",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=failed_lean_check mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 23,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:db6520403b964612e48d62320277bd0e32e94c930dbfee25f3380a89ef8881fb"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-failed_lean_theorem",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "failed_lean_theorem",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=failed_lean_theorem mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 29,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:0746c27a1d4615f032bd31adc0a6349a474c9ab2ff705249bf564c9fbd24b2db"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-lean_release_id_mismatch",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "lean_release_id_mismatch",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=lean_release_id_mismatch mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 22,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:76c4dd34ec8133ccd7a6d5312136014cd7f22d280b4bacf48ff7b34ce7ca1f14"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-legacy_handoff_in_release_mode",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "legacy_handoff_in_release_mode",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=legacy_handoff_in_release_mode mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 25,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:d2127b2cdc07352577effcd4ad6e969291f900a88ce1af2514c71f3925e6274a"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-missing_formal_check",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "missing_formal_check",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_formal_check mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 1,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:ec5d4943e766685fa26d765d224531b73caffd02e1c1e232437a3af93209de09"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-missing_handoff",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "missing_handoff",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_handoff mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [
-        "verification_result.json"
-      ],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 22,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:25092f2bd93d18e3d0cb3393a43976cb99e69339da8e2b77a4d50f9348e9d0ab"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-missing_lean_check_result",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "missing_lean_check_result",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_lean_check_result mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 12,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:90fb4e1fa953a7c9f968e5c5c2e032bd0cb07a6cf09276746680817722fbbff7"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-missing_proof_obligation",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "missing_proof_obligation",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_proof_obligation mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 13,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:dba84e3d5d05667fe95d62a02aa9792cd2c1f24c47ebd52fb743b2370a6d1961"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-missing_registry",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "missing_registry",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_registry mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=failed_lean_check mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -260,7 +74,193 @@
       "observed_repair_hint": null,
       "duration_ms": 21,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:db6520403b964612e48d62320277bd0e32e94c930dbfee25f3380a89ef8881fb"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-failed_lean_theorem",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "failed_lean_theorem",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=failed_lean_theorem mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 23,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:0746c27a1d4615f032bd31adc0a6349a474c9ab2ff705249bf564c9fbd24b2db"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-lean_release_id_mismatch",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "lean_release_id_mismatch",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=lean_release_id_mismatch mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 34,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:76c4dd34ec8133ccd7a6d5312136014cd7f22d280b4bacf48ff7b34ce7ca1f14"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-legacy_handoff_in_release_mode",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "legacy_handoff_in_release_mode",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=legacy_handoff_in_release_mode mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 35,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:d2127b2cdc07352577effcd4ad6e969291f900a88ce1af2514c71f3925e6274a"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-missing_formal_check",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "missing_formal_check",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_formal_check mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 3,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:ec5d4943e766685fa26d765d224531b73caffd02e1c1e232437a3af93209de09"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-missing_handoff",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "missing_handoff",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_handoff mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [
+        "verification_result.json"
+      ],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 40,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:25092f2bd93d18e3d0cb3393a43976cb99e69339da8e2b77a4d50f9348e9d0ab"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-missing_lean_check_result",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "missing_lean_check_result",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_lean_check_result mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 21,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:90fb4e1fa953a7c9f968e5c5c2e032bd0cb07a6cf09276746680817722fbbff7"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-missing_proof_obligation",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "missing_proof_obligation",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_proof_obligation mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 15,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:dba84e3d5d05667fe95d62a02aa9792cd2c1f24c47ebd52fb743b2370a6d1961"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-missing_registry",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "missing_registry",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_registry mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 31,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:df7c2e81222013341ee143622ae7e0efae05fc6746c94552434f347c45a3097d"
     },
     {
@@ -268,11 +268,36 @@
       "run_id": "bench-run-registry_disallowed_status",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "registry_disallowed_status",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=registry_disallowed_status mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=registry_disallowed_status mode=science_claim profile=labtrust_qc_release",
+          "exit_code": 0
+        }
+      ],
+      "artifacts_produced": [
+        "verification_result.json"
+      ],
+      "observed_status": "passed",
+      "observed_failure_code": null,
+      "observed_responsible_component": null,
+      "observed_repair_hint": null,
+      "duration_ms": 59,
+      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
+      "signature_or_digest": "sha256:2a7ff49f3d8b502980ee989fc12cd82b5a9f066585b1e9a61f48fc401181aa10"
+    },
+    {
+      "schema_version": "v0",
+      "run_id": "bench-run-registry_wrong_producer",
+      "task_id": "labtrust-qc-release-v0",
+      "case_id": "registry_wrong_producer",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
+      "commands": [
+        {
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=registry_wrong_producer mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -285,32 +310,7 @@
       "observed_repair_hint": null,
       "duration_ms": 48,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-      "signature_or_digest": "sha256:2a7ff49f3d8b502980ee989fc12cd82b5a9f066585b1e9a61f48fc401181aa10"
-    },
-    {
-      "schema_version": "v0",
-      "run_id": "bench-run-registry_wrong_producer",
-      "task_id": "labtrust-qc-release-v0",
-      "case_id": "registry_wrong_producer",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
-      "commands": [
-        {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=registry_wrong_producer mode=science_claim profile=labtrust_qc_release",
-          "exit_code": 0
-        }
-      ],
-      "artifacts_produced": [
-        "verification_result.json"
-      ],
-      "observed_status": "passed",
-      "observed_failure_code": null,
-      "observed_responsible_component": null,
-      "observed_repair_hint": null,
-      "duration_ms": 53,
-      "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:3b43ed43a67d7b155c943ff0d76d894d65ee9b1b4061a7c2ad51e06f6062d987"
     },
     {
@@ -318,11 +318,11 @@
       "run_id": "bench-run-rejected_certificate",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "rejected_certificate",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=rejected_certificate mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=rejected_certificate mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -333,9 +333,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 45,
+      "duration_ms": 137,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:1965b50665f5553a37a5b0474ab55d2553dde4e5d96e7383284f38356dcf5f2a"
     },
     {
@@ -343,11 +343,11 @@
       "run_id": "bench-run-release_admission",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "release_admission",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=release_admission mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=release_admission mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -358,9 +358,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 46,
+      "duration_ms": 80,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6b427810197669cc05b1c062bcb9b5e33d78bfee220ace9efa452ab8dfdbf1f4"
     },
     {
@@ -368,11 +368,11 @@
       "run_id": "bench-run-release_chain",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "release_chain",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=release_chain mode=release_chain profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=release_chain mode=release_chain profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -383,9 +383,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 51,
+      "duration_ms": 79,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:62167e3c8fe7b20d7fa8720e6e206fb98d6318342c111447bfac07aa1b59261e"
     },
     {
@@ -393,11 +393,11 @@
       "run_id": "bench-run-scientific_memory_import_failure",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "scientific_memory_import_failure",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=scientific_memory_import_failure mode=release_chain profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=scientific_memory_import_failure mode=release_chain profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -408,9 +408,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 51,
+      "duration_ms": 56,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b9389ed942245bdd9c652742d55019ee52a95047625998a0c1132057b3f4527c"
     },
     {
@@ -418,11 +418,11 @@
       "run_id": "bench-run-trace_hash_mismatch",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "trace_hash_mismatch",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=trace_hash_mismatch mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=trace_hash_mismatch mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -433,9 +433,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 47,
+      "duration_ms": 49,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b3de92564881c208178e9378114a197239cc0936b95970bfd6b638fbfb163fb5"
     },
     {
@@ -443,11 +443,11 @@
       "run_id": "bench-run-unauthorized_lean_theorem",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "unauthorized_lean_theorem",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=unauthorized_lean_theorem mode=science_claim profile=labtrust_qc_release",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=unauthorized_lean_theorem mode=science_claim profile=labtrust_qc_release",
           "exit_code": 0
         }
       ],
@@ -456,9 +456,9 @@
       "observed_failure_code": null,
       "observed_responsible_component": null,
       "observed_repair_hint": null,
-      "duration_ms": 19,
+      "duration_ms": 27,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6c5ff6cdcb46abf7360eac897379f4a50ea64770a06693577796e3af87465304"
     },
     {
@@ -466,11 +466,11 @@
       "run_id": "bench-run-wrong_admission_profile",
       "task_id": "labtrust-qc-release-v0",
       "case_id": "wrong_admission_profile",
-      "started_at": "2026-05-22T01:01:37Z",
-      "completed_at": "2026-05-22T01:01:37Z",
+      "started_at": "2026-05-22T01:58:22Z",
+      "completed_at": "2026-05-22T01:58:22Z",
       "commands": [
         {
-          "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=wrong_admission_profile mode=science_claim profile=agent_tool_use_safety",
+          "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=wrong_admission_profile mode=science_claim profile=agent_tool_use_safety",
           "exit_code": 0
         }
       ],
@@ -481,7 +481,7 @@
       "observed_repair_hint": null,
       "duration_ms": 23,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:f6223c41b28553dec34e90e09d874f10976fc1e324cf7eff8e00e029f1cbf97a"
     }
   ],
@@ -501,7 +501,7 @@
         "semantic_checks_skipped": 0
       },
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e130f20ec4f53028b8a255cc2165679a89e22c0a01323806a1c2d5d2b000b5aa"
     },
     {
@@ -516,7 +516,7 @@
         "formal_checks_required": true
       },
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:9ef85f9687f5ebc09bc70c961d3ee8d0c6e96175d1d0258b99ddf9a427bec5c4"
     },
     {
@@ -531,7 +531,7 @@
         "profile_id": "admission_profile"
       },
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e4584181ed23b6cdf1ec05196cc1782c59e54b147d39b6771f1fb6a3cd9a3e75"
     },
     {
@@ -544,7 +544,7 @@
       "coverage_ratio": 1,
       "details": {},
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6c1687b55825c54234ecc403babcb04ccaaff7cf84e2a5b81af3ece387f60278"
     }
   ],
@@ -589,7 +589,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -612,7 +612,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:21c13745cdc24af3c67fbb1c6590775c539f6ec8b780be13b44890e6f3b44cdc"
     },
     {
@@ -655,7 +655,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -678,7 +678,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:d9786fc28864cb3c8b4225715b7d0661b2c3debd46346f5a5b6f1a7dfae1b745"
     },
     {
@@ -721,7 +721,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -744,7 +744,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:0bc360ca23fbbbcdea1050f940b9c019fde5a9058520ec58feb691a9c58ccec2"
     },
     {
@@ -787,7 +787,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -810,7 +810,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:11efe02a13ba88666505820c11621773ccd4ea6d1297bf10d6376aa034a1a74c"
     },
     {
@@ -853,7 +853,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -881,7 +881,7 @@
         }
       ],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:117d5db7ff8ce1230139a08c23f040e588e0092fe2259a3e4fe826e15334e3e6"
     },
     {
@@ -925,7 +925,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -948,7 +948,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c298e17545e28d6fd7bc6ddc48276b69faa599db580d537b944419bbc819e453"
     },
     {
@@ -991,7 +991,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1014,7 +1014,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:a88b51047c5e13f33b2925033112461b15b53254710af842d780dc1af2b8f995"
     },
     {
@@ -1058,7 +1058,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1081,7 +1081,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:0042b749382195ee1927ba92d3ba036584e8c86298c8b030d47b3b725431c85a"
     },
     {
@@ -1124,7 +1124,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1147,7 +1147,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:f0e83f8de00205a5bd43cc8d12f0f4c96cfef6c3a8e17d28e135f4643c193b10"
     },
     {
@@ -1190,7 +1190,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1213,7 +1213,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:bd277eb8da57cf421ffd67009cc7749b1d035023a89409fee54ee0bf1d7ee069"
     },
     {
@@ -1256,7 +1256,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1279,7 +1279,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:07860e7e4fc917ae7b9054defb1789be765ff4b5a0557ab6937e18db6fe0843b"
     },
     {
@@ -1322,7 +1322,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1345,7 +1345,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e5d9dbf8b9f930331657bbbd9031795347570c4bcd3de073801491d1009cda7f"
     },
     {
@@ -1388,7 +1388,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1411,7 +1411,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:058a2c5d3524fa729a76f1fd07e538ae860abc9ad021eb7146bcd9f35a3939e4"
     },
     {
@@ -1454,7 +1454,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1477,7 +1477,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:ea4ba8aa888be8c4b7a5eba70d762c4669d8f514d304bad62f5c01b96055c56d"
     },
     {
@@ -1520,7 +1520,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1543,7 +1543,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:87a98624a7211ab894670988858ad938dbb5ed29f07331a9cbc40f3601bc7a2e"
     },
     {
@@ -1586,7 +1586,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1609,7 +1609,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:bbfd8ae142f8e3b137ba337646066f33ea8988ab7d30b6cc9c751215fe8753f8"
     },
     {
@@ -1652,7 +1652,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1675,7 +1675,7 @@
       "quality_score": 1,
       "gaps": [],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b04906046093611f5f7d19f8f15382b29ce16169eab0131393f00d32c6e9322b"
     },
     {
@@ -1718,7 +1718,7 @@
         "lineage": {
           "present": true,
           "score": 1,
-          "notes": "7b714f0d584b76a9dfa21e3114ff6770d0da310d"
+          "notes": "21101193f946ed171107897b75558471ad20010d"
         },
         "provenance": {
           "present": true,
@@ -1746,7 +1746,7 @@
         }
       ],
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:be85655b7fc69b0826734c9eb550eec6db480a40b3062cc398aa988ddc0b3405"
     }
   ],
@@ -1762,7 +1762,7 @@
       "observed_responsible_component": "hashing",
       "localized_correctly": true,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:446f0368cd81d084e6b85bfb4d524b1d5439093a33e1d00ff36b1a1f0ef7c058"
     },
     {
@@ -1776,7 +1776,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:fe039e9c636e98e3874bc6b08ab4cacac837e940b7fc938bc0557ba44bc056a8"
     },
     {
@@ -1790,7 +1790,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:dadeccf9e8e7edd21bde8d01aac1865f7c7423e2683c915eda098698340852df"
     },
     {
@@ -1804,7 +1804,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:94abffb006b763905a98ec2273a92f52a28479d7e08f8c4dc2cec0d290579ece"
     },
     {
@@ -1818,7 +1818,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:d110c9fedde16ae4e665b247226d892ee990161d69804f98c14409fdf96975f9"
     },
     {
@@ -1832,7 +1832,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6f54bfd734eb72d061b4a5c417203b0522119822596b7626e7d97fc359a15529"
     },
     {
@@ -1846,7 +1846,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:659507806a9024a8fe6459dcb7cc8a6c06932a4b2f2b03058c3fe6fbee688a66"
     },
     {
@@ -1860,7 +1860,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:cebc78c53a390c753f0664fdd4f849fa0cf59dc268481c23fa82e24aa9689233"
     },
     {
@@ -1874,7 +1874,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:70f814e188bfa55a02d0229c8c9e3bac57c65a2bd59c5fcc4724a19482dc83de"
     },
     {
@@ -1888,7 +1888,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:0bcacebc56e091d5a649227b987ead54696d65cb416bf7fa446168c88e5b5466"
     },
     {
@@ -1902,7 +1902,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:044ccc0e2d3a486a9127ab78cc322509fb01774283cc914f2c58ef5b1867cef5"
     },
     {
@@ -1916,7 +1916,7 @@
       "observed_responsible_component": "verifier",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b14e834161d8a51db2d4006d23af68031795c26c5d4aef9b032b763607535ac3"
     },
     {
@@ -1930,7 +1930,7 @@
       "observed_responsible_component": "verifier",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6d9f2a10ed0697e279b0f1172df87be68d39927c0509637085f89565a9f296a1"
     },
     {
@@ -1944,7 +1944,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e0ee00b80a2a7624a99afbaaa8813d76b122de3a0beb357500856e29b7a2bef1"
     },
     {
@@ -1958,7 +1958,7 @@
       "observed_responsible_component": "scientific_memory",
       "localized_correctly": true,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c1633242d4466ea084f8b1f7e0938aa3c6b25b55cf7599da8c992915a736aad9"
     },
     {
@@ -1972,7 +1972,7 @@
       "observed_responsible_component": "certificate_producer",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:bad841036dee8a70295568732cb366ad19279702e07ee1470d80cb8284e5bcae"
     },
     {
@@ -1986,7 +1986,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:25b8b49a3d425ac45130467ba7e574e9e8358598ac2c00e879cf089b2a783bce"
     },
     {
@@ -2000,7 +2000,7 @@
       "observed_responsible_component": "unknown",
       "localized_correctly": false,
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:88f6bf932089b8fba65d8ded9579134b18fdec8ae327a43a28326440447c6022"
     }
   ],
@@ -2050,89 +2050,89 @@
         "workflow_id": "hospital_lab.qc_release"
       },
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:dc64f86a72e5364b87bb592452f3ec9c75d87259fcfd43cea507bea087fbb999"
     }
   ],
   "commands": [
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=bundle_hash_mismatch mode=release_chain profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=bundle_hash_mismatch mode=release_chain profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=certificate_status_rejected mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=certificate_status_rejected mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=failed_lean_check mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=failed_lean_check mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=failed_lean_theorem mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=failed_lean_theorem mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=lean_release_id_mismatch mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=lean_release_id_mismatch mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=legacy_handoff_in_release_mode mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=legacy_handoff_in_release_mode mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_formal_check mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_formal_check mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_handoff mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_handoff mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_lean_check_result mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_lean_check_result mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_proof_obligation mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_proof_obligation mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=missing_registry mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=missing_registry mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=registry_disallowed_status mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=registry_disallowed_status mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=registry_wrong_producer mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=registry_wrong_producer mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=rejected_certificate mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=rejected_certificate mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=release_admission mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=release_admission mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=release_chain mode=release_chain profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=release_chain mode=release_chain profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=scientific_memory_import_failure mode=release_chain profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=scientific_memory_import_failure mode=release_chain profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=trace_hash_mismatch mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=trace_hash_mismatch mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=unauthorized_lean_theorem mode=science_claim profile=labtrust_qc_release",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=unauthorized_lean_theorem mode=science_claim profile=labtrust_qc_release",
       "exit_code": 0
     },
     {
-      "command": "pf benchmark admission --cases c:\\Users\\mateo\\provability-fabric\\benchmarks\\admission\\labtrust_qc_release --registry c:\\Users\\mateo\\pcs-core\\examples\\artifact_registry.valid.json # case=wrong_admission_profile mode=science_claim profile=agent_tool_use_safety",
+      "command": "pf benchmark admission --cases benchmarks/admission/labtrust_qc_release --registry ../pcs-core/examples/artifact_registry.valid.json # case=wrong_admission_profile mode=science_claim profile=agent_tool_use_safety",
       "exit_code": 0
     }
   ],
@@ -2164,9 +2164,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/bundle_hash_mismatch/benchmark_run.v0.json",
       "sha256": "sha256:26b6265b1c207908c7318bee8e257428241880c9991e0327fc1b31d8ed1b5c83",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6240177dac7728748afb660981ddc98d6171bf53d48d65346f6df036dbe368e0"
     },
     {
@@ -2174,9 +2174,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/certificate_status_rejected/benchmark_run.v0.json",
       "sha256": "sha256:14aadd28f6f611a1f651c36ceab5a99a1ced69f221dc868c8af58e29aa5ee9c8",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:536eaffccc75079df2248f21aa795f904c7c754c290c00eef7d91816867996f9"
     },
     {
@@ -2184,9 +2184,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/failed_lean_check/benchmark_run.v0.json",
       "sha256": "sha256:db6520403b964612e48d62320277bd0e32e94c930dbfee25f3380a89ef8881fb",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:8081dc76a0816b621dd733b243e075e158ae6d4744cb54f9d3ce39db375e6148"
     },
     {
@@ -2194,9 +2194,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/failed_lean_theorem/benchmark_run.v0.json",
       "sha256": "sha256:0746c27a1d4615f032bd31adc0a6349a474c9ab2ff705249bf564c9fbd24b2db",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b6188c661ab531edd7c9a2badd3483dee42c6eda81f3adce9e355bc906da8c56"
     },
     {
@@ -2204,9 +2204,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/lean_release_id_mismatch/benchmark_run.v0.json",
       "sha256": "sha256:76c4dd34ec8133ccd7a6d5312136014cd7f22d280b4bacf48ff7b34ce7ca1f14",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:4f14fdc8dad65b065d316f74de4e05a25006a475c018744241265d9bdf4f72d0"
     },
     {
@@ -2214,9 +2214,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/legacy_handoff_in_release_mode/benchmark_run.v0.json",
       "sha256": "sha256:d2127b2cdc07352577effcd4ad6e969291f900a88ce1af2514c71f3925e6274a",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:462c4df1b5117ec242661a6ed3ad3dba457f33a6f4d022d2cafe44ed9931aff1"
     },
     {
@@ -2224,9 +2224,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/missing_formal_check/benchmark_run.v0.json",
       "sha256": "sha256:ec5d4943e766685fa26d765d224531b73caffd02e1c1e232437a3af93209de09",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:827ab97bed574c4acad70ab78c72c2d1c8475e53b28509c1207a9404cc2751b9"
     },
     {
@@ -2234,9 +2234,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/missing_handoff/benchmark_run.v0.json",
       "sha256": "sha256:25092f2bd93d18e3d0cb3393a43976cb99e69339da8e2b77a4d50f9348e9d0ab",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:74565ae7f59bf3642719e9b072b8edd0fdddece26889ebcf330addfc296e418b"
     },
     {
@@ -2244,9 +2244,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/missing_lean_check_result/benchmark_run.v0.json",
       "sha256": "sha256:90fb4e1fa953a7c9f968e5c5c2e032bd0cb07a6cf09276746680817722fbbff7",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:546d623c938626c3e524fbc64ca9efec27da9f81227c77cd81f1c395bc518ae9"
     },
     {
@@ -2254,9 +2254,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/missing_proof_obligation/benchmark_run.v0.json",
       "sha256": "sha256:dba84e3d5d05667fe95d62a02aa9792cd2c1f24c47ebd52fb743b2370a6d1961",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:3292d225c9bd836bd77b3c0936f276e3eb477712e1c198f5178f518c9b6870cb"
     },
     {
@@ -2264,9 +2264,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/missing_registry/benchmark_run.v0.json",
       "sha256": "sha256:df7c2e81222013341ee143622ae7e0efae05fc6746c94552434f347c45a3097d",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b94b2eb32fbd753f14432befe09d6930a14df4768930aab7799ed1ab68cdfa76"
     },
     {
@@ -2274,9 +2274,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/registry_disallowed_status/benchmark_run.v0.json",
       "sha256": "sha256:2a7ff49f3d8b502980ee989fc12cd82b5a9f066585b1e9a61f48fc401181aa10",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:7e2096d5a5fa54b04ecdad620112a640070f7a1826798a92a7d74f51a0c20b1d"
     },
     {
@@ -2284,9 +2284,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/registry_wrong_producer/benchmark_run.v0.json",
       "sha256": "sha256:3b43ed43a67d7b155c943ff0d76d894d65ee9b1b4061a7c2ad51e06f6062d987",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:d9e424e211eec2b532099e04e8233ae74df5975f14a3bd23c761c15ac8223b38"
     },
     {
@@ -2294,9 +2294,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/rejected_certificate/benchmark_run.v0.json",
       "sha256": "sha256:1965b50665f5553a37a5b0474ab55d2553dde4e5d96e7383284f38356dcf5f2a",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:3c0a63f57cc51311e9175bd24aa6fda262d3a6ff17aee8ea0b1243a08a7cbc74"
     },
     {
@@ -2304,9 +2304,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/release_admission/benchmark_run.v0.json",
       "sha256": "sha256:6b427810197669cc05b1c062bcb9b5e33d78bfee220ace9efa452ab8dfdbf1f4",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:446751be99744ed16baa9a8091aba134ccb57a269d97906c59b165364b44de39"
     },
     {
@@ -2314,9 +2314,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/release_chain/benchmark_run.v0.json",
       "sha256": "sha256:62167e3c8fe7b20d7fa8720e6e206fb98d6318342c111447bfac07aa1b59261e",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:9652b01a7e005bc7f83d763ecbbb0d5d3e3e881c03ab9c98cbc11a58e185e1ab"
     },
     {
@@ -2324,9 +2324,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/scientific_memory_import_failure/benchmark_run.v0.json",
       "sha256": "sha256:b9389ed942245bdd9c652742d55019ee52a95047625998a0c1132057b3f4527c",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:bf9dc6cde67d7c6c5c2c9aa85955505526b4c2d99a7ec0be83a2d9b650da7e5b"
     },
     {
@@ -2334,9 +2334,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/trace_hash_mismatch/benchmark_run.v0.json",
       "sha256": "sha256:b3de92564881c208178e9378114a197239cc0936b95970bfd6b638fbfb163fb5",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:3649e65b001441301a31ca3ff73621925212c682f6736701bb0da579d3556f3a"
     },
     {
@@ -2344,9 +2344,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/unauthorized_lean_theorem/benchmark_run.v0.json",
       "sha256": "sha256:6c5ff6cdcb46abf7360eac897379f4a50ea64770a06693577796e3af87465304",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:1f210d2d81089546c2837ceee7bdfaebb0db745cab38d33fd9bbe7eb890847b4"
     },
     {
@@ -2354,9 +2354,9 @@
       "artifact_type": "BenchmarkRun.v0",
       "path": "runs/wrong_admission_profile/benchmark_run.v0.json",
       "sha256": "sha256:f6223c41b28553dec34e90e09d874f10976fc1e324cf7eff8e00e029f1cbf97a",
-      "role": "producer_export",
+      "role": "primary",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:ae94288317534e76517c5507b4609c91e3247dabfd2a180d070d2b31569424c8"
     },
     {
@@ -2366,7 +2366,7 @@
       "sha256": "sha256:e130f20ec4f53028b8a255cc2165679a89e22c0a01323806a1c2d5d2b000b5aa",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c02b694c1ab624a85e5d70c7fb8b5542c8f8a01a39567e869a62d10428289262"
     },
     {
@@ -2376,7 +2376,7 @@
       "sha256": "sha256:9ef85f9687f5ebc09bc70c961d3ee8d0c6e96175d1d0258b99ddf9a427bec5c4",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:11e776ab7f31dc848e74cc1500e21a6269c9d403668ecb045bf7431ed0e1aeb0"
     },
     {
@@ -2386,7 +2386,7 @@
       "sha256": "sha256:e4584181ed23b6cdf1ec05196cc1782c59e54b147d39b6771f1fb6a3cd9a3e75",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:40ca44f684522955e1c16c213439ab38f16444c398738cfc595f393b063abb74"
     },
     {
@@ -2396,7 +2396,7 @@
       "sha256": "sha256:6c1687b55825c54234ecc403babcb04ccaaff7cf84e2a5b81af3ece387f60278",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:4b811a081b6ee12f18b92790909bea8b1cfd148405209f63a0796498a1f13ba9"
     },
     {
@@ -2404,9 +2404,9 @@
       "artifact_type": "ProfileCoverageReport.v0",
       "path": "coverage/admission_profile.profile_coverage_report.v0.json",
       "sha256": "sha256:dc64f86a72e5364b87bb592452f3ec9c75d87259fcfd43cea507bea087fbb999",
-      "role": "producer_export",
+      "role": "ingest_bundle",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:5277d6c149b7551dbcc1517975dd4577d8f0e51c2475f9e16309125d1751b146"
     },
     {
@@ -2416,7 +2416,7 @@
       "sha256": "sha256:21c13745cdc24af3c67fbb1c6590775c539f6ec8b780be13b44890e6f3b44cdc",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c774e5f383e5a16d257acf70933c72813539a1dd69309977bcd0c8872118e7ba"
     },
     {
@@ -2426,7 +2426,7 @@
       "sha256": "sha256:d9786fc28864cb3c8b4225715b7d0661b2c3debd46346f5a5b6f1a7dfae1b745",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:d6553f337487ba638bcf23f2b9d06e7adc317ea66b20edc0eca08defea4475ab"
     },
     {
@@ -2436,7 +2436,7 @@
       "sha256": "sha256:0bc360ca23fbbbcdea1050f940b9c019fde5a9058520ec58feb691a9c58ccec2",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:01e254193057cef39f37d960b4d7ee51bbe6b395bb71bc1fc2d62b092e62db7b"
     },
     {
@@ -2446,7 +2446,7 @@
       "sha256": "sha256:11efe02a13ba88666505820c11621773ccd4ea6d1297bf10d6376aa034a1a74c",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:f1ba4d2fe0951dea4f343aa946a7422c0e436d4a9e72dbdbfa0b2e1447a25c2d"
     },
     {
@@ -2456,7 +2456,7 @@
       "sha256": "sha256:117d5db7ff8ce1230139a08c23f040e588e0092fe2259a3e4fe826e15334e3e6",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:767a5413ed2babf4d82f6d4233fbf0cdf3dcec0348791717b23caa615d4b12c2"
     },
     {
@@ -2466,7 +2466,7 @@
       "sha256": "sha256:c298e17545e28d6fd7bc6ddc48276b69faa599db580d537b944419bbc819e453",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:7d06a89c377f301ed654dd5196f780c2b2bf603c9c40f26672806f566d78cf95"
     },
     {
@@ -2476,7 +2476,7 @@
       "sha256": "sha256:a88b51047c5e13f33b2925033112461b15b53254710af842d780dc1af2b8f995",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:8eb61ee1dcd2db75c85761a4594cda3817595e34646011dcd2b64bc217077bf8"
     },
     {
@@ -2486,7 +2486,7 @@
       "sha256": "sha256:0042b749382195ee1927ba92d3ba036584e8c86298c8b030d47b3b725431c85a",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:1c209eb88c2dd7929bc22f78453e6ee043d5ea59e0bbbc513f68613f03984d88"
     },
     {
@@ -2496,7 +2496,7 @@
       "sha256": "sha256:f0e83f8de00205a5bd43cc8d12f0f4c96cfef6c3a8e17d28e135f4643c193b10",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b55f24dca14604898754f6c4e96b4dc80af0d45da869d35eaed145ec0d403d83"
     },
     {
@@ -2506,7 +2506,7 @@
       "sha256": "sha256:bd277eb8da57cf421ffd67009cc7749b1d035023a89409fee54ee0bf1d7ee069",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6fa6484d2e07894cd4a908eacf777fc7af649a5041fdd94e1b6805edc866d4e5"
     },
     {
@@ -2516,7 +2516,7 @@
       "sha256": "sha256:07860e7e4fc917ae7b9054defb1789be765ff4b5a0557ab6937e18db6fe0843b",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:995970e15a4cbfd7e0f9cdafc38e3d98f13bbf01fc474bced0f3ff823736c487"
     },
     {
@@ -2526,7 +2526,7 @@
       "sha256": "sha256:e5d9dbf8b9f930331657bbbd9031795347570c4bcd3de073801491d1009cda7f",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c8f22c2bd9b4d8cde1f739b996e090aa1ccd1abf790da9fb4f1eb9ab4d9df2ce"
     },
     {
@@ -2536,7 +2536,7 @@
       "sha256": "sha256:058a2c5d3524fa729a76f1fd07e538ae860abc9ad021eb7146bcd9f35a3939e4",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:7e0e719217e746671b6f369061b2f46fe59e6999e893387f4c698b1fde53e030"
     },
     {
@@ -2546,7 +2546,7 @@
       "sha256": "sha256:ea4ba8aa888be8c4b7a5eba70d762c4669d8f514d304bad62f5c01b96055c56d",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:dffe0d140a6939781129ac2eb9054411948e493bf04d69d48edd1ebf708a31b7"
     },
     {
@@ -2556,7 +2556,7 @@
       "sha256": "sha256:87a98624a7211ab894670988858ad938dbb5ed29f07331a9cbc40f3601bc7a2e",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:70f894b70ecdd8ccec9cec4635efcc4ec558e0efe9149b424480e737136030de"
     },
     {
@@ -2566,7 +2566,7 @@
       "sha256": "sha256:bbfd8ae142f8e3b137ba337646066f33ea8988ab7d30b6cc9c751215fe8753f8",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:8dab8d869e3a6589ff0d47d5458c93da28fa5dd20836155286c8bff9fd699fae"
     },
     {
@@ -2576,7 +2576,7 @@
       "sha256": "sha256:b04906046093611f5f7d19f8f15382b29ce16169eab0131393f00d32c6e9322b",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c07e40b67698791f00101491e57198d984a3bad46d4df0bbd57863712cfb47bd"
     },
     {
@@ -2586,7 +2586,7 @@
       "sha256": "sha256:be85655b7fc69b0826734c9eb550eec6db480a40b3062cc398aa988ddc0b3405",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:830974ba3d19d84817e1f0da75aed063eb43792e0ca8a896f1bd1588e25d3dbd"
     },
     {
@@ -2596,7 +2596,7 @@
       "sha256": "sha256:446f0368cd81d084e6b85bfb4d524b1d5439093a33e1d00ff36b1a1f0ef7c058",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:41103da65fa57a7bae018d3bc2062dccaff2a8098fa59810df3644d461c17d2f"
     },
     {
@@ -2606,7 +2606,7 @@
       "sha256": "sha256:fe039e9c636e98e3874bc6b08ab4cacac837e940b7fc938bc0557ba44bc056a8",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6ce7303596efee481217e75bb19a8ef6911e9b77ec8967f25911c4f4effd78f0"
     },
     {
@@ -2616,7 +2616,7 @@
       "sha256": "sha256:dadeccf9e8e7edd21bde8d01aac1865f7c7423e2683c915eda098698340852df",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:36b6efc62d5bf560420e270e87183279963468f93e7b793bf1c39d8531a0fb3b"
     },
     {
@@ -2626,7 +2626,7 @@
       "sha256": "sha256:94abffb006b763905a98ec2273a92f52a28479d7e08f8c4dc2cec0d290579ece",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:b9f8d0c2dd806b9c840e0ea7517d3d60b1b125bbf67ba217eb3b4280f7858dcd"
     },
     {
@@ -2636,7 +2636,7 @@
       "sha256": "sha256:d110c9fedde16ae4e665b247226d892ee990161d69804f98c14409fdf96975f9",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:c8ff20ef3f4934ed1ec4f3b8ab24c0a28e1946ca8f152f98f5b4083966b234bd"
     },
     {
@@ -2646,7 +2646,7 @@
       "sha256": "sha256:6f54bfd734eb72d061b4a5c417203b0522119822596b7626e7d97fc359a15529",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:f850fa5174af65c45995813e5cab50e4b33f6b80f7d6e371d3eb42e1644845b8"
     },
     {
@@ -2656,7 +2656,7 @@
       "sha256": "sha256:659507806a9024a8fe6459dcb7cc8a6c06932a4b2f2b03058c3fe6fbee688a66",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:93d665d1d7918b838b29a6a4ca6b174febdc858ee0d09f76e57638821920b8d5"
     },
     {
@@ -2666,7 +2666,7 @@
       "sha256": "sha256:cebc78c53a390c753f0664fdd4f849fa0cf59dc268481c23fa82e24aa9689233",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6d64a2dbc323ad6230e9c91759464d77af99e4266ad8a20c2d4e5476bd684bff"
     },
     {
@@ -2676,7 +2676,7 @@
       "sha256": "sha256:70f814e188bfa55a02d0229c8c9e3bac57c65a2bd59c5fcc4724a19482dc83de",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6632c64b8bb0e0bba89d121d7c4c6cec0d69f46ee99724dd7354a098054bc3ca"
     },
     {
@@ -2686,7 +2686,7 @@
       "sha256": "sha256:0bcacebc56e091d5a649227b987ead54696d65cb416bf7fa446168c88e5b5466",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:6e3ff899c0e324ab9a37942c0a8a3a8944726bd4da329e77b9880a58e28288c0"
     },
     {
@@ -2696,7 +2696,7 @@
       "sha256": "sha256:044ccc0e2d3a486a9127ab78cc322509fb01774283cc914f2c58ef5b1867cef5",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e37a5cdae3d8f1945473215771734e19ad6842fbe5af325685f8ba4ce1940ac4"
     },
     {
@@ -2706,7 +2706,7 @@
       "sha256": "sha256:b14e834161d8a51db2d4006d23af68031795c26c5d4aef9b032b763607535ac3",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:874ce05e4f30435209f3b553cffeea4a174761a1463c823705201ec29eb7c9f4"
     },
     {
@@ -2716,7 +2716,7 @@
       "sha256": "sha256:6d9f2a10ed0697e279b0f1172df87be68d39927c0509637085f89565a9f296a1",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:442aeef65093ea3bb631f8f10d0697abf0a7eb88b8c9dd6b343e699f2586b443"
     },
     {
@@ -2726,7 +2726,7 @@
       "sha256": "sha256:e0ee00b80a2a7624a99afbaaa8813d76b122de3a0beb357500856e29b7a2bef1",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:ef14300310fd1dbee966f415c285b62a53c4b4f73a52027e2c24f98223f707f9"
     },
     {
@@ -2736,7 +2736,7 @@
       "sha256": "sha256:c1633242d4466ea084f8b1f7e0938aa3c6b25b55cf7599da8c992915a736aad9",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:e77c9ae190c90bf18f81c03588cb5d1e10e65048fc0b6cfb0d132f51c20fb3ca"
     },
     {
@@ -2746,7 +2746,7 @@
       "sha256": "sha256:bad841036dee8a70295568732cb366ad19279702e07ee1470d80cb8284e5bcae",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:56bd81fa8946d54248ad2d450c580006f3004aedee67edd60fd68299cb2cb07d"
     },
     {
@@ -2756,7 +2756,7 @@
       "sha256": "sha256:25b8b49a3d425ac45130467ba7e574e9e8358598ac2c00e879cf089b2a783bce",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:7a617d6623f6825d703bbd4ee530c08c2a5a09663743430c28e573a39c09b290"
     },
     {
@@ -2766,11 +2766,11 @@
       "sha256": "sha256:88f6bf932089b8fba65d8ded9579134b18fdec8ae327a43a28326440447c6022",
       "role": "producer_export",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-      "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
+      "source_commit": "21101193f946ed171107897b75558471ad20010d",
       "signature_or_digest": "sha256:970b2fc03ffec3a3aa719909e2172428cbb0d0afea88ec78a884119932be966b"
     }
   ],
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
-  "source_commit": "7b714f0d584b76a9dfa21e3114ff6770d0da310d",
-  "signature_or_digest": "sha256:d81fca2e9400329fcdcab96f634b03861457bc3e7ffb0ef4e017289b3ca01f41"
+  "source_commit": "21101193f946ed171107897b75558471ad20010d",
+  "signature_or_digest": "sha256:ee7d34c5c3890aef26c61c070ebcb3c7c747928f25584df8f463ecccd86ee108"
 }

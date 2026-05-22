@@ -106,6 +106,17 @@ func benchmarkBundleRelPath(elem ...string) string {
 	return filepath.ToSlash(filepath.Join(elem...))
 }
 
+func benchmarkArtifactRefRole(artifactType string) string {
+	switch artifactType {
+	case "BenchmarkRun.v0":
+		return "primary"
+	case "ProfileCoverageReport.v0":
+		return "ingest_bundle"
+	default:
+		return "producer_export"
+	}
+}
+
 func buildPCSBenchmarkArtifactRef(artifactType, relPath, contentDigest, sourceCommit string) PCSBenchmarkArtifactRef {
 	relPath = benchmarkBundleRelPath(relPath)
 	refID := fmt.Sprintf("ref-%s-%s", artifactType, filepath.Base(relPath))
@@ -114,7 +125,7 @@ func buildPCSBenchmarkArtifactRef(artifactType, relPath, contentDigest, sourceCo
 		ArtifactType:      artifactType,
 		Path:              relPath,
 		SHA256:            contentDigest,
-		Role:              "producer_export",
+		Role:              benchmarkArtifactRefRole(artifactType),
 		SourceRepo:        VerifierSourceRepo,
 		SourceCommit:      sourceCommit,
 		SignatureOrDigest: digestBenchmarkRun(refID, artifactType, relPath, "ref", contentDigest),
@@ -398,6 +409,38 @@ func BenchmarkArtifactSchemaForFile(name string) (string, error) {
 		}
 		return "", fmt.Errorf("unknown benchmark artifact %q", base)
 	}
+}
+
+// ValidateBenchmarkArtifactFileWithPCSCore validates one benchmark JSON file against pcs-core/schemas when pcsCoreRoot is set.
+func ValidateBenchmarkArtifactFileWithPCSCore(pcsCoreRoot, path string) error {
+	repoRoot := ""
+	if root, err := FindRepoRoot(path); err == nil {
+		repoRoot = root
+	}
+	if strings.TrimSpace(pcsCoreRoot) == "" {
+		return ValidateBenchmarkArtifactFile(repoRoot, path)
+	}
+	schema, err := BenchmarkArtifactSchemaForFile(path)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var doc any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	if arr, ok := doc.([]any); ok {
+		for i, item := range arr {
+			if err := ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, schema, item); err != nil {
+				return fmt.Errorf("%s[%d]: %w", filepath.Base(path), i, err)
+			}
+		}
+		return nil
+	}
+	return ValidateDocumentAgainstSchemaPreferPCSCore(pcsCoreRoot, repoRoot, schema, doc)
 }
 
 // ValidateBenchmarkArtifactFile validates one benchmark bundle JSON file (pcs validate compatible).

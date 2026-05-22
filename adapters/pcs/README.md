@@ -88,6 +88,18 @@ pcs-bench producer gate (labtrust ingest at `benchmark_runs/labtrust_admission/p
 make pcs-bench-producer
 ```
 
+Validate an existing ingest (release-grade):
+
+```bash
+bash scripts/pcs-bench-validate-ingest.sh \
+  --input benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json \
+  --bundle-dir benchmark_runs/labtrust_admission \
+  --pcs-core ../pcs-core \
+  --release-grade
+```
+
+Labtrust failure-family case IDs: `pcs.LabtrustRequiredFailureFamilyCaseIDs` (see `admission_benchmark_labtrust_test.go`).
+
 See [docs/guides/pcs-admission-benchmark.md](../../docs/guides/pcs-admission-benchmark.md).
 
 ## Tests

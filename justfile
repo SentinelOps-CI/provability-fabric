@@ -18,6 +18,19 @@ test-pcs-benchmark:
 validate-pcs-benchmark-bundle:
     bash "{{root}}/scripts/pcs-validate-benchmark-bundle.sh" "{{root}}/benchmark_runs/labtrust_admission"
 
+pcs-bench-producer:
+    make pcs-bench-producer
+
+export-pcs-benchmark-ingest-reference:
+    make export-pcs-benchmark-ingest-reference
+
+pcs-bench-validate-ingest ingest="{{root}}/benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json" bundle_dir="{{root}}/benchmark_runs/labtrust_admission":
+    bash "{{root}}/scripts/pcs-bench-validate-ingest.sh" \
+      --input "{{ingest}}" \
+      --bundle-dir "{{bundle_dir}}" \
+      --pcs-core "{{pcs_core}}" \
+      --release-grade
+
 pcs-schema-diff:
     bash "{{root}}/scripts/pcs-schema-diff.sh" "{{pcs_core}}"
 

@@ -39,3 +39,28 @@ run_materialize_admission_cases() {
   py="$(resolve_python)" || return 1
   PCS_BENCHMARK_QUIET=1 "${py}" "${root}/scripts/materialize-admission-benchmark-cases.py" --quiet
 }
+
+# ensure_pcs_core_python installs pcs-core (editable) so benchmark_ingest validation can import referencing/jsonschema.
+ensure_pcs_core_python() {
+  local pcs_core="$1"
+  local py
+  py="$(resolve_python)" || return 1
+  if [[ -z "${pcs_core}" || ! -d "${pcs_core}/python" ]]; then
+    echo "pcs-core python package not found at ${pcs_core}/python" >&2
+    return 1
+  fi
+  if [[ -n "${PCS_SKIP_PCS_CORE_PIP:-}" ]]; then
+    return 0
+  fi
+  if "${py}" -c "from pcs_core.benchmark_ingest import validate_benchmark_ingest_file" 2>/dev/null; then
+    return 0
+  fi
+  if "${py}" -m pip install -q -e "${pcs_core}/python" 2>/dev/null; then
+    return 0
+  fi
+  if "${py}" -m pip install -q --user -e "${pcs_core}/python"; then
+    return 0
+  fi
+  echo "failed to install pcs-core python package from ${pcs_core}/python" >&2
+  return 1
+}

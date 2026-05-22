@@ -227,6 +227,11 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 	if opts.SourceCommit == "" {
 		opts.SourceCommit = ResolveSourceCommit()
 	}
+	if strings.TrimSpace(opts.RepoRoot) == "" {
+		if root, err := FindRepoRoot(opts.CasesDir); err == nil {
+			opts.RepoRoot = root
+		}
+	}
 
 	var results []AdmissionBenchmarkCaseResult
 	var locCases []FailureLocalizationCaseResult
@@ -379,13 +384,58 @@ func admissionCasePassed(c AdmissionBenchmarkCase, cr AdmissionBenchmarkCaseResu
 }
 
 func buildBenchmarkCommandLine(c AdmissionBenchmarkCase, workflow AdmissionBenchmarkWorkflow, opts AdmissionBenchmarkOptions) string {
-	parts := []string{"pf", "benchmark", "admission", "--cases", opts.CasesDir}
-	if opts.RegistryPath != "" {
-		parts = append(parts, "--registry", opts.RegistryPath)
+	repoRoot := strings.TrimSpace(opts.RepoRoot)
+	if repoRoot == "" {
+		repoRoot, _ = FindRepoRoot(opts.CasesDir)
+	}
+	casesDir := portableBenchmarkPath(repoRoot, opts.CasesDir)
+	registry := portableBenchmarkPath(repoRoot, opts.RegistryPath)
+	parts := []string{"pf", "benchmark", "admission", "--cases", casesDir}
+	if registry != "" {
+		parts = append(parts, "--registry", registry)
 	}
 	parts = append(parts, fmt.Sprintf("# case=%s mode=%s profile=%s", c.CaseID, c.VerifyMode, c.ProfileID))
 	_ = workflow
 	return strings.Join(parts, " ")
+}
+
+func benchmarkPathKey(p string) string {
+	abs := p
+	if resolved, err := filepath.Abs(p); err == nil {
+		abs = resolved
+	}
+	return strings.ToLower(filepath.ToSlash(filepath.Clean(abs)))
+}
+
+// portableBenchmarkPath rewrites absolute filesystem paths to repo-relative forward-slash paths for reproducible command logs.
+func portableBenchmarkPath(repoRoot, path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	clean := filepath.Clean(path)
+	absClean := clean
+	if resolved, err := filepath.Abs(clean); err == nil {
+		absClean = resolved
+	}
+	if repoRoot != "" {
+		absRepo, _ := filepath.Abs(repoRoot)
+		if rel, err := filepath.Rel(absRepo, absClean); err == nil && rel != "" && !strings.HasPrefix(rel, "..") {
+			return filepath.ToSlash(rel)
+		}
+		siblingCore, _ := filepath.Abs(filepath.Join(absRepo, "..", "pcs-core"))
+		keyClean := benchmarkPathKey(absClean)
+		keySibling := benchmarkPathKey(siblingCore)
+		if keySibling != "" && (keyClean == keySibling || strings.HasPrefix(keyClean, keySibling+"/")) {
+			tail := strings.TrimPrefix(keyClean, keySibling)
+			tail = strings.TrimPrefix(tail, "/")
+			if tail == "" {
+				return "../pcs-core"
+			}
+			return filepath.ToSlash(filepath.Join("..", "pcs-core", filepath.FromSlash(tail)))
+		}
+	}
+	return filepath.ToSlash(clean)
 }
 
 func explainFromPCSReport(r *PCSExplainQualityReport) *ExplainQualityCaseScore {

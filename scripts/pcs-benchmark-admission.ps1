@@ -89,16 +89,22 @@ if ($env:PCS_CORE_PATH -and (Test-Path (Join-Path $env:PCS_CORE_PATH 'schemas'))
     $ValidateArgs += @('--validate-pcs-core-output', (Resolve-Path (Join-Path $Root '..\pcs-core')).Path)
 }
 
+function Get-AdmissionOutName {
+    param([string]$Suite)
+    if ($Suite -eq 'labtrust_qc_release') { return 'labtrust_admission' }
+    return "${Suite}_admission"
+}
+
 $Suites = @('labtrust_qc_release', 'tool_use_safety', 'computation_reproducibility', 'formal_trust_kernel')
 $Failed = 0
 foreach ($Suite in $Suites) {
-    $Out = Join-Path $OutRoot "${Suite}_admission"
-    Write-Host "==> pf benchmark admission --cases benchmarks/admission/$Suite ($ValidateArgs)"
+    $OutName = Get-AdmissionOutName $Suite
+    Write-Host "==> pf benchmark admission --cases benchmarks/admission/$Suite -> $OutName ($ValidateArgs)"
     try {
         Invoke-Pf benchmark admission `
             --cases "benchmarks/admission/$Suite" `
             --registry $Registry `
-            --out "benchmark_runs/${Suite}_admission" `
+            --out "benchmark_runs/$OutName" `
             @ValidateArgs
     } catch {
         Write-Host $_

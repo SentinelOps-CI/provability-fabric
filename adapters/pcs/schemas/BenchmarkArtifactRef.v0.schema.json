@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcs.sentinelops.ci/schemas/BenchmarkArtifactRef.v0.schema.json",
   "title": "BenchmarkArtifactRef.v0",
+  "description": "On-disk provenance for one embedded ingest artifact. sha256 must equal the embedded object signature_or_digest.",
   "type": "object",
   "required": [
     "schema_version",

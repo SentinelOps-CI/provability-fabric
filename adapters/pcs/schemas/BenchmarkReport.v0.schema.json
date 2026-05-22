@@ -46,7 +46,7 @@
     "metric_summaries": {
       "type": "array",
       "items": {
-        "$ref": "MetricSummary.v0.schema.json"
+        "$ref": "#/$defs/metric_summary"
       }
     },
     "summary": {
@@ -285,6 +285,41 @@
         "message": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "metric_summary": {
+      "type": "object",
+      "required": [
+        "name",
+        "applicability"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "common.defs.json#/$defs/benchmark_metric_id"
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "applicability": {
+          "$ref": "common.defs.json#/$defs/benchmark_metric_applicability"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

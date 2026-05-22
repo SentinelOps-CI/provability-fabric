@@ -41,14 +41,24 @@ fi
 
 FAILED=0
 TOTAL=0
+admission_out_dir() {
+  local suite="$1"
+  if [[ "${suite}" == "labtrust_qc_release" ]]; then
+    echo "labtrust_admission"
+  else
+    echo "${suite}_admission"
+  fi
+}
+
 for SUITE in labtrust_qc_release tool_use_safety computation_reproducibility formal_trust_kernel; do
   TOTAL=$((TOTAL + 1))
-  OUT="${OUT_ROOT}/${SUITE}_admission"
-  echo "==> pf benchmark admission --cases benchmarks/admission/${SUITE}"
+  OUT_NAME="$(admission_out_dir "${SUITE}")"
+  OUT="${OUT_ROOT}/${OUT_NAME}"
+  echo "==> pf benchmark admission --cases benchmarks/admission/${SUITE} -> ${OUT_NAME}"
   if ! run_pf benchmark admission \
     --cases "benchmarks/admission/${SUITE}" \
     --registry "${REGISTRY}" \
-    --out "benchmark_runs/${SUITE}_admission" \
+    --out "benchmark_runs/${OUT_NAME}" \
     "${PCS_CORE_VALIDATE[@]}"; then
     FAILED=$((FAILED + 1))
   fi

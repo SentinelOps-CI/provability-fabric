@@ -26,7 +26,6 @@ fi
 
 PF_ONLY=(
   "AdmissionBenchmarkCase.v0.schema.json"
-  "PCSBenchIngest.v0.schema.json"
   "ScienceClaimBundle.computation.v0.schema.json"
 )
 PF_ONLY_PROFILES=(
@@ -77,9 +76,25 @@ if [[ -d "${STAGING}/profiles" ]]; then
   cp -af "${STAGING}/profiles/." "${ROOT}/config/schemas/pcs/profiles/"
 fi
 
+mirror_pcs_bench_ingest_alias() {
+  local dest="$1"
+  local canonical_ingest="${dest}/PcsBenchIngest.v0.schema.json"
+  local alias_ingest="${dest}/PCSBenchIngest.v0.schema.json"
+  if [[ ! -f "${canonical_ingest}" ]]; then
+    return 0
+  fi
+  if [[ ! -e "${alias_ingest}" ]] || ! cmp -s "${canonical_ingest}" "${alias_ingest}"; then
+    cp -f "${canonical_ingest}" "${alias_ingest}" 2>/dev/null || true
+  fi
+}
+
+mirror_pcs_bench_ingest_alias "${ROOT}/config/schemas/pcs"
+mirror_pcs_bench_ingest_alias "${ROOT}/adapters/pcs/schemas"
+
 echo "Synced pcs-core schemas from ${CANONICAL} to:"
 echo "  ${ROOT}/config/schemas/pcs"
 echo "  ${ROOT}/adapters/pcs/schemas"
 echo "Preserved PF-only: ${PF_ONLY[*]}"
+echo "Mirrored PcsBenchIngest.v0.schema.json -> PCSBenchIngest.v0.schema.json (PF CLI alias)"
 
 PCS_CORE_SCHEMAS="${CANONICAL}" bash "${ROOT}/scripts/pcs-schema-diff.sh"

@@ -99,6 +99,12 @@ export-pcs-benchmark-ingest-reference:
 	@$(ECHOOK) "Materialize labtrust PcsBenchIngest reference artifact..."
 	bash scripts/export-pcs-benchmark-ingest-reference.sh
 
+validate-pcs-reference-ingest:
+	@$(ECHOOK) "Validate committed labtrust reference ingest (producer contract)..."
+	python3 scripts/pcs-bench-producer-contract-check.py \
+	  --ingest benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json \
+	  --bundle-dir benchmark_runs/labtrust_admission
+
 ifeq ($(OS),Windows_NT)
 pcs-bench-producer:
 	@$(ECHOOK) "PCS-bench producer gate (labtrust admission ingest)..."
@@ -109,7 +115,7 @@ pcs-bench-producer:
 	@bash scripts/pcs-bench-producer.sh
 endif
 
-test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle pcs-bench-producer
+test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle pcs-bench-producer validate-pcs-reference-ingest
 	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures, admission benchmarks)"
 
 validate-pcs-fixtures:

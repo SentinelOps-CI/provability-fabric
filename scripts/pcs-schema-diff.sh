@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Compare provability-fabric config/schemas/pcs to pcs-core (canonical files only; PF extensions allowed).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,9 +28,31 @@ if [[ ! -d "${VENDOR_DIR}" ]]; then
   exit 1
 fi
 
-if diff -ru "${CANONICAL}" "${VENDOR_DIR}"; then
-  echo "OK: config/schemas/pcs matches ${CANONICAL}"
-else
-  echo "FAIL: schema drift between pcs-core and provability-fabric" >&2
+FAILED=0
+for path in "${CANONICAL}"/*.json; do
+  [[ -f "${path}" ]] || continue
+  name="$(basename "${path}")"
+  vendor_path="${VENDOR_DIR}/${name}"
+  if [[ ! -f "${vendor_path}" ]]; then
+    echo "missing vendor schema: ${name}" >&2
+    FAILED=1
+    continue
+  fi
+  if ! diff -u "${path}" "${vendor_path}"; then
+    FAILED=1
+  fi
+done
+
+if [[ "${FAILED}" -ne 0 ]]; then
+  echo "FAIL: schema drift between pcs-core and provability-fabric (canonical files)" >&2
   exit 1
 fi
+
+echo "OK: config/schemas/pcs matches ${CANONICAL} (canonical benchmark/pcs schemas)"
+for extra in "${VENDOR_DIR}"/*.json; do
+  [[ -f "${extra}" ]] || continue
+  name="$(basename "${extra}")"
+  if [[ ! -f "${CANONICAL}/${name}" ]]; then
+    echo "  PF extension preserved: ${name}"
+  fi
+done

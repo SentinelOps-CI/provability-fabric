@@ -32,6 +32,27 @@ var RequiredAdmissionInvalidCaseIDs = []string{
 	"scientific_memory_import_failure",
 }
 
+// LabtrustRequiredFailureFamilyCaseIDs are negative admission cases the labtrust QC release suite must reject.
+// Unioned with the valid release case, this set is the PF producer contract for pcs-bench ingestion.
+var LabtrustRequiredFailureFamilyCaseIDs = []string{
+	"missing_handoff",
+	"legacy_handoff_in_release_mode",
+	"missing_registry",
+	"wrong_admission_profile",
+	"rejected_certificate",
+	"certificate_status_rejected",
+	"trace_hash_mismatch",
+	"bundle_hash_mismatch",
+	"registry_wrong_producer",
+	"registry_disallowed_status",
+	"missing_proof_obligation",
+	"missing_lean_check_result",
+	"failed_lean_check",
+	"failed_lean_theorem",
+	"unauthorized_lean_theorem",
+	"scientific_memory_import_failure",
+}
+
 // writeAdmissionBenchmarkBundle emits a pcs-core benchmark bundle for pcs-bench ingestion.
 // When pcsCoreRoot is non-empty, per-artifact validation uses pcs-core/schemas.
 func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCSBenchmarkBundle, executions []benchmarkCaseExecution) error {
@@ -280,6 +301,21 @@ func mustJSONDoc(v any) any {
 	return doc
 }
 
+func benchmarkIngestPathForSummary(repoRoot, outDir string) string {
+	ingestPath := filepath.Join(outDir, "pcs_bench_ingest.v0.json")
+	if strings.TrimSpace(repoRoot) == "" {
+		if root, err := FindRepoRoot(outDir); err == nil {
+			repoRoot = root
+		}
+	}
+	if repoRoot != "" {
+		if rel, err := filepath.Rel(repoRoot, ingestPath); err == nil && rel != "" && !strings.HasPrefix(rel, "..") {
+			ingestPath = rel
+		}
+	}
+	return filepath.ToSlash(ingestPath)
+}
+
 // FormatBenchmarkAdmissionSummaryJSON returns a compact JSON summary for --json-summary.
 func FormatBenchmarkAdmissionSummaryJSON(run AdmissionBenchmarkSuiteV0, outDir string) (string, error) {
 	passed := 0
@@ -288,7 +324,7 @@ func FormatBenchmarkAdmissionSummaryJSON(run AdmissionBenchmarkSuiteV0, outDir s
 			passed++
 		}
 	}
-	ingestPath := filepath.Join(outDir, "pcs_bench_ingest.v0.json")
+	ingestPath := benchmarkIngestPathForSummary("", outDir)
 	summary := map[string]any{
 		"producer_id":                     "provability-fabric",
 		"suite_id":                        pcsBenchmarkSuiteID(run.Workflow),

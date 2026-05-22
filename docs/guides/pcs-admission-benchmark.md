@@ -159,16 +159,18 @@ CI checks that `benchmarks/admission/examples/labtrust_qc_release.pcs_bench_inge
 Release-grade gate (pcs-core adequacy + sidecar paths):
 
 ```bash
-python3 scripts/validate-pf-pcs-bench-ingest.py \
-  --ingest benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json \
+bash scripts/pcs-bench-validate-ingest.sh \
+  --input benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json \
   --bundle-dir benchmark_runs/labtrust_admission \
   --pcs-core ../pcs-core \
   --release-grade
 ```
 
+(`make pcs-bench-producer` runs admission, then the same validate-ingest gate.)
+
 Explain export uses `pcs.ExportPCSExplainQualityReport` with PF field → pcs-core section mapping (`verification`, `provenance`, `repair_hints`, `handoffs`, `formal_checks`).
 
-Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs`.
+Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs`. The labtrust QC release producer contract (`pcs.LabtrustRequiredFailureFamilyCaseIDs`) is enforced by `TestLabtrustFailureFamiliesRejectedInBenchmark` and must stay aligned with pcs-bench failure-family coverage.
 
 Minimum gate thresholds (current PF tests):
 
@@ -187,9 +189,20 @@ Minimum gate thresholds (current PF tests):
 | `--json-summary` with producer/suite/workflow metrics and `pcs_bench_ingest_path` | Done |
 | Failure localization gold standard (check-aware components, artifact-path alignment, per-case `failure_localization/`) | Done |
 | Required invalid failure families (`RequiredAdmissionInvalidCaseIDs`, incl. `scientific_memory_import_failure`) | Done |
-| Committed reference ingest (`benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json`, `pcs validate` + `TestExportPCSBenchIngestReferenceArtifact`) | Done |
-| `make pcs-bench-producer` (admission + `validate-pf-pcs-bench-ingest.py --release-grade`) | Done |
+| Committed reference ingest (`benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json`, portable commands, `pcs validate` + `TestExportPCSBenchIngestReferenceArtifact`) | Done |
+| Canonical producer output path `benchmark_runs/labtrust_admission/` (CI + `pcs-benchmark-admission` scripts aligned) | Done |
+| `make pcs-bench-producer` (admission + `pcs-bench-validate-ingest.sh --release-grade`) | Done |
 | Canonical producer ids (`suite_id`: `pf-labtrust-admission-v0`, `workflow_id`: `hospital_lab.qc_release`) | Done |
+| Unified producer contract gate (`scripts/pcs-bench-producer-contract-check.py` + CI) | Done |
+
+Producer contract check (failure families, portable paths, suite metrics, sidecar presence):
+
+```bash
+python3 scripts/pcs-bench-producer-contract-check.py \
+  --ingest benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json \
+  --bundle-dir benchmark_runs/labtrust_admission
+make validate-pcs-reference-ingest   # committed reference artifact
+```
 
 ## Adding cases
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
@@ -82,7 +83,11 @@ func TestExportPCSBenchIngestReferenceArtifact(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Skip("reference ingest not materialized; run scripts/export-pcs-benchmark-ingest-reference.sh")
 	}
+	pcsCore := pcsCoreRoot(t)
 	if err := pcs.ValidateBenchmarkArtifactFile(root, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := pcs.ValidateBenchmarkArtifactFileWithPCSCore(pcsCore, path); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -95,5 +100,24 @@ func TestExportPCSBenchIngestReferenceArtifact(t *testing.T) {
 	}
 	if err := pcs.ValidatePCSBenchIngestSemantics(ingest); err != nil {
 		t.Fatal(err)
+	}
+	if ingest.SuiteID != "pf-labtrust-admission-v0" || ingest.WorkflowID != "hospital_lab.qc_release" {
+		t.Fatalf("reference ingest ids: suite=%q workflow=%q", ingest.SuiteID, ingest.WorkflowID)
+	}
+	if len(ingest.FailureLocalizationReports) == 0 || len(ingest.ExplainQualityReports) == 0 {
+		t.Fatal("reference ingest missing FLR or explain quality reports")
+	}
+	if len(ingest.ArtifactRefs) == 0 {
+		t.Fatal("reference ingest missing artifact_refs")
+	}
+	for _, cmd := range ingest.Commands {
+		if strings.Contains(cmd.Command, `\`) {
+			t.Fatalf("reference command must use portable paths: %q", cmd.Command)
+		}
+	}
+	for _, ref := range ingest.ArtifactRefs {
+		if strings.Contains(ref.Path, `\`) {
+			t.Fatalf("reference artifact ref path must use forward slashes: %q", ref.Path)
+		}
 	}
 }

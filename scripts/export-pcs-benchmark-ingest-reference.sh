@@ -46,6 +46,30 @@ REF="${REF_DIR}/labtrust_qc_release.pcs_bench_ingest.reference.json"
 cp "${OUT}/pcs_bench_ingest.v0.json" "${REF}"
 echo "Wrote ${REF}"
 
+PCS_CORE="${PCS_CORE_PATH:-}"
+if [[ -z "${PCS_CORE}" && -d "${ROOT}/../pcs-core/schemas" ]]; then
+  PCS_CORE="${ROOT}/../pcs-core"
+fi
+
+PY="$(resolve_python)" || exit 1
+"${PY}" "${ROOT}/scripts/pcs-bench-producer-contract-check.py" \
+  --ingest "${REF}" \
+  --bundle-dir "${OUT}"
+
+if [[ -n "${PCS_CORE}" ]]; then
+  echo "==> pcs-bench validate-ingest (release-grade)"
+  bash "${ROOT}/scripts/pcs-bench-validate-ingest.sh" \
+    --input "${REF}" \
+    --bundle-dir "${OUT}" \
+    --pcs-core "${PCS_CORE}" \
+    --release-grade
+  bash "${ROOT}/scripts/pcs-bench-validate-ingest.sh" \
+    --input "${OUT}/pcs_bench_ingest.v0.json" \
+    --bundle-dir "${OUT}" \
+    --pcs-core "${PCS_CORE}" \
+    --release-grade
+fi
+
 if command -v pcs >/dev/null 2>&1; then
   echo "==> pcs validate reference ingest"
   pcs validate "${REF}"

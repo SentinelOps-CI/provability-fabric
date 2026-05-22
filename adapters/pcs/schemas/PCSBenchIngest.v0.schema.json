@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcs.sentinelops.ci/schemas/PcsBenchIngest.v0.schema.json",
   "title": "PcsBenchIngest.v0",
+  "description": "Producer benchmark export for pcs-bench. v0 policy: embedded arrays hold authoritative v0 objects; artifact_refs are optional sidecar file provenance only (path + sha256). Path-only arrays are invalid.",
   "type": "object",
   "required": [
     "schema_version",
@@ -26,6 +27,7 @@
     "suite_id": { "type": "string", "minLength": 1 },
     "workflow_id": { "type": "string", "minLength": 1 },
     "benchmark_runs": {
+      "description": "Embedded BenchmarkRun.v0 objects (authoritative; not path strings).",
       "type": "array",
       "items": { "$ref": "BenchmarkRun.v0.schema.json" }
     },
@@ -54,6 +56,7 @@
       "items": { "type": "string" }
     },
     "artifact_refs": {
+      "description": "Optional BenchmarkArtifactRef.v0 sidecar provenance. Does not replace embedded objects. Required for producer file exports at release-grade.",
       "type": "array",
       "items": { "$ref": "BenchmarkArtifactRef.v0.schema.json" }
     },
