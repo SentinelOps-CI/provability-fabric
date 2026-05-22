@@ -1,6 +1,6 @@
 # PCS release checklist
 
-Run before tagging a Provability Fabric PCS release. CI on `main` runs the same gates via [.github/workflows/pcs-ci.yml](../../.github/workflows/pcs-ci.yml).
+Run before tagging a Provability Fabric PCS release. CI on `main` runs the same gates via [.github/workflows/pcs-ci.yml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/pcs-ci.yml).
 
 ## Prerequisites
 

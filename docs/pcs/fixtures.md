@@ -54,7 +54,7 @@ Use `release-run/` as the atomic handoff directory, then promote:
 make freeze-pcs-labtrust-release
 ```
 
-See [release-run/README.md](../../release-run/README.md).
+See [release-run/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/release-run/README.md).
 
 ### Validate
 

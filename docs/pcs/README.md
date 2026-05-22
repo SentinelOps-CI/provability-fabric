@@ -51,13 +51,14 @@ make test-pcs-full
 Individual targets:
 
 ```bash
-make test-pcs                  # Go unit tests (adapter + pf CLI)
-make test-pcs-rc-gate        # Release fixture identity lock
-make test-pcs-phase2         # Release protocol artifact tests
-make validate-pcs-fixtures   # Schema matrix on tests/pcs
-make test-pcs-benchmark      # All admission benchmark suites
-make pcs-bench-producer      # LabTrust ingest producer gate
-make demo-pcs                # Quick verify / sign / inspect
+make test-pcs                 # Unit tests (adapter + pf CLI)
+make test-pcs-rc-gate         # Release fixture identity lock
+make test-pcs-phase2          # Handoff, registry, and release-chain tests
+make validate-pcs-fixtures    # Schema matrix on tests/pcs
+make test-pcs-benchmark       # All admission benchmark suites
+make pcs-bench-producer       # LabTrust ingest producer gate
+make demo-pcs                 # Quick verify / sign / inspect
+make pcs-release-gate         # Sync schemas + full gate + demos + clean chain
 ```
 
 ## Admission profiles
@@ -78,4 +79,4 @@ Built-in profiles live under `adapters/pcs/admission_profiles/`:
 - **CertifyEdge** — temporal certificates
 - **Scientific Memory** — imports signed bundles
 
-Developer package index: [adapters/pcs/README.md](../../adapters/pcs/README.md).
+Developer package index: [adapters/pcs/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/adapters/pcs/README.md).

@@ -42,6 +42,7 @@ The tree is large; use this as a compass. For CI, supply chain, and local comman
 | **Proofs & templates** | [`spec-templates/v1`](spec-templates/v1), [`lakefile.lean`](lakefile.lean) | Lean 4; `lake build` from proof dirs |
 | **Runtime** | [`runtime/`](runtime/) | Rust: attestor, KMS proxy, tool-broker, sidecar-watcher, labeler, wasm-sandbox; Node ledger; Go admission-controller |
 | **Adapters** | [`adapters/`](adapters/) | HTTP/file and framework adapters (Rust, Node, Python, Go) |
+| **Proof-Carrying Science** | [`docs/pcs/`](docs/pcs/README.md), [`adapters/pcs/`](adapters/pcs/) | Verify and sign science claim bundles; release admission benchmarks |
 | **Platform & UI** | [`services/`](services/), [`console/`](console/), [`marketplace/`](marketplace/) | APIs, console, marketplace |
 | **Config & schemas** | [`config/`](config/) | JSON schemas and specification assets |
 | **Benchmarks** | [`bench/swebench/`](bench/swebench/README.md) | SWE-bench runner; Linux/WSL for real runs; details in package README |
@@ -101,6 +102,19 @@ Adopt shared schemas, replay tooling, and CI patterns alongside this repo:
 - [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) — permissions, epochs, IFC  
 
 In-repo: [`docs/specs/standards.md`](docs/specs/standards.md), [`docs/evidence/overview.md`](docs/evidence/overview.md), [`docs/evidence/replay.md`](docs/evidence/replay.md).
+
+### Proof-Carrying Science (PCS)
+
+Verify lab and computation workflows with the `pf` CLI and frozen release fixtures:
+
+```bash
+git clone https://github.com/SentinelOps-CI/pcs-core ../pcs-core
+export PCS_CORE_PATH=../pcs-core
+make demo-pcs
+make test-pcs-full    # full local gate; see docs/pcs/release-checklist.md
+```
+
+Documentation: [docs/pcs/README.md](docs/pcs/README.md).
 
 ---
 

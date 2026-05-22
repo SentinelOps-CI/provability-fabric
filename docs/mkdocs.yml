@@ -65,6 +65,15 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: guides/getting-started.md
+  - Proof-Carrying Science:
+      - Overview: pcs/README.md
+      - Quickstart: pcs/quickstart.md
+      - Verification: pcs/verification.md
+      - Admission benchmarks: pcs/admission-benchmarks.md
+      - Clean checkout chain: pcs/clean-checkout-chain.md
+      - Fixtures: pcs/fixtures.md
+      - Release checklist: pcs/release-checklist.md
+      - Glossary: pcs/glossary.md
   - Guides:
     - Deployment: guides/deployment-guide.md
     - Developer Guide: guides/developer-guide.md
@@ -73,6 +82,8 @@ nav:
     - Demos: guides/demos.md
     - Quickstarts: guides/quickstarts.md
     - Platform: guides/platform.md
+    - Reuse and extend: guides/reuse-and-extend.md
+    - Extension points: guides/extension-points.md
     - Morph: guides/morph.md
     - Spec Assistant: guides/specassistant.md
   - Architecture:
@@ -149,7 +160,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/provability-fabric/provability-fabric
+      link: https://github.com/SentinelOps-CI/provability-fabric
     - icon: fontawesome/brands/discord
       link: https://discord.gg/provability-fabric
     - icon: fontawesome/brands/twitter

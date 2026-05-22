@@ -21,7 +21,8 @@ This directory contains the documentation for the Provability-Fabric framework. 
 | **compliance/** | Compliance: SOC2, safety case, insurance |
 | **community/** | Community: governance |
 | **dev/** | Developer tooling: Lean build |
-| **internal/** | Contributor tracking: placeholders inventory, burn-down, decisions, audit, solve-rate debugging, SWE-bench stabilization regression matrix |
+| **internal/** | Contributor-only notes (not in published MkDocs nav); see [internal/README.md](internal/README.md) |
+| **releases/** | Historical release notes (e.g. PCS RC archives) |
 
 **Bench (SWE-bench)** is documented primarily in the repository at `bench/swebench/README.md` and `experiments/README.md` (manifests, compare, publish). The MkDocs site links to those paths via the docs index; there is no separate `docs/bench/` tree.
 
@@ -44,7 +45,7 @@ mkdocs serve
 
 Open `http://127.0.0.1:8000` to preview. For a static build: `mkdocs build` (writes `./build`). CI uses the same layout; see `.github/workflows/docs-build.yaml` and `.github/workflows/docs-deploy.yaml`.
 
-The nested `docs/mkdocs.yml` is retained for alternate or partial builds; prefer the root config for the full site.
+The nested `docs/mkdocs.yml` mirrors the root navigation for partial builds. Prefer the root `mkdocs.yml` for the full public site. The `internal/` tree is intentionally omitted from navigation.
 
 ## Contributing
 

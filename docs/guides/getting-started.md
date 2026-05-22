@@ -173,6 +173,14 @@ pf monitor my-first-agent
 - **Discord**: Join our community for discussions
 - **Examples**: Check the `examples/` directory for working code
 
+## Proof-Carrying Science (optional)
+
+If you work with **science claim bundles** (lab QC release, tool-use safety, or reproducible computation), use the dedicated PCS guides:
+
+1. Clone [pcs-core](https://github.com/SentinelOps-CI/pcs-core) beside this repo and set `PCS_CORE_PATH`.
+2. Run `make demo-pcs` from the repository root.
+3. Read [PCS documentation](../pcs/README.md) for release mode, benchmarks, and the [release checklist](../pcs/release-checklist.md).
+
 ## License
 
 Apache 2.0 License - see [LICENSE](../LICENSE) for details.

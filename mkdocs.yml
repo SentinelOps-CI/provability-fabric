@@ -69,28 +69,102 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
-  - Architecture: architecture.md
-  - New Features:
-      - Real-Time Communication: features/real-time-communication.md
-      - Advanced Search: features/advanced-search.md
-      - Authentication & User Management: features/authentication.md
-  - Deployment:
-      - Production Deployment: deployment/production-deployment.md
-      - Original Deployment Guide: deployment-guide.md
-  - Developer Guide: developer-guide.md
-  - Examples: examples.md
+  - Getting Started: guides/getting-started.md
+  - Proof-Carrying Science:
+      - Overview: pcs/README.md
+      - Quickstart: pcs/quickstart.md
+      - Verification: pcs/verification.md
+      - Admission benchmarks: pcs/admission-benchmarks.md
+      - Clean checkout chain: pcs/clean-checkout-chain.md
+      - Fixtures: pcs/fixtures.md
+      - Release checklist: pcs/release-checklist.md
+      - Glossary: pcs/glossary.md
+  - Guides:
+      - Deployment: guides/deployment-guide.md
+      - Production deployment: guides/deployment/production-deployment.md
+      - Developer guide: guides/developer-guide.md
+      - Testing: guides/testing-guide.md
+      - Examples: guides/examples.md
+      - Demos: guides/demos.md
+      - Quickstarts: guides/quickstarts.md
+      - Platform: guides/platform.md
+      - Reuse and extend: guides/reuse-and-extend.md
+      - Extension points: guides/extension-points.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Decision path: architecture/decision-path.md
+      - Guarantees: architecture/guarantees.md
+      - Policy: architecture/policy.md
+      - Multi-channel policy: architecture/policy/multi_channel.md
+      - Multi-tenant: architecture/multi-tenant.md
+      - Cross-region DR: architecture/cross-region-dr.md
+  - Reference:
+      - CLI: reference/cli-reference.md
+      - API: reference/api-reference.md
+      - WebSocket API: reference/api/websocket-api.md
+      - Configuration: reference/configuration.md
+      - Versioning: reference/versioning.md
+      - CI: reference/ci-reference.md
+      - Error catalog: reference/error-catalog.md
+      - Proof quality gates: reference/proof-quality-gates.md
+  - Specs:
+      - Plan DSL: specs/plan-dsl.md
+      - Egress certificate: specs/egress-certificate.md
+      - DSSE verify contract: specs/dsse-verify-contract.md
+      - Standards: specs/standards.md
+      - CERT-V1 quickstart: specs/standards/CERT-V1-quickstart.md
+  - Evidence:
+      - Overview: evidence/overview.md
+      - Replay: evidence/replay.md
+  - Security:
+      - Overview: security/overview.md
+      - Threat model: security/threat_model.md
+      - SLSA: security/slsa.md
+      - Signing and rotation: security/signing-rotation.md
+      - Enclave attestation: security/enclave-attestation.md
+  - Runtime:
+      - Attestation: runtime/attestation.md
+      - Performance: runtime/perf.md
+      - SLOs: runtime/slo.md
   - Adapters:
-      - Overview: adapters.md
-      - α-β-CROWN Adapter: alpha-beta-crown-adapter.md
-  - Security: security/overview.md
-  - API Reference: api-reference.md
-  - Testing: testing-guide.md
+      - Overview: adapters/overview.md
+      - Alpha-Beta-CROWN: adapters/alpha-beta-crown.md
+      - Action DSL sidecar: adapters/action-dsl-sidecar.md
+  - Integrations:
+      - OpenAI: integrations/openai.md
+      - MCP:
+          - Integration: integrations/mcp/integration.md
+          - Quick reference: integrations/mcp/quick-reference.md
+          - Migration: integrations/mcp/migration-guide.md
+  - Runbooks:
+      - Index: runbooks/README.md
+      - Deployment: runbooks/deployment.md
+      - Rollback: runbooks/rollback.md
+      - Incident response: runbooks/incident-response.md
+      - Break glass: runbooks/break-glass.md
+      - Operations: runbooks/operations.md
+      - Surge: runbooks/surge.md
+      - Approvals: runbooks/approvals.md
+      - GuardTrip triage: runbooks/guardtrip-triage.md
+  - Features:
+      - Real-time communication: features/real-time-communication.md
+      - Dev mode: features/dev-mode-e4.md
+      - Authentication: features/authentication.md
+      - Advanced search: features/advanced-search.md
+  - Compliance:
+      - SOC2: compliance/soc2.md
+      - Safety case: compliance/safety_case.md
+      - Insurance: compliance/insurance.md
+  - Community:
+      - Governance: community/governance.md
+  - Dev:
+      - Lean build: dev/lean-build.md
+  - Glossary: glossary.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/provability-fabric/provability-fabric
+      link: https://github.com/SentinelOps-CI/provability-fabric
     - icon: fontawesome/brands/discord
       link: https://discord.gg/provability-fabric
     - icon: fontawesome/brands/twitter

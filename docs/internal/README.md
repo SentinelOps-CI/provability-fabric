@@ -1,0 +1,12 @@
+# Internal documentation (contributors)
+
+These pages support ongoing development and experiments. They are **not** included in the public MkDocs navigation (`mkdocs.yml` at the repository root).
+
+| Topic | Path |
+|-------|------|
+| Placeholder inventory | [placeholders/inventory.md](placeholders/inventory.md) |
+| SWE-bench stabilization matrix | [swebench-stabilization-regression-matrix.md](swebench-stabilization-regression-matrix.md) |
+| SWE-bench audit notes | [audit-swebench-experiments.md](audit-swebench-experiments.md) |
+| PF solve-rate debugging | [pf-solve-rate-debugging.md](pf-solve-rate-debugging.md) |
+
+For public documentation entry points, see [docs/index.md](../index.md).
