@@ -22,11 +22,11 @@
 
 ## Why this project
 
-Provability Fabric ties **specifications and proofs** to **what actually runs**. You get Lean-backed bundles, sidecars and admission control that enforce policy, and trails you can replay and verify — not only “best effort” logging.
+Provability Fabric ties **specifications and proofs** to **what actually runs**. You get Lean-backed bundles, sidecars and admission control that enforce policy, and trails you can replay and verify as structured evidence instead of informal logging alone.
 
 | Pillar | What it gives you |
 | :--- | :--- |
-| **Prove** | Specifications and Lean proofs live next to agent bundles so claims are checkable, not hand-wavy. |
+| **Prove** | Specifications and Lean proofs live next to agent bundles so claims stay checkable against formal artifacts. |
 | **Enforce** | Rust and Go runtimes, WASM sandboxing, and tooling brokers limit what agents can do at execution time. |
 | **Audit** | Evidence formats, ledgers, and replay-oriented workflows support end-to-end accountability. |
 
@@ -87,7 +87,7 @@ cargo clippy --workspace -- -D warnings
 
 - **Minimal (CLI + bundles):** [`core/cli/pf`](core/cli/pf), [`bundles/`](bundles/), [`config/`](config/). See [Reuse and extend](docs/guides/reuse-and-extend.md).
 - **Full platform:** Go services, console, ledger, gateway — use Docker Compose or the launch scripts below.
-- **Optional:** `bench/`, `experiments/`, `console/`, `marketplace/`, `demos/` are not required for a CLI-only or forked minimal setup.
+- **Optional:** A CLI-only or forked minimal setup can omit `bench/`, `experiments/`, `console/`, `marketplace/`, and `demos/`.
 
 ---
 
@@ -105,7 +105,7 @@ In-repo: [`docs/specs/standards.md`](docs/specs/standards.md), [`docs/evidence/o
 
 ### Proof-Carrying Science (PCS)
 
-Verify lab and computation workflows with the `pf` CLI and frozen release fixtures:
+Verify lab and computation workflows with the `pf` CLI and frozen release fixtures.
 
 ```bash
 git clone https://github.com/SentinelOps-CI/pcs-core ../pcs-core
@@ -114,7 +114,7 @@ make demo-pcs
 make test-pcs-full    # full local gate; see docs/pcs/release-checklist.md
 ```
 
-Documentation: [docs/pcs/README.md](docs/pcs/README.md).
+Full PCS documentation lives at [docs/pcs/README.md](docs/pcs/README.md).
 
 ---
 

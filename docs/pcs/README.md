@@ -1,17 +1,17 @@
 # Proof-Carrying Science (PCS) in Provability Fabric
 
-Provability Fabric verifies and signs scientific claim bundles from the [pcs-core](https://github.com/SentinelOps-CI/pcs-core) artifact vocabulary. This repo is the **release admission controller**: it checks bundle consistency, enforces admission profiles, validates release-chain artifacts, and produces signed bundles for downstream import.
+Provability Fabric verifies and signs scientific claim bundles that follow the [pcs-core](https://github.com/SentinelOps-CI/pcs-core) artifact vocabulary. In this repository, the release admission controller checks bundle consistency, enforces admission profiles, validates release-chain artifacts, and produces signed bundles that downstream systems can import.
 
 ## Prerequisites
 
-Clone [pcs-core](https://github.com/SentinelOps-CI/pcs-core) as a sibling directory (or set `PCS_CORE_PATH`):
+Clone [pcs-core](https://github.com/SentinelOps-CI/pcs-core) as a sibling directory, or point `PCS_CORE_PATH` at an existing checkout.
 
 ```bash
 git clone https://github.com/SentinelOps-CI/pcs-core ../pcs-core
 export PCS_CORE_PATH=../pcs-core
 ```
 
-Optional siblings for the full cross-repo demo: [LabTrust-Gym](https://github.com/fraware/LabTrust-Gym), [CertifyEdge](https://github.com/fraware/CertifyEdge), [scientific-memory](https://github.com/fraware/scientific-memory).
+For the full cross-repo demonstration, you may also clone [LabTrust-Gym](https://github.com/fraware/LabTrust-Gym), [CertifyEdge](https://github.com/fraware/CertifyEdge), and [scientific-memory](https://github.com/fraware/scientific-memory) beside this repository.
 
 ## Documentation map
 
@@ -22,7 +22,7 @@ Optional siblings for the full cross-repo demo: [LabTrust-Gym](https://github.co
 | [Admission benchmarks](admission-benchmarks.md) | Run and validate release admission benchmarks |
 | [Clean checkout chain](clean-checkout-chain.md) | End-to-end cross-repo release workflow |
 | [Fixtures](fixtures.md) | Regenerate frozen release and conformance fixtures |
-| [Glossary](glossary.md) | Terms used across PCS docs |
+| [Glossary](glossary.md) | Terms used across PCS documentation |
 | [Release checklist](release-checklist.md) | Pre-tag verification steps |
 
 ## Repository layout
@@ -30,25 +30,25 @@ Optional siblings for the full cross-repo demo: [LabTrust-Gym](https://github.co
 | Path | Role |
 |------|------|
 | `adapters/pcs/` | Verification engine and admission profiles |
-| `core/cli/pf/` | `pf` CLI: verify, sign, inspect, validate, explain, benchmark |
+| `core/cli/pf/` | `pf` CLI for verify, sign, inspect, validate, explain, and benchmark |
 | `config/schemas/pcs/` | Schema mirror synced from pcs-core |
 | `tests/pcs/fixtures/` | Conformance and release evidence fixtures |
 | `benchmarks/admission/` | Admission benchmark case definitions |
-| `benchmark_runs/` | Generated benchmark output (not source of truth) |
+| `benchmark_runs/` | Ephemeral benchmark output; committed fixtures under `tests/pcs/` remain authoritative |
 | `tools/pcs-validate/` | Fixture matrix validator |
 | `release-run/` | Atomic working directory for a full release run |
 
-The `_ci_sim_pcs/` directory is a local mirror used for isolated checks. Do not treat it as canonical; use a real `pcs-core` checkout for schema validation and `pcs validate`.
+The `_ci_sim_pcs/` directory holds a local mirror for isolated checks. Treat a real `pcs-core` checkout as the canonical source for schema validation and for the `pcs validate` command.
 
 ## Local quality gates
 
-Run the same gates as [PCS CI](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/pcs-ci.yml):
+Run the same gates as [PCS CI](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/pcs-ci.yml).
 
 ```bash
 make test-pcs-full
 ```
 
-Individual targets:
+Individual targets include the following.
 
 ```bash
 make test-pcs                 # Unit tests (adapter + pf CLI)
@@ -63,7 +63,7 @@ make pcs-release-gate         # Sync schemas + full gate + demos + clean chain
 
 ## Admission profiles
 
-Built-in profiles live under `adapters/pcs/admission_profiles/`:
+Built-in profiles live under `adapters/pcs/admission_profiles/`.
 
 | Profile ID | Workflow |
 |------------|----------|
@@ -74,9 +74,11 @@ Built-in profiles live under `adapters/pcs/admission_profiles/`:
 
 ## Related repos
 
-- **pcs-core** — canonical schemas, Python `pcs validate`, example fixtures
-- **LabTrust-Gym** — simulates lab runs and exports bundles
-- **CertifyEdge** — temporal certificates
-- **Scientific Memory** — imports signed bundles
+| Repository | Role |
+|------------|------|
+| **pcs-core** | Canonical schemas, Python `pcs validate`, and example fixtures |
+| **LabTrust-Gym** | Simulates lab runs and exports bundles |
+| **CertifyEdge** | Temporal certificates |
+| **Scientific Memory** | Imports signed bundles |
 
-Developer package index: [adapters/pcs/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/adapters/pcs/README.md).
+The developer package index is in [adapters/pcs/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/adapters/pcs/README.md).

@@ -4,7 +4,7 @@ Verifies and signs **pcs-core canonical** `ScienceClaimBundle.v0` artifacts.
 
 ## Documentation
 
-User guides live under [docs/pcs/](../../docs/pcs/README.md):
+User guides live under [docs/pcs/](../../docs/pcs/README.md).
 
 - [Quickstart](../../docs/pcs/quickstart.md)
 - [Verification](../../docs/pcs/verification.md)
@@ -13,11 +13,11 @@ User guides live under [docs/pcs/](../../docs/pcs/README.md):
 
 ## Responsibilities
 
-- Load LabTrust-certified science claim bundles (`runtime_receipts[]`, `certificates[]`, `schema_version: "v0"`)
+- Load LabTrust-certified science claim bundles (`runtime_receipts[]`, `certificates[]`, `schema_version` `"v0"`)
 - Reject legacy singular-field bundle shapes
 - Run 17 consistency, provenance, registry, and status-transition checks
 - Enforce release-mode admission (handoff manifest, artifact registry, admission profile)
-- Admission profiles in `admission_profiles/`: `labtrust_qc_release`, `agent_tool_use_safety`, `scientific_computation_reproducibility`
+- Apply admission profiles in `admission_profiles/` (`labtrust_qc_release`, `agent_tool_use_safety`, `scientific_computation_reproducibility`)
 - Emit `ReleaseChainValidationResult.v0` and `VerificationResult.v0`
 - Build `SignedScienceClaimBundle.v0` for Scientific Memory import
 
@@ -71,4 +71,4 @@ cd adapters/pcs && go test ./... -count=1
 
 Set `PCS_CORE_PATH` for schema mirror and benchmark validation tests.
 
-Canonical artifact vocabulary: [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
+Canonical artifact vocabulary lives in [pcs-core](https://github.com/SentinelOps-CI/pcs-core).

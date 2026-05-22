@@ -146,7 +146,7 @@ A mathematical demonstration that a particular property or constraint holds for 
 A formal mathematical proof that demonstrates an agent's behavioral guarantees.
 
 ### Proof-Carrying Science (PCS)
-A workflow for attaching verification evidence to scientific claims: certified bundles, release handoffs, artifact registries, and signed outputs suitable for downstream systems. See [PCS documentation](pcs/README.md) and the [PCS glossary](pcs/glossary.md).
+A workflow for attaching verification evidence to scientific claims through certified bundles, release handoffs, artifact registries, and signed outputs suitable for downstream systems. See [PCS documentation](pcs/README.md) and the [PCS glossary](pcs/glossary.md).
 
 ### Provenance
 The complete history and origin of data, code, and components in a system.

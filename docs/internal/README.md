@@ -1,6 +1,6 @@
 # Internal documentation (contributors)
 
-These pages support ongoing development and experiments. They are **not** included in the public MkDocs navigation (`mkdocs.yml` at the repository root).
+These pages support ongoing development and experiments. They stay outside the public MkDocs navigation defined in `mkdocs.yml` at the repository root.
 
 | Topic | Path |
 |-------|------|

@@ -4,7 +4,7 @@ Provability Fabric verifies and signs **pcs-core canonical** `ScienceClaimBundle
 
 ## Canonical bundle shape
 
-Provability Fabric does not accept legacy bundle shapes. Bundles must use:
+Provability Fabric accepts only the current pcs-core bundle shape. Each bundle must include the following fields.
 
 | Field | Required shape |
 |-------|----------------|
@@ -13,7 +13,7 @@ Provability Fabric does not accept legacy bundle shapes. Bundles must use:
 | Certificates | `certificates[]` |
 | Policy | `verification_policy` with `policy_id` and `required_checks` |
 
-Reference conformance fixtures: `tests/pcs/fixtures/labtrust/` (from [pcs-core](https://github.com/SentinelOps-CI/pcs-core) examples).
+Conformance reference fixtures live at `tests/pcs/fixtures/labtrust/`, aligned with [pcs-core](https://github.com/SentinelOps-CI/pcs-core) examples.
 
 ## Basic commands
 
@@ -27,7 +27,7 @@ make demo-pcs
 ./pf migrate science-claim tests/pcs/invalid_legacy_singular_runtime_receipt.json --out /tmp/migrated.json
 ```
 
-Paths like `tests/pcs/<file>.json` resolve from the repository root even when the CLI runs from `core/cli/pf`.
+Paths such as `tests/pcs/<file>.json` resolve from the repository root even when the CLI runs from `core/cli/pf`.
 
 ### Inspect flags
 
@@ -41,7 +41,7 @@ Use `--local-dev` only for bundles marked for local development.
 
 ## Release mode
 
-With `--release-mode`, Provability Fabric acts as the release admission controller. Handoff and registry are required:
+With `--release-mode`, Provability Fabric acts as the release admission controller. Handoff and registry artifacts are required.
 
 | Flag | Artifact | Required in release mode |
 |------|----------|--------------------------|
@@ -52,11 +52,11 @@ With `--release-mode`, Provability Fabric acts as the release admission controll
 | `--proof-obligations` | `ProofObligation.v0` | When profile requires formal checks |
 | `--lean-check-result` | `LeanCheckResult.v0` | When profile requires formal checks |
 
-Do not pass `ReleaseManifest.v0` to `--registry`; use `--manifest` for release-chain verification.
+Pass `ReleaseManifest.v0` to `--manifest` for release-chain verification. The `--registry` flag expects `ArtifactRegistry.v0`.
 
 ### Formal checks (Lean trust envelope)
 
-Provability Fabric does not run Lean. It validates `ProofObligation.v0` and `LeanCheckResult.v0` supplied by pcs-core and records `formal.<ObligationKind>` checks in the release-chain validation result.
+Lean execution stays in pcs-core and upstream tooling. Provability Fabric validates `ProofObligation.v0` and `LeanCheckResult.v0` supplied by those tools and records `formal.<ObligationKind>` checks in the release-chain validation result.
 
 ```bash
 RELEASE=tests/pcs/fixtures/labtrust-release
@@ -122,20 +122,13 @@ Release-chain validation emits `ReleaseChainValidationResult.v0` with checks suc
 | 16 | `signature_or_digest_present` | Digest present |
 | 17 | `source_commit_not_placeholder` | No placeholder commit in release mode |
 
-Older signed fixtures may show 15 embedded checks from an earlier generation commit; new sign output always embeds 17.
+Older signed fixtures may show 15 embedded checks from an earlier generation commit. New sign output always embeds 17.
 
 ## Outputs for Scientific Memory
 
-**VerificationResult** (`schema_version`: `v0`):
+A **VerificationResult** uses `schema_version` `v0` and includes a `status` of `ProofChecked` or `Rejected`, structured failure information in `checks[].details`, and a canonical JSON digest in `signature_or_digest`.
 
-- `status`: `ProofChecked` or `Rejected`
-- `checks[].details`: structured failure information
-- `signature_or_digest`: canonical JSON digest
-
-**SignedScienceClaimBundle** (`schema_version`: `v0`):
-
-- Embeds certified bundle and verification result
-- `signed_input_bundle_hash`: SHA-256 of the certified bundle file
+A **SignedScienceClaimBundle** also uses `schema_version` `v0`, embeds the certified bundle and verification result, and records `signed_input_bundle_hash` as the SHA-256 of the certified bundle file.
 
 ## Admission profiles
 
@@ -145,7 +138,7 @@ Older signed fixtures may show 15 embedded checks from an earlier generation com
 | `agent_tool_use_safety` | Agent tool-use safety |
 | `scientific_computation_reproducibility` | Reproducible computation workflows |
 
-Profile JSON files: `adapters/pcs/admission_profiles/`.
+Profile JSON files live under `adapters/pcs/admission_profiles/`.
 
 ## Validate protocol artifacts
 

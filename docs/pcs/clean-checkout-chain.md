@@ -1,6 +1,6 @@
 # Clean checkout chain
 
-PCS v0.1 is release-ready only when the full cross-repo chain succeeds on clean checkouts with sibling repositories:
+PCS v0.1 is release-ready when the full cross-repo chain succeeds on clean checkouts with these sibling repositories.
 
 - [pcs-core](https://github.com/SentinelOps-CI/pcs-core)
 - [LabTrust-Gym](https://github.com/fraware/LabTrust-Gym)
@@ -10,20 +10,16 @@ PCS v0.1 is release-ready only when the full cross-repo chain succeeds on clean 
 
 ## One-command run
 
-From provability-fabric (Git Bash, WSL, or Linux):
+From provability-fabric on Git Bash, WSL, or Linux, run the following.
 
 ```bash
 export PCS_DETERMINISTIC=1
 ./scripts/run-pcs-v01-clean-chain.sh
 ```
 
-Or:
+You can also use `just pcs-v01-clean-chain`.
 
-```bash
-just pcs-v01-clean-chain
-```
-
-PowerShell:
+PowerShell users can set determinism and invoke the PowerShell entry point.
 
 ```powershell
 $env:PCS_DETERMINISTIC = "1"
@@ -32,7 +28,7 @@ just pcs-v01-clean-chain-ps1
 
 ## Manual chain
 
-Run from a **LabTrust-Gym** working directory:
+Run the following from a **LabTrust-Gym** working directory.
 
 ```bash
 # LabTrust-Gym
@@ -69,7 +65,7 @@ just pcs-render-claim claim-pcs-qc-release-v0.1
 
 ## pcs validate in this repo
 
-The `pcs` command comes from pcs-core (Python):
+The `pcs` command comes from pcs-core (Python).
 
 ```bash
 ./pcs validate path/to/artifact.json
@@ -77,9 +73,9 @@ The `pcs` command comes from pcs-core (Python):
 ./scripts/pcs validate path/to/artifact.json
 ```
 
-Requires `../pcs-core` or `PCS_CORE_PATH`.
+Set `../pcs-core` or `PCS_CORE_PATH` before running validation.
 
-Provability Fabric also validates individual artifact types:
+Provability Fabric also validates individual artifact types.
 
 ```bash
 pf validate verification-result verification_result.json
@@ -88,13 +84,13 @@ pf validate signed-science-claim signed_science_claim_bundle.json
 
 ## PF-only segment (CI or partial checkout)
 
-When LabTrust-Gym is not cloned, run the PF segment against frozen release fixtures:
+When LabTrust-Gym is absent from your workspace, run the PF segment against frozen release fixtures.
 
 ```bash
 make pcs-v01-pf-chain
 ```
 
-This uses `release-run/` or `tests/pcs/fixtures/labtrust-release/` and passes formal artifacts when present (`scripts/pcs-formal-release-args.sh`).
+This target uses `release-run/` or `tests/pcs/fixtures/labtrust-release/` and passes formal artifacts when present (`scripts/pcs-formal-release-args.sh`).
 
 ## Environment variables
 

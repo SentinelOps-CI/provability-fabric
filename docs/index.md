@@ -1,6 +1,6 @@
 # Provability Fabric documentation
 
-Provability Fabric is an open-source framework for **provable agent behavior**: specifications and Lean proofs tied to what runs in production, runtime enforcement, and evidence you can replay and verify.
+Provability Fabric is an open-source framework for **provable agent behavior**. Specifications and Lean proofs connect to production runtime enforcement, and evidence packages support replay and verification.
 
 ## Start here
 
@@ -22,7 +22,7 @@ Provability Fabric is an open-source framework for **provable agent behavior**: 
 
 ### Proof-Carrying Science (PCS)
 
-Provability Fabric can verify and sign **science claim bundles** (lab QC release, tool-use safety, reproducible computation) and run **release admission benchmarks**.
+Provability Fabric verifies and signs **science claim bundles** for lab QC release, tool-use safety, and reproducible computation. It also runs **release admission benchmarks** that score admit and reject behavior.
 
 - [PCS hub](pcs/README.md) — quickstart, verification, benchmarks, fixtures
 - [Release checklist](pcs/release-checklist.md) — pre-release verification
@@ -35,24 +35,24 @@ Provability Fabric can verify and sign **science claim bundles** (lab QC release
 
 ### Benchmarks (SWE-bench)
 
-Agent benchmark workflows are documented in the repository (not only in this site):
+Agent benchmark workflows are documented in the repository alongside this site.
 
 - [bench/swebench/README.md](../bench/swebench/README.md)
 - [experiments/README.md](../experiments/README.md)
 
 ## Build this site locally
 
-From the repository root:
+From the repository root, install dependencies and start the preview server.
 
 ```bash
 pip install -r docs/requirements.txt
 mkdocs serve
 ```
 
-Open `http://127.0.0.1:8000`. Static output: `mkdocs build` → `./build/`.
+Open `http://127.0.0.1:8000` in your browser. A static build writes to `./build/` when you run `mkdocs build`.
 
-See [docs/README.md](README.md) for the full documentation map. Contributor-only notes live under [internal/](internal/) and are omitted from the published navigation.
+See [docs/README.md](README.md) for the full documentation map. Contributor-only notes live under [internal/](internal/) and stay outside the published navigation.
 
 ## License
 
-Apache 2.0 — see [LICENSE](../LICENSE).
+Apache 2.0. See [LICENSE](../LICENSE).

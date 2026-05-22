@@ -1,21 +1,16 @@
 # PCS quickstart
 
-This walkthrough verifies and signs a LabTrust conformance bundle. It does not require sibling repos beyond optional pcs-core for schema checks.
+This walkthrough verifies and signs a LabTrust conformance bundle. You need only this repository and, when you want schema checks against pcs-core, an optional sibling checkout of [pcs-core](https://github.com/SentinelOps-CI/pcs-core).
 
 ## One-command demo
 
-From the repository root:
+From the repository root, run the following command.
 
 ```bash
 make demo-pcs
 ```
 
-This runs:
-
-1. `pf verify science-claim` on the certified bundle
-2. `pf sign science-claim` to a demo signed output
-3. `pf inspect science-claim --strict` on the signed bundle
-4. `pf inspect science-claim --reverify` on the LabTrust-export signed fixture
+The demo runs `pf verify science-claim` on the certified bundle, `pf sign science-claim` to a demo signed output, `pf inspect science-claim --strict` on the signed bundle, and `pf inspect science-claim --reverify` on the LabTrust-export signed fixture.
 
 ## Manual commands
 
@@ -26,7 +21,7 @@ This runs:
 ./pf inspect science-claim tests/pcs/signed_science_claim_bundle.demo.json --strict
 ```
 
-Or with Go directly:
+You can also invoke the CLI with Go directly.
 
 ```bash
 go -C core/cli/pf run . verify science-claim \
@@ -46,23 +41,19 @@ flowchart LR
   PF --> SM[Scientific Memory]
 ```
 
-1. LabTrust runs a demo and exports trace, runtime receipt, and a pending bundle.
-2. CertifyEdge emits a trace certificate.
-3. LabTrust attaches the certificate to produce `science_claim_bundle.certified.json`.
-4. Provability Fabric verifies consistency and signs an importable result.
-5. Scientific Memory imports the signed bundle.
+LabTrust runs a demo and exports trace, runtime receipt, and a pending bundle. CertifyEdge emits a trace certificate. LabTrust attaches the certificate to produce `science_claim_bundle.certified.json`. Provability Fabric verifies consistency and signs an importable result. Scientific Memory imports the signed bundle.
 
-Provability Fabric does not simulate LabTrust or run temporal checking. It checks internal consistency, provenance, certificate status, and trace-hash alignment.
+Provability Fabric focuses on internal consistency, provenance, certificate status, and trace-hash alignment. LabTrust simulation and temporal checking happen in the upstream repositories.
 
 ## Release-mode smoke test
 
-Frozen release fixtures are under `tests/pcs/fixtures/labtrust-release/`:
+Frozen release fixtures live under `tests/pcs/fixtures/labtrust-release/`.
 
 ```bash
 make demo-pcs-release
 ```
 
-For strict release admission (handoff, registry, admission profile, formal artifacts), see [Verification](verification.md).
+For strict release admission with handoff, registry, admission profile, and formal artifacts, see [Verification](verification.md).
 
 ## Next steps
 

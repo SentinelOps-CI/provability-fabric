@@ -6,15 +6,15 @@ Committed `*.pcs_bench_ingest.reference.json` files are gold-standard `PcsBenchI
 |------|-----------------|
 | `labtrust_qc_release.pcs_bench_ingest.reference.json` | `benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json` |
 
-Requirements enforced in CI and `TestExportPCSBenchIngestReferenceArtifact`:
+CI and `TestExportPCSBenchIngestReferenceArtifact` enforce the following properties.
 
-- `producer_id`: `provability-fabric`, `suite_id`: `pf-labtrust-admission-v0`, `workflow_id`: `hospital_lab.qc_release`
-- Non-empty `failure_localization_reports`, `explain_quality_reports`, `artifact_refs`
-- Portable `commands` and `artifact_refs[].path` (repo-relative forward slashes, no Windows backslashes)
+- `producer_id` is `provability-fabric`, `suite_id` is `pf-labtrust-admission-v0`, and `workflow_id` is `hospital_lab.qc_release`
+- `failure_localization_reports`, `explain_quality_reports`, and `artifact_refs` are non-empty
+- `commands` and `artifact_refs[].path` use repo-relative forward slashes for portability
 
 See [docs/pcs/admission-benchmarks.md](../../../docs/pcs/admission-benchmarks.md).
 
-Regenerate after changing admission benchmark emit logic or labtrust cases:
+Regenerate after changing admission benchmark emit logic or labtrust cases.
 
 ```bash
 make pcs-bench-producer
