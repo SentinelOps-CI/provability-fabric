@@ -18,3 +18,5 @@ make freeze-pcs-labtrust-release
 ```
 
 This runs `pcs-release-run-pf.sh` then `pcs-release-run-promote.sh`, which validates certificate ID alignment before copying to `tests/pcs/fixtures/labtrust-release/` and `pcs-core/examples/labtrust-release/`.
+
+Documentation: [docs/pcs/fixtures.md](../docs/pcs/fixtures.md).

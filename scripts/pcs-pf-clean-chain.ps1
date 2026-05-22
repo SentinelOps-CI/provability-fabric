@@ -61,7 +61,16 @@ if (-not (Test-Path $PcsPy)) { throw "pcs-core not found at $PcsCore (set PCS_CO
 $env:PYTHONPATH = "$(Join-Path $PcsPy 'pcs_core');$PcsPy"
 $Pcs = "python -m pcs_core.cli"
 
-if (-not (Test-Path $Certified)) { throw "missing certified bundle: $Certified" }
+$ReleaseFixtures = Join-Path $Root "tests\pcs\fixtures\labtrust-release"
+$Seed = Join-Path $ReleaseFixtures "science_claim_bundle.certified.json"
+if ($Workdir -match 'release-run' -or -not (Test-Path $Certified)) {
+    if (Test-Path $Seed) {
+        Write-Host "seeding $Certified from labtrust-release fixtures"
+        Copy-Item -Force $Seed $Certified
+    } elseif (-not (Test-Path $Certified)) {
+        throw "missing certified bundle: $Certified"
+    }
+}
 if (-not $env:PF_SOURCE_COMMIT) {
     Push-Location $Root
     try { $env:PF_SOURCE_COMMIT = (git rev-parse HEAD 2>$null).Trim() } catch { }
@@ -70,7 +79,6 @@ if (-not $env:PF_SOURCE_COMMIT) {
 if (-not $env:PF_RELEASE_MODE) { $env:PF_RELEASE_MODE = "1" }
 if (-not $env:PF_ADMISSION_PROFILE) { $env:PF_ADMISSION_PROFILE = "labtrust_qc_release" }
 
-$ReleaseFixtures = Join-Path $Root "tests\pcs\fixtures\labtrust-release"
 $Handoff = if ($env:PF_HANDOFF) { $env:PF_HANDOFF } else { Join-Path $ReleaseFixtures "handoff_to_pf.json" }
 $Registry = if ($env:PF_REGISTRY) { $env:PF_REGISTRY } else { Join-Path $ReleaseFixtures "artifact_registry.json" }
 

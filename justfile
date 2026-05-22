@@ -12,6 +12,9 @@ test-pcs:
 test-pcs-full:
     make test-pcs-full
 
+pcs-release-gate:
+    make pcs-release-gate
+
 test-pcs-benchmark:
     bash "{{root}}/scripts/pcs-benchmark-admission.sh" || powershell -NoProfile -ExecutionPolicy Bypass -File "{{root}}/scripts/pcs-benchmark-admission.ps1"
 

@@ -418,11 +418,16 @@ func validateComputationReleaseFixtures(dir, root string, results *[]validateRes
 		if err != nil {
 			*results = append(*results, validateResult{File: label, Status: "load_error", Error: err.Error()})
 			failed++
-		} else if err := pcs.ValidateComputationProfileBundle(root, bundle); err != nil {
-			*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
-			failed++
 		} else {
-			*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+			if err := pcs.HydrateComputationBundleFromDir(bundle, dir); err != nil {
+				*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+				failed++
+			} else if err := pcs.ValidateComputationProfileBundle(root, bundle); err != nil {
+				*results = append(*results, validateResult{File: label, Status: "schema_invalid", Error: err.Error()})
+				failed++
+			} else {
+				*results = append(*results, validateResult{File: label, Status: "schema_valid"})
+			}
 		}
 	}
 	handoff := filepath.Join(dir, "handoff_to_pf.json")

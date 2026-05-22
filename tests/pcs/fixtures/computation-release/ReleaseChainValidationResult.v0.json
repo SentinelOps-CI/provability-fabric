@@ -1,0 +1,185 @@
+{
+  "schema_version": "v0",
+  "validation_id": "validation-release-pcs-v0.1-scientific-computation-reproducibility",
+  "release_id": "release-pcs-v0.1-scientific-computation-reproducibility",
+  "release_candidate": "pcs-v0.1-scientific-computation-conformance",
+  "workflow_profile_id": "scientific_computation.reproducibility_v0",
+  "validator": "pcs-core",
+  "validator_version": "0.1.0",
+  "checked_at": "2026-05-18T12:00:00Z",
+  "status": "ProofChecked",
+  "checks": [
+    {
+      "check_id": "release_manifest_integrity",
+      "description": "Release manifest artifact hashes match files",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ReleaseManifest.v0.artifact_hashes_match_files"
+      ],
+      "responsible_component": "pcs-core"
+    },
+    {
+      "check_id": "science_claim_bundle_semantics",
+      "description": "Science claim bundle certificate refs present",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ScienceClaimBundle.v0.non_empty_runtime_receipts",
+        "ScienceClaimBundle.v0.certified_bundle_has_certificate_when_checked"
+      ],
+      "responsible_component": "pcs-core"
+    },
+    {
+      "check_id": "verification_and_signed_bundle_hashes",
+      "description": "Verification and signed bundle hash alignment",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "VerificationResult.v0.verified_input_bundle_hash_matches_certified",
+        "VerificationResult.v0.failed_checks_block_import_ready_status",
+        "SignedScienceClaimBundle.v0.signed_input_bundle_hash_matches_certified"
+      ],
+      "responsible_component": "Provability Fabric"
+    },
+    {
+      "check_id": "computation_witness_release_status",
+      "description": "Computation witness status checked for release",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.computation_status_checked_for_release"
+      ],
+      "responsible_component": "pcs-core"
+    },
+    {
+      "check_id": "computation_witness_source_commit",
+      "description": "Computation witness source commit matches manifest",
+      "status": "passed",
+      "details": {},
+      "registry_check_refs": [
+        "ComputationWitness.v0.source_commit_matches_release_manifest"
+      ],
+      "responsible_component": "pcs-core"
+    }
+  ],
+  "artifacts_checked": 9,
+  "failure_codes": [],
+  "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+  "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+  "deferred_registry_checks": [
+    {
+      "registry_ref": "DatasetReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "DatasetReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "EnvironmentReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "EnvironmentReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationRunReceipt.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationRunReceipt.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ResultArtifact.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ResultArtifact.v0.source_commit_not_placeholder",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.signature_or_digest_valid",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.code_commit_present",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.dataset_hash_matches_receipt",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.environment_hash_matches_receipt",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.run_receipt_hash_matches_declared_run",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ComputationWitness.v0.result_hashes_match_result_artifacts",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "ReleaseManifest.v0.release_mode_commit_policy",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    },
+    {
+      "registry_ref": "HandoffManifest.v0.handoff_input_hashes_when_validated",
+      "status": "deferred",
+      "enforcement_location": "artifact_validate",
+      "responsible_component": "pcs-core",
+      "reason": "Deferred for scientific-memory computation conformance fixture import."
+    }
+  ],
+  "signature_or_digest": "sha256:bfe0427f8f63fcd07f67ee3ac393a44575a5e4b63244089c8f5ded0f394232ff"
+}

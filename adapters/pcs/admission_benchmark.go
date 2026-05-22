@@ -538,7 +538,10 @@ func assemblePCSBenchmarkBundle(
 		}
 	}
 	coverage := buildPCSCoverageReports(suiteID, opts.SourceCommit, metrics, cov)
-	report := buildPCSBenchmarkReport(suiteID, runID, opts.SourceCommit, executions, metrics, coverage)
+	report, err := buildPCSBenchmarkReport(suiteID, runID, opts.SourceCommit, executions, metrics, coverage)
+	if err != nil {
+		return PCSBenchmarkBundle{}, err
+	}
 	return PCSBenchmarkBundle{
 		Report:               report,
 		Runs:                 runs,

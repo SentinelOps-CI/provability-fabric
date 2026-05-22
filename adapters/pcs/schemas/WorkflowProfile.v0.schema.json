@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcs.sentinelops.ci/schemas/WorkflowProfile.v0.schema.json",
   "title": "WorkflowProfile.v0",
+  "description": "LabTrust profile of WorkflowProfile.v0 including optional formalization block until upstream pcs-core adopts it.",
   "type": "object",
   "required": [
     "schema_version",
@@ -52,6 +53,7 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "limitations_notice": { "$ref": "common.defs.json#/$defs/limitations_notice" },
+    "formalization": { "$ref": "WorkflowProfile.formalization.extension.schema.json" },
     "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   },
   "$defs": {

@@ -1,0 +1,122 @@
+{
+  "schema_version": "v0",
+  "release_id": "release-pcs-v0.1-scientific-computation-reproducibility",
+  "release_candidate": "pcs-v0.1-scientific-computation-conformance",
+  "generated_at": "2026-05-18T12:00:00Z",
+  "validation_profile": "scientific_computation.reproducibility_v0",
+  "workflow_profile_id": "scientific_computation.reproducibility_v0",
+  "chain_root": {
+    "trace_hash": "sha256:701f0ede04cba3644c15e7364228b5bcd873fd7b690ccf1a90cc5e6af93fe046",
+    "certificate_id": "witness-computation-demo-v0.1",
+    "certified_bundle_hash": "sha256:3520c4c528d33c41337793ebc47d0f45ae96c332419896d70bc3a4137a59a66b",
+    "signed_bundle_hash": "sha256:3520c4c528d33c41337793ebc47d0f45ae96c332419896d70bc3a4137a59a66b"
+  },
+  "release_chain_validation_result": {
+    "path": "release_chain_validation_result.v0.json",
+    "sha256": "sha256:6deed683a82babaf06dd72178332fdbf8cf36a80a60e18a018bb2c216fc6e3c0"
+  },
+  "canonical_signed_bundle": {
+    "path": "signed_science_claim_bundle.json",
+    "sha256": "sha256:3520c4c528d33c41337793ebc47d0f45ae96c332419896d70bc3a4137a59a66b"
+  },
+  "canonical_claim_id": "claim-computation-release-v0.1",
+  "limitations_notice": "This artifact verifies declared computational provenance and hash consistency. It does not prove that the dataset is unbiased, that the model is scientifically valid, or that the result generalizes beyond the declared inputs and environment.",
+  "producer_repos": {
+    "pcs_core": {
+      "repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c"
+    },
+    "scientific_computation": {
+      "repo": "https://github.com/example/scientific-computation-runner",
+      "commit": "4c5439ae358733f9a4c4a58e33fdaed1ab0d29de"
+    },
+    "certifyedge": {
+      "repo": "https://github.com/fraware/CertifyEdge",
+      "commit": "cb6848001e2e60a484e04eba5ad6be3fe2e4eccc"
+    },
+    "provability_fabric": {
+      "repo": "https://github.com/SentinelOps-CI/provability-fabric",
+      "commit": "0f659b90c80c46a6bbfd51b0d37ea723b032fb9d"
+    },
+    "scientific_memory": {
+      "repo": "https://github.com/fraware/scientific-memory",
+      "commit": "796bb99cb79fe7b195fd156feb346c08fc334d33"
+    }
+  },
+  "artifacts": {
+    "dataset_receipt.json": {
+      "artifact_type": "DatasetReceipt.v0",
+      "schema": "schemas/DatasetReceipt.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:6c952299faa9b5ab944460f59b467baea5be7447ac13b9a69ed5890a3106a7c4"
+    },
+    "environment_receipt.json": {
+      "artifact_type": "EnvironmentReceipt.v0",
+      "schema": "schemas/EnvironmentReceipt.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:e2eb6e0b238b34daccd6f7de1058fc63a27f5f178ada18cdae0dd99ff93944a7"
+    },
+    "computation_run_receipt.json": {
+      "artifact_type": "ComputationRunReceipt.v0",
+      "schema": "schemas/ComputationRunReceipt.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:6e7ad087387b4f242718290e977055de670ed047ff2f5d0eef400ef29da1a3bc"
+    },
+    "result_artifact.json": {
+      "artifact_type": "ResultArtifact.v0",
+      "schema": "schemas/ResultArtifact.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:1133e3ab0f3d19d24adb14b99a2fa0f9a29809fc4eaf24827dd0f299e63836fe"
+    },
+    "computation_witness.json": {
+      "artifact_type": "ComputationWitness.v0",
+      "schema": "schemas/ComputationWitness.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:524c76f338791b6fa631c9ec538958ad5ba01a62011d165f05bc3a840589c91e"
+    },
+    "workflow_profile.v0.json": {
+      "artifact_type": "WorkflowProfile.v0",
+      "schema": "schemas/WorkflowProfile.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:9059e646990af0b72f82b740c0f8db102fea4b3b8e5ed809c916fc259ae279f8"
+    },
+    "science_claim_bundle.certified.json": {
+      "artifact_type": "ScienceClaimBundle.v0",
+      "schema": "schemas/ScienceClaimBundle.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:3520c4c528d33c41337793ebc47d0f45ae96c332419896d70bc3a4137a59a66b"
+    },
+    "verification_result.json": {
+      "artifact_type": "VerificationResult.v0",
+      "schema": "schemas/VerificationResult.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:d8c313dde7b282838497a7d70eb9e5da8e78877f4ee32ccb6c15a09f3b0a9724"
+    },
+    "signed_science_claim_bundle.json": {
+      "artifact_type": "SignedScienceClaimBundle.v0",
+      "schema": "schemas/SignedScienceClaimBundle.v0.schema.json",
+      "producer": "pcs-core",
+      "source_repo": "https://github.com/SentinelOps-CI/pcs-core",
+      "source_commit": "a361fd2b388f88cdbc9e4e4691ae49dba714ab6c",
+      "sha256": "sha256:3520c4c528d33c41337793ebc47d0f45ae96c332419896d70bc3a4137a59a66b"
+    }
+  },
+  "release_status": "Validated",
+  "signature_or_digest": "sha256:059e145297c449980b871098245ffdb7e1f7a2b34a1bf1af07b60dfb824fef79"
+}

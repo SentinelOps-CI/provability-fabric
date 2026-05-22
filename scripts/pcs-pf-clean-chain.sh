@@ -20,9 +20,16 @@ if ! resolve_pf "${ROOT}"; then
 fi
 PCS="${PCS:-${ROOT}/scripts/pcs}"
 
-if [[ ! -f "${CERTIFIED}" ]]; then
-  echo "missing certified bundle: ${CERTIFIED}" >&2
-  exit 1
+RELEASE_FIXTURES="${ROOT}/tests/pcs/fixtures/labtrust-release"
+SEED_BUNDLE="${RELEASE_FIXTURES}/science_claim_bundle.certified.json"
+if [[ "${WORKDIR}" == *"release-run"* ]] || [[ ! -f "${CERTIFIED}" ]]; then
+  if [[ -f "${SEED_BUNDLE}" ]]; then
+    echo "seeding ${CERTIFIED} from labtrust-release fixtures"
+    cp "${SEED_BUNDLE}" "${CERTIFIED}"
+  elif [[ ! -f "${CERTIFIED}" ]]; then
+    echo "missing certified bundle: ${CERTIFIED}" >&2
+    exit 1
+  fi
 fi
 
 export PF_SOURCE_COMMIT="${PF_SOURCE_COMMIT:-$(git -C "${ROOT}" rev-parse HEAD 2>/dev/null)}"
@@ -30,7 +37,6 @@ export PF_RELEASE_MODE="${PF_RELEASE_MODE:-1}"
 export PF_DETERMINISTIC="${PF_DETERMINISTIC:-1}"
 export PCS_DETERMINISTIC="${PCS_DETERMINISTIC:-1}"
 
-RELEASE_FIXTURES="${ROOT}/tests/pcs/fixtures/labtrust-release"
 export PF_ADMISSION_PROFILE="${PF_ADMISSION_PROFILE:-labtrust_qc_release}"
 HANDOFF="${PF_HANDOFF:-${RELEASE_FIXTURES}/handoff_to_pf.json}"
 REGISTRY="${PF_REGISTRY:-${RELEASE_FIXTURES}/artifact_registry.json}"

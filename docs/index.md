@@ -118,6 +118,7 @@ cargo test --workspace
 - **[CI Reference](reference/ci-reference.md)** - Main `ci.yml`, reusable Rust/Lean/Node jobs, supply-chain gates (Dependency review, cargo-deny, actionlint, SBOM, Scorecard), PF CI / TRUST-FIRE, Bench SWE-bench
 - **[Configuration](reference/configuration.md)** - Configuration options and management
 - **[Versioning](reference/versioning.md)** - Platform version and crate/package versions
+- **[Proof-Carrying Science (PCS)](pcs/README.md)** - Verify, sign, release chain, admission benchmarks
 - **[Glossary](glossary.md)** - Terms and definitions
 - **[Standards](specs/standards.md)** - Framework standards and specifications
 

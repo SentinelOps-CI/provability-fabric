@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PCS v0.1 full clean-checkout chain (LabTrust-Gym → CertifyEdge → PF → Scientific Memory).
-# Requires sibling checkouts; see docs/guides/pcs-v01-clean-chain.md
+# Requires sibling checkouts; see docs/pcs/clean-checkout-chain.md
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

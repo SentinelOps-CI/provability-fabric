@@ -6,6 +6,7 @@ package pcs
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -84,16 +85,6 @@ type PCSMetricSummary struct {
 	SignatureOrDigest string         `json:"signature_or_digest"`
 }
 
-// PCSBenchmarkReportMetricSummary is the BenchmarkReport.v0 metric_summaries[] row shape.
-type PCSBenchmarkReportMetricSummary struct {
-	Name          string   `json:"name"`
-	Score         *float64 `json:"score,omitempty"`
-	Applicability string   `json:"applicability"`
-	Reason        string   `json:"reason,omitempty"`
-	Numerator     int      `json:"numerator,omitempty"`
-	Denominator   int      `json:"denominator,omitempty"`
-}
-
 // PCSBenchmarkReport matches pcs-core BenchmarkReport.v0.
 type PCSBenchmarkReport struct {
 	SchemaVersion     string                      `json:"schema_version"`
@@ -101,7 +92,7 @@ type PCSBenchmarkReport struct {
 	BenchmarkSuiteID  string                      `json:"benchmark_suite_id"`
 	Runs              []PCSBenchmarkReportRunRef  `json:"runs"`
 	Metrics           []string                    `json:"metrics"`
-	MetricSummaries   []PCSBenchmarkReportMetricSummary `json:"metric_summaries"`
+	MetricSummaries   []PCSMetricSummary          `json:"metric_summaries"`
 	Summary           PCSBenchmarkSummary         `json:"summary"`
 	Coverage          PCSBenchmarkCoverageBlock   `json:"coverage"`
 	Failures          []PCSBenchmarkFailureEntry  `json:"failures"`
@@ -892,40 +883,119 @@ func clampUnitScore(score float64) float64 {
 	return score
 }
 
-func buildPCSBenchmarkReportMetricSummaries(metrics BenchmarkRunMetrics) []PCSBenchmarkReportMetricSummary {
+func buildPCSMetricSummary(
+	metricID string,
+	score float64,
+	applicability, reason string,
+	numerator, denominator float64,
+	sourceCommit string,
+	details map[string]any,
+) (PCSMetricSummary, error) {
+	if details == nil {
+		details = map[string]any{}
+	}
+	ms := PCSMetricSummary{
+		SchemaVersion:     SchemaVersionV0,
+		MetricID:          metricID,
+		Score:             clampUnitScore(score),
+		Applicability:     applicability,
+		Numerator:         numerator,
+		Denominator:       denominator,
+		Reason:            reason,
+		Details:           details,
+		SourceRepo:        VerifierSourceRepo,
+		SourceCommit:      sourceCommit,
+		SignatureOrDigest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+	}
+	raw, err := json.Marshal(ms)
+	if err != nil {
+		return PCSMetricSummary{}, err
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return PCSMetricSummary{}, err
+	}
+	digest, err := CanonicalHash(doc)
+	if err != nil {
+		return PCSMetricSummary{}, err
+	}
+	ms.SignatureOrDigest = digest
+	return ms, nil
+}
+
+func buildPCSBenchmarkReportMetricSummaries(
+	suiteID, sourceCommit string,
+	metricIDs []string,
+	metrics BenchmarkRunMetrics,
+	coverage map[string]PCSCoverageReport,
+	invalidCaseCount int,
+) ([]PCSMetricSummary, error) {
 	releaseScore := clampUnitScore((metrics.ValidReleaseAdmissionRate + metrics.InvalidReleaseRejectionRate) / 2)
-	repairHint := clampUnitScore(metrics.ExplainOutputCompleteness)
-	specs := []struct {
-		name  string
-		score float64
-	}{
-		{"release_reproducibility_score", releaseScore},
-		{"failure_localization_accuracy", clampUnitScore(metrics.FailureLocalizationAccuracy)},
-		{"certificate_completeness_score", clampUnitScore(metrics.FailureCodeAccuracy)},
-		{"registry_coverage_score", clampUnitScore(metrics.RegistryCheckCoverage)},
-		{"formal_check_coverage_score", clampUnitScore(metrics.FormalCheckEnforcementCoverage)},
-		{"scientific_memory_interpretability_score", 1.0},
-		{"repair_hint_quality_score", repairHint},
-		{"cross_domain_portability_score", clampUnitScore(metrics.AdmissionProfileCoverage)},
-	}
-	out := make([]PCSBenchmarkReportMetricSummary, 0, len(specs))
-	for _, spec := range specs {
-		score := spec.score
-		scoreCopy := score
-		num := int(score + 0.5)
-		if num < 0 {
-			num = 0
+	out := make([]PCSMetricSummary, 0, len(metricIDs))
+	for _, metricID := range metricIDs {
+		var ms PCSMetricSummary
+		var err error
+		switch metricID {
+		case "failure_localization_accuracy":
+			if invalidCaseCount <= 0 {
+				ms, err = buildPCSMetricSummary(metricID, 0, "insufficient_cases", "no invalid benchmark cases in suite", 0, 0, sourceCommit, nil)
+			} else {
+				score := clampUnitScore(metrics.FailureLocalizationAccuracy)
+				ms, err = buildPCSMetricSummary(metricID, score, "measured", "component alignment on invalid cases", score*float64(invalidCaseCount), float64(invalidCaseCount), sourceCommit, nil)
+			}
+		case "cross_domain_portability_score":
+			if suiteID != "cross-domain-release-chain-v0" {
+				ms, err = buildPCSMetricSummary(metricID, 0, "not_applicable", fmt.Sprintf("metric only measured for cross-domain-release-chain-v0 (suite=%s)", suiteID), 0, 0, sourceCommit, nil)
+			} else {
+				score := clampUnitScore(metrics.AdmissionProfileCoverage)
+				ms, err = buildPCSMetricSummary(metricID, score, "measured", "cross-domain suite portability rollup", score, 1, sourceCommit, nil)
+			}
+		case "release_reproducibility_score":
+			if cov, ok := coverage["release_reproducibility"]; ok {
+				ms, err = buildPCSMetricSummary(metricID, cov.CoverageRatio, applicabilityFromCoverage(cov), fmt.Sprintf("coverage from %s", cov.CoverageID), cov.Numerator, cov.Denominator, sourceCommit, map[string]any{"coverage_id": cov.CoverageID})
+			} else {
+				ms, err = buildPCSMetricSummary(metricID, releaseScore, "measured", "pf benchmark admission rollup", releaseScore, 1, sourceCommit, nil)
+			}
+		case "certificate_completeness_score":
+			if cov, ok := coverage["certificate_completeness"]; ok {
+				ms, err = buildPCSMetricSummary(metricID, cov.CoverageRatio, applicabilityFromCoverage(cov), fmt.Sprintf("coverage from %s", cov.CoverageID), cov.Numerator, cov.Denominator, sourceCommit, map[string]any{"coverage_id": cov.CoverageID})
+			} else {
+				ms, err = buildPCSMetricSummary(metricID, clampUnitScore(metrics.FailureCodeAccuracy), "measured", "pf benchmark admission rollup", clampUnitScore(metrics.FailureCodeAccuracy), 1, sourceCommit, nil)
+			}
+		case "registry_coverage_score":
+			if cov, ok := coverage["registry_coverage"]; ok {
+				ms, err = buildPCSMetricSummary(metricID, cov.CoverageRatio, applicabilityFromCoverage(cov), fmt.Sprintf("coverage from %s", cov.CoverageID), cov.Numerator, cov.Denominator, sourceCommit, map[string]any{"coverage_id": cov.CoverageID})
+			} else {
+				ms, err = buildPCSMetricSummary(metricID, clampUnitScore(metrics.RegistryCheckCoverage), "measured", "pf benchmark admission rollup", clampUnitScore(metrics.RegistryCheckCoverage), 1, sourceCommit, nil)
+			}
+		case "formal_check_coverage_score":
+			if cov, ok := coverage["formal_check_coverage"]; ok {
+				ms, err = buildPCSMetricSummary(metricID, cov.CoverageRatio, applicabilityFromCoverage(cov), fmt.Sprintf("coverage from %s", cov.CoverageID), cov.Numerator, cov.Denominator, sourceCommit, map[string]any{"coverage_id": cov.CoverageID})
+			} else {
+				ms, err = buildPCSMetricSummary(metricID, clampUnitScore(metrics.FormalCheckEnforcementCoverage), "measured", "pf benchmark admission rollup", clampUnitScore(metrics.FormalCheckEnforcementCoverage), 1, sourceCommit, nil)
+			}
+		case "scientific_memory_interpretability_score":
+			if cov, ok := coverage["scientific_memory_coverage"]; ok {
+				ms, err = buildPCSMetricSummary(metricID, cov.CoverageRatio, applicabilityFromCoverage(cov), fmt.Sprintf("coverage from %s", cov.CoverageID), cov.Numerator, cov.Denominator, sourceCommit, map[string]any{"coverage_id": cov.CoverageID})
+			} else {
+				ms, err = buildPCSMetricSummary(metricID, 1, "measured", "pf benchmark admission rollup", 1, 1, sourceCommit, nil)
+			}
+		default:
+			ms, err = buildPCSMetricSummary(metricID, 0, "skipped", "no coverage or summary source for metric", 0, 0, sourceCommit, nil)
 		}
-		out = append(out, PCSBenchmarkReportMetricSummary{
-			Name:          spec.name,
-			Score:         &scoreCopy,
-			Applicability: "measured",
-			Reason:        "pf benchmark admission",
-			Numerator:     num,
-			Denominator:   1,
-		})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ms)
 	}
-	return out
+	return out, nil
+}
+
+func applicabilityFromCoverage(cov PCSCoverageReport) string {
+	if cov.Denominator > 0 {
+		return "measured"
+	}
+	return "failed_to_measure"
 }
 
 func buildPCSBenchmarkReport(
@@ -933,7 +1003,7 @@ func buildPCSBenchmarkReport(
 	executions []benchmarkCaseExecution,
 	metrics BenchmarkRunMetrics,
 	coverage map[string]PCSCoverageReport,
-) PCSBenchmarkReport {
+) (PCSBenchmarkReport, error) {
 	var runRefs []PCSBenchmarkReportRunRef
 	failures := []PCSBenchmarkFailureEntry{}
 	var total, passed, failed, expectedDetected, unexpectedPass, unexpectedFail int
@@ -986,6 +1056,12 @@ func buildPCSBenchmarkReport(
 		"certificate_completeness_score",
 		"registry_coverage_score",
 		"formal_check_coverage_score",
+		"scientific_memory_interpretability_score",
+	}
+	invalidCaseCount := expectedDetected + unexpectedFail
+	metricSummaries, err := buildPCSBenchmarkReportMetricSummaries(suiteID, sourceCommit, metricIDs, metrics, coverage, invalidCaseCount)
+	if err != nil {
+		return PCSBenchmarkReport{}, err
 	}
 	return PCSBenchmarkReport{
 		SchemaVersion:    SchemaVersionV0,
@@ -993,7 +1069,7 @@ func buildPCSBenchmarkReport(
 		BenchmarkSuiteID: suiteID,
 		Runs:             runRefs,
 		Metrics:          metricIDs,
-		MetricSummaries:  buildPCSBenchmarkReportMetricSummaries(metrics),
+		MetricSummaries:  metricSummaries,
 		ProducerID:       "provability-fabric",
 		Summary: PCSBenchmarkSummary{
 			TotalCases:                     total,
@@ -1013,5 +1089,5 @@ func buildPCSBenchmarkReport(
 		SourceRepo:        VerifierSourceRepo,
 		SourceCommit:      sourceCommit,
 		SignatureOrDigest: digestBenchmarkRun(reportID, suiteID, "report", "passed", fmt.Sprintf("%d", passed)),
-	}
+	}, nil
 }

@@ -15,8 +15,8 @@
     "result_artifact.json": "sha256:a38eeaab2b0cd104ac461b6a061bfa09e4f797253c27173107452a5acd9c42ed",
     "computation_witness.json": "sha256:a86081703ca5bc521445cc5a38826adfc1ca55f87f52f35b3c429a2bbdaf13f9",
     "science_claim_bundle.certified.json": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d",
-    "verification_result.json": "sha256:62a27aa4a2378a8a1462a583e9e2aae350c8252b29e3450fe9a63034f90f6b31",
+    "verification_result.json": "sha256:59c45c6e24cbca96489cfdefc0b156c39bec252b53b09e8f1d8b7b48fa88676f",
     "signed_science_claim_bundle.json": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea",
-    "scientific_memory_import_report.json": "sha256:bf01de184c8670fb951179955863975f919770514301765246efef74845b8851"
+    "scientific_memory_import_report.json": "sha256:21fa9d915b7f313a3e9d1b1fdf4bdd2815bbd06404ae9699518bd5e367bca41e"
   }
 }

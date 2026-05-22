@@ -8,8 +8,8 @@
   "chain_root": {
     "trace_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828",
     "certificate_id": "witness-sci-comp-repro-001",
-    "certified_bundle_hash": "sha256:a517f93b98b02370d3d26d42ccd65ba928b210fc31002260be6803611efac22c",
-    "signed_bundle_hash": "sha256:6ad535dc544c15981b75763c6ff6b0b74f04b9822688d3a0bae4b0249952e65b"
+    "certified_bundle_hash": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d",
+    "signed_bundle_hash": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea"
   },
   "release_chain_validation_result": {
     "path": "release_chain_validation_result.v0.json",
@@ -17,7 +17,7 @@
   },
   "canonical_signed_bundle": {
     "path": "signed_science_claim_bundle.json",
-    "sha256": "sha256:6ad535dc544c15981b75763c6ff6b0b74f04b9822688d3a0bae4b0249952e65b"
+    "sha256": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea"
   },
   "canonical_claim_id": "claim-qc-release-v0.1",
   "limitations_notice": "This artifact is a proof-carrying computational reproducibility result. It verifies that declared inputs, environment metadata, code provenance, execution command, and result artifact hashes are internally consistent. It does not prove that the scientific model is true, that the dataset is unbiased, or that the result is externally valid.",
@@ -106,7 +106,7 @@
       "producer": "Provability Fabric",
       "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
       "source_commit": "c333333333333333333333333333333333333333",
-      "sha256": "sha256:62a27aa4a2378a8a1462a583e9e2aae350c8252b29e3450fe9a63034f90f6b31"
+      "sha256": "sha256:59c45c6e24cbca96489cfdefc0b156c39bec252b53b09e8f1d8b7b48fa88676f"
     },
     "signed_science_claim_bundle.json": {
       "artifact_type": "SignedScienceClaimBundle.v0",
@@ -118,5 +118,13 @@
     }
   },
   "release_status": "Validated",
-  "signature_or_digest": "sha256:c5d33e30664b45c3af321a03ca3fe94e35298f37924566692956ad4a14fd2598"
+  "signature_or_digest": "sha256:9b7baa8b06fc2bfa1c622a8d6019ba2e2c5ab99c8e0dcc729d5a40e8ecbcc10f",
+  "proof_obligation": {
+    "path": "proof_obligation.v0.json",
+    "sha256": "sha256:3a80604bd630a7fd6e6f06ed3802bca444bc09a044fa77a93ab2e4104d0cf73d"
+  },
+  "lean_check_result": {
+    "path": "lean_check_result.v0.json",
+    "sha256": "sha256:9761d9456dd24e838d94f3502a3c3d89cfcc6043993b7ce1c9688866fc9c6643"
+  }
 }

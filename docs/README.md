@@ -14,6 +14,7 @@ This directory contains the documentation for the Provability-Fabric framework. 
 | **security/** | Security: overview, threat model, SLSA, signing & rotation, enclave attestation |
 | **runtime/** | Runtime: attestation, performance, SLOs |
 | **adapters/** | Adapters: overview, alpha-beta-CROWN, action DSL sidecar |
+| **pcs/** | Proof-Carrying Science: verify, sign, release chain, admission benchmarks |
 | **integrations/** | Integrations: OpenAI, MCP (integration, quick reference, migration) |
 | **runbooks/** | Operations: deployment, rollback, incident response, break glass, surge, approvals, GuardTrip triage |
 | **features/** | Feature docs: real-time communication, dev mode, authentication, advanced search |
@@ -30,6 +31,7 @@ This directory contains the documentation for the Provability-Fabric framework. 
 - **[guides/getting-started.md](guides/getting-started.md)** - Quick start and basic concepts
 - **[architecture/overview.md](architecture/overview.md)** - System architecture
 - **[evidence/overview.md](evidence/overview.md)** - Evidence and CERTs (see also [specs/standards.md](specs/standards.md), [evidence/replay.md](evidence/replay.md))
+- **[pcs/README.md](pcs/README.md)** - Proof-Carrying Science: quickstart, verification, benchmarks, fixtures
 
 ## Building
 

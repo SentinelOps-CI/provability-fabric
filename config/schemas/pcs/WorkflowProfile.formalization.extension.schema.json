@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/WorkflowProfile.formalization.extension.schema.json",
+  "title": "WorkflowProfile.formalization (LabTrust extension)",
+  "description": "Optional formalization block until adopted in pcs-core WorkflowProfile.v0.",
+  "type": "object",
+  "required": ["trust_kernel", "required_obligations", "formalization_scope"],
+  "additionalProperties": false,
+  "properties": {
+    "trust_kernel": { "type": "string", "minLength": 1 },
+    "required_obligations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "formalization_scope": {
+      "type": "string",
+      "const": "trust_envelope_only"
+    }
+  }
+}

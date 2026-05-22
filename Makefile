@@ -101,9 +101,13 @@ export-pcs-benchmark-ingest-reference:
 
 validate-pcs-reference-ingest:
 	@$(ECHOOK) "Validate committed labtrust reference ingest (producer contract)..."
-	python3 scripts/pcs-bench-producer-contract-check.py \
-	  --ingest benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json \
-	  --bundle-dir benchmark_runs/labtrust_admission
+	bash scripts/pcs-validate-reference-ingest.sh
+
+pcs-release-gate:
+	@$(ECHOOK) "Syncing PCS schemas from pcs-core..."
+	bash scripts/pcs-schema-sync.sh $(PCS_CORE_PATH)
+	@$(MAKE) validate-pcs-schema-diff test-pcs-full demo-pcs demo-pcs-release pcs-v01-pf-chain
+	@$(ECHOOK) "OK: PCS release gate passed (schemas, full CI gate, demos, PF clean-chain)"
 
 ifeq ($(OS),Windows_NT)
 pcs-bench-producer:

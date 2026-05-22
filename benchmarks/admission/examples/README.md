@@ -12,6 +12,8 @@ Requirements enforced in CI and `TestExportPCSBenchIngestReferenceArtifact`:
 - Non-empty `failure_localization_reports`, `explain_quality_reports`, `artifact_refs`
 - Portable `commands` and `artifact_refs[].path` (repo-relative forward slashes, no Windows backslashes)
 
+See [docs/pcs/admission-benchmarks.md](../../../docs/pcs/admission-benchmarks.md).
+
 Regenerate after changing admission benchmark emit logic or labtrust cases:
 
 ```bash
