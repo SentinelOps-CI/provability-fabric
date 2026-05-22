@@ -235,7 +235,7 @@ func writeAdmissionBenchmarkBundle(repoRoot, pcsCoreRoot, dir string, bundle PCS
 		}
 		caseLog := strings.Join(logsByCase[caseID], "\n")
 		if caseLog == "" {
-			caseLog = fmt.Sprintf("case=%s status=%s failure=%s", caseID, ex.ObservedStatus, ex.ObservedFailureCode)
+			caseLog = fmt.Sprintf("case=%s status=%s failure=%s", caseID, ex.ObservedStatus, benchmarkRunFailureCode(ex))
 		}
 		if err := os.WriteFile(filepath.Join(caseDir, "run.log"), []byte(caseLog+"\n"), 0644); err != nil {
 			return err

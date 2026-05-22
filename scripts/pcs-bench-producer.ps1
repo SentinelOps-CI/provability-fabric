@@ -1,4 +1,4 @@
-# PF pcs-bench producer gate (Windows fallback when bash is unavailable).
+# PF pcs-bench producer gate (Windows fallback).
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
@@ -38,12 +38,16 @@ Pop-Location
 $Ingest = Join-Path $Out "pcs_bench_ingest.v0.json"
 if (-not (Test-Path $Ingest)) { Write-Error "missing $Ingest" }
 
-if (Get-Command pcs-bench -ErrorAction SilentlyContinue) {
-    pcs-bench validate-ingest --input $Ingest --pcs-core $PcsCore
-} elseif (Get-Command pcs -ErrorAction SilentlyContinue) {
-    pcs validate $Ingest
-} else {
-    go run ./tools/pcs-validate --benchmark-bundle $Out --pcs-core $PcsCore
-}
+python (Join-Path $Root "scripts\validate-pf-pcs-bench-ingest.py") `
+  --ingest $Ingest `
+  --bundle-dir $Out `
+  --pcs-core $PcsCore `
+  --release-grade
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+if (Get-Command pcs -ErrorAction SilentlyContinue) {
+    pcs validate $Ingest
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 Write-Host "OK: pcs-bench producer ingest at $Ingest"

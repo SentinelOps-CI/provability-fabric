@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PF pcs-bench producer gate: admission benchmark + ingest validation for pcs-bench aggregation.
+# PF pcs-bench producer gate: admission benchmark + pcs-core ingest validation for aggregation.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,14 +48,17 @@ run_pf benchmark admission \
 INGEST="${OUT}/pcs_bench_ingest.v0.json"
 test -f "${INGEST}"
 
-echo "==> validate pcs_bench_ingest for pcs-bench"
-if command -v pcs-bench >/dev/null 2>&1; then
-  pcs-bench validate-ingest --input "${INGEST}" --pcs-core "${PCS_CORE}"
-elif command -v pcs >/dev/null 2>&1; then
+echo "==> pcs-core release-grade ingest validation"
+python3 "${ROOT}/scripts/validate-pf-pcs-bench-ingest.py" \
+  --ingest "${INGEST}" \
+  --bundle-dir "${OUT}" \
+  --pcs-core "${PCS_CORE}" \
+  --release-grade
+
+if command -v pcs >/dev/null 2>&1; then
   (cd "${PCS_CORE}/python" && pip install -q -e .) 2>/dev/null || true
+  echo "==> pcs validate ${INGEST}"
   pcs validate "${INGEST}"
-else
-  go run ./tools/pcs-validate --benchmark-bundle "${OUT}" --pcs-core "${PCS_CORE}"
 fi
 
 echo "OK: pcs-bench producer ingest at ${INGEST}"

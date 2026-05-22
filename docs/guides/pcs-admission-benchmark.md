@@ -156,6 +156,16 @@ bash scripts/export-pcs-benchmark-ingest-reference.sh
 
 CI checks that `benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json` exists and passes `pcs validate`.
 
+Release-grade gate (pcs-core adequacy + sidecar paths):
+
+```bash
+python3 scripts/validate-pf-pcs-bench-ingest.py \
+  --ingest benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json \
+  --bundle-dir benchmark_runs/labtrust_admission \
+  --pcs-core ../pcs-core \
+  --release-grade
+```
+
 Explain export uses `pcs.ExportPCSExplainQualityReport` with PF field → pcs-core section mapping (`verification`, `provenance`, `repair_hints`, `handoffs`, `formal_checks`).
 
 Canonical required invalid case IDs (union across workflows) are listed in `pcs.RequiredAdmissionInvalidCaseIDs`.
@@ -178,7 +188,7 @@ Minimum gate thresholds (current PF tests):
 | Failure localization gold standard (check-aware components, artifact-path alignment, per-case `failure_localization/`) | Done |
 | Required invalid failure families (`RequiredAdmissionInvalidCaseIDs`, incl. `scientific_memory_import_failure`) | Done |
 | Committed reference ingest (`benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json`, `pcs validate` + `TestExportPCSBenchIngestReferenceArtifact`) | Done |
-| `make pcs-bench-producer` (admission + ingest validation for pcs-bench aggregation) | Done |
+| `make pcs-bench-producer` (admission + `validate-pf-pcs-bench-ingest.py --release-grade`) | Done |
 | Canonical producer ids (`suite_id`: `pf-labtrust-admission-v0`, `workflow_id`: `hospital_lab.qc_release`) | Done |
 
 ## Adding cases

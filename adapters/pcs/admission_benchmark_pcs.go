@@ -29,9 +29,9 @@ type PCSBenchmarkRun struct {
 	Commands                     []PCSBenchmarkCommandEntry `json:"commands"`
 	ArtifactsProduced            []string                 `json:"artifacts_produced"`
 	ObservedStatus               string                   `json:"observed_status"`
-	ObservedFailureCode          string                   `json:"observed_failure_code"`
-	ObservedResponsibleComponent string                   `json:"observed_responsible_component"`
-	ObservedRepairHint           string                   `json:"observed_repair_hint"`
+	ObservedFailureCode          *string                  `json:"observed_failure_code"`
+	ObservedResponsibleComponent *string                  `json:"observed_responsible_component"`
+	ObservedRepairHint           *string                  `json:"observed_repair_hint"`
 	DurationMS                   int                      `json:"duration_ms"`
 	SourceRepo                   string                   `json:"source_repo"`
 	SourceCommit                 string                   `json:"source_commit"`
@@ -287,30 +287,38 @@ func buildPCSBenchmarkRun(
 ) PCSBenchmarkRun {
 	cr := ctx.Result
 	status := benchmarkObservedStatus(cr)
-	fc := firstObservedFailureCode(cr.ObservedFailureCodes)
-	repairHint := ""
-	resp := "unknown"
-	if ctx.RCVR != nil {
-		for _, c := range ctx.RCVR.Checks {
-			if c.Status == "failed" {
-				resp = mapResponsibleComponent(c.ResponsibleComponent)
-				if rh, ok := c.Details["repair_hint"].(string); ok && rh != "" {
-					repairHint = rh
+	var fcPtr, respPtr, repairPtr *string
+	fcDigest := ""
+	if status != "passed" {
+		fc := firstObservedFailureCode(cr.ObservedFailureCodes)
+		fcDigest = fc
+		fcPtr = stringPtr(fc)
+		resp := "unknown"
+		repairHint := ""
+		if ctx.RCVR != nil {
+			for _, c := range ctx.RCVR.Checks {
+				if c.Status == "failed" {
+					resp = mapResponsibleComponent(c.ResponsibleComponent)
+					if rh, ok := c.Details["repair_hint"].(string); ok && rh != "" {
+						repairHint = rh
+					}
+					break
+				}
+			}
+		}
+		if ctx.VR != nil {
+			for _, exp := range ExplainVerificationFailures(*ctx.VR) {
+				if exp.RepairHint != "" {
+					repairHint = exp.RepairHint
+				}
+				if exp.ResponsibleComponent != "" {
+					resp = mapResponsibleComponent(exp.ResponsibleComponent)
 				}
 				break
 			}
 		}
-	}
-	if ctx.VR != nil && status == "failed" {
-		for _, exp := range ExplainVerificationFailures(*ctx.VR) {
-			if exp.RepairHint != "" {
-				repairHint = exp.RepairHint
-			}
-			if exp.ResponsibleComponent != "" {
-				resp = mapResponsibleComponent(exp.ResponsibleComponent)
-			}
-			break
-		}
+		respPtr = stringPtr(resp)
+		repairPtr = stringPtr(repairHint)
 	}
 	duration := int(ctx.Completed.Sub(ctx.Started).Milliseconds())
 	if duration < 0 {
@@ -327,14 +335,28 @@ func buildPCSBenchmarkRun(
 		Commands:                     []PCSBenchmarkCommandEntry{{Command: ctx.Command, ExitCode: ctx.ExitCode}},
 		ArtifactsProduced:            artifactPathsForCase(ctx),
 		ObservedStatus:               status,
-		ObservedFailureCode:          fc,
-		ObservedResponsibleComponent: resp,
-		ObservedRepairHint:           repairHint,
+		ObservedFailureCode:          fcPtr,
+		ObservedResponsibleComponent: respPtr,
+		ObservedRepairHint:           repairPtr,
 		DurationMS:                   duration,
 		SourceRepo:                   VerifierSourceRepo,
 		SourceCommit:                 sourceCommit,
-		SignatureOrDigest:            digestBenchmarkRun(runID, taskID, cr.CaseID, status, fc),
+		SignatureOrDigest:            digestBenchmarkRun(runID, taskID, cr.CaseID, status, fcDigest),
 	}
+}
+
+func stringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func benchmarkRunFailureCode(run PCSBenchmarkRun) string {
+	if run.ObservedFailureCode == nil {
+		return ""
+	}
+	return *run.ObservedFailureCode
 }
 
 func artifactPathsForCase(ctx benchmarkCaseExecution) []string {

@@ -25,6 +25,7 @@ on:
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'scripts/pcs-benchmark-admission.sh'
       - 'scripts/pcs-bench-producer.sh'
+      - 'scripts/validate-pf-pcs-bench-ingest.py'
       - 'scripts/materialize-admission-benchmark-cases.py'
       - 'benchmarks/admission/**'
       - 'justfile'
@@ -55,6 +56,7 @@ on:
       - 'scripts/run-pcs-v01-clean-chain.sh'
       - 'scripts/pcs-benchmark-admission.sh'
       - 'scripts/pcs-bench-producer.sh'
+      - 'scripts/validate-pf-pcs-bench-ingest.py'
       - 'scripts/materialize-admission-benchmark-cases.py'
       - 'benchmarks/admission/**'
       - 'justfile'
@@ -542,6 +544,11 @@ jobs:
           grep -q '"workflow_id": "hospital_lab.qc_release"' "$RUNNER_TEMP/admission_summary.json"
           grep -q '"pcs_bench_ingest_path"' "$RUNNER_TEMP/admission_summary.json"
           python3 -c "import json; i=json.load(open('${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json')); assert i['suite_id']=='pf-labtrust-admission-v0'; assert i['workflow_id']=='hospital_lab.qc_release'; assert all('/' in r['path'] or '\\\\' not in r['path'] for r in i.get('artifact_refs',[]))"
+          python3 "$GITHUB_WORKSPACE/scripts/validate-pf-pcs-bench-ingest.py" \
+            --ingest "${OUT}/labtrust_qc_release_admission/pcs_bench_ingest.v0.json" \
+            --bundle-dir "${OUT}/labtrust_qc_release_admission" \
+            --pcs-core "$PCS_CORE_PATH" \
+            --release-grade
 
       - name: CLI smoke (verify, sign, inspect)
         run: |
