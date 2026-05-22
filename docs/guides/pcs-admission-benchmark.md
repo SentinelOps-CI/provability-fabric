@@ -63,6 +63,12 @@ Or via Make:
 make test-pcs-benchmark
 ```
 
+pcs-bench producer gate (labtrust ingest + validation):
+
+```bash
+make pcs-bench-producer
+```
+
 On Windows (Git Bash), `bash scripts/pf.sh` builds `core/cli/pf/pf.exe` automatically when Go is installed. Benchmark shell scripts use the same resolver. You can also run:
 
 ```powershell
@@ -172,6 +178,8 @@ Minimum gate thresholds (current PF tests):
 | Failure localization gold standard (check-aware components, artifact-path alignment, per-case `failure_localization/`) | Done |
 | Required invalid failure families (`RequiredAdmissionInvalidCaseIDs`, incl. `scientific_memory_import_failure`) | Done |
 | Committed reference ingest (`benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json`, `pcs validate` + `TestExportPCSBenchIngestReferenceArtifact`) | Done |
+| `make pcs-bench-producer` (admission + ingest validation for pcs-bench aggregation) | Done |
+| Canonical producer ids (`suite_id`: `pf-labtrust-admission-v0`, `workflow_id`: `hospital_lab.qc_release`) | Done |
 
 ## Adding cases
 

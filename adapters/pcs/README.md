@@ -82,6 +82,12 @@ bash scripts/pf.sh benchmark admission \
   --validate --validate-pcs-core-output ../pcs-core
 ```
 
+pcs-bench producer gate (labtrust ingest at `benchmark_runs/labtrust_admission/pcs_bench_ingest.v0.json`):
+
+```bash
+make pcs-bench-producer
+```
+
 See [docs/guides/pcs-admission-benchmark.md](../../docs/guides/pcs-admission-benchmark.md).
 
 ## Tests

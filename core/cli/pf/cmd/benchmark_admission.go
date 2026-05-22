@@ -25,7 +25,7 @@ func benchmarkAdmissionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "admission",
 		Short: "Run PCS release admission benchmark cases",
-		Long: `Execute valid/invalid admission cases under benchmarks/admission/<workflow> and emit a pcs-core benchmark bundle (benchmark_report.v0.json, benchmark_run.v0.json, failure_localization_result.v0.json, coverage_report.v0.json, explain_quality_report.v0.json, commands.json, logs/, runs/).`,
+		Long: `Execute valid/invalid admission cases under benchmarks/admission/<workflow> and emit a pcs-core benchmark bundle (benchmark_report.v0.json, benchmark_run.v0.json, failure_localization_result.v0.json, coverage_report.v0.json, explain_quality_report.v0.json, pcs_bench_ingest.v0.json, commands.json, logs/, runs/).`,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			casesDir, err := cmd.Flags().GetString("cases")

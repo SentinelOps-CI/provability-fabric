@@ -99,7 +99,17 @@ export-pcs-benchmark-ingest-reference:
 	@$(ECHOOK) "Materialize labtrust PcsBenchIngest reference artifact..."
 	bash scripts/export-pcs-benchmark-ingest-reference.sh
 
-test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle
+ifeq ($(OS),Windows_NT)
+pcs-bench-producer:
+	@$(ECHOOK) "PCS-bench producer gate (labtrust admission ingest)..."
+	@bash scripts/pcs-bench-producer.sh || powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pcs-bench-producer.ps1
+else
+pcs-bench-producer:
+	@$(ECHOOK) "PCS-bench producer gate (labtrust admission ingest)..."
+	@bash scripts/pcs-bench-producer.sh
+endif
+
+test-pcs-full: test-pcs test-pcs-rc-gate test-pcs-phase2 validate-pcs-fixtures test-pcs-benchmark validate-pcs-benchmark-bundle pcs-bench-producer
 	@$(ECHOOK) "OK: PCS full gate passed (unit, RC lock, Phase 2, fixtures, admission benchmarks)"
 
 validate-pcs-fixtures:

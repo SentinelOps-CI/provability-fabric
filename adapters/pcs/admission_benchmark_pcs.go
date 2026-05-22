@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -200,6 +199,33 @@ func suiteIDFromWorkflow(workflowID string) string {
 	s := strings.ReplaceAll(workflowID, ".", "-")
 	s = strings.ReplaceAll(s, "_", "-")
 	return s
+}
+
+// pcsBenchmarkWorkflowID maps PF admission workflow folder ids to pcs-core registry workflow ids.
+func pcsBenchmarkWorkflowID(admissionWorkflowID string) string {
+	switch admissionWorkflowID {
+	case "labtrust_qc_release":
+		return "hospital_lab.qc_release"
+	default:
+		return admissionWorkflowID
+	}
+}
+
+// pcsBenchmarkSuiteID is the pcs-bench producer suite id for PF admission benchmarks.
+func pcsBenchmarkSuiteID(admissionWorkflowID string) string {
+	switch admissionWorkflowID {
+	case "labtrust_qc_release":
+		return "pf-labtrust-admission-v0"
+	case "agent_tool_use.safety_v0":
+		return "pf-tool-use-admission-v0"
+	case "scientific_computation.reproducibility_v0":
+		return "pf-computation-admission-v0"
+	case "formal_trust_kernel.enforcement_v0":
+		return "pf-formal-admission-v0"
+	default:
+		w := pcsBenchmarkWorkflowID(admissionWorkflowID)
+		return "pf-" + suiteIDFromWorkflow(w) + "-v0"
+	}
 }
 
 func taskIDFromWorkflow(workflowID string) string {
@@ -914,7 +940,7 @@ func buildPCSBenchmarkReport(
 		runRefs = append(runRefs, PCSBenchmarkReportRunRef{
 			RunID:          fmt.Sprintf("bench-run-%s", cr.CaseID),
 			CaseID:         cr.CaseID,
-			Path:           filepath.Join("runs", cr.CaseID, "benchmark_run.v0.json"),
+			Path:           benchmarkBundleRelPath("runs", cr.CaseID, "benchmark_run.v0.json"),
 			ObservedStatus: benchmarkObservedStatus(cr),
 		})
 	}

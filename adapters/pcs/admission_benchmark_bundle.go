@@ -291,8 +291,8 @@ func FormatBenchmarkAdmissionSummaryJSON(run AdmissionBenchmarkSuiteV0, outDir s
 	ingestPath := filepath.Join(outDir, "pcs_bench_ingest.v0.json")
 	summary := map[string]any{
 		"producer_id":                     "provability-fabric",
-		"suite_id":                        suiteIDFromWorkflow(run.Workflow),
-		"workflow_id":                     run.Workflow,
+		"suite_id":                        pcsBenchmarkSuiteID(run.Workflow),
+		"workflow_id":                     pcsBenchmarkWorkflowID(run.Workflow),
 		"cases_run":                       len(run.Cases),
 		"cases_passed":                    passed,
 		"failure_localization_accuracy":   run.Metrics.FailureLocalizationAccuracy,
@@ -432,6 +432,11 @@ func validateAdmissionBenchmarkBundleDir(repoRoot, pcsCoreRoot, dir string) erro
 	}
 	if err := ValidatePCSBenchIngestSemantics(ingest); err != nil {
 		return fmt.Errorf("pcs_bench_ingest semantics: %w", err)
+	}
+	for i, ref := range ingest.ArtifactRefs {
+		if err := validateOne("BenchmarkArtifactRef.v0.schema.json", mustJSONDoc(ref)); err != nil {
+			return fmt.Errorf("artifact_refs[%d]: %w", i, err)
+		}
 	}
 	for _, spec := range []string{
 		"coverage/registry_coverage_report.v0.json",

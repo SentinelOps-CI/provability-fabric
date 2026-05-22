@@ -102,7 +102,12 @@ func ExportPCSExplainQualityReport(in ExportPCSExplainQualityCaseInput) *PCSExpl
 	)
 }
 
+func benchmarkBundleRelPath(elem ...string) string {
+	return filepath.ToSlash(filepath.Join(elem...))
+}
+
 func buildPCSBenchmarkArtifactRef(artifactType, relPath, contentDigest, sourceCommit string) PCSBenchmarkArtifactRef {
+	relPath = benchmarkBundleRelPath(relPath)
 	refID := fmt.Sprintf("ref-%s-%s", artifactType, filepath.Base(relPath))
 	return PCSBenchmarkArtifactRef{
 		SchemaVersion:     SchemaVersionV0,
@@ -171,7 +176,7 @@ func buildPCSProfileCoverageReport(
 		CoverageRatio:          ratio,
 		Details: map[string]any{
 			"profiles_exercised": cov.Admission.ProfilesExercised,
-			"workflow_id":        workflow.WorkflowID,
+			"workflow_id":        pcsBenchmarkWorkflowID(workflow.WorkflowID),
 		},
 		SourceRepo:        VerifierSourceRepo,
 		SourceCommit:      sourceCommit,
@@ -225,12 +230,12 @@ func buildPCSBenchIngest(
 		bundle.Report.SourceCommit,
 		bundle.Report.Summary.RegistryCoverage,
 	)
-	refs := buildPCSBenchIngestArtifactRefs(bundleDir, coverage, explains, profileCov, flrs)
+	refs := buildPCSBenchIngestArtifactRefs(bundleDir, runs, coverage, explains, profileCov, flrs)
 	ingest := PCSBenchIngestV0{
 		SchemaVersion:              SchemaVersionV0,
 		ProducerID:                 "provability-fabric",
 		SuiteID:                    bundle.Report.BenchmarkSuiteID,
-		WorkflowID:                 workflow.WorkflowID,
+		WorkflowID:                 pcsBenchmarkWorkflowID(workflow.WorkflowID),
 		BenchmarkRuns:              runs,
 		CoverageReports:            coverage,
 		ExplainQualityReports:      explains,
@@ -285,12 +290,25 @@ func coverageReportExportPath(metric, metricID string) string {
 
 func buildPCSBenchIngestArtifactRefs(
 	bundleDir string,
+	runs []PCSBenchmarkRun,
 	coverage []PCSCoverageReport,
 	explains []PCSExplainQualityReport,
 	profileCov PCSProfileCoverageReport,
 	flrs []PCSFailureLocalizationResult,
 ) []PCSBenchmarkArtifactRef {
 	refs := []PCSBenchmarkArtifactRef{}
+	for _, run := range runs {
+		if run.SignatureOrDigest == "" {
+			continue
+		}
+		rel := benchmarkBundleRelPath("runs", run.CaseID, "benchmark_run.v0.json")
+		if _, err := os.Stat(filepath.Join(bundleDir, rel)); err != nil {
+			continue
+		}
+		refs = append(refs, buildPCSBenchmarkArtifactRef(
+			"BenchmarkRun.v0", rel, run.SignatureOrDigest, run.SourceCommit,
+		))
+	}
 	for _, cov := range coverage {
 		rel := coverageReportExportPath(cov.Metric, cov.MetricID)
 		if rel == "" || cov.SignatureOrDigest == "" {
@@ -312,13 +330,13 @@ func buildPCSBenchIngestArtifactRefs(
 		}
 	}
 	for _, eq := range explains {
-		rel := filepath.Join("explain_quality", eq.CaseID+".explain_quality_report.v0.json")
+		rel := benchmarkBundleRelPath("explain_quality", eq.CaseID+".explain_quality_report.v0.json")
 		refs = append(refs, buildPCSBenchmarkArtifactRef(
 			"ExplainQualityReport.v0", rel, eq.SignatureOrDigest, eq.SourceCommit,
 		))
 	}
 	for _, flr := range flrs {
-		rel := filepath.Join("failure_localization", flr.CaseID+".failure_localization_result.v0.json")
+		rel := benchmarkBundleRelPath("failure_localization", flr.CaseID+".failure_localization_result.v0.json")
 		refs = append(refs, buildPCSBenchmarkArtifactRef(
 			"FailureLocalizationResult.v0", rel, flr.SignatureOrDigest, flr.SourceCommit,
 		))

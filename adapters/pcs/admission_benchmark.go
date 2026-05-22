@@ -233,7 +233,8 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 	var explainCases []ExplainQualityCaseScore
 	var lastRCVR *ReleaseChainValidationResult
 	var executions []benchmarkCaseExecution
-	suiteID := suiteIDFromWorkflow(workflow.WorkflowID)
+	suiteID := pcsBenchmarkSuiteID(workflow.WorkflowID)
+	pcsWorkflowID := pcsBenchmarkWorkflowID(workflow.WorkflowID)
 	taskID := taskIDFromWorkflow(workflow.WorkflowID)
 
 	for _, c := range cases {
@@ -255,7 +256,7 @@ func RunAdmissionBenchmark(opts AdmissionBenchmarkOptions) (AdmissionBenchmarkSu
 		}
 		pcsExplain := ExportPCSExplainQualityReport(ExportPCSExplainQualityCaseInput{
 			Case: c, Result: cr, RCVR: rcvr, VR: vr,
-			SuiteID: suiteID, WorkflowID: workflow.WorkflowID, SourceCommit: opts.SourceCommit,
+			SuiteID: suiteID, WorkflowID: pcsWorkflowID, SourceCommit: opts.SourceCommit,
 		})
 		if pcsExplain != nil {
 			explain = explainFromPCSReport(pcsExplain)

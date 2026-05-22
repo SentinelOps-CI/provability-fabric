@@ -6,6 +6,7 @@ package pcs_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
@@ -36,6 +37,17 @@ func TestPCSBenchIngestSemanticsLabtrustBundle(t *testing.T) {
 	for _, ref := range ingest.ArtifactRefs {
 		if ref.SHA256 == "" || ref.Path == "" {
 			t.Fatalf("incomplete artifact ref: %+v", ref)
+		}
+	}
+	if ingest.SuiteID != "pf-labtrust-admission-v0" {
+		t.Fatalf("suite_id=%q want pf-labtrust-admission-v0", ingest.SuiteID)
+	}
+	if ingest.WorkflowID != "hospital_lab.qc_release" {
+		t.Fatalf("workflow_id=%q want hospital_lab.qc_release", ingest.WorkflowID)
+	}
+	for _, ref := range ingest.ArtifactRefs {
+		if strings.Contains(ref.Path, `\`) {
+			t.Fatalf("artifact ref path must use forward slashes: %q", ref.Path)
 		}
 	}
 }
