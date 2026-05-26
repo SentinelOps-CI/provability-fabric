@@ -1,22 +1,5 @@
 <div align="center">
 
-# Provability Fabric
-
-**Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
-
-<sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
-
-<br/>
-
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-site-brightgreen.svg)](https://provability-fabric.org)
-[![Formal verification](https://img.shields.io/badge/verification-Lean-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
-[![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
-[![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
-
-<br/>
-
-<!-- readme-banner: Provability Fabric spine (94 cols; regen: .github/assets/_build_banner.py) -->
 <pre>
 #######################################################################################
 #                                                                                     #
@@ -27,29 +10,18 @@
 #     |_|   |_|  \___/ \_/  |_.__/_|_|_|\__|\__, |_|  \__,_|_.__/|_|  |_|\___|        #
 #                                       |___/                                         #
 #                                                                                     #
-#                         .-------------------------------.                           #
-#        .--------------->|       VERIFIED EXECUTION       |<---------------.         #
-#        |                '---------------.---------------'                |          #
-#        |                                |                                |          #
-# .------v------.       .----------------v----------------.        .-------v-----.    #
-# /    SPEC      \______/        SIGNED PROOF BUNDLE       \______/     AUDIT     \   #
-# \______________/      \___________________________________/      \______________/   #
-#        |                                |                                |          #
-#        |                         .------v------.                         |          #
-#        '------------------------>|  RUNTIME    |<------------------------'          #
-#                                  |   GUARD     |                                    #
-#                                  '------.------'                                    #
-#                                         |                                           #
-#                                  =======v======                                     #
-#                                  |   ALLOW    |                                     #
-#                                  |   DENY     |                                     #
-#                                  ==============                                     #
-#                                                                                     #
-#                                                                                     #
 #######################################################################################
 </pre>
 
-<br/>
+**Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
+
+<sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-site-brightgreen.svg)](https://provability-fabric.org)
+[![Formal verification](https://img.shields.io/badge/verification-Lean-brightgreen.svg)](https://github.com/SentinelOps-CI/provability-fabric)
+[![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
+[![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
 
 [Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Agent & CI guide](AGENTS.md)
 
