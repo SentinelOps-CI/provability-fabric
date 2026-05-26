@@ -1,8 +1,25 @@
 <div align="center">
 
+<!-- readme-banner: Provability Fabric spine (94 cols; regen: .github/assets/_build_banner.py) -->
+<pre>
+##############################################################################################
+#                                                                                            #
+#              ___                  _    _ _ _ _          ___     _        _                 #
+#             | _ \_ _ _____ ____ _| |__(_) (_) |_ _  _  | __|_ _| |__ _ _(_)__              #
+#             |  _/ '_/ _ \ V / _` | '_ \ | | |  _| || | | _/ _` | '_ \ '_| / _|             #
+#             |_| |_| \___/\_/\__,_|_.__/_|_|_|\__|\_, | |_|\__,_|_.__/_| |_\__|             #
+#                                                   |__/                                     #
+#                                                                                            #
+##############################################################################################
+</pre>
+
 # Provability Fabric
 
 **Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
+
+<sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
+
+<br/>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-site-brightgreen.svg)](https://provability-fabric.org)
@@ -10,7 +27,9 @@
 [![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
 [![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
 
-<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="220"/>
+<br/>
+
+<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="200"/>
 
 <br/>
 
