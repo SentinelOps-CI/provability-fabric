@@ -17,6 +17,7 @@ pub mod declassify;
 pub mod dfa;
 pub mod effects;
 pub mod egress_cert;
+pub mod evidence_v01;
 pub mod events;
 pub mod ifc_labels;
 pub mod label_witness;

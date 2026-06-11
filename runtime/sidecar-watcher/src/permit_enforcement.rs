@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use crate::cert_v1::{write_cert, CertV1, MorphInfo};
+use crate::cert_v1::{write_cert_with_binding, CertV1, MorphInfo};
 use crate::policy_adapter::{
     self, EnforcementMode, PermissionResult, PolicyAdapter, PolicyConfig, Tool,
 };
@@ -211,8 +211,9 @@ impl PermitEnforcementHook {
         let session = &event.session_id;
         let seq = result.timestamp; // fallback; ideally monotonic seq
 
-        let path = write_cert(&cert, session, seq)?;
-        info!("CERT-V1 written: {}", path);
+        let bundle_ref = std::env::var("EVIDENCE_BUNDLE_REF").ok();
+        let path = write_cert_with_binding(&cert, session, seq, bundle_ref.as_deref())?;
+        info!("CERT-V1 written with Evidence v0.1 binding: {}", path);
         Ok(())
     }
 
