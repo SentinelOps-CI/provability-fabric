@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1",
+  "attestation_id": "attest-basic-001",
+  "attestor": "sidecar-watcher/demo",
+  "signed_claim_ref": {
+    "role": "proof",
+    "path": "artifacts/proof.json",
+    "media_type": "application/vnd.provability-fabric.evidence.proof+json",
+    "digest": "sha256:3c1435ff573801180594e2f0a2074b0e4d370bb6d84e9c4629a4b96e974fa5e9"
+  },
+  "signature": "demo-signature-placeholder"
+}

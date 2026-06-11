@@ -1,0 +1,8 @@
+{
+  "report_id": "report-invalid-001",
+  "bundle_ref": "examples/missing-bundle.json",
+  "status": "unknown",
+  "errors": [],
+  "warnings": [],
+  "validated_at": "not-a-datetime"
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1",
+  "attestation_id": "attest-invalid-001",
+  "attestor": "sidecar-watcher/demo",
+  "signed_claim_ref": {
+    "role": "proof",
+    "path": "artifacts/proof.json",
+    "media_type": "application/vnd.provability-fabric.evidence.proof+json",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

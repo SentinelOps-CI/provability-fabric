@@ -1,0 +1,8 @@
+{
+  "report_id": "report-basic-001",
+  "bundle_ref": "specs/evidence/v0.1/examples/valid/basic-evidence-bundle.json",
+  "status": "pass",
+  "errors": [],
+  "warnings": [],
+  "validated_at": "2025-06-01T12:00:00Z"
+}
