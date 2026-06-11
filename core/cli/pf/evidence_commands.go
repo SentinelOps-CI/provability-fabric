@@ -15,11 +15,12 @@ import (
 func evidenceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evidence",
-		Short: "Evidence v0.1 bundle pack and validate",
-		Long:  "Pack and validate Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
+		Short: "Evidence v0.1 bundle pack, validate, and replay",
+		Long:  "Pack, validate, and replay Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
 	}
 	cmd.AddCommand(evidenceBundleCmd())
 	cmd.AddCommand(evidenceValidateCmd())
+	cmd.AddCommand(evidenceReplayCmd())
 	return cmd
 }
 
@@ -109,5 +110,41 @@ func evidenceValidateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Directory containing artifact paths (default: bundle directory)")
 	cmd.Flags().StringVar(&reportOut, "report-out", "", "Write validation report JSON")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit validation report JSON to stdout")
+	return cmd
+}
+
+func evidenceReplayCmd() *cobra.Command {
+	var outPath string
+	var jsonOut bool
+
+	cmd := &cobra.Command{
+		Use:   "replay",
+		Short: "Verify replay preconditions for an Evidence v0.1 bundle",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			bundlePath, _ := cmd.Flags().GetString("bundle")
+			if bundlePath == "" {
+				return fmt.Errorf("--bundle is required")
+			}
+			report, err := evidence.ReplayBundle(evidence.ReplayOptions{
+				BundlePath: bundlePath,
+				OutPath:    outPath,
+			})
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(report)
+			} else {
+				fmt.Printf("status: %s trace_found=%v\n", report.Status, report.TraceFound)
+				for _, msg := range report.Errors {
+					fmt.Printf("error: %s\n", msg)
+				}
+			}
+			return err
+		},
+	}
+	cmd.Flags().String("bundle", "", "Path to Evidence v0.1 bundle JSON")
+	_ = cmd.MarkFlagRequired("bundle")
+	cmd.Flags().StringVar(&outPath, "out", "", "Write replay report JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit replay report JSON to stdout")
 	return cmd
 }
