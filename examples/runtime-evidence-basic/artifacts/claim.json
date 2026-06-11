@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1",
+  "claim_id": "claim-basic-001",
+  "statement": "Agent execution stayed within declared policy bounds for the demo session.",
+  "subject": {
+    "agent_id": "demo-agent",
+    "session_id": "sess-001"
+  }
+}

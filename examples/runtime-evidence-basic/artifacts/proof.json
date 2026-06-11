@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "proof_id": "proof-basic-001",
+  "proof_system": "lean4",
+  "artifact_refs": [
+    {
+      "role": "claim",
+      "path": "artifacts/claim.json",
+      "media_type": "application/vnd.provability-fabric.evidence.claim+json",
+      "digest": "sha256:09b99e794ee3a38346bc692ddab77c5b9b95d7c82526d6b19b176f64f3e17f3e"
+    }
+  ],
+  "proof_digest": "sha256:ac5d2e7a13046cdae7a22c4b7a00abdbd6302c2514d5f6607a17234a2c2fdec1"
+}
