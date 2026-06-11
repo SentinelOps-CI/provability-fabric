@@ -1,0 +1,49 @@
+name: Evidence v0.1 smoke
+
+on:
+  pull_request:
+    paths:
+      - 'specs/evidence/**'
+      - 'core/evidence/**'
+      - 'core/cli/pf/evidence_commands.go'
+      - 'testbed/evidence-v0.1/**'
+      - 'tests/evidence_**/**'
+      - 'tests/e2e/test_evidence_bundle_basic.py'
+      - 'tests/runtime_evidence/**'
+      - 'tests/forensic_replay/**'
+      - 'tests/testbed/test_evidence_v01_testbed.py'
+      - '.github/workflows/evidence-v01-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'specs/evidence/**'
+      - 'core/evidence/**'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        run: pip install jsonschema pytest
+      - name: Go tests
+        run: go test ./...
+        working-directory: core/evidence
+      - name: Build pf
+        run: go build -o pf .
+        working-directory: core/cli/pf
+      - name: Validate fixture bundle
+        run: ./core/cli/pf/pf evidence validate specs/evidence/v0.1/examples/valid/basic-evidence-bundle.json --strict
+      - name: Pytest evidence suites
+        run: |
+          pytest tests/evidence_schema -q
+          pytest tests/evidence_validation -q
+          pytest tests/evidence_replay -q
+      - name: Testbed happy path
+        run: bash testbed/evidence-v0.1/run_happy_path.sh
