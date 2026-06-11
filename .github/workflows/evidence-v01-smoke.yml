@@ -1,13 +1,22 @@
-﻿name: Evidence v0.1 smoke
+name: Evidence v0.1 smoke
 
 on:
   pull_request:
     paths:
       - 'specs/evidence/**'
-      - 'tests/evidence_schema/**'
       - 'core/evidence/**'
-      - 'tests/evidence_validation/**'
       - 'core/cli/pf/evidence_commands.go'
+      - 'core/cli/pf/main.go'
+      - 'runtime/sidecar-watcher/src/evidence_v01.rs'
+      - 'runtime/sidecar-watcher/src/cert_v1.rs'
+      - 'runtime/sidecar-watcher/src/permit_enforcement.rs'
+      - 'testbed/evidence-v0.1/**'
+      - 'tests/evidence_**/**'
+      - 'tests/e2e/test_evidence_bundle_basic.py'
+      - 'tests/runtime_evidence/**'
+      - 'tests/forensic_replay/**'
+      - 'tests/testbed/test_evidence_v01_testbed.py'
+      - 'tools/cert-validate/validate.py'
       - '.github/workflows/evidence-v01-smoke.yml'
   push:
     branches: [main]
@@ -27,24 +36,97 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install jsonschema pytest
-      - run: pytest tests/evidence_schema -q
+
+      - name: Install Python deps
+        run: pip install jsonschema pytest
+
+      - name: Pytest evidence schema
+        run: pytest tests/evidence_schema -q
 
   evidence-validator:
     runs-on: ubuntu-latest
     needs: evidence-schema-only
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install jsonschema pytest
-      - run: go test ./...
+
+      - name: Install Python deps
+        run: pip install jsonschema pytest
+
+      - name: Go tests (core/evidence)
+        run: go test ./...
         working-directory: core/evidence
-      - run: pytest tests/evidence_validation -q
+
+      - name: Pytest evidence validation
+        run: pytest tests/evidence_validation -q
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: evidence-validator
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install jsonschema pytest
+
+      - name: Go tests (core/evidence)
+        run: go test ./...
+        working-directory: core/evidence
+
+      - name: Build pf CLI
+        run: go build -o pf .
+        working-directory: core/cli/pf
+
+      - name: Validate fixture bundle (strict)
+        run: |
+          ./core/cli/pf/pf evidence validate \
+            specs/evidence/v0.1/examples/valid/basic-evidence-bundle.json \
+            --strict \
+            --base-dir specs/evidence/v0.1/examples/valid
+
+      - name: Pytest evidence suites
+        run: |
+          pytest tests/evidence_schema -q
+          pytest tests/evidence_validation -q
+          pytest tests/evidence_replay -q
+          pytest tests/e2e/test_evidence_bundle_basic.py -q
+          pytest tests/runtime_evidence -q
+          pytest tests/forensic_replay -q
+
+      - name: Testbed happy path
+        run: bash testbed/evidence-v0.1/run_happy_path.sh
+
+      - name: Testbed tamper case
+        run: bash testbed/evidence-v0.1/run_tamper_case.sh
+
+      - name: Pytest testbed wrapper
+        run: pytest tests/testbed/test_evidence_v01_testbed.py -q
+
+      - name: Runtime sidecar binding (Linux + CERT-V1)
+        run: |
+          if [ -f external/CERT-V1/schema/cert-v1.schema.json ]; then
+            pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q
+          else
+            echo "CERT-V1 schema missing; skipping live sidecar test"
+          fi
