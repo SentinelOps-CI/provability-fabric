@@ -15,10 +15,11 @@ import (
 func evidenceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evidence",
-		Short: "Evidence v0.1 bundle pack",
-		Long:  "Pack Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
+		Short: "Evidence v0.1 bundle pack and validate",
+		Long:  "Pack and validate Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
 	}
 	cmd.AddCommand(evidenceBundleCmd())
+	cmd.AddCommand(evidenceValidateCmd())
 	return cmd
 }
 
@@ -60,4 +61,53 @@ func evidenceBundleCmd() *cobra.Command {
 	_ = pack.MarkFlagRequired("out")
 	bundle.AddCommand(pack)
 	return bundle
+}
+
+func evidenceValidateCmd() *cobra.Command {
+	var strict bool
+	var reportOut string
+	var jsonOut bool
+	var baseDir string
+
+	cmd := &cobra.Command{
+		Use:   "validate [bundle]",
+		Short: "Validate an Evidence v0.1 bundle",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
+				BundlePath: args[0],
+				Strict:     strict,
+				BaseDir:    baseDir,
+			})
+			if report == nil {
+				return err
+			}
+			if reportOut != "" {
+				if writeErr := evidence.WriteValidationReport(reportOut, report); writeErr != nil {
+					return writeErr
+				}
+			}
+			if jsonOut {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				_ = enc.Encode(report)
+			} else if err != nil {
+				fmt.Printf("status: %s\n", report.Status)
+				for _, msg := range report.Errors {
+					fmt.Printf("error: %s\n", msg)
+				}
+			} else {
+				fmt.Printf("Validation passed: %s\n", args[0])
+			}
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&strict, "strict", false, "Fail closed on schema, digest, and cross-ref errors")
+	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Directory containing artifact paths (default: bundle directory)")
+	cmd.Flags().StringVar(&reportOut, "report-out", "", "Write validation report JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit validation report JSON to stdout")
+	return cmd
 }

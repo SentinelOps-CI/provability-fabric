@@ -65,6 +65,12 @@ def main():
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
+    parser.add_argument(
+        "--allow-missing-schema",
+        action="store_true",
+        help="Exit 0 when schema file is missing (default: fail closed)",
+    )
+
     args = parser.parse_args()
 
     # Load schema
@@ -73,7 +79,11 @@ def main():
 
     schema = load_schema(args.schema)
     if schema is None:
-        sys.exit(0)
+        if args.allow_missing_schema:
+            print("Schema missing; exiting 0 due to --allow-missing-schema")
+            sys.exit(0)
+        print("Schema missing; re-run with --allow-missing-schema to skip (not recommended)")
+        sys.exit(1)
 
     if args.verbose:
         print("Schema loaded successfully")

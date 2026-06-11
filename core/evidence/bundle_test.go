@@ -36,6 +36,29 @@ func TestPackValidFixture(t *testing.T) {
 	if bundle.BundleDigest == "" {
 		t.Fatal("expected bundle_digest")
 	}
+	report, err := ValidateBundle(ValidateOptions{
+		BundlePath: out,
+		Strict:     true,
+		RepoRoot:   root,
+		BaseDir:    exampleDir,
+	})
+	if err != nil {
+		t.Fatalf("validate packed bundle: %v (%v)", err, report.Errors)
+	}
+}
+
+func TestValidateFixtureBundle(t *testing.T) {
+	root := repoRoot(t)
+	bundlePath := filepath.Join(root, "specs", "evidence", "v0.1", "examples", "valid", "basic-evidence-bundle.json")
+	_, err := ValidateBundle(ValidateOptions{
+		BundlePath: bundlePath,
+		Strict:     true,
+		RepoRoot:   root,
+		BaseDir:    filepath.Dir(bundlePath),
+	})
+	if err != nil {
+		t.Fatalf("validate fixture: %v", err)
+	}
 }
 
 func TestBundleDigestDeterministic(t *testing.T) {
@@ -78,6 +101,20 @@ func TestBundleToMapRoundTrip(t *testing.T) {
 	if _, ok := m["artifacts"].([]any); !ok {
 		raw, _ := json.Marshal(m["artifacts"])
 		t.Fatalf("artifacts not []any: %s", string(raw))
+	}
+}
+
+func TestMissingArtifactFails(t *testing.T) {
+	root := repoRoot(t)
+	bad := filepath.Join(root, "specs", "evidence", "v0.1", "examples", "invalid", "missing-artifacts.json")
+	_, err := ValidateBundle(ValidateOptions{
+		BundlePath: bad,
+		Strict:     true,
+		RepoRoot:   root,
+		BaseDir:    filepath.Dir(bad),
+	})
+	if err == nil {
+		t.Fatal("expected validation failure")
 	}
 }
 
