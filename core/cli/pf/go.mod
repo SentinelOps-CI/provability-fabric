@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/SentinelOps-CI/provability-fabric/adapters/pcs v0.0.0
+	github.com/SentinelOps-CI/provability-fabric/core/evidence v0.0.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/spf13/cobra v1.8.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -12,6 +13,8 @@ require (
 )
 
 replace github.com/SentinelOps-CI/provability-fabric/adapters/pcs => ../../../adapters/pcs
+
+replace github.com/SentinelOps-CI/provability-fabric/core/evidence => ../../evidence
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
