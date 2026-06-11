@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.org/schemas/evidence/v0.1/attestation.schema.json",
+  "title": "EvidenceAttestationV01",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "attestation_id", "attestor", "signed_claim_ref", "signature"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "attestation_id": { "type": "string", "minLength": 1 },
+    "attestor": { "type": "string", "minLength": 1 },
+    "signed_claim_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "media_type", "digest"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "signature": { "type": "string", "minLength": 1 },
+    "media_type": {
+      "type": "string",
+      "description": "Optional media type when attestation wraps CERT-V1"
+    }
+  }
+}
