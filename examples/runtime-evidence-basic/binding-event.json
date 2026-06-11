@@ -1,0 +1,10 @@
+{
+  "event_type": "evidence_v01_binding",
+  "session_id": "runtime-demo-001",
+  "cert_path": "evidence/certs/runtime-demo-001/1.cert.json",
+  "evidence_bundle_ref": "examples/runtime-evidence-basic/basic-evidence-bundle.json",
+  "artifact_digests": {
+    "cert-v1": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "schema_version": "0.1"
+}
