@@ -79,6 +79,7 @@ func init() {
 	rootCmd.AddCommand(epochCmd())
 	rootCmd.AddCommand(perfCmd())
 	rootCmd.AddCommand(traceCmd())
+	rootCmd.AddCommand(evidenceCmd())
 
 	// Enhanced unified commands for developer workflow
 	rootCmd.AddCommand(explainStateCmd())
