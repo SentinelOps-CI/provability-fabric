@@ -100,10 +100,9 @@ If you are forking the repo to build your own product or variant, see the [Reuse
 
 - [Getting started](docs/guides/getting-started.md)
 - [Developer guide](docs/guides/developer-guide.md)
-- [CI and supply-chain reference](docs/reference/ci-reference.md)
+- [CI and supply-chain reference](docs/reference/ci-reference.md) (workflows, local commands, artifacts not to commit)
 - [Extension points](docs/guides/extension-points.md) (adapters, bundles, runtime)
 - [Configuration reference](docs/reference/configuration.md)
-- [Agent / automation guide](AGENTS.md) (CI entry points, local commands, artifacts not to commit)
 
 ## Questions
 

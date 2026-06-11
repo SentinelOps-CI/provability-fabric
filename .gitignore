@@ -265,3 +265,6 @@ workspaces_verify_preflight_smoke/
 /release-run/signed_science_claim_bundle.json
 /release-run/scientific_memory_import_report.json
 /release-run/RELEASE_FIXTURE_MANIFEST.json
+
+core/cli/pf/pf
+

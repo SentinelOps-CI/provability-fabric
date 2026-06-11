@@ -116,6 +116,8 @@ nav:
   - Evidence:
       - Overview: evidence/overview.md
       - Replay: evidence/replay.md
+  - Roadmap:
+      - Evidence v0.1: roadmap/evidence-v0.1.md
   - Security:
       - Overview: security/overview.md
       - Threat model: security/threat_model.md
