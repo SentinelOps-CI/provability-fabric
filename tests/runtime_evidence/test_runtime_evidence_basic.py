@@ -5,7 +5,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,6 +18,14 @@ PF = REPO / "core" / "cli" / "pf" / "pf"
 EXAMPLE = REPO / "examples" / "runtime-evidence-basic"
 BUNDLE = EXAMPLE / "basic-evidence-bundle.json"
 BINDING = EXAMPLE / "binding-event.json"
+SCENARIO = EXAMPLE / "run_scenario.sh"
+
+
+def _bash_exe() -> str | None:
+    git_bash = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+    if git_bash.is_file():
+        return str(git_bash)
+    return shutil.which("bash")
 
 
 @pytest.fixture(scope="module")
@@ -54,3 +65,11 @@ def test_runtime_tampered_bundle_fails(pf_bin: Path, tmp_path: Path) -> None:
         capture_output=True,
     )
     assert proc.returncode != 0
+
+
+@pytest.mark.skipif(_bash_exe() is None, reason="bash required")
+def test_run_scenario_static() -> None:
+    bash = _bash_exe()
+    assert bash is not None
+    proc = subprocess.run([bash, str(SCENARIO)], cwd=REPO, text=True, capture_output=True)
+    assert proc.returncode == 0, proc.stderr + proc.stdout

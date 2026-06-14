@@ -60,11 +60,41 @@ pub fn write_evidence_binding(binding: &EvidenceV01Binding) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::io::{BufRead, BufReader};
+    use std::path::PathBuf;
 
     #[test]
     fn binding_serializes_event_type() {
         let b = EvidenceV01Binding::new("sess", "evidence/certs/sess/1.cert.json");
         assert_eq!(b.event_type, "evidence_v01_binding");
         assert_eq!(b.schema_version, "0.1");
+    }
+
+    #[test]
+    fn write_evidence_binding_produces_valid_jsonl() {
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_current_dir(tmp.path()).expect("chdir");
+
+        let binding = EvidenceV01Binding::new("sess-1", "evidence/certs/sess-1/1.cert.json")
+            .with_bundle_ref("examples/runtime-evidence-basic/basic-evidence-bundle.json")
+            .with_artifact_digest("cert-v1", "sha256:abc".to_string());
+
+        write_evidence_binding(&binding).expect("write binding");
+
+        let log_path = PathBuf::from("evidence/logs/sidecar.jsonl");
+        assert!(log_path.is_file(), "expected sidecar.jsonl");
+
+        let file = fs::File::open(&log_path).expect("open log");
+        let line = BufReader::new(file)
+            .lines()
+            .next()
+            .expect("one line")
+            .expect("read line");
+        let parsed: EvidenceV01Binding = serde_json::from_str(&line).expect("valid JSONL");
+        assert_eq!(parsed.event_type, "evidence_v01_binding");
+        assert_eq!(parsed.session_id, "sess-1");
+        assert!(parsed.evidence_bundle_ref.is_some());
+        assert!(parsed.artifact_digests.contains_key("cert-v1"));
     }
 }
