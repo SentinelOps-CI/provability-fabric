@@ -97,9 +97,11 @@ For CI and private upstream repos, set repository secret **`STANDARDS_GITHUB_TOK
 
 **Local shortcut:** `make evidence-verify` runs standards init, Go/pytest suites, and both testbed scripts (Linux/WSL or Git Bash on Windows).
 
+**Fresh-clone record (2026-06-14):** on `main` after delivery closure — `make dev-standards` + `make evidence-verify` (Linux/WSL); Evidence smoke dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869) on `main`.
+
 ## Post-merge hygiene
 
-1. Optional: delete remote branches `evidence-v02/*` (keep documented archives such as `refs/backup/pre-split-evidence-v02` if retained).
+1. ~~Optional: delete remote branches `evidence-v02/*`~~ — **Done** (2026-06-14); kept `evidence-v01/snapshot` as archive.
 2. Monitor [`evidence-v01-smoke.yml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/evidence-v01-smoke.yml) on `main` for regressions; dispatch via Actions when validating delivery.
 3. Ensure org/repo secret **`STANDARDS_GITHUB_TOKEN`** is configured for fork PRs and workflows that call `make submodules`.
 4. Optional: delete remote `evidence-v01/*` branches after v0.1 archive policy is agreed (see [Evidence v0.1 delivery guide](evidence-v0.1-delivery.md#post-merge-hygiene)).

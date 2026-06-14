@@ -104,6 +104,16 @@ make docs-strict     # mkdocs build --strict (docs-only PRs)
 
 See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for the fresh-clone checklist and [Evidence v0.2 status](docs/roadmap/evidence-v0.2-status.md) for current delivery gates.
 
+### CI expectations
+
+| Change type | Required local checks | CI workflows |
+|-------------|----------------------|--------------|
+| Evidence / standards | `make evidence-verify` | `evidence-v01-smoke.yml`, `standards-pin.yml` |
+| Docs only | `make docs-strict` | `docs-build.yaml`, `docs-deploy.yaml` |
+| Code (general) | `go test`, `cargo test`, targeted pytest | `ci.yml` reusable jobs |
+
+Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-matrix.md). Fork and org workflows need **`STANDARDS_GITHUB_TOKEN`** for private `verifiable-ai-ci/*` repos.
+
 ## Reuse and forking
 
 If you are forking the repo to build your own product or variant, see the [Reuse and extend](docs/guides/reuse-and-extend.md) guide. It covers:

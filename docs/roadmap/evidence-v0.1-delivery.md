@@ -92,6 +92,6 @@ mkdocs build
 
 ## Post-merge hygiene
 
-1. Optional: delete remote branches `evidence-v01/*` (except `snapshot` if kept for reference).
+1. ~~Optional: delete remote branches `evidence-v01/*`~~ — **Done** except `evidence-v01/snapshot` (2026-06-14).
 2. ~~Remove `scripts/create-evidence-v01-pr-stack.ps1`~~ — done on `main`.
 3. Monitor `evidence-v01-smoke.yml` on `main` for regressions.
