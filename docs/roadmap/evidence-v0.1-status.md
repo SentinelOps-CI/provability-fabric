@@ -40,20 +40,21 @@ Last full local matrix (on `evidence-v01/onboarding-docs`, 2026-06-14): see [Fre
 | Stack landed on `main` (#97) | Complete |
 | PR opener script removed | Complete |
 | CI on GitHub | Partial — many repo-wide checks fail on docs-only PRs; Evidence smoke passed from PR #85 onward |
-| Fresh-clone quickstart verified by independent reviewer | Pending |
+| Fresh-clone quickstart verified by independent reviewer | Complete (v0.2 matrix on `evidence-v02/integration`) |
 
-See [Evidence v0.1 delivery](evidence-v0.1-delivery.md) for historical merge order.
+See [Evidence v0.2 integration](evidence-v0.2.md) for the v0.2 definition of done.
 
-## Known limitations (v0.1 by design)
+## Known limitations (v0.1 superseded by v0.2)
 
-| Limitation | Notes |
-|------------|-------|
-| Replay does not invoke `so trace run` | Bundle + `trace_digest` checks only |
-| Runtime binding on permit-enforcement emit path only | v0.1; see runtime-evidence-basic guide |
-| Live sidecar test requires Linux + CERT-V1 submodule | Skipped on Windows local runs |
-| `external/CERT-V1` required for strict cert validation | Clone per `external/README.md` |
-| PCS `pf/cmd` test failures | Pre-existing; out of Evidence v0.1 scope |
-| Windows testbed | Bash/Git Bash locally; CI uses `ubuntu-latest` |
+| v0.1 limitation | v0.2 status |
+|-----------------|-------------|
+| Static replay only | Addressed — `pf evidence replay --execute` |
+| Manual external clone | Addressed — git submodules + `make dev-standards` |
+| CI skips without CERT-V1 | Addressed — smoke job fails closed |
+| PCS / so bundle confusion | Addressed — lane guide + negative tests (no schema merge) |
+| Binding docs implied conditional | Addressed — binding always on emit; bundle ref optional |
+
+## Remaining notes
 
 ## Out of scope (v0.1)
 
