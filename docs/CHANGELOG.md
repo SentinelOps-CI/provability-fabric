@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - Bench / eval pipeline hardening
 
+### Added
+
+- **Evidence v0.1:** JSON Schema artifacts under `specs/evidence/v0.1/`, public specification
+  docs, valid/invalid fixtures, and compatibility matrix separating v0.1 from PCS
+  `EvidenceBundle.v0` and `so bundle pack` tar archives. New CLI namespace
+  `pf evidence` with `bundle pack`, `validate --strict`, and `replay`. Runtime sidecar
+  additive `evidence_v01_binding` JSONL events, examples, forensic replay walkthrough,
+  public testbed scripts (`testbed/evidence-v0.1/`), and CI smoke workflow.
+  CERT validator (`tools/cert-validate/validate.py`) now fails closed when the external
+  schema is missing unless `--allow-missing-schema` is passed.
+
 ### Changed
 
 - **Documentation refresh:** Canonical clone and release URLs under `docs/**` now point to **`SentinelOps-CI/provability-fabric`** where appropriate; [docs/README.md](README.md) documents MkDocs via `docs/requirements.txt`, root `mkdocs.yml`, and output directory **`build/`**. [reference/ci-reference.md](reference/ci-reference.md) documents main `ci.yml`, reusable workflows, and supply-chain jobs (**dependency-review**, **cargo-deny**, **actionlint**, SBOM, Scorecard). [guides/developer-guide.md](guides/developer-guide.md), [guides/getting-started.md](guides/getting-started.md), [guides/testing-guide.md](guides/testing-guide.md), [security/overview.md](security/overview.md), [security/README.md](security/README.md), root [README.md](../README.md), [CONTRIBUTING.md](../CONTRIBUTING.md), and [SECURITY.md](../SECURITY.md) updated for Go **1.23+**, per-package Node installs, `cargo deny`, and CI automation cross-links.
