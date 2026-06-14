@@ -33,8 +33,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Set up Lean
         run: |
@@ -90,8 +88,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Download DFA artifacts
         uses: actions/download-artifact@v4
@@ -139,8 +135,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Download DFA artifacts
         uses: actions/download-artifact@v4
@@ -185,8 +179,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Download DFA artifacts
         uses: actions/download-artifact@v4
@@ -269,8 +261,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Download DFA artifacts
         uses: actions/download-artifact@v4
@@ -320,8 +310,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Download DFA artifacts
         uses: actions/download-artifact@v4
