@@ -97,7 +97,7 @@ mkdocs build
   specs/evidence/v0.1/examples/valid/basic-evidence-bundle.json --strict
 ```
 
-**Local result (2026-06-14):** executed on working tree at `evidence-v01/onboarding-docs` tip (see agent verification summary).
+**Local result (2026-06-14):** executed on `evidence-v01/onboarding-docs` tip — 37 pytest passed (1 skipped: live sidecar on Windows), `go test ./...` in `core/evidence` passed, `cargo test -p sidecar-watcher` binding tests passed (CERT-V1 live test skipped without submodule locally), `mkdocs build` passed.
 
 ## After merge
 
