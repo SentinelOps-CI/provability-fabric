@@ -22,7 +22,7 @@ This page summarizes GitHub Actions for this repository: the **main CI entry**, 
 | `release-sbom.yml` | On `release: published`, attaches CycloneDX JSON to the GitHub Release. |
 | `scorecards.yml` | [OpenSSF Scorecard](https://scorecard.dev/) on a schedule and on pushes to `main`. |
 
-Contributor-oriented pointers: **[AGENTS.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/AGENTS.md)** (local commands, what not to commit) and **[.github/WORKFLOWS.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/WORKFLOWS.md)** (workflow inventory).
+Contributor-oriented pointers: **[CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md)** (local commands, what not to commit) and **[.github/WORKFLOWS.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/WORKFLOWS.md)** (workflow inventory).
 
 ---
 

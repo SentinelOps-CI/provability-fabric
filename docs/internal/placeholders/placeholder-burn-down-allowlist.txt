@@ -1,7 +1,7 @@
 # Placeholder burn-down allowlist (P1)
 # Paths listed here may contain sanitized example placeholders (variable-style, clearly labeled).
 # Rule: variable-style (e.g. SLACK_WEBHOOK_URL, ghp_xxx), clearly labeled as example; no real-looking secrets.
-# See docs/placeholder-burn-down.md (SC-002, SC-003, BT-002, TD-015, EX-001, EX-002).
+# See docs/internal/placeholders/ (SC-002, SC-003, BT-002, TD-015, EX-001, EX-002).
 # EX-001: benign comment "Synchronous unit test stub" is skipped by script (comment-only + excuse).
 # EX-002: PostMortemStub is a type name in break_glass.rs; gate has no pattern matching it.
 # P14 proof test: test_impacted_only.py asserts script output (impacted_only --build-impacted).
@@ -16,7 +16,6 @@ tools/ci/test_impacted_only.py
 tools/pr-bot/README.md
 core/sdk/README.md
 api/v1/BUF_USAGE.md
-docs/placeholder-burn-down.md
 docs/placeholders-and-stubs.md
 docs/decisions-placeholders-v1.md
 docs/dsse-verify-contract.md

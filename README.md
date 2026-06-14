@@ -1,21 +1,25 @@
 <div align="center">
 
+<!-- readme-banner: Provability Fabric spine (94 cols; regen: .github/assets/_build_banner.py) -->
 <pre>
-#######################################################################################
-#                                                                                     #
-#      ____                  _    _ _ _ _          _____     _          _             #
-#     |  _ \ _ __ _____   __| |__(_) (_) |_ _   _|  ___|_ _| |__  _ __(_) ___         #
-#     | |_) | '__/ _ \ \ / /| '_ \ | | | __| | | | |_ / _` | '_ \| '__| |/ __|        #
-#     |  __/| | | (_) \ V / | |_) || | | |_| |_| |  _| (_| | |_) | |  | | (__         #
-#     |_|   |_|  \___/ \_/  |_.__/_|_|_|\__|\__, |_|  \__,_|_.__/|_|  |_|\___|        #
-#                                            |___/                                    #
-#                                                                                     #
-#######################################################################################
+##############################################################################################
+#                                                                                            #
+#              ___                  _    _ _ _ _          ___     _        _                 #
+#             | _ \_ _ _____ ____ _| |__(_) (_) |_ _  _  | __|_ _| |__ _ _(_)__              #
+#             |  _/ '_/ _ \ V / _` | '_ \ | | |  _| || | | _/ _` | '_ \ '_| / _|             #
+#             |_| |_| \___/\_/\__,_|_.__/_|_|_|\__|\_, | |_|\__,_|_.__/_| |_\__|             #
+#                                                   |__/                                     #
+#                                                                                            #
+##############################################################################################
 </pre>
+
+# Provability Fabric
 
 **Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
 
 <sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
+
+<br/>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-site-brightgreen.svg)](https://provability-fabric.org)
@@ -23,7 +27,13 @@
 [![Lean CI](https://img.shields.io/badge/CI-Lean%20%28Morph%29-blue.svg)](.github/workflows/lean-morph.yml)
 [![PR comments](https://img.shields.io/badge/PR%20comments-enabled-blue.svg)](#)
 
-[Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Agent & CI guide](AGENTS.md)
+<br/>
+
+<img src=".github/assets/provability-fabric - logofinal.png" alt="Provability Fabric" width="200"/>
+
+<br/>
+
+[Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [CI reference](docs/reference/ci-reference.md)
 
 </div>
 
@@ -43,7 +53,7 @@ Provability Fabric ties **specifications and proofs** to **what actually runs**.
 
 ## Repository map
 
-The tree is large; use this as a compass. For CI, supply chain, and local commands, see [**AGENTS.md**](AGENTS.md).
+The tree is large; use this as a compass. For CI, supply chain, and local commands, see [**CONTRIBUTING.md**](CONTRIBUTING.md) and [**docs/reference/ci-reference.md**](docs/reference/ci-reference.md).
 
 | Area | Path | Notes |
 |------|------|--------|
@@ -290,7 +300,7 @@ python tests/trust_fire_orchestrator.py
 
 Report vulnerabilities per [SECURITY.md](SECURITY.md).
 
-The default branch is protected by workflows including dependency review (PRs), **cargo-deny** ([`deny.toml`](deny.toml)), **actionlint**, SBOM jobs, and OpenSSF Scorecard. Enable the [dependency graph](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-the-dependency-graph) where GitHub features require it. Overview: [AGENTS.md](AGENTS.md), [.github/WORKFLOWS.md](.github/WORKFLOWS.md), [docs/reference/ci-reference.md](docs/reference/ci-reference.md).
+The default branch is protected by workflows including dependency review (PRs), **cargo-deny** ([`deny.toml`](deny.toml)), **actionlint**, SBOM jobs, and OpenSSF Scorecard. Enable the [dependency graph](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-the-dependency-graph) where GitHub features require it. Overview: [CONTRIBUTING.md](CONTRIBUTING.md), [.github/WORKFLOWS.md](.github/WORKFLOWS.md), [docs/reference/ci-reference.md](docs/reference/ci-reference.md).
 
 ---
 

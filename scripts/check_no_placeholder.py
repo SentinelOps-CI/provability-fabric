@@ -3,7 +3,7 @@
 # Copyright 2025 Provability-Fabric Contributors
 #
 # P1 gate: scan repo for forbidden placeholder/stub patterns.
-# Allowlisted paths (docs/placeholder-burn-down-allowlist.txt) are skipped.
+# Allowlisted paths (docs/internal/placeholders/placeholder-burn-down-allowlist.txt) are skipped.
 # Exit 0 if no forbidden patterns; 1 otherwise.
 
 from __future__ import annotations

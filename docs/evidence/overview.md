@@ -60,4 +60,21 @@ This runs `tools/cert-validate/validate.py` against the schema at `external/CERT
 - optional `morph`: environment snapshot info when running on Morph
 - `sig`: signature for the CERT payload
 
-See also: [Standards](specs/standards.md), [Replay](replay.md), and the CERT-V1 repository for the full schema.
+See also: [Standards](specs/standards.md), [Replay](replay.md), the CERT-V1 repository for the full schema, and the [Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md) for the planned bundle format and surface map.
+
+## Evidence surface map
+
+Today the repository exposes several evidence-related paths. Evidence v0.1 (in progress) adds a
+JSON bundle lane without replacing these surfaces.
+
+| Surface | Location | Role |
+|---------|----------|------|
+| Runtime CERT-V1 | `evidence/certs/<session>/<seq>.cert.json` | Sidecar-emitted certificates |
+| Sidecar log | `evidence/logs/sidecar.jsonl` | Hash-chained JSONL events |
+| TRACE-REPLAY-KIT | `tests/replay/out/certs/` (and trace outputs) | Replay-oriented CERTs and traces |
+| SWE-bench runs | `runs/<run_id>/<instance_id>/` | Run logs, metadata, replay bundles |
+| PCS science claims | `config/schemas/pcs/EvidenceBundle.v0.schema.json` | Distinct domain; not v0.1 bundles |
+| Spec archives | `so bundle pack` | tar.gz spec bundles; out of v0.1 scope |
+
+Planned v0.1 additions (`specs/evidence/v0.1/`, `pf evidence …`) are tracked in the
+[Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md).

@@ -282,6 +282,11 @@ install-full:
 
 validate-certs:
 	@$(ECHOOK) "🔍 Validating CERT-V1 certificates..."
+	@if [ ! -f external/CERT-V1/schema/cert-v1.schema.json ]; then \
+		echo "CERT-V1 schema missing at external/CERT-V1/schema/cert-v1.schema.json"; \
+		echo "Clone per external/README.md or pass --allow-missing-schema (not recommended)."; \
+		exit 1; \
+	fi
 	python tools/cert-validate/validate.py evidence/egress_certs/*.json evidence/certs/*/*.cert.json
 	@$(ECHOOK) "✅ Certificate validation completed"
 
@@ -427,10 +432,10 @@ docs-serve:
 
 # ---------- Placeholder burn-down (P1) ----------
 # Fails if forbidden placeholder/stub patterns exist outside allowlisted paths.
-# Allowlist: docs/placeholder-burn-down-allowlist.txt
+# Allowlist: docs/internal/placeholders/placeholder-burn-down-allowlist.txt
 no-runtime-placeholders:
 	@$(ECHOOK) "Checking for forbidden placeholder/stub patterns..."
-	@python scripts/check_no_placeholder.py || (echo "no-runtime-placeholders: fix or allowlist entries (see docs/placeholder-burn-down.md)" && exit 1)
+	@python scripts/check_no_placeholder.py || (echo "no-runtime-placeholders: fix or allowlist entries (see docs/internal/placeholders/placeholder-burn-down-allowlist.txt)" && exit 1)
 
 # ---------- Convenience ----------
 logs:
