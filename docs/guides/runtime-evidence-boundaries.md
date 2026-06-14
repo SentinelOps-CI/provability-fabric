@@ -2,23 +2,23 @@
 
 ## Runtime evidence overview
 
-Runtime evidence in Evidence v0.1 is an **additive binding layer** on top of existing CERT-V1 sidecar emission. The sidecar continues to write CERT-V1 JSON and append CERT lines to `evidence/logs/sidecar.jsonl`. When `EVIDENCE_BUNDLE_REF` is set, emit paths also append an `evidence_v01_binding` JSONL event linking the session, cert path, optional bundle reference, and cert digest.
+Runtime evidence in Evidence v0.1 is an **additive binding layer** on top of existing CERT-V1 sidecar emission. The sidecar continues to write CERT-V1 JSON and append CERT lines to `evidence/logs/sidecar.jsonl`. On every emit path through `write_cert_with_binding`, an `evidence_v01_binding` JSONL event is appended linking the session, cert path, cert digest, and optional bundle reference.
 
 ## Event sources
 
 | Source | Event | Output |
 |--------|-------|--------|
 | Sidecar `emit` handling | `permit_enforcement` CERT emission | `evidence/certs/<session>/<seq>.cert.json` |
-| Binding hook | `write_cert_with_binding` | `evidence/logs/sidecar.jsonl` (`evidence_v01_binding`) |
-| Platform services | evidence-service, replay-service | Out of v0.1 bundle scope unless explicitly packaged |
+| Binding hook | `write_cert_with_binding` (always on emit) | `evidence/logs/sidecar.jsonl` (`evidence_v01_binding`) |
+| Platform services | evidence-service, replay-service | Out of bundle scope unless explicitly packaged |
 
 ## Artifact binding
 
 Binding events record:
 
 - `session_id`, `cert_path`
-- Optional `evidence_bundle_ref` (from `EVIDENCE_BUNDLE_REF`)
 - `artifact_digests.cert-v1` (SHA-256 of the written CERT file)
+- Optional `evidence_bundle_ref` (only when `EVIDENCE_BUNDLE_REF` is set)
 
 CERT-V1 itself is **not modified**. Full v0.1 bundles are assembled separately via `pf evidence bundle pack`.
 
@@ -72,7 +72,7 @@ Binding JSONL alone is **not** validated by the bundle validator unless included
 
 - Invalid CERT: deny-wins via existing `validate_cert` (cert not written)
 - Binding write failure after cert write: cert remains; binding may be absent
-- Missing `external/CERT-V1` schema: sidecar panics at schema load (existing behavior)
+- Missing `external/CERT-V1` schema: validation and emit tests fail closed; run `make submodules`
 
 ## Tamper semantics
 

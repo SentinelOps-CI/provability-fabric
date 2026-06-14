@@ -1,10 +1,12 @@
 # Runtime evidence basic
 
-Sidecar-watcher emits CERT-V1 certificates and may append additive Evidence v0.1 binding records.
+Sidecar-watcher emits CERT-V1 certificates and **always** appends Evidence v0.1 binding records on the permit-enforcement emit path.
 
-## Emit path (v0.1)
+## Emit path (v0.2 scope)
 
-Binding events are written from the **permit enforcement** emit path only (`permit_enforcement.rs` → `write_cert_with_binding`). Other sidecar code paths do not emit Evidence v0.1 bindings in v0.1.
+Binding events are written from the **permit enforcement** emit path only (`permit_enforcement.rs` → `write_cert_with_binding`). This is the single production CERT write hook in `runtime/` (enforced by `scripts/check_cert_write_paths.sh` in CI). Other sidecar code paths do not emit CERT files in production.
+
+`evidence_bundle_ref` in the binding event is **optional** and populated only when `EVIDENCE_BUNDLE_REF` is set. The binding JSONL line is emitted regardless.
 
 ## Binding event
 
@@ -35,7 +37,7 @@ Run the static or live scenario:
 
 ```bash
 bash examples/runtime-evidence-basic/run_scenario.sh
-bash examples/runtime-evidence-basic/run_scenario.sh --live   # requires external/CERT-V1
+bash examples/runtime-evidence-basic/run_scenario.sh --live   # cargo test emit + binding (requires make submodules)
 ```
 
 ## CI requirements (live test)
