@@ -1,0 +1,35 @@
+name: Evidence v0.1 smoke
+
+on:
+  pull_request:
+    paths:
+      - 'specs/evidence/**'
+      - 'tests/evidence_schema/**'
+      - '.github/workflows/evidence-v01-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'specs/evidence/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidence-v01-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-schema-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install jsonschema pytest
+
+      - name: Pytest evidence schema
+        run: pytest tests/evidence_schema -q
