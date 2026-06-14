@@ -39,7 +39,7 @@ Last full local matrix (on `evidence-v01/onboarding-docs`, 2026-06-14): see [Fre
 | 15 stacked PRs opened and merged (#82–#96) | Complete |
 | Stack landed on `main` (#97) | Complete |
 | PR opener script removed | Complete |
-| CI on GitHub | Evidence smoke green on Linux CI (PR #110, 2026-06-14); other repo-wide checks may still fail |
+| CI on GitHub | Evidence smoke green on Linux CI (PR #110 stack tip; PR #111 `main` workflow_dispatch run 27512113090, 2026-06-14); other repo-wide checks may still fail |
 | Fresh-clone quickstart verified by independent reviewer | Complete (v0.2 matrix on `evidence-v02/integration`) |
 
 See [Evidence v0.2 integration](evidence-v0.2.md) and [Evidence v0.2 status](evidence-v0.2-status.md).

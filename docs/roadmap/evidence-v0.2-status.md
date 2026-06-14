@@ -14,7 +14,7 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 | Lane docs | compatibility matrix, `test_lane_separation.py` | `pytest tests/evidence_schema/test_lane_separation.py -q` |
 | Release docs | `docs/roadmap/evidence-v0.2.md`, CHANGELOG, mkdocs | `mkdocs build` |
 
-Last full Evidence smoke matrix (PR #110, Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`).
+Last full Evidence smoke matrix (Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`). Green baselines: PR #110 (stack tip CI) and PR #111 (`main` workflow_dispatch run [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090)).
 
 ## CI hardening (post-merge)
 
@@ -25,6 +25,7 @@ Last full Evidence smoke matrix (PR #110, Linux CI, 2026-06-14): all three jobs 
 | Bash for `pipefail` in init script | #108 | `make submodules` works on Ubuntu default shell |
 | Install KIT Python deps in smoke | #109 | Deep replay `--execute` has `requests` et al. |
 | Create testbed `out/` before replay report | #110 | `run_happy_path.sh` passes end-to-end |
+| Migrate workflows off `submodules: recursive` | #111 | Plain checkout + `make submodules`; grep confirms zero `submodules:` usages |
 
 ## Delivery
 
@@ -33,10 +34,10 @@ Last full Evidence smoke matrix (PR #110, Linux CI, 2026-06-14): all three jobs 
 | 7 stacked PRs opened and merged (#98–#104) | Complete |
 | Stack landed on `main` (#105) | Complete |
 | Evidence smoke green on Linux CI (#110) | Complete |
-| `main` post-#110 workflow_dispatch confirmation | Pending (Actions queue) |
+| `main` workflow_dispatch confirmation (#111, run 27512113090) | Complete |
 | Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Optional |
 
-See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done and [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 baseline.
+See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done, [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md) for stack and fresh-clone checklist, and [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 baseline.
 
 ## Known limitations
 
@@ -44,7 +45,7 @@ See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done and [Ev
 |------|--------|
 | Upstream tags `v1.0.0` not published | Pins use commit SHAs in `tools/standards/versions.json` |
 | Private `verifiable-ai-ci/*` repos | CI requires `STANDARDS_GITHUB_TOKEN` secret |
-| Other workflows using `submodules: recursive` | Being migrated to `make submodules` (no mathlib gitlink) |
+| Other workflows using `submodules: recursive` | Complete — removed in #111; use plain checkout + `make submodules` |
 | `mkdocs build --strict` | Pre-existing broken doc links (repo-wide, not Evidence-specific) |
 
 ## Out of scope (unchanged)

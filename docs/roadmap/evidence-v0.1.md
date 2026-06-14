@@ -44,8 +44,13 @@ Evidence v0.1 delivers a minimal, reusable, validated path for packaging, valida
 
 - `pf check-trace` only verifies that `bundles/` exists; it is not a traceability validator.
 - `replayStatusCmdNew()` exists but is not registered; `replay status` uses the legacy handler.
-- `tools/cert-validate/validate.py` previously exited 0 when the external CERT-V1 schema was missing; strict mode now fails closed unless `--allow-missing-schema` is passed.
-- Windows: some replay integration tests may skip when bash or external clones are unavailable.
+
+### Historical limitations (resolved in v0.2)
+
+- ~~`tools/cert-validate/validate.py` exited 0 when the external CERT-V1 schema was missing~~ — strict mode now fails closed unless `--allow-missing-schema` is passed; CI smoke requires CERT-V1 via `make submodules`.
+- ~~Manual external clone for CERT-V1 / KIT~~ — git submodules + `make dev-standards` (see [Evidence v0.2 status](evidence-v0.2-status.md)).
+- ~~CI skipped evidence checks without CERT-V1~~ — smoke job fails closed when standards are unavailable.
+- ~~Windows: replay integration tests skipped without bash or external clones~~ — use WSL/Git Bash + `make dev-standards`; testbed scripts run under bash in CI.
 
 ## VERSION vs tags
 
@@ -70,4 +75,4 @@ Recorded on Windows checkout at `65bee159035e38e7a8f907ce2773226eca1ea4f3` (clea
 
 ## Status
 
-See [Evidence v0.1 status](evidence-v0.1-status.md) for the completion checklist.
+See [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 completion checklist and [Evidence v0.2 status](evidence-v0.2-status.md) for current CI and delivery state.
