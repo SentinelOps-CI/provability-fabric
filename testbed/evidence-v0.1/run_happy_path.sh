@@ -9,6 +9,7 @@ if [[ ! -x "$PF" ]]; then
   (cd "$ROOT/core/cli/pf" && go build -o pf .)
 fi
 
-"$PF" evidence validate "$BUNDLE" --strict
-"$PF" evidence replay --bundle "$BUNDLE" --out "$ROOT/testbed/evidence-v0.1/out/replay-report.json"
+"$PF" evidence validate "$BUNDLE" --strict --base-dir "$ROOT/specs/evidence/v0.1/examples/valid"
+mkdir -p "$ROOT/testbed/evidence-v0.1/out"
+"$PF" evidence replay --bundle "$BUNDLE" --base-dir "$ROOT/specs/evidence/v0.1/examples/valid" --out "$ROOT/testbed/evidence-v0.1/out/replay-report.json"
 echo "evidence-v0.1 happy path OK"
