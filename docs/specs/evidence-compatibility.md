@@ -13,6 +13,7 @@ Evidence v0.1 is a distinct JSON bundle lane. This matrix maps existing platform
 
 | Platform artifact | v0.1 mapping | Notes |
 |-------------------|--------------|-------|
+| KIT `trace.json` (steps or events) | Import via `pf evidence trace import --kit-trace … --out execution-trace.json` | Produces v0.1 `execution-trace` artifact |
 | Trace JSON / replay bundle | `execution-trace` role artifact | Referenced by digest; replay CLI checks trace self-digest |
 | `so trace run` | Unchanged | v0.1 replay wraps bundle checks only |
 

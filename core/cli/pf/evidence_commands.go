@@ -15,12 +15,46 @@ import (
 func evidenceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evidence",
-		Short: "Evidence v0.1 bundle pack, validate, and replay",
+		Short: "Evidence v0.1 bundle pack, validate, trace import, and replay",
 		Long:  "Pack, validate, and replay Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
 	}
 	cmd.AddCommand(evidenceBundleCmd())
 	cmd.AddCommand(evidenceValidateCmd())
+	cmd.AddCommand(evidenceTraceCmd())
 	cmd.AddCommand(evidenceReplayCmd())
+	return cmd
+}
+
+func evidenceTraceCmd() *cobra.Command {
+	var kitPath, outPath, traceID string
+	cmd := &cobra.Command{
+		Use:   "trace",
+		Short: "Execution trace operations",
+	}
+	importCmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import TRACE-REPLAY-KIT trace JSON into v0.1 execution-trace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if kitPath == "" || outPath == "" {
+				return fmt.Errorf("--kit-trace and --out are required")
+			}
+			trace, err := evidence.ImportKITTrace(kitPath, traceID)
+			if err != nil {
+				return err
+			}
+			if err := evidence.WriteExecutionTrace(outPath, trace); err != nil {
+				return err
+			}
+			fmt.Printf("Wrote execution trace %s (digest %s)\n", outPath, trace.TraceDigest)
+			return nil
+		},
+	}
+	importCmd.Flags().StringVar(&kitPath, "kit-trace", "", "Path to TRACE-REPLAY-KIT trace.json")
+	importCmd.Flags().StringVar(&outPath, "out", "", "Output execution-trace.json path")
+	importCmd.Flags().StringVar(&traceID, "trace-id", "", "Optional trace_id (default from kit name)")
+	_ = importCmd.MarkFlagRequired("kit-trace")
+	_ = importCmd.MarkFlagRequired("out")
+	cmd.AddCommand(importCmd)
 	return cmd
 }
 
