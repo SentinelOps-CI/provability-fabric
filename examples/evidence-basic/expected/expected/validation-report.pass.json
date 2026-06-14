@@ -1,0 +1,8 @@
+{
+  "report_id": "report-golden-pass",
+  "bundle_ref": "examples/evidence-basic/basic-evidence-bundle.json",
+  "status": "pass",
+  "errors": [],
+  "warnings": [],
+  "validated_at": "2025-06-01T12:00:00Z"
+}
