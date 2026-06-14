@@ -27,6 +27,10 @@ All top-level artifacts include `schema_version: "0.1"`. Artifact references use
 { "role": "...", "path": "...", "media_type": "...", "digest": "sha256:<hex>" }
 ```
 
+## Tests
+
+Bundle pack and digest coverage lives in Go (`core/evidence/bundle_test.go`, run `go test ./...` in that module). `tests/evidence_bundle/test_bundle_pack.py` is a thin pytest shim so pack tests appear in the Evidence test suite without duplicating Go logic.
+
 ## Related docs
 
 - [Evidence model v0.1](../../docs/specs/evidence-model-v0.1.md)
