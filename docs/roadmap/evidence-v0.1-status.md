@@ -1,6 +1,6 @@
 # Evidence v0.1 status
 
-Honest completion tracker for the Evidence v0.1 workstream. Distinguishes **implementation on branches** from **delivery to `main`**.
+Completion tracker for the Evidence v0.1 workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #82–#97).
 
 ## Implementation (branch stack)
 
@@ -32,17 +32,17 @@ Last full local matrix (on `evidence-v01/onboarding-docs`, 2026-06-14): see [Fre
 | PR4/6/14 progressive CI smoke | Addressed — schema-only → validator → full + sidecar step |
 | PR15 delivery docs + script hygiene | Addressed — checklist, status update, post-merge script note |
 
-## Delivery (not complete until merged)
+## Delivery
 
 | Gate | Status |
 |------|--------|
-| 15 stacked PRs opened on GitHub | Pending — requires `gh auth login` |
-| CI green on each PR | Pending — runs after PRs exist |
-| Review + merge 1→15 to `main` | Pending |
-| Fresh-clone quickstart verified by reviewer | Pending |
-| Private delivery tracker (outside repo) | Maintainer responsibility |
+| 15 stacked PRs opened and merged (#82–#96) | Complete |
+| Stack landed on `main` (#97) | Complete |
+| PR opener script removed | Complete |
+| CI on GitHub | Partial — many repo-wide checks fail on docs-only PRs; Evidence smoke passed from PR #85 onward |
+| Fresh-clone quickstart verified by independent reviewer | Pending |
 
-See [Evidence v0.1 delivery](evidence-v0.1-delivery.md) for merge order and PR compare links.
+See [Evidence v0.1 delivery](evidence-v0.1-delivery.md) for historical merge order.
 
 ## Known limitations (v0.1 by design)
 
