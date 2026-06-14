@@ -16,7 +16,10 @@ func evidenceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evidence",
 		Short: "Evidence v0.1/v0.2 bundle pack, validate, trace import, and replay",
-		Long:  "Pack, validate, and replay Evidence v0.1/v0.2 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
+		Long: `Pack, validate, and replay Evidence JSON bundles.
+
+Evidence bundles are distinct from PCS EvidenceBundle.v0 (see pf verify science-claim)
+and from so bundle pack tar archives (see pf bundle pack).`,
 	}
 	cmd.AddCommand(evidenceBundleCmd())
 	cmd.AddCommand(evidenceValidateCmd())
