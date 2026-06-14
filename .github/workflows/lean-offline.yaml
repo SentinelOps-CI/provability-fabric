@@ -26,8 +26,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Full history for git operations
-          submodules: recursive # Include vendor/mathlib
+          fetch-depth: 0
+
+      - name: Vendor mathlib
+        run: make vendor-mathlib
 
       - name: Set up Lean
         run: |

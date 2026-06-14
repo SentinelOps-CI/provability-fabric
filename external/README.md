@@ -11,10 +11,20 @@ Pinned standards live under `external/` as git submodules. Tags are locked in
 ## Fresh clone
 
 ```bash
-git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric.git
+git clone https://github.com/SentinelOps-CI/provability-fabric.git
 cd provability-fabric
 make dev-standards
 ```
+
+`make submodules` runs [`scripts/init_external_standards.sh`](../scripts/init_external_standards.sh),
+which checks out pinned commits from [`tools/standards/versions.json`](../tools/standards/versions.json).
+
+### CI and private upstream repos
+
+`verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT` are private. GitHub Actions
+must set repository secret **`STANDARDS_GITHUB_TOKEN`**: a fine-grained or classic PAT with
+`repo` read access to those repositories. The Evidence smoke workflow passes this secret to
+`make submodules`.
 
 If you already cloned without submodules:
 
