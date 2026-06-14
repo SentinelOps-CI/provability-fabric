@@ -10,13 +10,20 @@ on:
       - 'runtime/sidecar-watcher/src/evidence_v01.rs'
       - 'runtime/sidecar-watcher/src/cert_v1.rs'
       - 'runtime/sidecar-watcher/src/permit_enforcement.rs'
+      - 'runtime/sidecar-watcher/tests/emit_evidence_tests.rs'
       - 'testbed/evidence-v0.1/**'
+      - 'testbed/evidence-v0.2/**'
       - 'tests/evidence_**/**'
       - 'tests/e2e/test_evidence_bundle_basic.py'
       - 'tests/runtime_evidence/**'
       - 'tests/forensic_replay/**'
-      - 'tests/testbed/test_evidence_v01_testbed.py'
+      - 'tests/testbed/**'
       - 'tools/cert-validate/validate.py'
+      - 'tools/standards/**'
+      - 'external/**'
+      - '.gitmodules'
+      - 'Makefile'
+      - 'scripts/check_cert_write_paths.sh'
       - '.github/workflows/evidence-v01-smoke.yml'
   push:
     branches: [main]
@@ -79,6 +86,8 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: dtolnay/rust-toolchain@stable
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
@@ -89,6 +98,19 @@ jobs:
 
       - name: Install Python deps
         run: pip install jsonschema pytest
+
+      - name: Init external standards
+        run: make submodules
+
+      - name: Standards pin check
+        run: make standards-pin-check
+
+      - name: Require CERT-V1 schema
+        run: |
+          test -f external/CERT-V1/schema/cert-v1.schema.json
+
+      - name: CERT write path guard
+        run: bash scripts/check_cert_write_paths.sh
 
       - name: Go tests (core/evidence)
         run: go test ./...
@@ -110,6 +132,7 @@ jobs:
           pytest tests/evidence_schema -q
           pytest tests/evidence_validation -q
           pytest tests/evidence_replay -q
+          pytest tests/evidence_trace -q
           pytest tests/e2e/test_evidence_bundle_basic.py -q
           pytest tests/runtime_evidence -q
           pytest tests/forensic_replay -q
@@ -120,13 +143,13 @@ jobs:
       - name: Testbed tamper case
         run: bash testbed/evidence-v0.1/run_tamper_case.sh
 
-      - name: Pytest testbed wrapper
-        run: pytest tests/testbed/test_evidence_v01_testbed.py -q
+      - name: Testbed v0.2 deep replay (static)
+        run: bash testbed/evidence-v0.2/run_deep_replay.sh
 
-      - name: Runtime sidecar binding (Linux + CERT-V1)
-        run: |
-          if [ -f external/CERT-V1/schema/cert-v1.schema.json ]; then
-            pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q
-          else
-            echo "CERT-V1 schema missing; skipping live sidecar test"
-          fi
+      - name: Pytest testbed wrapper
+        run: pytest tests/testbed -q
+
+      - name: Runtime sidecar emit (Linux + CERT-V1 required)
+        env:
+          CI: true
+        run: pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q

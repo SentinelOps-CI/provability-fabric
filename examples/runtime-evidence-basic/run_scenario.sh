@@ -36,4 +36,5 @@ if [[ ! -f "$SCHEMA" ]]; then
 fi
 
 cargo test -p sidecar-watcher write_cert_with_binding_emits_binding_jsonl -- --nocapture
+cargo test -p sidecar-watcher emit_evidence_binding_through_permit_enforcement -- --nocapture
 echo "Live scenario complete."

@@ -74,7 +74,8 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		return report, fmt.Errorf("invalid bundle JSON: %w", err)
 	}
 
-	schemaPath := filepath.Join(opts.RepoRoot, "specs", "evidence", "v0.1", "schemas", "evidence-bundle.schema.json")
+	schemaDir := filepath.Join(opts.RepoRoot, "specs", "evidence", schemaVersionDir(bundle.SchemaVersion), "schemas")
+	schemaPath := filepath.Join(schemaDir, "evidence-bundle.schema.json")
 	if err := validateAgainstSchema(schemaPath, data); err != nil {
 		report.Status = "fail"
 		report.Errors = append(report.Errors, err.Error())
@@ -83,11 +84,19 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		}
 	}
 
-	if bundle.SchemaVersion != SchemaVersion {
+	if bundle.SchemaVersion != SchemaVersion && bundle.SchemaVersion != SchemaVersionV02 {
 		err := fmt.Errorf("unsupported schema_version %q", bundle.SchemaVersion)
 		report.Status = "fail"
 		report.Errors = append(report.Errors, err.Error())
 		if opts.Strict {
+			return report, err
+		}
+	}
+
+	if opts.Strict && bundle.ReplayContext != nil {
+		if err := validateReplayContext(opts.BaseDir, bundle.ReplayContext); err != nil {
+			report.Status = "fail"
+			report.Errors = append(report.Errors, err.Error())
 			return report, err
 		}
 	}
@@ -138,7 +147,7 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		}
 
 		if opts.Strict {
-			if err := validateRoleArtifact(opts.RepoRoot, ref.Role, artifactPath); err != nil {
+			if err := validateRoleArtifact(opts.RepoRoot, bundle.SchemaVersion, ref.Role, artifactPath); err != nil {
 				report.Status = "fail"
 				report.Errors = append(report.Errors, err.Error())
 				return report, err
@@ -152,7 +161,7 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 	return report, nil
 }
 
-func validateRoleArtifact(repoRoot, role, artifactPath string) error {
+func validateRoleArtifact(repoRoot, schemaVersion, role, artifactPath string) error {
 	schemaName, ok := roleSchemaName(role)
 	if !ok {
 		return nil
@@ -161,8 +170,34 @@ func validateRoleArtifact(repoRoot, role, artifactPath string) error {
 	if err != nil {
 		return err
 	}
+	// Role artifact schemas are shared across v0.1 and v0.2 bundle versions.
 	schemaPath := filepath.Join(repoRoot, "specs", "evidence", "v0.1", "schemas", schemaName)
 	return validateAgainstSchema(schemaPath, body)
+}
+
+func schemaVersionDir(version string) string {
+	if version == SchemaVersionV02 {
+		return "v0.2"
+	}
+	return "v0.1"
+}
+
+func validateReplayContext(baseDir string, ctx *ReplayContext) error {
+	if ctx.KitTracePath != "" {
+		p := filepath.Join(baseDir, filepath.FromSlash(ctx.KitTracePath))
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("replay_context.kit_trace_path missing: %w", err)
+		}
+	}
+	if ctx.FixturesPath != "" {
+		p := filepath.Join(baseDir, filepath.FromSlash(ctx.FixturesPath))
+		if st, err := os.Stat(p); err != nil {
+			return fmt.Errorf("replay_context.fixtures_path missing: %w", err)
+		} else if !st.IsDir() {
+			return fmt.Errorf("replay_context.fixtures_path is not a directory: %s", ctx.FixturesPath)
+		}
+	}
+	return nil
 }
 
 func roleSchemaName(role string) (string, bool) {

@@ -15,6 +15,9 @@ import (
 
 const SchemaVersion = "0.1"
 
+// SchemaVersionV02 is the opt-in v0.2 bundle schema version.
+const SchemaVersionV02 = "0.2"
+
 // DigestPrefix is the required digest prefix for v0.1 artifacts.
 const DigestPrefix = "sha256:"
 

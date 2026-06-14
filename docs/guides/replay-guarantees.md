@@ -2,85 +2,73 @@
 
 ## Replay model
 
-`pf evidence replay` consumes an Evidence v0.1 bundle, runs strict validation, and verifies execution-trace self-consistency. It is a **bundle-level audit step**, not a full TRACE-REPLAY-KIT or SWE-bench re-execution.
+`pf evidence replay` consumes an Evidence v0.1 or v0.2 bundle, runs strict validation, and verifies execution-trace self-consistency. With `--execute`, it also runs TRACE-REPLAY-KIT (`runner/replay_run.py`) using v0.2 `replay_context` or inferred fixture paths.
+
+## Modes
+
+| Mode | Flags | Guarantees |
+|------|-------|------------|
+| Static (default) | none | Schema, digests, `trace_digest`, optional `replay_context` path checks |
+| Execute | `--execute` | Static checks plus KIT run exit code |
+| Low-view | `--execute --low-view` | Two KIT runs + `oracles/lowview_equal.py` determinism check |
+
+v0.1 bundles without `replay_context` continue to work in static mode only.
 
 ## Replayable claims
 
 A bundle replay **may** establish:
 
-- Bundle manifest schema conformance
+- Bundle manifest schema conformance (v0.1 or v0.2)
 - Artifact presence and byte-level digests
 - `bundle_digest` integrity
 - `trace_digest` self-consistency when an `execution-trace` artifact is present
+- With `--execute`: KIT runner completed with exit code 0 for resolved trace/fixtures
+- With `--low-view`: low-view oracle pass between two KIT outputs
 
 ## Non-replayable claims
 
 Replay **does not** establish:
 
-- End-to-end system determinism
-- External API or model behavior reproducibility
-- CERT signature validity (use CERT tooling)
+- CERT DSSE signature validity (use CERT tooling)
 - PCS science-claim admission
 - Policy or proof correctness
+- Morph environment reproducibility
+- PCS or spec-tar lane compatibility
 
 ## Determinism assumptions
 
 - Canonical JSON digest rules in [`core/evidence/digest.go`](../../core/evidence/digest.go) are stable for a given input object
 - Trace files on disk are unchanged between pack and replay
+- KIT Python dependencies match `external/TRACE-REPLAY-KIT/runner/requirements.txt`
 - Clock fields in reports (`replayed_at`) are not used for pass/fail
 
 ## External dependency assumptions
 
-- `specs/evidence/v0.1/schemas/` present in the repository checkout
-- Artifact paths resolve relative to bundle base directory
-- TRACE-REPLAY-KIT is **not** invoked; traces are validated structurally only
+- `specs/evidence/v0.1/schemas/` (and v0.2 bundle schema when applicable) present in checkout
+- `make submodules` for `--execute` / `--low-view`
+- Artifact paths resolve relative to bundle base directory (`--base-dir`)
 
-## Input and fixture requirements
-
-- Valid v0.1 bundle JSON
-- For trace checks: one or more `execution-trace` role artifacts with valid `trace_digest`
-- Strict mode requires all referenced artifact files to exist
-
-## Report structure
-
-Replay emits JSON with:
+## Report structure (v0.2 fields)
 
 | Field | Meaning |
 |-------|---------|
-| `report_id` | Unique replay run identifier |
-| `bundle_ref` | Input bundle path |
-| `status` | `pass` or `fail` |
+| `status` | Overall `pass` or `fail` |
+| `static_status` | Static validation + trace digest phase |
+| `execute_status` | KIT run result when `--execute` |
+| `kit_exit_code` | Process exit code from KIT runner |
+| `low_view_result` | Low-view oracle result when requested |
 | `trace_found` | Whether an execution-trace artifact was present |
-| `errors` | Machine-readable failure reasons |
-| `warnings` | Non-fatal conditions (e.g. no trace artifact) |
-| `replayed_at` | RFC3339 timestamp |
+| `errors` / `warnings` | Machine-readable messages |
 
 ## Failure interpretation
 
 | Failure | Meaning |
 |---------|---------|
-| Validation errors | Bundle schema, digest, or missing artifact |
-| `trace_digest mismatch` | Trace JSON was tampered after digest computation |
-| `no execution-trace artifact` | Warning only; partial replay preconditions |
+| Static fail | Fix bundle, artifacts, or digests before execute |
+| Execute fail | KIT trace/fixtures mismatch or runner error |
+| Low-view fail | Non-deterministic outputs between two runs |
 
-A replay failure means **the bundle or trace failed v0.1 checks**, not necessarily that the original runtime execution was incorrect.
+## Related commands
 
-## Relation to runtime evidence
-
-Runtime `evidence_v01_binding` events link certs to optional bundle refs. Replay does not read binding JSONL directly; package binding outputs into bundles first.
-
-## Relation to Evidence v0.1 bundles
-
-Replay operates only on v0.1 bundle manifests. It does not consume PCS `EvidenceBundle.v0` or `so bundle pack` tar archives.
-
-## Known limitations
-
-- Does not call `so trace run`
-- Does not re-run SWE-bench instances
-- Warnings when no trace artifact is present still yield `pass` if validation succeeds
-
-## Related
-
-- [Forensic replay basic](forensic-replay-basic.md)
-- [Evidence replay tests](../../tests/evidence_replay/test_evidence_replay.py)
-- [Evidence model v0.1](../specs/evidence-model-v0.1.md)
+- `pf evidence trace import` — convert KIT trace JSON to v0.1 execution-trace artifact
+- `so trace run` — direct KIT invocation without Evidence bundle coupling

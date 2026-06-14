@@ -8,14 +8,22 @@ use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
-static CERT_SCHEMA: Lazy<Value> = Lazy::new(|| {
-    // Load the CERT-V1 schema from the submodule path at runtime
+static CERT_SCHEMA: Lazy<Option<Value>> = Lazy::new(|| {
     let schema_path = std::env::var("CERT_V1_SCHEMA")
         .unwrap_or_else(|_| "external/CERT-V1/schema/cert-v1.schema.json".to_string());
-    let data = std::fs::read_to_string(&schema_path)
-        .unwrap_or_else(|e| panic!("Failed to read CERT-V1 schema {}: {}", schema_path, e));
-    serde_json::from_str(&data).expect("Invalid CERT-V1 schema JSON")
+    match std::fs::read_to_string(&schema_path) {
+        Ok(data) => serde_json::from_str(&data).ok(),
+        Err(_) => None,
+    }
 });
+
+fn cert_schema() -> Result<&'static Value> {
+    CERT_SCHEMA.as_ref().ok_or_else(|| {
+        anyhow!(
+            "CERT-V1 schema not available (clone with make submodules or set CERT_V1_SCHEMA)"
+        )
+    })
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CertV1 {
@@ -46,7 +54,7 @@ pub struct MorphInfo {
 }
 
 pub fn validate_cert(cert: &CertV1) -> Result<()> {
-    let compiled = jsonschema::JSONSchema::compile(&CERT_SCHEMA)?;
+    let compiled = jsonschema::JSONSchema::compile(cert_schema()?)?;
     let data = serde_json::to_value(cert)?;
     let result = compiled.validate(&data);
     if let Err(errors) = result {

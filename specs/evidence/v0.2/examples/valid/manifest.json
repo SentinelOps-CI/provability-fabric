@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.2",
+  "bundle_id": "deep-replay-bundle",
+  "producer": "pf-evidence/v0.2",
+  "created_at": "2025-06-14T12:00:00Z",
+  "replay_context": {
+    "kit_trace_path": "kit/trace.json",
+    "fixtures_path": "kit/fixtures",
+    "low_view_oracle": true
+  },
+  "artifacts": [
+    { "role": "claim", "path": "artifacts/claim.json" },
+    { "role": "proof", "path": "artifacts/proof.json" },
+    { "role": "attestation", "path": "artifacts/attestation.json" },
+    { "role": "execution-trace", "path": "artifacts/execution-trace.json" }
+  ]
+}

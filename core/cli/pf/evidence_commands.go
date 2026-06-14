@@ -15,12 +15,49 @@ import (
 func evidenceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "evidence",
-		Short: "Evidence v0.1 bundle pack, validate, and replay",
-		Long:  "Pack, validate, and replay Evidence v0.1 JSON bundles (distinct from PCS EvidenceBundle.v0 and so bundle pack tar archives).",
+		Short: "Evidence v0.1/v0.2 bundle pack, validate, trace import, and replay",
+		Long: `Pack, validate, and replay Evidence JSON bundles.
+
+Evidence bundles are distinct from PCS EvidenceBundle.v0 (see pf verify science-claim)
+and from so bundle pack tar archives (see pf bundle pack).`,
 	}
 	cmd.AddCommand(evidenceBundleCmd())
 	cmd.AddCommand(evidenceValidateCmd())
+	cmd.AddCommand(evidenceTraceCmd())
 	cmd.AddCommand(evidenceReplayCmd())
+	return cmd
+}
+
+func evidenceTraceCmd() *cobra.Command {
+	var kitPath, outPath, traceID string
+	cmd := &cobra.Command{
+		Use:   "trace",
+		Short: "Execution trace operations",
+	}
+	importCmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import TRACE-REPLAY-KIT trace JSON into v0.1 execution-trace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if kitPath == "" || outPath == "" {
+				return fmt.Errorf("--kit-trace and --out are required")
+			}
+			trace, err := evidence.ImportKITTrace(kitPath, traceID)
+			if err != nil {
+				return err
+			}
+			if err := evidence.WriteExecutionTrace(outPath, trace); err != nil {
+				return err
+			}
+			fmt.Printf("Wrote execution trace %s (digest %s)\n", outPath, trace.TraceDigest)
+			return nil
+		},
+	}
+	importCmd.Flags().StringVar(&kitPath, "kit-trace", "", "Path to TRACE-REPLAY-KIT trace.json")
+	importCmd.Flags().StringVar(&outPath, "out", "", "Output execution-trace.json path")
+	importCmd.Flags().StringVar(&traceID, "trace-id", "", "Optional trace_id (default from kit name)")
+	_ = importCmd.MarkFlagRequired("kit-trace")
+	_ = importCmd.MarkFlagRequired("out")
+	cmd.AddCommand(importCmd)
 	return cmd
 }
 
@@ -30,11 +67,11 @@ func evidenceBundleCmd() *cobra.Command {
 
 	bundle := &cobra.Command{
 		Use:   "bundle",
-		Short: "Evidence v0.1 bundle operations",
+		Short: "Evidence v0.1/v0.2 bundle operations",
 	}
 	pack := &cobra.Command{
 		Use:   "pack",
-		Short: "Pack an Evidence v0.1 bundle from a manifest",
+		Short: "Pack an Evidence bundle from a manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if manifestPath == "" || outPath == "" {
 				return fmt.Errorf("--manifest and --out are required")
@@ -72,7 +109,7 @@ func evidenceValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate [bundle]",
-		Short: "Validate an Evidence v0.1 bundle",
+		Short: "Validate an Evidence v0.1 or v0.2 bundle",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
@@ -114,27 +151,37 @@ func evidenceValidateCmd() *cobra.Command {
 }
 
 func evidenceReplayCmd() *cobra.Command {
-	var outPath string
-	var jsonOut bool
+	var bundlePath, outPath, fixturesDir, outDir, baseDir string
+	var jsonOut, execute, lowView bool
 
 	cmd := &cobra.Command{
 		Use:   "replay",
-		Short: "Verify replay preconditions for an Evidence v0.1 bundle",
+		Short: "Verify replay preconditions and optionally execute KIT replay",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			bundlePath, _ := cmd.Flags().GetString("bundle")
 			if bundlePath == "" {
 				return fmt.Errorf("--bundle is required")
 			}
 			report, err := evidence.ReplayBundle(evidence.ReplayOptions{
-				BundlePath: bundlePath,
-				OutPath:    outPath,
+				BundlePath:     bundlePath,
+				OutPath:        outPath,
+				BaseDir:        baseDir,
+				Execute:        execute,
+				FixturesDir:    fixturesDir,
+				OutDir:         outDir,
+				LowViewCompare: lowView,
 			})
 			if jsonOut {
 				enc := json.NewEncoder(os.Stdout)
 				enc.SetIndent("", "  ")
 				_ = enc.Encode(report)
 			} else {
-				fmt.Printf("status: %s trace_found=%v\n", report.Status, report.TraceFound)
+				fmt.Printf("status: %s static=%s trace_found=%v\n", report.Status, report.StaticStatus, report.TraceFound)
+				if report.ExecuteStatus != "" {
+					fmt.Printf("execute: %s\n", report.ExecuteStatus)
+				}
+				if report.LowViewResult != "" {
+					fmt.Printf("low_view: %s\n", report.LowViewResult)
+				}
 				for _, msg := range report.Errors {
 					fmt.Printf("error: %s\n", msg)
 				}
@@ -142,9 +189,14 @@ func evidenceReplayCmd() *cobra.Command {
 			return err
 		},
 	}
-	cmd.Flags().String("bundle", "", "Path to Evidence v0.1 bundle JSON")
+	cmd.Flags().StringVar(&bundlePath, "bundle", "", "Path to Evidence bundle JSON")
 	_ = cmd.MarkFlagRequired("bundle")
 	cmd.Flags().StringVar(&outPath, "out", "", "Write replay report JSON")
+	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Directory containing bundle artifacts")
+	cmd.Flags().StringVar(&fixturesDir, "fixtures", "", "Fixtures directory for --execute")
+	cmd.Flags().StringVar(&outDir, "out-dir", "", "Output directory for KIT replay artifacts")
+	cmd.Flags().BoolVar(&execute, "execute", false, "Run TRACE-REPLAY-KIT after static checks")
+	cmd.Flags().BoolVar(&lowView, "low-view", false, "Compare low-view outputs after execute")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit replay report JSON to stdout")
 	return cmd
 }

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.org/schemas/evidence/v0.2/evidence-bundle.schema.json",
+  "title": "EvidenceBundleV02",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bundle_id", "schema_version", "artifacts", "bundle_digest", "created_at", "producer"],
+  "properties": {
+    "bundle_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "const": "0.2" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "producer": { "type": "string", "minLength": 1 },
+    "replay_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kit_trace_path": { "type": "string", "minLength": 1 },
+        "fixtures_path": { "type": "string", "minLength": 1 },
+        "low_view_oracle": { "type": "boolean" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/artifact_ref" }
+    },
+    "bundle_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "media_type", "digest"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

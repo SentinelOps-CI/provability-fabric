@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Evidence v0.2:** Git submodules for CERT-V1 and TRACE-REPLAY-KIT (`make submodules`, `make standards-pin-check`, `make dev-standards`), `pf evidence trace import`, v0.2 bundle schema with optional `replay_context`, `pf evidence replay --execute` / `--low-view` via KIT runner, v0.2 fixtures and testbed, emit E2E integration test, lane-separation docs/tests, and roadmap at `docs/roadmap/evidence-v0.2.md`.
+
 - **Evidence v0.1:** JSON Schema artifacts under `specs/evidence/v0.1/`, public specification
   docs, valid/invalid fixtures, and compatibility matrix separating v0.1 from PCS
   `EvidenceBundle.v0` and `so bundle pack` tar archives. New CLI namespace

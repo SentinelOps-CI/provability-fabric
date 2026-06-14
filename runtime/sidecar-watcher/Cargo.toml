@@ -57,5 +57,9 @@ path = "tests/break_glass_mechanism.rs"
 name = "dfa_equiv"
 path = "tests/dfa_equiv.rs"
 
+[[test]]
+name = "emit_evidence_tests"
+path = "tests/emit_evidence_tests.rs"
+
 # Unregistered sources under tests/ (events_plan_dsl, ni_monitor_egress, etc.) are quarantined
 # until updated for the current public API. See tests/README.md.
