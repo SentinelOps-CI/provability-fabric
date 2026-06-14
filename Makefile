@@ -10,7 +10,7 @@ dev-up:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards
+.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify
 
 # ---------- Cross-platform helpers ----------
 # Seconds to wait after starting containers (override with: make demo-up WAIT=10)
@@ -58,6 +58,7 @@ help:
 	@$(ECHOOK) "  make submodules      - Init/update external standards submodules"
 	@$(ECHOOK) "  make standards-pin-check - Verify submodule tags match versions.json"
 	@$(ECHOOK) "  make dev-standards   - submodules + standards-pin-check"
+	@$(ECHOOK) "  make evidence-verify - Evidence v0.1/v0.2 local gate (Linux/WSL/Git Bash)"
 	@$(ECHOOK) "  make lint            - Run linting on all code"
 	@$(ECHOOK) ""
 
@@ -73,6 +74,15 @@ standards-pin-check:
 
 dev-standards: submodules standards-pin-check
 	@$(ECHOOK) "External standards ready for local development"
+
+evidence-verify: dev-standards
+	@$(ECHOOK) "Running Evidence v0.1/v0.2 verification..."
+	cd core/evidence && go test ./...
+	pytest tests/evidence_schema tests/evidence_validation tests/evidence_replay \
+		tests/evidence_trace tests/runtime_evidence tests/testbed -q
+	bash testbed/evidence-v0.1/run_happy_path.sh
+	bash testbed/evidence-v0.2/run_deep_replay.sh
+	@$(ECHOOK) "Evidence verification passed"
 
 # ---------- Development ----------
 dev:
