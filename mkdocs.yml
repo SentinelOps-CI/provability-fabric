@@ -116,6 +116,19 @@ nav:
   - Evidence:
       - Overview: evidence/overview.md
       - Replay: evidence/replay.md
+      - Evidence v0.1:
+          - Roadmap: roadmap/evidence-v0.1.md
+          - Status: roadmap/evidence-v0.1-status.md
+          - Quickstart: guides/evidence-v0.1-quickstart.md
+          - Model: specs/evidence-model-v0.1.md
+          - Bundle format: specs/evidence-bundle-v0.1.md
+          - Compatibility: specs/evidence-compatibility.md
+          - Walkthrough: guides/evidence-bundle-walkthrough.md
+          - Runtime basic: guides/runtime-evidence-basic.md
+          - Runtime boundaries: guides/runtime-evidence-boundaries.md
+          - Replay guarantees: guides/replay-guarantees.md
+          - Forensic replay: guides/forensic-replay-basic.md
+          - Changelog: CHANGELOG.md
   - Roadmap:
       - Evidence v0.1: roadmap/evidence-v0.1.md
   - Security:

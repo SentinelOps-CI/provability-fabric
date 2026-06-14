@@ -80,3 +80,92 @@ pub fn write_cert(cert: &CertV1, session: &str, seq: u64) -> Result<String> {
 
     Ok(path)
 }
+
+/// Write CERT and optional Evidence v0.1 binding (additive JSONL event).
+pub fn write_cert_with_binding(cert: &CertV1, session: &str, seq: u64, bundle_ref: Option<&str>) -> Result<String> {
+    let path = write_cert(cert, session, seq)?;
+    let mut binding = crate::evidence_v01::EvidenceV01Binding::new(session, &path);
+    if let Some(ref_id) = bundle_ref {
+        binding = binding.with_bundle_ref(ref_id);
+    }
+    if let Ok(digest) = digest_cert_file(&path) {
+        binding = binding.with_artifact_digest("cert-v1", digest);
+    }
+    crate::evidence_v01::write_evidence_binding(&binding)?;
+    Ok(path)
+}
+
+fn digest_cert_file(path: &str) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)?;
+    let sum = Sha256::digest(&buf);
+    Ok(format!("sha256:{:x}", sum))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::{BufRead, BufReader};
+    use std::path::{Path, PathBuf};
+
+    fn cert_schema_available() -> bool {
+        Path::new("external/CERT-V1/schema/cert-v1.schema.json").exists()
+    }
+
+    fn sample_cert() -> CertV1 {
+        CertV1 {
+            bundle_id: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            policy_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+            proof_hash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            automata_hash: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string(),
+            labeler_hash: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string(),
+            ni_monitor: "accept".to_string(),
+            permit_decision: "accept".to_string(),
+            path_witness_ok: true,
+            label_derivation_ok: true,
+            epoch: 1,
+            sidecar_build: "test@1.0".to_string(),
+            egress_profile: "EGRESS-DET-P1@1.0".to_string(),
+            morph: None,
+            sig: "unconfigured".to_string(),
+        }
+    }
+
+    #[test]
+    fn write_cert_with_binding_emits_binding_jsonl() {
+        if !cert_schema_available() {
+            eprintln!("skip: CERT-V1 schema missing");
+            return;
+        }
+
+        let tmp = tempfile::TempDir::new().expect("tempdir");
+        std::env::set_current_dir(tmp.path()).expect("chdir");
+
+        let cert = sample_cert();
+        let bundle_ref = "examples/runtime-evidence-basic/basic-evidence-bundle.json";
+        let path = write_cert_with_binding(&cert, "runtime-demo-001", 1, Some(bundle_ref))
+            .expect("write cert with binding");
+        assert!(Path::new(&path).is_file(), "cert file written");
+
+        let log_path = PathBuf::from("evidence/logs/sidecar.jsonl");
+        assert!(log_path.is_file(), "expected sidecar.jsonl");
+
+        let file = fs::File::open(&log_path).expect("open log");
+        let lines: Vec<String> = BufReader::new(file)
+            .lines()
+            .map(|l| l.expect("read line"))
+            .collect();
+        assert!(lines.len() >= 2, "expected cert line and binding line");
+
+        let binding_line = lines.last().expect("binding line");
+        let parsed: crate::evidence_v01::EvidenceV01Binding =
+            serde_json::from_str(binding_line).expect("binding JSONL");
+        assert_eq!(parsed.event_type, "evidence_v01_binding");
+        assert_eq!(parsed.evidence_bundle_ref.as_deref(), Some(bundle_ref));
+        assert!(parsed.artifact_digests.contains_key("cert-v1"));
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.org/schemas/evidence/v0.1/validation-report.schema.json",
+  "title": "EvidenceValidationReportV01",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_id", "bundle_ref", "status", "errors", "warnings", "validated_at"],
+  "properties": {
+    "report_id": { "type": "string", "minLength": 1 },
+    "bundle_ref": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pass", "fail"] },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "validated_at": { "type": "string", "format": "date-time" }
+  }
+}

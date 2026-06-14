@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1",
+  "trace_id": "trace-basic-001",
+  "events": [
+    {
+      "seq": 0,
+      "kind": "run_started",
+      "detail": "demo session"
+    },
+    {
+      "seq": 1,
+      "kind": "policy_checked",
+      "detail": "permit accept"
+    }
+  ],
+  "trace_digest": "sha256:09e991995ed1561fe58d2d597537cc72436a5c360118cca284e795f495d1210b"
+}

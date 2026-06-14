@@ -1,0 +1,33 @@
+{
+  "bundle_id": "basic-evidence-bundle",
+  "schema_version": "0.1",
+  "created_at": "2025-06-01T12:00:00Z",
+  "producer": "pf-evidence/v0.1",
+  "artifacts": [
+    {
+      "role": "claim",
+      "path": "artifacts/claim.json",
+      "media_type": "application/vnd.provability-fabric.evidence.claim+json",
+      "digest": "sha256:09b99e794ee3a38346bc692ddab77c5b9b95d7c82526d6b19b176f64f3e17f3e"
+    },
+    {
+      "role": "proof",
+      "path": "artifacts/proof.json",
+      "media_type": "application/vnd.provability-fabric.evidence.proof+json",
+      "digest": "sha256:c321e0bfcc750ca2bc7ab7a38ae7b1d97c7af423d80d49cbb3e0a62921a1f3e2"
+    },
+    {
+      "role": "attestation",
+      "path": "artifacts/attestation.json",
+      "media_type": "application/vnd.provability-fabric.evidence.attestation+json",
+      "digest": "sha256:94f7446165c3d48821d4ec658617ada293c4f78f56ba0794096329745f83f174"
+    },
+    {
+      "role": "execution-trace",
+      "path": "artifacts/execution-trace.json",
+      "media_type": "application/vnd.provability-fabric.evidence.execution-trace+json",
+      "digest": "sha256:187bfebdae04f46b88c37dce8f6d99d877d43fe4d65c641a2b4903cd7ff6497a"
+    }
+  ],
+  "bundle_digest": "sha256:d5ee274690ecac4e87e0996f3add1419354c4dd75a042f649557980bb065d0cf"
+}

@@ -1,0 +1,8 @@
+{
+  "bundle_id": "bad-evidence-bundle",
+  "schema_version": "0.2",
+  "created_at": "2025-06-01T12:00:00Z",
+  "producer": "pf-evidence/v0.1",
+  "artifacts": [],
+  "bundle_digest": "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+}
