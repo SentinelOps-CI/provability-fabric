@@ -42,5 +42,6 @@ Evidence v0.1 is a distinct JSON bundle lane. This matrix maps existing platform
 | Gap | Mitigation in v0.1 |
 |-----|-------------------|
 | Windows bash testbed | CI runs on `ubuntu-latest`; local Windows may skip bash scripts |
+| `specs/evidence/v0.1/examples/invalid/bad-bundle-digest.json` | Digest tamper (not schema invalid) | Bundle JSON conforms to schema; `bundle_digest` does not match artifact hashes |
 | Missing `external/CERT-V1` clone | cert validator fails closed; CI clones where configured |
 | Shallow `check-trace` | Documented in roadmap; not claimed as trace validator |
