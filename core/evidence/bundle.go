@@ -19,14 +19,22 @@ type ArtifactRef struct {
 	Digest    string `json:"digest"`
 }
 
-// EvidenceBundle is the v0.1 bundle manifest.
+// ReplayContext describes executable replay inputs for v0.2 bundles.
+type ReplayContext struct {
+	KitTracePath   string `json:"kit_trace_path,omitempty"`
+	FixturesPath   string `json:"fixtures_path,omitempty"`
+	LowViewOracle  bool   `json:"low_view_oracle,omitempty"`
+}
+
+// EvidenceBundle is the v0.1/v0.2 bundle manifest.
 type EvidenceBundle struct {
-	BundleID      string        `json:"bundle_id"`
-	SchemaVersion string        `json:"schema_version"`
-	CreatedAt     string        `json:"created_at"`
-	Producer      string        `json:"producer"`
-	Artifacts     []ArtifactRef `json:"artifacts"`
-	BundleDigest  string        `json:"bundle_digest"`
+	BundleID      string         `json:"bundle_id"`
+	SchemaVersion string         `json:"schema_version"`
+	CreatedAt     string         `json:"created_at"`
+	Producer      string         `json:"producer"`
+	Artifacts     []ArtifactRef  `json:"artifacts"`
+	ReplayContext *ReplayContext `json:"replay_context,omitempty"`
+	BundleDigest  string         `json:"bundle_digest"`
 }
 
 // PackManifest describes inputs for bundle pack.
@@ -35,6 +43,7 @@ type PackManifest struct {
 	BundleID      string `json:"bundle_id"`
 	Producer      string `json:"producer"`
 	CreatedAt     string `json:"created_at,omitempty"`
+	ReplayContext *ReplayContext `json:"replay_context,omitempty"`
 	Artifacts     []struct {
 		Role      string `json:"role"`
 		Path      string `json:"path"`
@@ -70,7 +79,7 @@ func Pack(opts PackOptions) (*EvidenceBundle, error) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return nil, fmt.Errorf("parse manifest: %w", err)
 	}
-	if manifest.SchemaVersion != SchemaVersion {
+	if manifest.SchemaVersion != SchemaVersion && manifest.SchemaVersion != SchemaVersionV02 {
 		return nil, fmt.Errorf("unsupported schema_version %q", manifest.SchemaVersion)
 	}
 	if manifest.BundleID == "" {
@@ -113,9 +122,10 @@ func Pack(opts PackOptions) (*EvidenceBundle, error) {
 
 	bundle := EvidenceBundle{
 		BundleID:      manifest.BundleID,
-		SchemaVersion: SchemaVersion,
+		SchemaVersion: manifest.SchemaVersion,
 		CreatedAt:     manifest.CreatedAt,
 		Producer:      manifest.Producer,
+		ReplayContext: manifest.ReplayContext,
 		Artifacts:     refs,
 	}
 	digest, err := bundleDigest(bundle)

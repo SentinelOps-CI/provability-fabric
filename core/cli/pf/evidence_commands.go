@@ -64,11 +64,11 @@ func evidenceBundleCmd() *cobra.Command {
 
 	bundle := &cobra.Command{
 		Use:   "bundle",
-		Short: "Evidence v0.1 bundle operations",
+		Short: "Evidence v0.1/v0.2 bundle operations",
 	}
 	pack := &cobra.Command{
 		Use:   "pack",
-		Short: "Pack an Evidence v0.1 bundle from a manifest",
+		Short: "Pack an Evidence bundle from a manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if manifestPath == "" || outPath == "" {
 				return fmt.Errorf("--manifest and --out are required")
@@ -106,7 +106,7 @@ func evidenceValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate [bundle]",
-		Short: "Validate an Evidence v0.1 bundle",
+		Short: "Validate an Evidence v0.1 or v0.2 bundle",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
