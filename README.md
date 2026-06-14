@@ -142,8 +142,9 @@ Full PCS documentation lives at [docs/pcs/README.md](docs/pcs/README.md).
 ### Option 1 — Install script (recommended)
 
 ```bash
-git clone https://github.com/SentinelOps-CI/provability-fabric
+git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric
 cd provability-fabric
+make dev-standards   # optional: verify CERT-V1 + TRACE-REPLAY-KIT pins
 
 # Linux / macOS
 ./scripts/install.sh
@@ -183,8 +184,9 @@ mkdocs serve --dev-addr=127.0.0.1:8002
 ### Option 3 — Build the CLI from source
 
 ```bash
-git clone https://github.com/SentinelOps-CI/provability-fabric
+git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric
 cd provability-fabric
+make dev-standards   # optional: verify CERT-V1 + TRACE-REPLAY-KIT pins
 
 cd core/cli/pf
 go build -o pf .    # Windows: pf.exe
@@ -259,8 +261,9 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [Co
 **Typical dev loop:**
 
 ```bash
-git clone https://github.com/SentinelOps-CI/provability-fabric
+git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric
 cd provability-fabric
+make dev-standards   # optional: verify CERT-V1 + TRACE-REPLAY-KIT pins
 
 cd core/cli/pf && go build -o pf . && cd ../..
 # Optional: cmd/specdoc and other Go tools as needed

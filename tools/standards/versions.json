@@ -1,6 +1,8 @@
 {
   "CERT-V1": "v1.0.0",
-  "TRACE-REPLAY-KIT": "v1.0.0"
+  "TRACE-REPLAY-KIT": "v1.0.0",
+  "pins": {
+    "CERT-V1": "61ad3e5e29ffea3c4090f9862862b6e007024362",
+    "TRACE-REPLAY-KIT": "957630f1ab8c00031c5f56d32e610a9f8baf69b6"
+  }
 }
-
-
