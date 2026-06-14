@@ -36,3 +36,26 @@ pr-comments.yml, cla-bot.yaml, bundle-check.yaml, dep-graph.yaml, verify-publish
 ## Maintenance
 
 When adding a workflow, add a one-line note in the appropriate section above so others can discover it without scanning the directory.
+
+## External standards checkout
+
+Workflows that validate CERT-V1, run TRACE-REPLAY-KIT replay, or link-check docs against
+`external/` paths must initialize standards explicitly:
+
+```yaml
+- uses: actions/checkout@v4
+- name: Init external standards
+  env:
+    STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
+  run: make submodules
+```
+
+Do **not** use `actions/checkout` with `submodules: true` or `submodules: recursive` — the
+repo vendors Lean mathlib separately via `make vendor-mathlib`, and private upstream
+standards require `STANDARDS_GITHUB_TOKEN` (see [`tools/standards/README.md`](../tools/standards/README.md)).
+
+| Pattern | When |
+|---------|------|
+| Plain `actions/checkout@v4` | No CERT-V1/KIT dependency (demo-e2e, policy-build, most Rust/Go CI) |
+| Checkout + `make submodules` | cert-validate, replay, egress, platform-replay, platform-cert-validate, nightly-replay, evidence-v01-smoke, docs-build, standards-pin |
+| Checkout + `make vendor-mathlib` | Lean offline / reusable-ci-lean when `vendor/mathlib` is not cached |

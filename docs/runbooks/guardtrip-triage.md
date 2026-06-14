@@ -318,6 +318,6 @@ groups:
 ## Related Documentation
 
 - [Rollback Runbook](../runbooks/rollback.md)
-- [Automated Incident Response](../architecture/incident-response.md)
-- [Security Incident Response](../security/incident-response.md)
-- [Monitoring and Alerting](../monitoring/alerting.md)
+- [Incident response](../runbooks/incident-response.md)
+- [Security overview](../security/overview.md)
+- [Operations runbook](../runbooks/operations.md)

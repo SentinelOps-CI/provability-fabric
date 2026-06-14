@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Set up Python (Lean gates)
         uses: actions/setup-python@v5

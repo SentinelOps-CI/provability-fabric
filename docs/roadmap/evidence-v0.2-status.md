@@ -46,7 +46,7 @@ See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done, [Evide
 | Upstream tags `v1.0.0` not published | Pins use commit SHAs in `tools/standards/versions.json` |
 | Private `verifiable-ai-ci/*` repos | CI requires `STANDARDS_GITHUB_TOKEN` secret |
 | Other workflows using `submodules: recursive` | Complete — removed in #111; use plain checkout + `make submodules` |
-| `mkdocs build --strict` | Pre-existing broken doc links (repo-wide, not Evidence-specific) |
+| `mkdocs build --strict` | Complete — enforced in docs-build CI and `make docs-strict` |
 
 ## Out of scope (unchanged)
 

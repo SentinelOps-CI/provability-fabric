@@ -23,7 +23,7 @@ Binding events are written from the **permit enforcement** emit path only (`perm
 }
 ```
 
-Implementation: [`runtime/sidecar-watcher/src/evidence_v01.rs`](../../runtime/sidecar-watcher/src/evidence_v01.rs).
+Implementation: [`runtime/sidecar-watcher/src/evidence_v01.rs`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/runtime/sidecar-watcher/src/evidence_v01.rs).
 
 ## Example bundle
 

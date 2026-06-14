@@ -16,7 +16,7 @@ Go modules and Node packages also use their own version fields (e.g. `go.mod`, `
 ## Toolchain and workspace
 
 - **Rust:** The repo root has a `rust-toolchain.toml` pinning `channel = "stable"` with `clippy` and `rustfmt`. All Rust workspace crates use this when building from the root.
-- **Workspace:** Root `Cargo.toml` defines the Rust workspace; see that file and the main [README](../README.md) "Rust workspace" section for the list of members and optional crates.
+- **Workspace:** Root `Cargo.toml` defines the Rust workspace; see that file and the main [README](https://github.com/SentinelOps-CI/provability-fabric/blob/main/README.md) "Rust workspace" section for the list of members and optional crates.
 
 ## Summary
 

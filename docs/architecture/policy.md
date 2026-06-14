@@ -696,7 +696,7 @@ kubectl rollout restart deployment/sidecar-watcher -n production
 The Provability Fabric policy enforcement system provides a robust, secure, and auditable foundation for access control. By combining ABAC, IFC, and unified actions with formal verification and runtime enforcement, the system ensures that security policies are correctly implemented and enforced.
 
 For additional information, see:
-- [Policy DSL Documentation](dsl.md)
-- [Certificate Schema](certs.md)
-- [Epoch Management](epochs.md)
-- [Operational Runbooks](../runbooks/)
+- [Plan DSL](../specs/plan-dsl.md)
+- [Egress certificate](../specs/egress-certificate.md)
+- [Signing and rotation](../security/signing-rotation.md)
+- [Operational Runbooks](../runbooks/README.md)

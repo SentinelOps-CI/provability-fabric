@@ -71,7 +71,7 @@ Recorded on Windows checkout at `65bee159035e38e7a8f907ce2773226eca1ea4f3` (clea
 | `make validate-certs` | Pass (vacuous) | Schema missing before fail-closed fix |
 | `make no-runtime-placeholders` | Fail | Scans `build/` after mkdocs |
 
-`external/CERT-V1/` is absent unless cloned per [`external/README.md`](../../external/README.md).
+`external/CERT-V1/` is absent unless cloned per [`external/README.md`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/external/README.md).
 
 ## Status
 

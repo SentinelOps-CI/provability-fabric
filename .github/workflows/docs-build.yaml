@@ -22,8 +22,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
+
+      - name: Init external standards
+        env:
+          STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
+        run: make submodules
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -74,8 +77,7 @@ jobs:
           fi
 
       - name: Build MkDocs site
-        run: |
-          mkdocs build
+        run: mkdocs build --strict
 
       - name: Check for broken links
         run: |

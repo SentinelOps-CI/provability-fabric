@@ -131,7 +131,6 @@ nav:
           - Replay guarantees: guides/replay-guarantees.md
           - Runtime basic: guides/runtime-evidence-basic.md
           - Runtime boundaries: guides/runtime-evidence-boundaries.md
-          - Replay guarantees: guides/replay-guarantees.md
           - Forensic replay: guides/forensic-replay-basic.md
           - Changelog: CHANGELOG.md
   - Roadmap:

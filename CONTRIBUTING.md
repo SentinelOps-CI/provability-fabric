@@ -97,6 +97,7 @@ Evidence changes should pass the [`evidence-v01-smoke.yml`](.github/workflows/ev
 ```bash
 make dev-standards   # CERT-V1 + TRACE-REPLAY-KIT submodules
 make evidence-verify # Go tests, pytest suites, v0.1 + v0.2 testbed scripts
+make docs-strict     # mkdocs build --strict (docs-only PRs)
 ```
 
 `make evidence-verify` requires bash (Linux, WSL, or Git Bash on Windows). Clone external standards per [`external/README.md`](external/README.md). Fork maintainers and org workflows need repository secret **`STANDARDS_GITHUB_TOKEN`** for private `verifiable-ai-ci/*` repos.

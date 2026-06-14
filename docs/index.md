@@ -37,8 +37,8 @@ Provability Fabric verifies and signs **science claim bundles** for lab QC relea
 
 Agent benchmark workflows are documented in the repository alongside this site.
 
-- [bench/swebench/README.md](../bench/swebench/README.md)
-- [experiments/README.md](../experiments/README.md)
+- [bench/swebench/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/README.md)
+- [experiments/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/README.md)
 
 ## Build this site locally
 
@@ -51,7 +51,7 @@ mkdocs serve
 
 Open `http://127.0.0.1:8000` in your browser. A static build writes to `./build/` when you run `mkdocs build`.
 
-See [docs/README.md](README.md) for the full documentation map. Contributor-only notes live under [internal/](internal/) and stay outside the published navigation.
+See [documentation map](documentation-map.md) for the full documentation map. Contributor-only notes live under [internal/README.md](internal/README.md) and stay outside the published navigation.
 
 ## License
 

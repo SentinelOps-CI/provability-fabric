@@ -13,7 +13,7 @@ Evidence v0.2 closes v0.1 limitation areas without breaking v0.1 bundles. v0.2 i
 | Runtime E2E | Emit integration test + binding always documented | `cargo test emit_evidence` |
 | Lane docs | Compatibility matrix + negative pytest | `tests/evidence_schema/test_lane_separation.py` |
 | CERT ergonomics | Graceful test skip without schema panic | `cargo test -p sidecar-watcher` without submodules (unit skip) |
-| Release docs | Roadmap, CHANGELOG, mkdocs nav | `mkdocs build --strict` |
+| Release docs | Roadmap, CHANGELOG, mkdocs nav | `mkdocs build --strict` (Complete) |
 
 ## v0.1 limitations superseded
 

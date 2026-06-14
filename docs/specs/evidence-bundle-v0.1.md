@@ -49,7 +49,7 @@ pf evidence replay --bundle /tmp/bundle.json --out /tmp/replay.json
 
 ## Canonical hashing
 
-`bundle_digest` covers the bundle object with `bundle_digest` omitted, using UTF-8 JSON and recursively sorted object keys. Implementation: [`core/evidence/bundle.go`](../../core/evidence/bundle.go).
+`bundle_digest` covers the bundle object with `bundle_digest` omitted, using UTF-8 JSON and recursively sorted object keys. Implementation: [`core/evidence/bundle.go`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/core/evidence/bundle.go).
 
 ## Validation
 
