@@ -64,7 +64,7 @@ help:
 # ---------- External standards submodules ----------
 submodules:
 	@$(ECHOOK) "Initializing external standards submodules..."
-	git submodule update --init --depth 1 external/CERT-V1 external/TRACE-REPLAY-KIT
+	$(if $(filter Windows_NT,$(OS)),bash scripts/init_external_standards.sh,sh scripts/init_external_standards.sh)
 	@$(ECHOOK) "Submodules ready (run make standards-pin-check to verify tags)"
 
 standards-pin-check:
