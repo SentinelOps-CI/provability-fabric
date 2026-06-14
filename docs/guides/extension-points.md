@@ -106,7 +106,7 @@ New templates do not require code changes in core; only the CLI `init` command w
 
 ### Rust workspace (optional crates)
 
-The root [Cargo.toml](../../Cargo.toml) lists workspace members and documents **optional crates** in comments. These are not part of the default `cargo build --workspace` or require extra dependencies or APIs:
+The root [Cargo.toml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/Cargo.toml) lists workspace members and documents **optional crates** in comments. These are not part of the default `cargo build --workspace` or require extra dependencies or APIs:
 
 - **egress-firewall** – needs native Hyperscan (libhs). Build with `cargo build -p egress-firewall` when deps are available.
 - **core/sdk/rust** – needs protoc. Build with `cargo build -p provability-fabric-core-sdk-rust` when deps are available.

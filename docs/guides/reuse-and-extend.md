@@ -17,7 +17,7 @@ Components not required for a minimal fork: `bench/`, `experiments/`, `console/`
 ### Clone and fork
 
 - Clone: `git clone https://github.com/SentinelOps-CI/provability-fabric.git` (or your fork URL).
-- To contribute back: fork on GitHub, add your fork as a remote, and open pull requests to the upstream repo. See [Contributing](../../CONTRIBUTING.md) and [Governance](../community/governance.md).
+- To contribute back: fork on GitHub, add your fork as a remote, and open pull requests to the upstream repo. See [Contributing](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md) and [Governance](../community/governance.md).
 
 ### What to change when maintaining your own fork
 
@@ -63,7 +63,7 @@ Run:
 ./pf bundle pack bundles/test-agent -o /tmp/test-agent.tar.gz
 ```
 
-See also [scripts/test-new-user.sh](../../scripts/test-new-user.sh) (and `.bat` on Windows) with minimal mode.
+See also [scripts/test-new-user.sh](https://github.com/SentinelOps-CI/provability-fabric/blob/main/scripts/test-new-user.sh) (and `.bat` on Windows) with minimal mode.
 
 ## Standard reuse (CLI + Rust workspace)
 
@@ -84,7 +84,7 @@ cd core/cli/pf && go build -o pf . && cd ../../..
 cargo build --workspace
 ```
 
-Optional crates (egress-firewall, core/sdk/rust, etc.) need extra deps; see root [Cargo.toml](../../Cargo.toml). Build them separately when needed.
+Optional crates (egress-firewall, core/sdk/rust, etc.) need extra deps; see root [Cargo.toml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/Cargo.toml). Build them separately when needed.
 
 ### Install script (standard mode)
 
@@ -100,7 +100,7 @@ For the complete platform (all Go services, console, ledger, bench tooling):
 - Linux/macOS: `./scripts/install.sh` or `./scripts/install.sh --full`
 - Windows: `scripts\install.bat` or `set INSTALL_MODE=full` then `scripts\install.bat`
 
-See [Getting started](getting-started.md) and the root [README](../../README.md).
+See [Getting started](getting-started.md) and the root [README](https://github.com/SentinelOps-CI/provability-fabric/blob/main/README.md).
 
 ## Install modes
 
@@ -146,7 +146,7 @@ The full web stack is optional. From the repo root:
 - **Platform only** (postgres, redis, api-gateway, spec-service, proof-service, build-orchestrator, evidence-service, replay-service, runtime-sidecar): `docker compose up`
 - **Full stack** (adds console, demos, Grafana, Prometheus): `docker compose --profile full up`
 
-See root [README](../../README.md) and [docker-compose.yml](../../docker-compose.yml). For minimal or CLI-only use, no Docker is required.
+See root [README](https://github.com/SentinelOps-CI/provability-fabric/blob/main/README.md) and [docker-compose.yml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/docker-compose.yml). For minimal or CLI-only use, no Docker is required.
 
 ## First-run verification
 
@@ -154,6 +154,6 @@ Scripts `scripts/test-new-user.sh` (Linux/macOS) and `scripts/test-new-user.bat`
 
 - **Minimal**: `pf --version`, `pf init test-agent`, optionally `pf bundle pack`.
 - **Standard**: above plus `cargo test --workspace` (or subset).
-- **Full**: full test suite as documented in [Contributing](../../CONTRIBUTING.md).
+- **Full**: full test suite as documented in [Contributing](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md).
 
 Run them after install to confirm your tier works.

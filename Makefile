@@ -10,7 +10,7 @@ dev-up:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify
+.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify
 
 # ---------- Cross-platform helpers ----------
 # Seconds to wait after starting containers (override with: make demo-up WAIT=10)
@@ -451,6 +451,11 @@ docs:
 	@$(ECHOOK) "📚 Building documentation..."
 	mkdocs build
 	@$(ECHOOK) "✅ Documentation built"
+
+docs-strict:
+	@$(ECHOOK) "📚 Building documentation (strict)..."
+	mkdocs build --strict
+	@$(ECHOOK) "✅ Strict documentation build passed"
 
 docs-serve:
 	@$(ECHOOK) "📚 Serving documentation..."

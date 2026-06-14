@@ -22,17 +22,17 @@ python -m pytest \
 
 | Source | Field | Expected |
 |--------|--------|----------|
-| [bench/swebench/run_config.py](bench/swebench/run_config.py) | `RunConfig.openhands_timeout` default | `1200` |
-| [experiments/exp-step2-lite-smoke/manifest.json](experiments/exp-step2-lite-smoke/manifest.json) | `budgets.timeout_sec` | `1200` |
-| [experiments/scripts/run-baseline-pf-cycle.sh](experiments/scripts/run-baseline-pf-cycle.sh) | `OPENHANDS_TIMEOUT` default | `1200` |
-| Engine | `PF_OPENHANDS_MAX_TASK_CHARS` default | `12000` (see [bench/swebench/engines/openhands_engine.py](bench/swebench/engines/openhands_engine.py)) |
+| [bench/swebench/run_config.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/run_config.py) | `RunConfig.openhands_timeout` default | `1200` |
+| [experiments/exp-step2-lite-smoke/manifest.json](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/exp-step2-lite-smoke/manifest.json) | `budgets.timeout_sec` | `1200` |
+| [experiments/scripts/run-baseline-pf-cycle.sh](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/scripts/run-baseline-pf-cycle.sh) | `OPENHANDS_TIMEOUT` default | `1200` |
+| Engine | `PF_OPENHANDS_MAX_TASK_CHARS` default | `12000` (see [bench/swebench/engines/openhands_engine.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/engines/openhands_engine.py)) |
 
 ## 3. Provider / subprocess contract (code review checklist)
 
-- [bench/swebench/provider_env.py](bench/swebench/provider_env.py): single normalization for provider, keys, base URL, model prefix for Prime.
-- [bench/swebench/runner.py](bench/swebench/runner.py): `env.json` uses `llm_env_diagnostics()` when available; fallback uses `normalize_openhands_provider`.
-- [experiments/scripts/ensure_openhands_config.py](experiments/scripts/ensure_openhands_config.py): uses `llm_credentials` and `effective_llm_model`.
-- [bench/swebench/engines/openhands_engine.py](bench/swebench/engines/openhands_engine.py):
+- [bench/swebench/provider_env.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/provider_env.py): single normalization for provider, keys, base URL, model prefix for Prime.
+- [bench/swebench/runner.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/runner.py): `env.json` uses `llm_env_diagnostics()` when available; fallback uses `normalize_openhands_provider`.
+- [experiments/scripts/ensure_openhands_config.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/scripts/ensure_openhands_config.py): uses `llm_credentials` and `effective_llm_model`.
+- [bench/swebench/engines/openhands_engine.py](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/engines/openhands_engine.py):
   - `prime_intellect` uses subprocess path with Prime compat proxy when configured.
   - Subprocess `env` forwards `OPENHANDS_PROVIDER`, `OPENHANDS_MODEL`, `PRIME_TEAM_ID`, and sets `OPENHANDS_PROVIDER` to the **normalized** provider string.
   - Authentication errors: if `pit_*` appears in env or error text, remediation points to Prime routing and `env.json`, not only OpenAI keys.
@@ -100,10 +100,10 @@ Expect exit code 0 and `compare.json`, `compare.csv`, `metrics_full.json` under 
 
 Cross-check failure signatures and recovery steps in:
 
-- [bench/swebench/README.md](bench/swebench/README.md)
-- [experiments/exp-step2-lite-smoke/env-checklist.md](experiments/exp-step2-lite-smoke/env-checklist.md)
-- [experiments/exp-step2-lite-smoke/commands.md](experiments/exp-step2-lite-smoke/commands.md)
-- [experiments/exp-step2-lite-smoke/troubleshooting-compare-results.md](experiments/exp-step2-lite-smoke/troubleshooting-compare-results.md)
+- [bench/swebench/README.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/bench/swebench/README.md)
+- [experiments/exp-step2-lite-smoke/env-checklist.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/exp-step2-lite-smoke/env-checklist.md)
+- [experiments/exp-step2-lite-smoke/commands.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/exp-step2-lite-smoke/commands.md)
+- [experiments/exp-step2-lite-smoke/troubleshooting-compare-results.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/experiments/exp-step2-lite-smoke/troubleshooting-compare-results.md)
 
 ## Provider matrix (manual or scripted)
 

@@ -37,7 +37,7 @@ Replay **does not** establish:
 
 ## Determinism assumptions
 
-- Canonical JSON digest rules in [`core/evidence/digest.go`](../../core/evidence/digest.go) are stable for a given input object
+- Canonical JSON digest rules in [`core/evidence/digest.go`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/core/evidence/digest.go) are stable for a given input object
 - Trace files on disk are unchanged between pack and replay
 - KIT Python dependencies match `external/TRACE-REPLAY-KIT/runner/requirements.txt`
 - Clock fields in reports (`replayed_at`) are not used for pass/fail

@@ -294,8 +294,8 @@ curl http://localhost:8080/metrics | grep -E "(queue|strict_mode|response_time)"
 
 ## References
 
-- [Backpressure Implementation](../optimization/backpressure.md)
+- [Runtime performance](../runtime/perf.md)
 - [System Architecture](../architecture/overview.md)
-- [Performance SLOs](../slo/performance.md)
-- [Security Policies](../security/policies.md)
-- [Incident Response](../incident/response.md)
+- [Performance SLOs](../runtime/slo.md)
+- [Security overview](../security/overview.md)
+- [Incident Response](../runbooks/incident-response.md)

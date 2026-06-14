@@ -60,7 +60,7 @@ This runs `tools/cert-validate/validate.py` against the schema at `external/CERT
 - optional `morph`: environment snapshot info when running on Morph
 - `sig`: signature for the CERT payload
 
-See also: [Standards](specs/standards.md), [Replay](replay.md), the CERT-V1 repository for the full schema, and the [Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md) for the planned bundle format and surface map.
+See also: [Standards](../specs/standards.md), [Replay](replay.md), the CERT-V1 repository for the full schema, and the [Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md) for the planned bundle format and surface map.
 
 ## Evidence surface map
 

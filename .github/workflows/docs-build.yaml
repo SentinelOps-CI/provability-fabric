@@ -77,8 +77,7 @@ jobs:
           fi
 
       - name: Build MkDocs site
-        run: |
-          mkdocs build
+        run: mkdocs build --strict
 
       - name: Check for broken links
         run: |

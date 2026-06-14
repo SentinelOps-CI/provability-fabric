@@ -57,7 +57,7 @@ Reports capture `status` (`pass`|`fail`), `errors`, `warnings`, `bundle_ref`, an
 
 - File artifacts: SHA-256 over raw bytes (`sha256:<hex>`)
 - Self-referential digests (`proof_digest`, `trace_digest`, `bundle_digest`): canonical JSON with sorted object keys, excluding the digest field itself
-- Bundle manifest hashing uses the same canonicalization as [`core/evidence/digest.go`](../../core/evidence/digest.go)
+- Bundle manifest hashing uses the same canonicalization as [`core/evidence/digest.go`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/core/evidence/digest.go)
 
 ## CERT compatibility
 
@@ -89,4 +89,4 @@ See [Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md) for platform caveats (`
 
 - [Bundle format](evidence-bundle-v0.1.md)
 - [Compatibility matrix](evidence-compatibility.md)
-- [Schemas](../../specs/evidence/v0.1/README.md)
+- [Schemas](https://github.com/SentinelOps-CI/provability-fabric/blob/main/specs/evidence/v0.1/README.md)
