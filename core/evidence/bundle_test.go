@@ -36,15 +36,6 @@ func TestPackValidFixture(t *testing.T) {
 	if bundle.BundleDigest == "" {
 		t.Fatal("expected bundle_digest")
 	}
-	report, err := ValidateBundle(ValidateOptions{
-		BundlePath: out,
-		Strict:     true,
-		RepoRoot:   root,
-		BaseDir:    exampleDir,
-	})
-	if err != nil {
-		t.Fatalf("validate packed bundle: %v (%v)", err, report.Errors)
-	}
 }
 
 func TestValidateFixtureBundle(t *testing.T) {

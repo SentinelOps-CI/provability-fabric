@@ -1,15 +1,19 @@
-name: Evidence v0.1 smoke
+﻿name: Evidence v0.1 smoke
 
 on:
   pull_request:
     paths:
       - 'specs/evidence/**'
       - 'tests/evidence_schema/**'
+      - 'core/evidence/**'
+      - 'tests/evidence_validation/**'
+      - 'core/cli/pf/evidence_commands.go'
       - '.github/workflows/evidence-v01-smoke.yml'
   push:
     branches: [main]
     paths:
       - 'specs/evidence/**'
+      - 'core/evidence/**'
 
 permissions:
   contents: read
@@ -23,13 +27,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - run: pip install jsonschema pytest
+      - run: pytest tests/evidence_schema -q
 
-      - name: Install Python deps
-        run: pip install jsonschema pytest
-
-      - name: Pytest evidence schema
-        run: pytest tests/evidence_schema -q
+  evidence-validator:
+    runs-on: ubuntu-latest
+    needs: evidence-schema-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install jsonschema pytest
+      - run: go test ./...
+        working-directory: core/evidence
+      - run: pytest tests/evidence_validation -q
