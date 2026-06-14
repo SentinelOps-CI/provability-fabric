@@ -32,7 +32,11 @@ on:
       - 'core/evidence/**'
       - 'external/**'
       - 'scripts/init_external_standards.sh'
+      - 'scripts/check_cert_write_paths.sh'
+      - 'Makefile'
       - '.github/workflows/evidence-v01-smoke.yml'
+
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -104,6 +108,9 @@ jobs:
         env:
           STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
         run: make submodules
+
+      - name: Install TRACE-REPLAY-KIT Python deps
+        run: pip install -r external/TRACE-REPLAY-KIT/runner/requirements.txt
 
       - name: Standards pin check
         run: make standards-pin-check
