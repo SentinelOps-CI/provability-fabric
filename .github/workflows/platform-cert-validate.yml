@@ -18,8 +18,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
+
+    - name: Init external standards
+      env:
+        STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
+      run: make submodules
     
     - name: Set up Python
       uses: actions/setup-python@v4

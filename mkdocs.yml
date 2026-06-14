@@ -120,6 +120,7 @@ nav:
           - Roadmap: roadmap/evidence-v0.1.md
           - v0.2 integration: roadmap/evidence-v0.2.md
           - Status: roadmap/evidence-v0.1-status.md
+          - v0.2 status: roadmap/evidence-v0.2-status.md
           - Quickstart: guides/evidence-v0.1-quickstart.md
           - Model: specs/evidence-model-v0.1.md
           - Bundle format: specs/evidence-bundle-v0.1.md

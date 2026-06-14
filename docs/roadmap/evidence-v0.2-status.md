@@ -1,0 +1,71 @@
+# Evidence v0.2 status
+
+Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #110.
+
+## Implementation (branch stack)
+
+| Item | Branch artifact | Local verification |
+|------|-----------------|-------------------|
+| Submodules | `.gitmodules`, `make submodules`, `make standards-pin-check` | `make dev-standards` |
+| Trace adapter | `core/evidence/trace_adapter.go`, `pf evidence trace import` | `go test ./...`; `pytest tests/evidence_trace -q` |
+| v0.2 schema | `specs/evidence/v0.2/schemas/`, `replay_context` | v0.1 fixtures unchanged; v0.2 fixture validates |
+| Deep replay | `kit_runner.go`, `--execute` / `--low-view` | `testbed/evidence-v0.2/run_deep_replay.sh --execute` |
+| Runtime E2E | `emit_evidence_tests.rs`, smoke hardening | `cargo test -p sidecar-watcher emit_evidence`; Linux sidecar pytest |
+| Lane docs | compatibility matrix, `test_lane_separation.py` | `pytest tests/evidence_schema/test_lane_separation.py -q` |
+| Release docs | `docs/roadmap/evidence-v0.2.md`, CHANGELOG, mkdocs | `mkdocs build` |
+
+Last full Evidence smoke matrix (PR #110, Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`).
+
+## CI hardening (post-merge)
+
+| Fix | PR | Outcome |
+|-----|-----|---------|
+| Remove broken `submodules: recursive` checkout | #106 | Checkout no longer fails on stale `vendor/mathlib` gitlink |
+| Fetch private CERT-V1 / TRACE-REPLAY-KIT | #107 | `STANDARDS_GITHUB_TOKEN` + `scripts/init_external_standards.sh` |
+| Bash for `pipefail` in init script | #108 | `make submodules` works on Ubuntu default shell |
+| Install KIT Python deps in smoke | #109 | Deep replay `--execute` has `requests` et al. |
+| Create testbed `out/` before replay report | #110 | `run_happy_path.sh` passes end-to-end |
+
+## Delivery
+
+| Gate | Status |
+|------|--------|
+| 7 stacked PRs opened and merged (#98–#104) | Complete |
+| Stack landed on `main` (#105) | Complete |
+| Evidence smoke green on Linux CI (#110) | Complete |
+| `main` post-#110 workflow_dispatch confirmation | Pending (Actions queue) |
+| Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Optional |
+
+See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done and [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 baseline.
+
+## Known limitations
+
+| Item | Status |
+|------|--------|
+| Upstream tags `v1.0.0` not published | Pins use commit SHAs in `tools/standards/versions.json` |
+| Private `verifiable-ai-ci/*` repos | CI requires `STANDARDS_GITHUB_TOKEN` secret |
+| Other workflows using `submodules: recursive` | Being migrated to `make submodules` (no mathlib gitlink) |
+| `mkdocs build --strict` | Pre-existing broken doc links (repo-wide, not Evidence-specific) |
+
+## Out of scope (unchanged)
+
+- Merging PCS `EvidenceBundle.v0` with Evidence JSON schemas
+- Replacing `pf bundle pack` tar archives
+- Vendoring CERT-V1 into the main repo
+
+## Verification commands
+
+```bash
+make submodules && make standards-pin-check
+cd core/evidence && go test ./...
+cd core/cli/pf && go build -o pf .
+./pf evidence trace import --kit-trace specs/evidence/v0.2/examples/valid/kit/trace.json --out /tmp/v01-trace.json
+./pf evidence replay --bundle specs/evidence/v0.2/examples/valid/deep-replay-bundle.json \
+  --base-dir specs/evidence/v0.2/examples/valid --execute --low-view
+bash testbed/evidence-v0.1/run_happy_path.sh
+bash testbed/evidence-v0.2/run_deep_replay.sh --execute
+pytest tests/evidence_schema tests/evidence_validation tests/evidence_replay \
+  tests/evidence_trace tests/runtime_evidence tests/testbed -q
+cargo test -p sidecar-watcher -- emit_evidence
+bash scripts/check_cert_write_paths.sh
+```
