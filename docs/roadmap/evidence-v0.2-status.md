@@ -12,9 +12,9 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 | Deep replay | `kit_runner.go`, `--execute` / `--low-view` | `testbed/evidence-v0.2/run_deep_replay.sh --execute` |
 | Runtime E2E | `emit_evidence_tests.rs`, smoke hardening | `cargo test -p sidecar-watcher emit_evidence`; Linux sidecar pytest |
 | Lane docs | compatibility matrix, `test_lane_separation.py` | `pytest tests/evidence_schema/test_lane_separation.py -q` |
-| Release docs | `docs/roadmap/evidence-v0.2.md`, CHANGELOG, mkdocs | `mkdocs build` |
+| Release docs | `docs/roadmap/evidence-v0.2.md`, CHANGELOG, mkdocs | `mkdocs build --strict` |
 
-Last full Evidence smoke matrix (Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`). Green baselines: PR #110 (stack tip CI) and PR #111 (`main` workflow_dispatch run [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090)).
+Last full Evidence smoke matrix (Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`). Green baselines: PR #110, PR #111 dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090), and closure dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869).
 
 ## CI hardening (post-merge)
 
@@ -35,7 +35,9 @@ Last full Evidence smoke matrix (Linux CI, 2026-06-14): all three jobs green (`e
 | Stack landed on `main` (#105) | Complete |
 | Evidence smoke green on Linux CI (#110) | Complete |
 | `main` workflow_dispatch confirmation (#111, run 27512113090) | Complete |
-| Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Optional |
+| Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Complete — deleted 2026-06-14; kept `evidence-v01/snapshot` |
+| Fresh-clone checklist recorded | Complete — see [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md#fresh-clone-verification-checklist) (2026-06-14, commit on `main`) |
+| mkdocs strict + docs-build CI | Complete — #114 |
 
 See [Evidence v0.2 integration](evidence-v0.2.md) for definition of done, [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md) for stack and fresh-clone checklist, and [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 baseline.
 

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Evidence v0.2 delivery complete (2026-06-14):** Delivery sign-off docs (#112), standards checkout parity and `tools/standards/README.md` (#113), mkdocs `build --strict` gate with link fixes (#114), remote stack branch cleanup (`evidence-v01/snapshot` retained), CI health matrix at `docs/internal/ci-health-matrix.md`, and `make evidence-verify` / `make docs-strict` developer gates. Evidence smoke baseline on `main`: [workflow_dispatch 27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090).
+
 - **Evidence v0.2:** Git submodules for CERT-V1 and TRACE-REPLAY-KIT (`make submodules`, `make standards-pin-check`, `make dev-standards`), `pf evidence trace import`, v0.2 bundle schema with optional `replay_context`, `pf evidence replay --execute` / `--low-view` via KIT runner, v0.2 fixtures and testbed, emit E2E integration test, lane-separation docs/tests, and roadmap at `docs/roadmap/evidence-v0.2.md`.
 
 - **Evidence v0.1:** JSON Schema artifacts under `specs/evidence/v0.1/`, public specification

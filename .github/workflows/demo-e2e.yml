@@ -6,6 +6,9 @@ name: Demo End-to-End Tests
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'demos/verifiable-mcp-fraud/**'
+      - '.github/workflows/demo-e2e.yml'
   pull_request:
     branches: [ main ]
     paths:
