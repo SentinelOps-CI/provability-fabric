@@ -1,0 +1,8 @@
+[submodule "external/CERT-V1"]
+	path = external/CERT-V1
+	url = https://github.com/verifiable-ai-ci/CERT-V1.git
+	branch = v1.0.0
+[submodule "external/TRACE-REPLAY-KIT"]
+	path = external/TRACE-REPLAY-KIT
+	url = https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT.git
+	branch = v1.0.0

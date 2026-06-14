@@ -1,15 +1,36 @@
-# External dependencies (optional)
+# External dependencies (git submodules)
 
-This directory is used by `docker-compose.yml` for optional mounts:
+Pinned standards live under `external/` as git submodules. Tags are locked in
+[`tools/standards/versions.json`](../tools/standards/versions.json).
 
-- **CERT-V1** – Clone [verifiable-ai-ci/CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) into `CERT-V1/` for evidence-service schema and verifiers.
-- **TRACE-REPLAY-KIT** – Clone [verifiable-ai-ci/TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) into `TRACE-REPLAY-KIT/` for the replay-service runner.
+| Submodule | Repository | Purpose |
+|-----------|------------|---------|
+| `CERT-V1/` | [verifiable-ai-ci/CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) | CERT-V1 JSON schema and validation |
+| `TRACE-REPLAY-KIT/` | [verifiable-ai-ci/TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) | Deterministic trace replay runner |
 
-If these directories are missing, Docker Compose will create empty mount points and the platform will start; full evidence and replay features may require the real content.
-
-Example setup:
+## Fresh clone
 
 ```bash
-git clone --depth 1 https://github.com/verifiable-ai-ci/CERT-V1.git CERT-V1
-git clone --depth 1 https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT.git TRACE-REPLAY-KIT
+git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric.git
+cd provability-fabric
+make dev-standards
 ```
+
+If you already cloned without submodules:
+
+```bash
+make submodules
+make standards-pin-check
+```
+
+## Docker Compose
+
+`docker-compose.yml` mounts these directories for evidence-service and replay-service.
+If submodules are missing, Compose creates empty mount points; run `make submodules`
+before relying on CERT validation or deep replay.
+
+## Windows / Docker
+
+For local Windows development without native submodule paths, mount this repo into
+Docker Compose and run sidecar or cert tests inside the Linux container where
+`external/CERT-V1` is available.

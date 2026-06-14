@@ -25,6 +25,9 @@ For the full pull request and review process, see [Governance - Pull Request Pro
 If you only need the CLI and spec/bundle workflow (no Rust, Node, or Docker):
 
 ```bash
+git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric.git
+cd provability-fabric
+make dev-standards   # CERT-V1 + TRACE-REPLAY-KIT for evidence/replay tests
 # Requires Go 1.23+ (see core/cli/pf/go.mod)
 cd core/cli/pf && go build -o pf . && cd ../../..
 # Add the binary to your PATH; on Windows the output is pf.exe

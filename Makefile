@@ -10,7 +10,7 @@ dev-up:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders
+.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards
 
 # ---------- Cross-platform helpers ----------
 # Seconds to wait after starting containers (override with: make demo-up WAIT=10)
@@ -55,8 +55,24 @@ help:
 	@$(ECHOOK) "  make install-standard - CLI + Rust workspace"
 	@$(ECHOOK) "  make install-full    - Full install (all Python/Node deps)"
 	@$(ECHOOK) "  make validate-certs  - Validate all CERT-V1 certificates"
+	@$(ECHOOK) "  make submodules      - Init/update external standards submodules"
+	@$(ECHOOK) "  make standards-pin-check - Verify submodule tags match versions.json"
+	@$(ECHOOK) "  make dev-standards   - submodules + standards-pin-check"
 	@$(ECHOOK) "  make lint            - Run linting on all code"
 	@$(ECHOOK) ""
+
+# ---------- External standards submodules ----------
+submodules:
+	@$(ECHOOK) "Initializing external standards submodules..."
+	git submodule update --init --depth 1 external/CERT-V1 external/TRACE-REPLAY-KIT
+	@$(ECHOOK) "Submodules ready (run make standards-pin-check to verify tags)"
+
+standards-pin-check:
+	@$(ECHOOK) "Checking external standards pin drift..."
+	python tools/standards/check_pins.py
+
+dev-standards: submodules standards-pin-check
+	@$(ECHOOK) "External standards ready for local development"
 
 # ---------- Development ----------
 dev:
