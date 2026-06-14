@@ -39,10 +39,10 @@ Last full local matrix (on `evidence-v01/onboarding-docs`, 2026-06-14): see [Fre
 | 15 stacked PRs opened and merged (#82–#96) | Complete |
 | Stack landed on `main` (#97) | Complete |
 | PR opener script removed | Complete |
-| CI on GitHub | Partial — many repo-wide checks fail on docs-only PRs; Evidence smoke passed from PR #85 onward |
+| CI on GitHub | Evidence smoke green on Linux CI (PR #110, 2026-06-14); other repo-wide checks may still fail |
 | Fresh-clone quickstart verified by independent reviewer | Complete (v0.2 matrix on `evidence-v02/integration`) |
 
-See [Evidence v0.2 integration](evidence-v0.2.md) for the v0.2 definition of done.
+See [Evidence v0.2 integration](evidence-v0.2.md) and [Evidence v0.2 status](evidence-v0.2-status.md).
 
 ## Known limitations (v0.1 superseded by v0.2)
 
@@ -53,8 +53,6 @@ See [Evidence v0.2 integration](evidence-v0.2.md) for the v0.2 definition of don
 | CI skips without CERT-V1 | Addressed — smoke job fails closed |
 | PCS / so bundle confusion | Addressed — lane guide + negative tests (no schema merge) |
 | Binding docs implied conditional | Addressed — binding always on emit; bundle ref optional |
-
-## Remaining notes
 
 ## Out of scope (v0.1)
 
