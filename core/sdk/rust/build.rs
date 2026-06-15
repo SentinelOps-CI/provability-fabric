@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "../../api/v1/egress.proto",
                 "../../api/v1/safety_case.proto",
             ],
-            &["../../api/v1"],
+            &["../../api"],
         )?;
     Ok(())
 }

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package provability_fabric.api.v1;
 
-option go_package = "github.com/provability-fabric/api/v1;v1";
+option go_package = "github.com/provability-fabric/core/sdk/go/generated/v1;v1";
 option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
