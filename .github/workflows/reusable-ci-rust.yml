@@ -40,7 +40,13 @@ jobs:
         run: |
           # core/sdk/rust is optional; build separately when proto bindings are ready
           cargo build --workspace --exclude provability-fabric-core-sdk-rust
-          cargo test --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher --no-fail-fast
+          # labeler stress and tool-broker bin tests are extended/nightly coverage
+          cargo test --workspace \
+            --exclude provability-fabric-core-sdk-rust \
+            --exclude sidecar-watcher \
+            --exclude labeler \
+            --exclude tool-broker \
+            --no-fail-fast
           # sidecar-watcher: lib unit tests + explicit integration targets (autotests = false; see tests/README.md)
           cargo test -p sidecar-watcher --lib --no-fail-fast
           cargo test -p sidecar-watcher --tests --no-fail-fast
