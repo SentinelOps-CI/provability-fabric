@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
+import "receipt.proto";
 
 // Egress Firewall Service for content scanning and certificate generation
 service EgressFirewallService {
@@ -247,7 +248,7 @@ message DetectorResults {
   double overall_risk_score = 5;
   
   // Risk level
-  RiskLevel risk_level = 6;
+  ScanRiskLevel risk_level = 6;
   
   // Detection confidence (0.0 to 1.0)
   double detection_confidence = 7;
@@ -268,7 +269,7 @@ message PiiDetectionResult {
   double confidence_score = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // PII location
@@ -286,7 +287,7 @@ message PiiLocation {
   double confidence = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // Secrets detection result
@@ -304,7 +305,7 @@ message SecretsDetectionResult {
   double confidence_score = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // Secret location
@@ -322,7 +323,7 @@ message SecretLocation {
   double confidence = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // Near-duplicate detection result
@@ -340,7 +341,7 @@ message NearDupeDetectionResult {
   double confidence_score = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // Policy violation result
@@ -358,7 +359,7 @@ message PolicyViolationResult {
   double confidence_score = 4;
   
   // Risk level
-  RiskLevel risk_level = 5;
+  ScanRiskLevel risk_level = 5;
 }
 
 // Policy violation
@@ -392,13 +393,13 @@ enum ViolationSeverity {
   VIOLATION_SEVERITY_CRITICAL = 4;
 }
 
-// Risk level
-enum RiskLevel {
-  RISK_LEVEL_UNSPECIFIED = 0;
-  RISK_LEVEL_LOW = 1;
-  RISK_LEVEL_MEDIUM = 2;
-  RISK_LEVEL_HIGH = 3;
-  RISK_LEVEL_CRITICAL = 4;
+// Scan content risk level
+enum ScanRiskLevel {
+  SCAN_RISK_LEVEL_UNSPECIFIED = 0;
+  SCAN_RISK_LEVEL_LOW = 1;
+  SCAN_RISK_LEVEL_MEDIUM = 2;
+  SCAN_RISK_LEVEL_HIGH = 3;
+  SCAN_RISK_LEVEL_CRITICAL = 4;
 }
 
 // Scan metadata

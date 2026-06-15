@@ -241,16 +241,16 @@ message AccessReceipt {
   google.protobuf.Timestamp timestamp = 6;
   
   // Hash of result
-  string result_hash = 6;
+  string result_hash = 7;
   
   // Signature algorithm
-  string sign_alg = 7;
+  string sign_alg = 8;
   
   // Cryptographic signature
-  string sig = 8;
+  string sig = 9;
   
   // Receipt expiration
-  google.protobuf.Timestamp expires_at = 9;
+  google.protobuf.Timestamp expires_at = 10;
 }
 
 // Plan constraints

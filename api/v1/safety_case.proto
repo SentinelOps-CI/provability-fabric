@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
+import "receipt.proto";
 
 // Safety Case Service for managing and validating safety cases
 service SafetyCaseService {
@@ -127,7 +128,7 @@ enum SafetyCaseType {
 // Risk assessment
 message RiskAssessment {
   // Overall risk level
-  RiskLevel overall_risk_level = 1;
+  SafetyRiskLevel overall_risk_level = 1;
   
   // Risk score (0.0 to 1.0)
   double risk_score = 2;
@@ -139,7 +140,7 @@ message RiskAssessment {
   repeated MitigationStrategy mitigation_strategies = 4;
   
   // Residual risk
-  RiskLevel residual_risk_level = 5;
+  SafetyRiskLevel residual_risk_level = 5;
   
   // Risk assessment timestamp
   google.protobuf.Timestamp assessed_at = 6;
@@ -151,14 +152,14 @@ message RiskAssessment {
   string methodology = 8;
 }
 
-// Risk level
-enum RiskLevel {
-  RISK_LEVEL_UNSPECIFIED = 0;
-  RISK_LEVEL_NEGLIGIBLE = 1;
-  RISK_LEVEL_LOW = 2;
-  RISK_LEVEL_MEDIUM = 3;
-  RISK_LEVEL_HIGH = 4;
-  RISK_LEVEL_CRITICAL = 5;
+// Safety case risk level
+enum SafetyRiskLevel {
+  SAFETY_RISK_LEVEL_UNSPECIFIED = 0;
+  SAFETY_RISK_LEVEL_NEGLIGIBLE = 1;
+  SAFETY_RISK_LEVEL_LOW = 2;
+  SAFETY_RISK_LEVEL_MEDIUM = 3;
+  SAFETY_RISK_LEVEL_HIGH = 4;
+  SAFETY_RISK_LEVEL_CRITICAL = 5;
 }
 
 // Risk factor
@@ -173,7 +174,7 @@ message RiskFactor {
   string description = 3;
   
   // Risk level
-  RiskLevel risk_level = 4;
+  SafetyRiskLevel risk_level = 4;
   
   // Probability (0.0 to 1.0)
   double probability = 5;
