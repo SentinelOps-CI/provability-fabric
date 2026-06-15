@@ -25,7 +25,7 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 | CI | prepare | — | — | Green (#118) |
 | CI | protobuf-lint (buf) | — | — | Green (#116 proto dedup) |
 | CI | lean | Stale `vendor/mathlib` cache without `.git` | P1 | `rm -rf` before vendor + script fix (#118) |
-| CI | go-node | `npm ci` path / prisma chain | P1 | Subshell install steps (#118) |
+| CI | go-node | PCS handoff drift; heavy benchmark suite in unit job | P1 | Fixture pins + `pcsbench` build tag (#118) |
 | CI | extended | k8s helm tests in lightweight job | P1 | Skip k8s paths; red-team offline (#118) |
 | CI | rust | Long-running | P2 | Monitor |
 
@@ -38,6 +38,7 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 | proto-* | `actions/upload-artifact@v3` deprecated | Bumped to v4 | Fixed (#116+) |
 | proto-performance | Wrong protoc encode path | Covered by `make proto-gen-go` | Fixed (#118) |
 | proto-go | protoc-gen-go not on PATH | `GOPATH/bin` in setup-go | Fixed (#118) |
+| proto-ts/rust | Global npm/cargo plugin bins not on PATH | Append prefix/bin to `GITHUB_PATH` | Fixed (#118) |
 
 ## Actionlint
 
