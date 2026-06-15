@@ -22,6 +22,11 @@ def main() -> int:
             [
                 "protoc",
                 f"--proto_path={REPO_ROOT / 'api'}",
+                *(
+                    [f"--proto_path={Path('/usr/include')}"]
+                    if Path("/usr/include").exists()
+                    else []
+                ),
                 "--descriptor_set_out=/dev/null",
                 str(proto.relative_to(REPO_ROOT)),
             ],

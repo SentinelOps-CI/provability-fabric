@@ -1,6 +1,7 @@
 # Protobuf generation and validation (included from root Makefile).
 # SPDX-License-Identifier: Apache-2.0
 
+PROTOC_INCLUDE ?= /usr/include
 PROTO_API_DIR := api
 PROTO_V1_DIR := api/v1
 PROTO_FILES := $(wildcard $(PROTO_V1_DIR)/*.proto)
@@ -18,7 +19,8 @@ proto-lint:
 	@command -v protoc >/dev/null 2>&1 || { echo "protoc is required"; exit 1; }
 	@for f in $(PROTO_FILES); do \
 		echo "  $$f"; \
-		protoc --proto_path=$(PROTO_API_DIR) --descriptor_set_out=/dev/null "$$f" || exit 1; \
+		protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
+			--descriptor_set_out=/dev/null "$$f" || exit 1; \
 	done
 	@$(ECHOOK) "Protobuf lint passed"
 
@@ -27,18 +29,17 @@ proto-validate: proto-lint
 proto-gen-go:
 	@$(ECHOOK) "Generating Go protobuf bindings..."
 	@mkdir -p $(GO_PROTO_OUT)
-	@protoc --proto_path=$(PROTO_API_DIR) \
+	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
 		--go_out=$(GO_PROTO_OUT) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GO_PROTO_OUT) --go-grpc_opt=paths=source_relative \
 		$(PROTO_FILES)
-	@cd core/sdk/go && go build ./...
 
 proto-gen-ts:
 	@$(ECHOOK) "Generating TypeScript protobuf bindings..."
 	@command -v protoc-gen-ts_proto >/dev/null 2>&1 || { echo "Install ts-proto: npm install -g ts-proto"; exit 1; }
 	@mkdir -p $(TS_SDK_DIR)/generated
-	@protoc --plugin=protoc-gen-ts_proto \
-		--proto_path=$(PROTO_API_DIR) \
+	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
+		--plugin=protoc-gen-ts_proto \
 		--ts_proto_out=$(TS_SDK_DIR)/generated \
 		--ts_proto_opt=esModuleInterop=true \
 		--ts_proto_opt=forceLong=string \
