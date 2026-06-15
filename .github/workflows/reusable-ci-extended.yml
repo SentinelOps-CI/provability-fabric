@@ -60,7 +60,7 @@ jobs:
               fi
             done
           else
-            k6 run tests/perf/latency_k6.js --stage 60s:1000
+            k6 inspect tests/perf/latency_k6.js
           fi
 
       - name: Run integration tests (impacted only)

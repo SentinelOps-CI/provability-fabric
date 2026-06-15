@@ -8,7 +8,7 @@ echo "🔧 Vendoring mathlib for offline builds..."
 
 # Configuration
 MATHLIB_VERSION="v4.7.0"
-MATHLIB_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac"
+MATHLIB_COMMIT="a45ae63747140c1b2cbad9d46f518015c047047a"
 VENDOR_DIR="vendor/mathlib"
 
 # Create vendor directory

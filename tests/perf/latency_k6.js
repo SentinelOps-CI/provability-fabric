@@ -19,16 +19,12 @@ export const options = {
     { duration: '30s', target: 0 }, // Ramp down
   ],
   thresholds: {
-    // SLO thresholds
-    'p(95)': ['total_latency_ms < 2000'], // p95 < 2.0s
-    'p(99)': ['total_latency_ms < 4000'], // p99 < 4.0s
-    'errors': ['rate < 0.001'], // Error rate < 0.1%
-    
-    // Component budget thresholds
-    'p(95)': ['plan_latency_ms < 150'], // Plan budget
-    'p(95)': ['retrieval_latency_ms < 600'], // Retrieval budget
-    'p(95)': ['kernel_latency_ms < 120'], // Kernel budget
-    'p(95)': ['egress_latency_ms < 400'], // Egress budget
+    'total_latency_ms': ['p(95)<2000', 'p(99)<4000'],
+    'errors': ['rate<0.001'],
+    'plan_latency_ms': ['p(95)<150'],
+    'retrieval_latency_ms': ['p(95)<600'],
+    'kernel_latency_ms': ['p(95)<120'],
+    'egress_latency_ms': ['p(95)<400'],
   },
 };
 
