@@ -42,7 +42,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
       - name: Install dependencies
         run: |
@@ -81,7 +80,7 @@ jobs:
 
       - name: Check for broken links
         run: |
-          npm install -g markdown-link-check
+          npm install -g markdown-link-check@3.11.2
           find docs -name "*.md" -exec markdown-link-check -c .markdown-link-check.json -q {} \;
 
       - name: Deploy to GitHub Pages

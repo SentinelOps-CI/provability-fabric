@@ -1033,15 +1033,6 @@ message GetSafetyCaseStatsRequest {
   string group_by = 4;
 }
 
-// Statistics scope
-enum StatsScope {
-  STATS_SCOPE_UNSPECIFIED = 0;
-  STATS_SCOPE_TENANT = 1;
-  STATS_SCOPE_GLOBAL = 2;
-  STATS_SCOPE_TYPE = 3;
-  STATS_SCOPE_STATUS = 4;
-}
-
 // Get safety case statistics response
 message GetSafetyCaseStatsResponse {
   // Safety case statistics
@@ -1051,7 +1042,7 @@ message GetSafetyCaseStatsResponse {
   repeated TimeSeriesPoint time_series = 2;
   
   // Grouped statistics
-  repeated GroupedStatistics grouped_stats = 3;
+  repeated SafetyCaseGroupedStatistics grouped_stats = 3;
   
   // Statistics timestamp
   google.protobuf.Timestamp timestamp = 4;
@@ -1087,23 +1078,8 @@ message SafetyCaseStatistics {
   double avg_compliance_score = 9;
 }
 
-// Time series point
-message TimeSeriesPoint {
-  // Timestamp
-  google.protobuf.Timestamp timestamp = 1;
-  
-  // Value
-  double value = 2;
-  
-  // Metric name
-  string metric = 3;
-  
-  // Additional metadata
-  map<string, string> metadata = 4;
-}
-
-// Grouped statistics
-message GroupedStatistics {
+// Grouped safety case statistics
+message SafetyCaseGroupedStatistics {
   // Group key
   string group_key = 1;
   
@@ -1112,78 +1088,4 @@ message GroupedStatistics {
   
   // Statistics for this group
   SafetyCaseStatistics statistics = 3;
-}
-
-// Health check request
-message HealthCheckRequest {
-  // Service identifier
-  string service = 1;
-  
-  // Health check level
-  HealthCheckLevel level = 2;
-}
-
-// Health check level
-enum HealthCheckLevel {
-  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
-  HEALTH_CHECK_LEVEL_BASIC = 1;
-  HEALTH_CHECK_LEVEL_DETAILED = 2;
-  HEALTH_CHECK_LEVEL_CRITICAL = 3;
-}
-
-// Health check response
-message HealthCheckResponse {
-  // Service status
-  ServiceStatus status = 1;
-  
-  // Service version
-  string version = 2;
-  
-  // Uptime in seconds
-  uint64 uptime_seconds = 3;
-  
-  // Service metadata
-  map<string, string> metadata = 4;
-  
-  // Health check details
-  repeated HealthCheckDetail details = 5;
-  
-  // Last health check timestamp
-  google.protobuf.Timestamp last_check = 6;
-}
-
-// Service status
-enum ServiceStatus {
-  SERVICE_STATUS_UNSPECIFIED = 0;
-  SERVICE_STATUS_HEALTHY = 1;
-  SERVICE_STATUS_DEGRADED = 2;
-  SERVICE_STATUS_UNHEALTHY = 3;
-  SERVICE_STATUS_UNKNOWN = 4;
-}
-
-// Health check detail
-message HealthCheckDetail {
-  // Component name
-  string component = 1;
-  
-  // Component status
-  ComponentStatus status = 2;
-  
-  // Component message
-  string message = 3;
-  
-  // Component metrics
-  map<string, string> metrics = 4;
-  
-  // Last check timestamp
-  google.protobuf.Timestamp last_check = 5;
-}
-
-// Component status
-enum ComponentStatus {
-  COMPONENT_STATUS_UNSPECIFIED = 0;
-  COMPONENT_STATUS_HEALTHY = 1;
-  COMPONENT_STATUS_DEGRADED = 2;
-  COMPONENT_STATUS_UNHEALTHY = 3;
-  COMPONENT_STATUS_UNKNOWN = 4;
 }

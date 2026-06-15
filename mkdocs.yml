@@ -134,7 +134,7 @@ nav:
           - Forensic replay: guides/forensic-replay-basic.md
           - Changelog: CHANGELOG.md
   - Roadmap:
-      - Evidence v0.1: roadmap/evidence-v0.1.md
+      - Evidence v0.2 integration: roadmap/evidence-v0.2.md
   - Security:
       - Overview: security/overview.md
       - Threat model: security/threat_model.md

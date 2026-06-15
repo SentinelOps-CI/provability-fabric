@@ -517,29 +517,6 @@ message VerifyCertificateRequest {
   VerificationLevel level = 4;
 }
 
-// Verification context
-message VerificationContext {
-  // Verification timestamp
-  google.protobuf.Timestamp verification_time = 1;
-  
-  // Verifier identifier
-  string verifier_id = 2;
-  
-  // Verification purpose
-  string purpose = 3;
-  
-  // Additional context
-  map<string, string> metadata = 4;
-}
-
-// Verification level
-enum VerificationLevel {
-  VERIFICATION_LEVEL_UNSPECIFIED = 0;
-  VERIFICATION_LEVEL_BASIC = 1;
-  VERIFICATION_LEVEL_STRICT = 2;
-  VERIFICATION_LEVEL_CRITICAL = 3;
-}
-
 // Verify certificate response
 message VerifyCertificateResponse {
   // Verification result
@@ -600,28 +577,13 @@ message ContentItem {
   ScanPriority priority = 4;
 }
 
-// Batch configuration
-message BatchConfig {
-  // Maximum batch size
-  uint32 max_batch_size = 1;
-  
-  // Timeout in milliseconds
-  uint32 timeout_ms = 2;
-  
-  // Enable parallel processing
-  bool enable_parallel = 3;
-  
-  // Maximum concurrent scans
-  uint32 max_concurrent = 4;
-}
-
 // Batch scan response
 message BatchScanContentResponse {
   // Scan results for each content item
   repeated ContentScanResult results = 1;
   
   // Batch statistics
-  BatchStats stats = 2;
+  ContentScanBatchStats stats = 2;
   
   // Total processing time in milliseconds
   uint64 total_processing_time_ms = 3;
@@ -651,8 +613,8 @@ message ContentScanResult {
   bool success = 4;
 }
 
-// Batch statistics
-message BatchStats {
+// Content scan batch statistics
+message ContentScanBatchStats {
   // Total content items processed
   uint32 total_items = 1;
   
@@ -920,27 +882,6 @@ message GetFirewallStatsRequest {
   TimeRange time_range = 3;
 }
 
-// Statistics scope
-enum StatsScope {
-  STATS_SCOPE_UNSPECIFIED = 0;
-  STATS_SCOPE_TENANT = 1;
-  STATS_SCOPE_GLOBAL = 2;
-  STATS_SCOPE_PERFORMANCE = 3;
-  STATS_SCOPE_SECURITY = 4;
-}
-
-// Time range
-message TimeRange {
-  // Start timestamp
-  google.protobuf.Timestamp start_time = 1;
-  
-  // End timestamp
-  google.protobuf.Timestamp end_time = 2;
-  
-  // Time granularity in seconds
-  uint32 granularity_seconds = 3;
-}
-
 // Get firewall statistics response
 message GetFirewallStatsResponse {
   // Firewall statistics
@@ -986,21 +927,6 @@ message FirewallStatistics {
   uint64 backpressure_activations = 9;
 }
 
-// Time series point
-message TimeSeriesPoint {
-  // Timestamp
-  google.protobuf.Timestamp timestamp = 1;
-  
-  // Value
-  double value = 2;
-  
-  // Metric name
-  string metric = 3;
-  
-  // Additional metadata
-  map<string, string> metadata = 4;
-}
-
 // Detector performance statistics
 message DetectorPerformanceStats {
   // Detector name
@@ -1020,78 +946,4 @@ message DetectorPerformanceStats {
   
   // Detection accuracy (0.0 to 1.0)
   double detection_accuracy = 6;
-}
-
-// Health check request
-message HealthCheckRequest {
-  // Service identifier
-  string service = 1;
-  
-  // Health check level
-  HealthCheckLevel level = 2;
-}
-
-// Health check level
-enum HealthCheckLevel {
-  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
-  HEALTH_CHECK_LEVEL_BASIC = 1;
-  HEALTH_CHECK_LEVEL_DETAILED = 2;
-  HEALTH_CHECK_LEVEL_CRITICAL = 3;
-}
-
-// Health check response
-message HealthCheckResponse {
-  // Service status
-  ServiceStatus status = 1;
-  
-  // Service version
-  string version = 2;
-  
-  // Uptime in seconds
-  uint64 uptime_seconds = 3;
-  
-  // Service metadata
-  map<string, string> metadata = 4;
-  
-  // Health check details
-  repeated HealthCheckDetail details = 5;
-  
-  // Last health check timestamp
-  google.protobuf.Timestamp last_check = 6;
-}
-
-// Service status
-enum ServiceStatus {
-  SERVICE_STATUS_UNSPECIFIED = 0;
-  SERVICE_STATUS_HEALTHY = 1;
-  SERVICE_STATUS_DEGRADED = 2;
-  SERVICE_STATUS_UNHEALTHY = 3;
-  SERVICE_STATUS_UNKNOWN = 4;
-}
-
-// Health check detail
-message HealthCheckDetail {
-  // Component name
-  string component = 1;
-  
-  // Component status
-  ComponentStatus status = 2;
-  
-  // Component message
-  string message = 3;
-  
-  // Component metrics
-  map<string, string> metrics = 4;
-  
-  // Last check timestamp
-  google.protobuf.Timestamp last_check = 5;
-}
-
-// Component status
-enum ComponentStatus {
-  COMPONENT_STATUS_UNSPECIFIED = 0;
-  COMPONENT_STATUS_HEALTHY = 1;
-  COMPONENT_STATUS_DEGRADED = 2;
-  COMPONENT_STATUS_UNHEALTHY = 3;
-  COMPONENT_STATUS_UNKNOWN = 4;
 }
