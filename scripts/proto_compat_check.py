@@ -28,7 +28,7 @@ def main() -> int:
                     else []
                 ),
                 "--descriptor_set_out=/dev/null",
-                str(proto.relative_to(REPO_ROOT)),
+                str(proto.relative_to(REPO_ROOT / "api")),
             ],
             cwd=REPO_ROOT,
             capture_output=True,
