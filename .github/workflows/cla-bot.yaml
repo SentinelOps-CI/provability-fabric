@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  CLA_CONFIG_PATH: "cla/cla.json"
+  CLA_CONFIG_PATH: "CLA/cla.json"
   CLA_CHECK_NAME: "CLA Check"
 
 jobs:
@@ -114,7 +114,7 @@ jobs:
 
           # Option B (ci-health-matrix): when CLA hosted service is unavailable, skip
           # verification on workflow_dispatch and do not block push-to-main (no push trigger).
-          if ! curl -fsS --max-time 10 "${CLA_URL}/health" >/dev/null 2>&1; then
+          if ! curl -fsS --max-time 10 "${CLA_URL}" >/dev/null 2>&1; then
             echo "CLA service unreachable at ${CLA_URL}; skipping check (configure hosted CLA or restore API)"
             echo "cla_status=success" >> $GITHUB_OUTPUT
             echo "missing_contributors=" >> $GITHUB_OUTPUT
