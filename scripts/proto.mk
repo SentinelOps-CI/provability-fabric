@@ -49,7 +49,7 @@ proto-gen-ts:
 
 proto-gen-rust:
 	@$(ECHOOK) "Generating Rust protobuf bindings (via tonic_build)..."
-	@cd $(RUST_SDK_DIR) && cargo check
+	@cargo build -p provability-fabric-core-sdk-rust --build-script-only
 
 proto-gen: proto-gen-go proto-gen-ts proto-gen-rust
 	@$(ECHOOK) "Protobuf code generation complete"

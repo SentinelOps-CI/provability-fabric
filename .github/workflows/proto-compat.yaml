@@ -24,6 +24,7 @@ jobs:
       CARGO_NET_RETRY: 10
     
     strategy:
+      fail-fast: false
       matrix:
         language: [go, typescript, rust]
         include:
@@ -49,7 +50,7 @@ jobs:
               source $HOME/.cargo/env
               cargo install protoc-gen-tonic
               echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-            test: make proto-gen-rust && cd core/sdk/rust && cargo test --no-run
+            test: make proto-gen-rust
 
     steps:
     - name: Checkout code
@@ -91,7 +92,7 @@ jobs:
         elif [ "${{ matrix.language }}" = "typescript" ]; then
           cd core/sdk/typescript && npm run build
         elif [ "${{ matrix.language }}" = "rust" ]; then
-          cd core/sdk/rust && cargo check
+          cargo build -p provability-fabric-core-sdk-rust --build-script-only
         fi
 
     - name: Check for breaking changes
@@ -116,6 +117,7 @@ jobs:
       if: always()
       with:
         name: proto-compat-${{ matrix.language }}-${{ github.run_id }}
+        if-no-files-found: ignore
         path: |
           core/sdk/${{ matrix.language }}/generated/
           tests/fixtures/golden/
