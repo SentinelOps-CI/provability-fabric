@@ -48,8 +48,13 @@ proto-gen-ts:
 		$(PROTO_FILES)
 
 proto-gen-rust:
-	@$(ECHOOK) "Generating Rust protobuf bindings (via tonic_build)..."
-	@cargo build -p provability-fabric-core-sdk-rust --build-script-only
+	@$(ECHOOK) "Generating Rust protobuf bindings (via protoc-gen-tonic)..."
+	@command -v protoc-gen-tonic >/dev/null 2>&1 || { echo "protoc-gen-tonic is required (cargo install protoc-gen-tonic)"; exit 1; }
+	@mkdir -p $(RUST_SDK_DIR)/.proto-gen-out
+	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
+		--plugin=protoc-gen-tonic=$$(command -v protoc-gen-tonic) \
+		--tonic_out=$(RUST_SDK_DIR)/.proto-gen-out \
+		$(PROTO_FILES)
 
 proto-gen: proto-gen-go proto-gen-ts proto-gen-rust
 	@$(ECHOOK) "Protobuf code generation complete"

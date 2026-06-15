@@ -92,7 +92,7 @@ jobs:
         elif [ "${{ matrix.language }}" = "typescript" ]; then
           cd core/sdk/typescript && npm run build
         elif [ "${{ matrix.language }}" = "rust" ]; then
-          cargo build -p provability-fabric-core-sdk-rust --build-script-only
+          make proto-gen-rust
         fi
 
     - name: Check for breaking changes
