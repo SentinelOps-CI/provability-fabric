@@ -72,7 +72,7 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
 | Workflow | Known failure | Priority | Fix |
 |----------|---------------|----------|-----|
-| Multi-Architecture Build & Deploy | Invalid image tag `:-<sha>` on PR builds | P2 | `type=sha,prefix=sha-` (#118) |
+| Multi-Architecture Build & Deploy | Wrong build context (`/` vs service dir); invalid PR sha tag | P2 | Per-service `context` + `sha-` prefix (#118) |
 
 ## CLA / automation
 
