@@ -680,14 +680,14 @@ message ValidateSafetyCaseRequest {
   SafetyCase safety_case = 1;
   
   // Validation context
-  ValidationContext context = 2;
+  SafetyCaseValidationContext context = 2;
   
   // Validation level
-  ValidationLevel level = 3;
+  SafetyCaseValidationLevel level = 3;
 }
 
-// Validation context
-message ValidationContext {
+// Safety case validation context
+message SafetyCaseValidationContext {
   // Validation timestamp
   google.protobuf.Timestamp validation_time = 1;
   
@@ -701,12 +701,12 @@ message ValidationContext {
   map<string, string> metadata = 4;
 }
 
-// Validation level
-enum ValidationLevel {
-  VALIDATION_LEVEL_UNSPECIFIED = 0;
-  VALIDATION_LEVEL_BASIC = 1;
-  VALIDATION_LEVEL_STRICT = 2;
-  VALIDATION_LEVEL_CRITICAL = 3;
+// Safety case validation level
+enum SafetyCaseValidationLevel {
+  SAFETY_CASE_VALIDATION_LEVEL_UNSPECIFIED = 0;
+  SAFETY_CASE_VALIDATION_LEVEL_BASIC = 1;
+  SAFETY_CASE_VALIDATION_LEVEL_STRICT = 2;
+  SAFETY_CASE_VALIDATION_LEVEL_CRITICAL = 3;
 }
 
 // Validate safety case response
