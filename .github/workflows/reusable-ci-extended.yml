@@ -68,14 +68,28 @@ jobs:
           IMPACTED_TESTS: ${{ inputs.impacted_tests }}
         run: |
           pip install -r tests/integration/requirements.txt
-          if ! command -v kind >/dev/null 2>&1; then
-            echo "Skipping integration tests: kind not available on runner"
-            exit 0
-          fi
+          # Kind/Helm admission tests run in integration.yaml; ci-extended covers red-team + perf only.
           if [ -n "$IMPACTED_TESTS" ]; then
-            timeout 20m pytest $IMPACTED_TESTS -v
+            k8s_tests=""
+            for test in $IMPACTED_TESTS; do
+              case "$test" in
+                *test_happy_path.py|*test_violation_path.py)
+                  echo "Skipping k8s integration test in ci-extended: $test"
+                  ;;
+                *)
+                  k8s_tests="$k8s_tests $test"
+                  ;;
+              esac
+            done
+            if [ -n "$k8s_tests" ]; then
+              timeout 20m pytest $k8s_tests -v
+            else
+              echo "No non-k8s impacted integration tests to run"
+            fi
           else
-            timeout 20m pytest tests/integration/ -v
+            timeout 20m pytest tests/integration/ -v \
+              --ignore=tests/integration/test_happy_path.py \
+              --ignore=tests/integration/test_violation_path.py
           fi
 
       - name: Sign spec bundles
