@@ -150,8 +150,8 @@ export const searchCertificates = async (request: {
   tenant_id?: string;
   policy_hash?: string;
   session_id?: string;
-  start_time?: Date;
-  end_time?: Date;
+  start_time?: Date | string;
+  end_time?: Date | string;
   ni_monitor?: string;
   limit?: number;
   offset?: number;
