@@ -50,7 +50,7 @@ proto-gen-ts:
 proto-gen-rust:
 	@$(ECHOOK) "Generating Rust protobuf bindings (via protoc-gen-tonic)..."
 	@command -v protoc-gen-tonic >/dev/null 2>&1 || { echo "protoc-gen-tonic is required (cargo install protoc-gen-tonic)"; exit 1; }
-	@mkdir -p $(RUST_SDK_DIR)/.proto-gen-out
+	@mkdir -p $(RUST_SDK_DIR)/.proto-gen-out/provability_fabric/api/v1
 	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
 		--plugin=protoc-gen-tonic=$$(command -v protoc-gen-tonic) \
 		--tonic_out=$(RUST_SDK_DIR)/.proto-gen-out \
