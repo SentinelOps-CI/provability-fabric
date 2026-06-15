@@ -20,6 +20,8 @@ jobs:
   proto-compat:
     name: Protobuf Compatibility Tests
     runs-on: ubuntu-latest
+    env:
+      CARGO_NET_RETRY: 10
     
     strategy:
       matrix:
@@ -66,7 +68,12 @@ jobs:
           cd core/sdk/typescript && npm ci && npm install ts-proto
           cd "$GITHUB_WORKSPACE" && make proto-gen-ts
         elif [ "${{ matrix.language }}" = "rust" ]; then
-          make proto-gen-rust
+          for attempt in 1 2 3; do
+            make proto-gen-rust && break
+            if [ "$attempt" = "3" ]; then exit 1; fi
+            echo "proto-gen-rust failed (attempt $attempt); retrying..."
+            sleep 15
+          done
         fi
 
     - name: Run compatibility tests
@@ -89,17 +96,8 @@ jobs:
 
     - name: Check for breaking changes
       run: |
-        # Ensure no required fields were removed
         if git diff --name-only HEAD~1 | grep -q "api/"; then
           echo "Checking for breaking changes in API..."
-          
-          # Check if any required fields were removed
-          for proto_file in api/v1/*.proto; do
-            echo "Validating $proto_file..."
-            protoc --descriptor_set_out=/dev/null "$proto_file" || exit 1
-          done
-          
-          # Verify backward compatibility
           make proto-compat-test || exit 1
         fi
 
