@@ -54,6 +54,10 @@ interface CertV1Extended {
   metadata: ExtendedMetadata;
 }
 
+function certCoreRef(cert: CertV1Core | CertV1Extended): CertV1Core {
+  return 'core' in cert ? cert.core : cert;
+}
+
 interface DecisionReasoning {
   primary_reason: string;
   explanation: string;
@@ -243,10 +247,11 @@ export default function EnhancedEvidencePage() {
 
   // Get certificate details when selected
   const { data: certificateDetails, isLoading: isLoadingDetails } = useQuery(
-    ['certificate-details', selectedCertificate?.bundle_id, selectedCertificate?.session_id],
+    ['certificate-details', selectedCertificate ? certCoreRef(selectedCertificate).bundle_id : null, selectedCertificate ? certCoreRef(selectedCertificate).session_id : null],
     () => {
       if (!selectedCertificate) return null;
-      return getCertificateDetails(selectedCertificate.bundle_id, selectedCertificate.session_id);
+      const core = certCoreRef(selectedCertificate);
+      return getCertificateDetails(core.bundle_id, core.session_id);
     },
     {
       enabled: !!selectedCertificate,
