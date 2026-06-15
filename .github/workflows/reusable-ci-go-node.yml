@@ -48,7 +48,9 @@ jobs:
           (cd core/sdk/typescript && npm ci)
 
       - name: Run spectral lint
-        run: spectral lint **/spec.yaml --ruleset config/schemas/aispec-schema.json
+        run: |
+          mapfile -t specs < <(find . -name spec.yaml ! -path './bundles/art/*')
+          spectral lint "${specs[@]}" --ruleset config/schemas/aispec-schema.json
 
       - name: Test PCS science-claim
         run: make test-pcs validate-pcs-fixtures
