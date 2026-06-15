@@ -36,9 +36,9 @@ proto-gen-go:
 
 proto-gen-ts:
 	@$(ECHOOK) "Generating TypeScript protobuf bindings..."
-	@command -v protoc-gen-ts_proto >/dev/null 2>&1 || { echo "Install ts-proto: npm install -g ts-proto"; exit 1; }
+	@PATH="$(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin:$$PATH" command -v protoc-gen-ts_proto >/dev/null 2>&1 || { echo "Install ts-proto in $(TS_SDK_DIR) (npm install ts-proto)"; exit 1; }
 	@mkdir -p $(TS_SDK_DIR)/generated
-	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
+	@PATH="$(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin:$$PATH" protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
 		--plugin=protoc-gen-ts_proto \
 		--ts_proto_out=$(TS_SDK_DIR)/generated \
 		--ts_proto_opt=esModuleInterop=true \

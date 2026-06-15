@@ -32,9 +32,8 @@ jobs:
             setup: |
               sudo apt-get update
               sudo apt-get install -y protobuf-compiler nodejs npm
-              npm install -g ts-proto
-              echo "$(npm config get prefix)/bin" >> "$GITHUB_PATH"
-            test: make proto-gen-ts && cd core/sdk/typescript && npm ci && npm test
+              cd core/sdk/typescript && npm ci && npm install ts-proto
+            test: make proto-gen-ts && cd core/sdk/typescript && npm test
           - language: rust
             setup: |
               sudo apt-get update
