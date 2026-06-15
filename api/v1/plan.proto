@@ -8,6 +8,7 @@ option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
+import "v1/receipt.proto";
 
 // Plan represents a typed plan with capabilities and constraints
 message Plan {
@@ -218,39 +219,6 @@ message RetryConfig {
   
   // Backoff multiplier
   float backoff_multiplier = 4;
-}
-
-// Access receipt for data access
-message AccessReceipt {
-  // Unique receipt identifier
-  string receipt_id = 1;
-  
-  // Tenant identifier
-  string tenant = 2;
-  
-  // Subject identifier
-  string subject_id = 3;
-  
-  // Hash of query
-  string query_hash = 4;
-  
-  // Index shard identifier
-  string index_shard = 5;
-  
-  // Receipt timestamp
-  google.protobuf.Timestamp timestamp = 6;
-  
-  // Hash of result
-  string result_hash = 6;
-  
-  // Signature algorithm
-  string sign_alg = 7;
-  
-  // Cryptographic signature
-  string sig = 8;
-  
-  // Receipt expiration
-  google.protobuf.Timestamp expires_at = 9;
 }
 
 // Plan constraints

@@ -7,7 +7,9 @@ Impacted Target Selector.
 Reads changed files from git diff and returns affected Lean targets via reverse-deps lookup.
 """
 
+import argparse
 import json
+import os
 import subprocess
 import sys
 import re
@@ -50,14 +52,12 @@ def filter_lean_files(changed_files: List[str]) -> List[str]:
 
 def get_impacted_targets(workspace_root: str, changed_files: List[str]) -> Set[str]:
     """Get impacted build targets from changed files."""
-    dep_graph = LeanDepGraph(workspace_root)
-    dep_graph.build_dependency_graph()
-
-    # Filter to Lean files
     lean_files = filter_lean_files(changed_files)
-
     if not lean_files:
         return set()
+
+    dep_graph = LeanDepGraph(workspace_root)
+    dep_graph.build_dependency_graph()
 
     # Get impacted modules
     impacted_modules = dep_graph.get_impacted_modules(lean_files)
@@ -126,69 +126,128 @@ def get_impacted_agents(workspace_root: str, changed_files: List[str]) -> Set[st
     return impacted_agents
 
 
+def build_result(
+    workspace_root: str, changed_files: List[str]
+) -> dict:
+    """Compute impacted targets/tests/agents for changed files."""
+    impacted_targets = get_impacted_targets(workspace_root, changed_files)
+    impacted_tests = get_impacted_tests(workspace_root, changed_files)
+    impacted_agents = get_impacted_agents(workspace_root, changed_files)
+    allowlist_impacted = get_impacted_allowlist(workspace_root, changed_files)
+    return {
+        "changed_files": changed_files,
+        "impacted_targets": sorted(impacted_targets),
+        "impacted_tests": sorted(impacted_tests),
+        "impacted_agents": sorted(impacted_agents),
+        "allowlist_impacted": allowlist_impacted,
+        "allowlist_needs_update": allowlist_impacted,
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Select Lean bundles, tests, and agents impacted by git changes."
+    )
+    parser.add_argument(
+        "workspace_root",
+        nargs="?",
+        default=".",
+        help="Repository root (positional; prefer --root in CI)",
+    )
+    parser.add_argument(
+        "base_ref",
+        nargs="?",
+        default=None,
+        help="Git ref to diff against (positional; prefer --base-ref in CI)",
+    )
+    parser.add_argument("--root", dest="root", default=None, help="Repository root")
+    parser.add_argument(
+        "--base-ref",
+        dest="base_ref_flag",
+        default=None,
+        help="Git ref to diff against (default: main or GITHUB_EVENT_BEFORE)",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        default=None,
+        help="Write JSON results to this path (used by reusable-ci-prepare)",
+    )
+    return parser.parse_args()
+
+
+def resolve_base_ref(args: argparse.Namespace) -> str:
+    if args.base_ref_flag:
+        return args.base_ref_flag
+    if args.base_ref:
+        return args.base_ref
+    return os.environ.get("GITHUB_EVENT_BEFORE") or "main"
+
+
 def main():
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python3 tools/select_impacted.py <workspace_root> [base_ref]")
-        sys.exit(1)
-
-    workspace_root = sys.argv[1]
-    base_ref = sys.argv[2] if len(sys.argv) > 2 else "main"
+    args = parse_args()
+    workspace_root = args.root or args.workspace_root
+    base_ref = resolve_base_ref(args)
 
     # Get changed files
     changed_files = get_changed_files(workspace_root, base_ref)
 
     if not changed_files:
         print("No changed files found")
+        if args.output:
+            result = build_result(workspace_root, [])
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            print(f"Wrote empty JSON output to {output_path}")
         sys.exit(0)
 
     print(f"Changed files: {len(changed_files)}")
     for file_path in changed_files:
         print(f"  - {file_path}")
 
-    # Get impacted targets
-    impacted_targets = get_impacted_targets(workspace_root, changed_files)
-    impacted_tests = get_impacted_tests(workspace_root, changed_files)
-    impacted_agents = get_impacted_agents(workspace_root, changed_files)
-    allowlist_impacted = get_impacted_allowlist(workspace_root, changed_files)
+    result = build_result(workspace_root, changed_files)
+    impacted_targets = result["impacted_targets"]
+    impacted_tests = result["impacted_tests"]
+    impacted_agents = result["impacted_agents"]
+    allowlist_impacted = result["allowlist_impacted"]
 
     # Print summary
     print(f"\nImpacted targets: {len(impacted_targets)}")
-    for target in sorted(impacted_targets):
+    for target in impacted_targets:
         print(f"  - {target}")
 
     print(f"\nImpacted tests: {len(impacted_tests)}")
-    for test in sorted(impacted_tests):
+    for test in impacted_tests:
         print(f"  - {test}")
 
     print(f"\nImpacted agents: {len(impacted_agents)}")
-    for agent in sorted(impacted_agents):
+    for agent in impacted_agents:
         print(f"  - {agent}")
 
     print(f"\nAllowlist impacted: {allowlist_impacted}")
 
     # Output for CI consumption
     print("\n--- TARGETS ---")
-    for target in sorted(impacted_targets):
+    for target in impacted_targets:
         print(target)
 
     print("\n--- TESTS ---")
-    for test in sorted(impacted_tests):
+    for test in impacted_tests:
         print(test)
 
     print("\n--- AGENTS ---")
-    for agent in sorted(impacted_agents):
+    for agent in impacted_agents:
         print(agent)
 
-    # Output JSON for further processing
-    result = {
-        "changed_files": changed_files,
-        "impacted_targets": list(impacted_targets),
-        "impacted_tests": list(impacted_tests),
-        "impacted_agents": list(impacted_agents),
-        "allowlist_impacted": allowlist_impacted,
-    }
-    print(f"\nJSON output:\n{json.dumps(result, indent=2)}")
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        print(f"\nWrote JSON output to {output_path}")
+    else:
+        print(f"\nJSON output:\n{json.dumps(result, indent=2)}")
 
 
 if __name__ == "__main__":

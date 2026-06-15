@@ -341,6 +341,9 @@ message TimeRange {
   
   // End timestamp
   google.protobuf.Timestamp end_time = 2;
+
+  // Time granularity in seconds (optional; used by firewall stats)
+  uint32 granularity_seconds = 3;
 }
 
 // Pagination
@@ -516,6 +519,10 @@ enum StatsScope {
   STATS_SCOPE_GLOBAL = 2;
   STATS_SCOPE_SUBJECT = 3;
   STATS_SCOPE_SHARD = 4;
+  STATS_SCOPE_PERFORMANCE = 5;
+  STATS_SCOPE_SECURITY = 6;
+  STATS_SCOPE_TYPE = 7;
+  STATS_SCOPE_STATUS = 8;
 }
 
 // Get receipt statistics response

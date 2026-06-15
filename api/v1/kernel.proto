@@ -7,8 +7,9 @@ option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
-import "plan.proto";
+import "v1/plan.proto";
+import "v1/receipt.proto";
+import "v1/egress.proto";
 
 // Policy Kernel Service for plan validation and enforcement
 service PolicyKernelService {
@@ -19,7 +20,7 @@ service PolicyKernelService {
   rpc ValidatePlanWithCache(ValidatePlanWithCacheRequest) returns (ValidatePlanWithCacheResponse);
   
   // Verify access receipts
-  rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+  rpc VerifyReceipt(PolicyKernelServiceVerifyReceiptRequest) returns (PolicyKernelServiceVerifyReceiptResponse);
   
   // Batch validate multiple plans
   rpc BatchValidatePlans(BatchValidatePlansRequest) returns (BatchValidatePlansResponse);
@@ -35,9 +36,6 @@ service PolicyKernelService {
   
   // Invalidate cache by policy
   rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
-  
-  // Health check
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
   
   // Get kernel metrics
   rpc GetKernelMetrics(GetKernelMetricsRequest) returns (GetKernelMetricsResponse);
@@ -85,8 +83,8 @@ message ValidatePlanWithCacheResponse {
   repeated string warnings = 7;
 }
 
-// Receipt verification request
-message VerifyReceiptRequest {
+// Kernel receipt verification request
+message PolicyKernelServiceVerifyReceiptRequest {
   // Receipt identifier
   string receipt_id = 1;
   
@@ -130,16 +128,8 @@ message ReceiptVerificationContext {
   map<string, string> metadata = 4;
 }
 
-// Verification level
-enum VerificationLevel {
-  VERIFICATION_LEVEL_UNSPECIFIED = 0;
-  VERIFICATION_LEVEL_BASIC = 1;
-  VERIFICATION_LEVEL_STRICT = 2;
-  VERIFICATION_LEVEL_CRITICAL = 3;
-}
-
-// Receipt verification response
-message VerifyReceiptResponse {
+// Kernel receipt verification response
+message PolicyKernelServiceVerifyReceiptResponse {
   // Verification result
   bool valid = 1;
   
@@ -177,28 +167,13 @@ message BatchValidatePlansRequest {
   ValidationContext context = 3;
 }
 
-// Batch configuration
-message BatchConfig {
-  // Maximum batch size
-  uint32 max_batch_size = 1;
-  
-  // Timeout in milliseconds
-  uint32 timeout_ms = 2;
-  
-  // Enable parallel processing
-  bool enable_parallel = 3;
-  
-  // Maximum concurrent validations
-  uint32 max_concurrent = 4;
-}
-
 // Batch validation response
 message BatchValidatePlansResponse {
   // Validation results for each plan
   repeated PlanValidationResult plan_results = 1;
   
   // Batch statistics
-  BatchStats stats = 2;
+  PlanValidationBatchStats stats = 2;
   
   // Total processing time in milliseconds
   uint64 total_processing_time_ms = 3;
@@ -231,8 +206,8 @@ message PlanValidationResult {
   bool cache_hit = 5;
 }
 
-// Batch statistics
-message BatchStats {
+// Plan validation batch statistics
+message PlanValidationBatchStats {
   // Total plans processed
   uint32 total_plans = 1;
   
@@ -256,14 +231,6 @@ message GetKernelConfigRequest {
   
   // Configuration scope
   ConfigScope scope = 2;
-}
-
-// Configuration scope
-enum ConfigScope {
-  CONFIG_SCOPE_UNSPECIFIED = 0;
-  CONFIG_SCOPE_TENANT = 1;
-  CONFIG_SCOPE_GLOBAL = 2;
-  CONFIG_SCOPE_ALL = 3;
 }
 
 // Kernel configuration response
@@ -305,34 +272,7 @@ message KernelConfig {
   repeated PolicyRule policy_rules = 7;
   
   // Performance thresholds
-  PerformanceThresholds performance_thresholds = 8;
-}
-
-// Cache configuration
-message CacheConfig {
-  // Enable caching
-  bool enabled = 1;
-  
-  // Maximum cache size
-  uint32 max_size = 2;
-  
-  // Cache TTL in seconds
-  uint32 ttl_seconds = 3;
-  
-  // Redis address for distributed caching
-  string redis_addr = 4;
-  
-  // Cache eviction policy
-  EvictionPolicy eviction_policy = 5;
-}
-
-// Eviction policy
-enum EvictionPolicy {
-  EVICTION_POLICY_UNSPECIFIED = 0;
-  EVICTION_POLICY_LRU = 1;
-  EVICTION_POLICY_LFU = 2;
-  EVICTION_POLICY_FIFO = 3;
-  EVICTION_POLICY_RANDOM = 4;
+  KernelPerformanceThresholds performance_thresholds = 8;
 }
 
 // Policy rule
@@ -341,13 +281,13 @@ message PolicyRule {
   string rule_id = 1;
   
   // Rule type
-  PolicyRuleType rule_type = 2;
+  KernelPolicyRuleType rule_type = 2;
   
   // Rule conditions
   repeated PolicyCondition conditions = 3;
   
   // Rule actions
-  repeated PolicyAction actions = 4;
+  repeated KernelPolicyAction actions = 4;
   
   // Rule priority
   uint32 priority = 5;
@@ -356,47 +296,20 @@ message PolicyRule {
   bool enabled = 6;
 }
 
-// Policy rule type
-enum PolicyRuleType {
-  POLICY_RULE_TYPE_UNSPECIFIED = 0;
-  POLICY_RULE_TYPE_CAPABILITY = 1;
-  POLICY_RULE_TYPE_BUDGET = 2;
-  POLICY_RULE_TYPE_PRIVACY = 3;
-  POLICY_RULE_TYPE_SECURITY = 4;
-  POLICY_RULE_TYPE_COMPLIANCE = 5;
+// Kernel policy rule type
+enum KernelPolicyRuleType {
+  KERNEL_POLICY_RULE_TYPE_UNSPECIFIED = 0;
+  KERNEL_POLICY_RULE_TYPE_CAPABILITY = 1;
+  KERNEL_POLICY_RULE_TYPE_BUDGET = 2;
+  KERNEL_POLICY_RULE_TYPE_PRIVACY = 3;
+  KERNEL_POLICY_RULE_TYPE_SECURITY = 4;
+  KERNEL_POLICY_RULE_TYPE_COMPLIANCE = 5;
 }
 
-// Policy condition
-message PolicyCondition {
-  // Condition field
-  string field = 1;
-  
-  // Condition operator
-  ConditionOperator operator = 2;
-  
-  // Condition value
-  string value = 3;
-  
-  // Additional parameters
-  map<string, string> parameters = 4;
-}
-
-// Condition operator
-enum ConditionOperator {
-  CONDITION_OPERATOR_UNSPECIFIED = 0;
-  CONDITION_OPERATOR_EQUALS = 1;
-  CONDITION_OPERATOR_NOT_EQUALS = 2;
-  CONDITION_OPERATOR_GREATER_THAN = 3;
-  CONDITION_OPERATOR_LESS_THAN = 4;
-  CONDITION_OPERATOR_CONTAINS = 5;
-  CONDITION_OPERATOR_NOT_CONTAINS = 6;
-  CONDITION_OPERATOR_REGEX = 7;
-}
-
-// Policy action
-message PolicyAction {
+// Kernel policy action
+message KernelPolicyAction {
   // Action type
-  ActionType action_type = 1;
+  KernelActionType action_type = 1;
   
   // Action parameters
   map<string, string> parameters = 2;
@@ -405,28 +318,19 @@ message PolicyAction {
   ActionSeverity severity = 3;
 }
 
-// Action type
-enum ActionType {
-  ACTION_TYPE_UNSPECIFIED = 0;
-  ACTION_TYPE_ALLOW = 1;
-  ACTION_TYPE_DENY = 2;
-  ACTION_TYPE_QUARANTINE = 3;
-  ACTION_TYPE_LOG = 4;
-  ACTION_TYPE_ALERT = 5;
-  ACTION_TYPE_RATE_LIMIT = 6;
+// Kernel action type
+enum KernelActionType {
+  KERNEL_ACTION_TYPE_UNSPECIFIED = 0;
+  KERNEL_ACTION_TYPE_ALLOW = 1;
+  KERNEL_ACTION_TYPE_DENY = 2;
+  KERNEL_ACTION_TYPE_QUARANTINE = 3;
+  KERNEL_ACTION_TYPE_LOG = 4;
+  KERNEL_ACTION_TYPE_ALERT = 5;
+  KERNEL_ACTION_TYPE_RATE_LIMIT = 6;
 }
 
-// Action severity
-enum ActionSeverity {
-  ACTION_SEVERITY_UNSPECIFIED = 0;
-  ACTION_SEVERITY_LOW = 1;
-  ACTION_SEVERITY_MEDIUM = 2;
-  ACTION_SEVERITY_HIGH = 3;
-  ACTION_SEVERITY_CRITICAL = 4;
-}
-
-// Performance thresholds
-message PerformanceThresholds {
+// Kernel performance thresholds
+message KernelPerformanceThresholds {
   // Maximum processing time in milliseconds
   uint64 max_processing_time_ms = 1;
   
@@ -483,13 +387,6 @@ message GetCacheStatsRequest {
   
   // Statistics scope
   StatsScope scope = 2;
-}
-
-// Statistics scope
-enum StatsScope {
-  STATS_SCOPE_UNSPECIFIED = 0;
-  STATS_SCOPE_TENANT = 1;
-  STATS_SCOPE_GLOBAL = 2;
 }
 
 // Cache statistics response
@@ -549,80 +446,6 @@ message InvalidateCacheResponse {
   repeated string affected_keys = 4;
 }
 
-// Health check request
-message HealthCheckRequest {
-  // Service identifier
-  string service = 1;
-  
-  // Health check level
-  HealthCheckLevel level = 2;
-}
-
-// Health check level
-enum HealthCheckLevel {
-  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
-  HEALTH_CHECK_LEVEL_BASIC = 1;
-  HEALTH_CHECK_LEVEL_DETAILED = 2;
-  HEALTH_CHECK_LEVEL_CRITICAL = 3;
-}
-
-// Health check response
-message HealthCheckResponse {
-  // Service status
-  ServiceStatus status = 1;
-  
-  // Service version
-  string version = 2;
-  
-  // Uptime in seconds
-  uint64 uptime_seconds = 3;
-  
-  // Service metadata
-  map<string, string> metadata = 4;
-  
-  // Health check details
-  repeated HealthCheckDetail details = 5;
-  
-  // Last health check timestamp
-  google.protobuf.Timestamp last_check = 6;
-}
-
-// Service status
-enum ServiceStatus {
-  SERVICE_STATUS_UNSPECIFIED = 0;
-  SERVICE_STATUS_HEALTHY = 1;
-  SERVICE_STATUS_DEGRADED = 2;
-  SERVICE_STATUS_UNHEALTHY = 3;
-  SERVICE_STATUS_UNKNOWN = 4;
-}
-
-// Health check detail
-message HealthCheckDetail {
-  // Component name
-  string component = 1;
-  
-  // Component status
-  ComponentStatus status = 2;
-  
-  // Component message
-  string message = 3;
-  
-  // Component metrics
-  map<string, string> metrics = 4;
-  
-  // Last check timestamp
-  google.protobuf.Timestamp last_check = 5;
-}
-
-// Component status
-enum ComponentStatus {
-  COMPONENT_STATUS_UNSPECIFIED = 0;
-  COMPONENT_STATUS_HEALTHY = 1;
-  COMPONENT_STATUS_DEGRADED = 2;
-  COMPONENT_STATUS_UNHEALTHY = 3;
-  COMPONENT_STATUS_UNKNOWN = 4;
-}
-
 // Kernel metrics request
 message GetKernelMetricsRequest {
   // Tenant identifier
@@ -642,18 +465,6 @@ enum MetricsScope {
   METRICS_SCOPE_GLOBAL = 2;
   METRICS_SCOPE_PERFORMANCE = 3;
   METRICS_SCOPE_SECURITY = 4;
-}
-
-// Time range
-message TimeRange {
-  // Start timestamp
-  google.protobuf.Timestamp start_time = 1;
-  
-  // End timestamp
-  google.protobuf.Timestamp end_time = 2;
-  
-  // Time granularity in seconds
-  uint32 granularity_seconds = 3;
 }
 
 // Kernel metrics response

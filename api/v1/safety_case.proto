@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
+import "v1/receipt.proto";
 
 // Safety Case Service for managing and validating safety cases
 service SafetyCaseService {
@@ -30,9 +31,6 @@ service SafetyCaseService {
   
   // Get safety case statistics
   rpc GetSafetyCaseStats(GetSafetyCaseStatsRequest) returns (GetSafetyCaseStatsResponse);
-  
-  // Health check
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 // Safety case for AI system deployment
@@ -127,7 +125,7 @@ enum SafetyCaseType {
 // Risk assessment
 message RiskAssessment {
   // Overall risk level
-  RiskLevel overall_risk_level = 1;
+  SafetyRiskLevel overall_risk_level = 1;
   
   // Risk score (0.0 to 1.0)
   double risk_score = 2;
@@ -139,7 +137,7 @@ message RiskAssessment {
   repeated MitigationStrategy mitigation_strategies = 4;
   
   // Residual risk
-  RiskLevel residual_risk_level = 5;
+  SafetyRiskLevel residual_risk_level = 5;
   
   // Risk assessment timestamp
   google.protobuf.Timestamp assessed_at = 6;
@@ -151,14 +149,14 @@ message RiskAssessment {
   string methodology = 8;
 }
 
-// Risk level
-enum RiskLevel {
-  RISK_LEVEL_UNSPECIFIED = 0;
-  RISK_LEVEL_NEGLIGIBLE = 1;
-  RISK_LEVEL_LOW = 2;
-  RISK_LEVEL_MEDIUM = 3;
-  RISK_LEVEL_HIGH = 4;
-  RISK_LEVEL_CRITICAL = 5;
+// Safety case risk level
+enum SafetyRiskLevel {
+  SAFETY_RISK_LEVEL_UNSPECIFIED = 0;
+  SAFETY_RISK_LEVEL_NEGLIGIBLE = 1;
+  SAFETY_RISK_LEVEL_LOW = 2;
+  SAFETY_RISK_LEVEL_MEDIUM = 3;
+  SAFETY_RISK_LEVEL_HIGH = 4;
+  SAFETY_RISK_LEVEL_CRITICAL = 5;
 }
 
 // Risk factor
@@ -173,7 +171,7 @@ message RiskFactor {
   string description = 3;
   
   // Risk level
-  RiskLevel risk_level = 4;
+  SafetyRiskLevel risk_level = 4;
   
   // Probability (0.0 to 1.0)
   double probability = 5;
@@ -679,14 +677,14 @@ message ValidateSafetyCaseRequest {
   SafetyCase safety_case = 1;
   
   // Validation context
-  ValidationContext context = 2;
+  SafetyCaseValidationContext context = 2;
   
   // Validation level
-  ValidationLevel level = 3;
+  SafetyCaseValidationLevel level = 3;
 }
 
-// Validation context
-message ValidationContext {
+// Safety case validation context
+message SafetyCaseValidationContext {
   // Validation timestamp
   google.protobuf.Timestamp validation_time = 1;
   
@@ -700,12 +698,12 @@ message ValidationContext {
   map<string, string> metadata = 4;
 }
 
-// Validation level
-enum ValidationLevel {
-  VALIDATION_LEVEL_UNSPECIFIED = 0;
-  VALIDATION_LEVEL_BASIC = 1;
-  VALIDATION_LEVEL_STRICT = 2;
-  VALIDATION_LEVEL_CRITICAL = 3;
+// Safety case validation level
+enum SafetyCaseValidationLevel {
+  SAFETY_CASE_VALIDATION_LEVEL_UNSPECIFIED = 0;
+  SAFETY_CASE_VALIDATION_LEVEL_BASIC = 1;
+  SAFETY_CASE_VALIDATION_LEVEL_STRICT = 2;
+  SAFETY_CASE_VALIDATION_LEVEL_CRITICAL = 3;
 }
 
 // Validate safety case response
@@ -912,43 +910,6 @@ message ListSafetyCasesRequest {
   SortOrder sort_order = 6;
 }
 
-// Time range
-message TimeRange {
-  // Start timestamp
-  google.protobuf.Timestamp start_time = 1;
-  
-  // End timestamp
-  google.protobuf.Timestamp end_time = 2;
-}
-
-// Pagination
-message Pagination {
-  // Page number (1-based)
-  uint32 page = 1;
-  
-  // Page size
-  uint32 page_size = 2;
-  
-  // Maximum page size
-  uint32 max_page_size = 3;
-}
-
-// Sort order
-message SortOrder {
-  // Sort field
-  string field = 1;
-  
-  // Sort direction
-  SortDirection direction = 2;
-}
-
-// Sort direction
-enum SortDirection {
-  SORT_DIRECTION_UNSPECIFIED = 0;
-  SORT_DIRECTION_ASC = 1;
-  SORT_DIRECTION_DESC = 2;
-}
-
 // List safety cases response
 message ListSafetyCasesResponse {
   // Safety cases list
@@ -962,24 +923,6 @@ message ListSafetyCasesResponse {
   
   // Processing time in milliseconds
   uint64 processing_time_ms = 4;
-}
-
-// Pagination info
-message PaginationInfo {
-  // Current page
-  uint32 current_page = 1;
-  
-  // Page size
-  uint32 page_size = 2;
-  
-  // Total pages
-  uint32 total_pages = 3;
-  
-  // Has next page
-  bool has_next = 4;
-  
-  // Has previous page
-  bool has_previous = 5;
 }
 
 // Revoke safety case request
@@ -1033,15 +976,6 @@ message GetSafetyCaseStatsRequest {
   string group_by = 4;
 }
 
-// Statistics scope
-enum StatsScope {
-  STATS_SCOPE_UNSPECIFIED = 0;
-  STATS_SCOPE_TENANT = 1;
-  STATS_SCOPE_GLOBAL = 2;
-  STATS_SCOPE_TYPE = 3;
-  STATS_SCOPE_STATUS = 4;
-}
-
 // Get safety case statistics response
 message GetSafetyCaseStatsResponse {
   // Safety case statistics
@@ -1051,7 +985,7 @@ message GetSafetyCaseStatsResponse {
   repeated TimeSeriesPoint time_series = 2;
   
   // Grouped statistics
-  repeated GroupedStatistics grouped_stats = 3;
+  repeated SafetyCaseGroupedStatistics grouped_stats = 3;
   
   // Statistics timestamp
   google.protobuf.Timestamp timestamp = 4;
@@ -1087,23 +1021,8 @@ message SafetyCaseStatistics {
   double avg_compliance_score = 9;
 }
 
-// Time series point
-message TimeSeriesPoint {
-  // Timestamp
-  google.protobuf.Timestamp timestamp = 1;
-  
-  // Value
-  double value = 2;
-  
-  // Metric name
-  string metric = 3;
-  
-  // Additional metadata
-  map<string, string> metadata = 4;
-}
-
-// Grouped statistics
-message GroupedStatistics {
+// Grouped safety case statistics
+message SafetyCaseGroupedStatistics {
   // Group key
   string group_key = 1;
   
@@ -1112,78 +1031,4 @@ message GroupedStatistics {
   
   // Statistics for this group
   SafetyCaseStatistics statistics = 3;
-}
-
-// Health check request
-message HealthCheckRequest {
-  // Service identifier
-  string service = 1;
-  
-  // Health check level
-  HealthCheckLevel level = 2;
-}
-
-// Health check level
-enum HealthCheckLevel {
-  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
-  HEALTH_CHECK_LEVEL_BASIC = 1;
-  HEALTH_CHECK_LEVEL_DETAILED = 2;
-  HEALTH_CHECK_LEVEL_CRITICAL = 3;
-}
-
-// Health check response
-message HealthCheckResponse {
-  // Service status
-  ServiceStatus status = 1;
-  
-  // Service version
-  string version = 2;
-  
-  // Uptime in seconds
-  uint64 uptime_seconds = 3;
-  
-  // Service metadata
-  map<string, string> metadata = 4;
-  
-  // Health check details
-  repeated HealthCheckDetail details = 5;
-  
-  // Last health check timestamp
-  google.protobuf.Timestamp last_check = 6;
-}
-
-// Service status
-enum ServiceStatus {
-  SERVICE_STATUS_UNSPECIFIED = 0;
-  SERVICE_STATUS_HEALTHY = 1;
-  SERVICE_STATUS_DEGRADED = 2;
-  SERVICE_STATUS_UNHEALTHY = 3;
-  SERVICE_STATUS_UNKNOWN = 4;
-}
-
-// Health check detail
-message HealthCheckDetail {
-  // Component name
-  string component = 1;
-  
-  // Component status
-  ComponentStatus status = 2;
-  
-  // Component message
-  string message = 3;
-  
-  // Component metrics
-  map<string, string> metrics = 4;
-  
-  // Last check timestamp
-  google.protobuf.Timestamp last_check = 5;
-}
-
-// Component status
-enum ComponentStatus {
-  COMPONENT_STATUS_UNSPECIFIED = 0;
-  COMPONENT_STATUS_HEALTHY = 1;
-  COMPONENT_STATUS_DEGRADED = 2;
-  COMPONENT_STATUS_UNHEALTHY = 3;
-  COMPONENT_STATUS_UNKNOWN = 4;
 }
