@@ -52,7 +52,14 @@ jobs:
       run: ${{ matrix.setup }}
 
     - name: Generate protobuf bindings
-      run: make proto-gen
+      run: |
+        if [ "${{ matrix.language }}" = "go" ]; then
+          make proto-gen-go
+        elif [ "${{ matrix.language }}" = "typescript" ]; then
+          make proto-gen-ts
+        elif [ "${{ matrix.language }}" = "rust" ]; then
+          make proto-gen-rust
+        fi
 
     - name: Run compatibility tests
       run: ${{ matrix.test }}

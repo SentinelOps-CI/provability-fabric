@@ -1,5 +1,4 @@
 {
-  "$schema": "https://meta.stoplight.io/schemas/rule.json",
   "extends": "spectral:oas",
   "rules": {
     "ai-spec-meta-required": {

@@ -13,22 +13,22 @@ import "v1/receipt.proto";
 service EgressFirewallService {
   // Scan content for policy violations
   rpc ScanContent(ScanContentRequest) returns (ScanContentResponse);
-  
+
   // Generate egress certificate
   rpc GenerateCertificate(GenerateCertificateRequest) returns (GenerateCertificateResponse);
-  
+
   // Verify egress certificate
   rpc VerifyCertificate(VerifyCertificateRequest) returns (VerifyCertificateResponse);
-  
+
   // Batch scan multiple content items
   rpc BatchScanContent(BatchScanContentRequest) returns (BatchScanContentResponse);
-  
+
   // Get firewall configuration
   rpc GetFirewallConfig(GetFirewallConfigRequest) returns (GetFirewallConfigResponse);
-  
+
   // Update firewall configuration
   rpc UpdateFirewallConfig(UpdateFirewallConfigRequest) returns (UpdateFirewallConfigResponse);
-  
+
   // Get firewall statistics
   rpc GetFirewallStats(GetFirewallStatsRequest) returns (GetFirewallStatsResponse);
 }
@@ -37,31 +37,31 @@ service EgressFirewallService {
 message ScanContentRequest {
   // Content to scan
   string text = 1;
-  
+
   // Tenant identifier
   string tenant = 2;
-  
+
   // Subject identifier
   string subject_id = 3;
-  
+
   // Plan identifier
   string plan_id = 4;
-  
+
   // Scan context
   map<string, string> context = 5;
-  
+
   // Enable early exit for performance
   bool enable_early_exit = 6;
-  
+
   // Maximum processing time in milliseconds
   uint32 max_processing_time_ms = 7;
-  
+
   // Scan priority
   ScanPriority priority = 8;
-  
+
   // Enable caching
   bool enable_cache = 9;
-  
+
   // Custom detector configuration
   DetectorConfig detector_config = 10;
 }
@@ -79,22 +79,22 @@ enum ScanPriority {
 message DetectorConfig {
   // Enable PII detection
   bool enable_pii_detection = 1;
-  
+
   // Enable secrets detection
   bool enable_secrets_detection = 2;
-  
+
   // Enable near-duplicate detection
   bool enable_near_dupe_detection = 3;
-  
+
   // Enable policy violation detection
   bool enable_policy_violation_detection = 4;
-  
+
   // Custom PII patterns
   repeated string custom_pii_patterns = 5;
-  
+
   // Custom secret patterns
   repeated string custom_secret_patterns = 6;
-  
+
   // Detection thresholds
   map<string, double> detection_thresholds = 7;
 }
@@ -103,25 +103,25 @@ message DetectorConfig {
 message ScanContentResponse {
   // Scanned text
   string text = 1;
-  
+
   // Egress certificate
   EgressCertificate certificate = 2;
-  
+
   // Scan warnings
   repeated string warnings = 3;
-  
+
   // Early exit indicator
   bool early_exit = 4;
-  
+
   // Exit reason
   string exit_reason = 5;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 6;
-  
+
   // Detector results
   DetectorResults detector_results = 7;
-  
+
   // Scan metadata
   ScanMetadata metadata = 8;
 }
@@ -130,49 +130,49 @@ message ScanContentResponse {
 message EgressCertificate {
   // Certificate identifier
   string cert_id = 1;
-  
+
   // Plan identifier
   string plan_id = 2;
-  
+
   // Tenant identifier
   string tenant = 3;
-  
+
   // Detector flags
   DetectorFlags detector_flags = 4;
-  
+
   // Near-duplicate score (0.0 to 1.0)
   double near_dupe_score = 5;
-  
+
   // Policy hash
   string policy_hash = 6;
-  
+
   // Text hash (BLAKE3)
   string text_hash = 7;
-  
+
   // Certificate timestamp
   google.protobuf.Timestamp timestamp = 8;
-  
+
   // Certificate signer
   string signer = 9;
-  
+
   // Non-interference verdict
   NonInterferenceVerdict non_interference = 10;
-  
+
   // Influencing labels
   repeated string influencing_labels = 11;
-  
+
   // Attestation reference
   string attestation_ref = 12;
-  
+
   // Certificate signature
   string signature = 13;
-  
+
   // Signature algorithm
   string signature_algorithm = 14;
-  
+
   // Certificate expiration
   google.protobuf.Timestamp expires_at = 15;
-  
+
   // Certificate status
   CertificateStatus status = 16;
 }
@@ -181,19 +181,19 @@ message EgressCertificate {
 message DetectorFlags {
   // PII detected
   bool pii_detected = 1;
-  
+
   // Secrets detected
   bool secrets_detected = 2;
-  
+
   // Near-duplicate detected
   bool near_dupe_detected = 3;
-  
+
   // Policy violations detected
   bool policy_violations = 4;
-  
+
   // Critical violations detected
   bool critical_violations = 5;
-  
+
   // Compliance violations detected
   bool compliance_violations = 6;
 }
@@ -203,17 +203,17 @@ message NonInterferenceVerdict {
   oneof verdict {
     // Passed verification
     bool passed = 1;
-    
+
     // Failed with reason
     string failed_reason = 2;
   }
-  
+
   // Verification timestamp
   google.protobuf.Timestamp verified_at = 3;
-  
+
   // Verification method
   string verification_method = 4;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence_score = 5;
 }
@@ -231,22 +231,22 @@ enum CertificateStatus {
 message DetectorResults {
   // PII detection results
   PiiDetectionResult pii_result = 1;
-  
+
   // Secrets detection results
   SecretsDetectionResult secrets_result = 2;
-  
+
   // Near-duplicate detection results
   NearDupeDetectionResult near_dupe_result = 3;
-  
+
   // Policy violation results
   PolicyViolationResult policy_violation_result = 4;
-  
+
   // Overall risk score (0.0 to 1.0)
   double overall_risk_score = 5;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 6;
-  
+
   // Detection confidence (0.0 to 1.0)
   double detection_confidence = 7;
 }
@@ -255,16 +255,16 @@ message DetectorResults {
 message PiiDetectionResult {
   // PII detected
   bool detected = 1;
-  
+
   // Detected PII types
   repeated string pii_types = 2;
-  
+
   // PII locations in text
   repeated PiiLocation locations = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence_score = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -273,16 +273,16 @@ message PiiDetectionResult {
 message PiiLocation {
   // Start position in text
   uint32 start_pos = 1;
-  
+
   // End position in text
   uint32 end_pos = 2;
-  
+
   // PII type
   string pii_type = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -291,16 +291,16 @@ message PiiLocation {
 message SecretsDetectionResult {
   // Secrets detected
   bool detected = 1;
-  
+
   // Detected secret types
   repeated string secret_types = 2;
-  
+
   // Secret locations in text
   repeated SecretLocation locations = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence_score = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -309,16 +309,16 @@ message SecretsDetectionResult {
 message SecretLocation {
   // Start position in text
   uint32 start_pos = 1;
-  
+
   // End position in text
   uint32 end_pos = 2;
-  
+
   // Secret type
   string secret_type = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -327,16 +327,16 @@ message SecretLocation {
 message NearDupeDetectionResult {
   // Near-duplicate detected
   bool detected = 1;
-  
+
   // Similarity score (0.0 to 1.0)
   double similarity_score = 2;
-  
+
   // Similar content references
   repeated string similar_content_refs = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence_score = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -345,16 +345,16 @@ message NearDupeDetectionResult {
 message PolicyViolationResult {
   // Policy violations detected
   bool detected = 1;
-  
+
   // Violation types
   repeated string violation_types = 2;
-  
+
   // Violation details
   repeated PolicyViolation violations = 3;
-  
+
   // Confidence score (0.0 to 1.0)
   double confidence_score = 4;
-  
+
   // Risk level
   ScanRiskLevel risk_level = 5;
 }
@@ -363,20 +363,20 @@ message PolicyViolationResult {
 message PolicyViolation {
   // Violation type
   string violation_type = 1;
-  
+
   // Violation description
   string description = 2;
-  
+
   // Violation severity
   ViolationSeverity severity = 3;
-  
+
   // Violation location in text
   uint32 start_pos = 4;
   uint32 end_pos = 5;
-  
+
   // Policy rule reference
   string policy_rule_ref = 6;
-  
+
   // Remediation suggestion
   string remediation = 7;
 }
@@ -403,22 +403,22 @@ enum ScanRiskLevel {
 message ScanMetadata {
   // Scan identifier
   string scan_id = 1;
-  
+
   // Scan timestamp
   google.protobuf.Timestamp scan_time = 2;
-  
+
   // Scanner version
   string scanner_version = 3;
-  
+
   // Detector versions
   map<string, string> detector_versions = 4;
-  
+
   // Scan configuration hash
   string config_hash = 5;
-  
+
   // Cache hit indicator
   bool cache_hit = 6;
-  
+
   // Processing pipeline used
   repeated string pipeline_steps = 7;
 }
@@ -427,13 +427,13 @@ message ScanMetadata {
 message GenerateCertificateRequest {
   // Content scan result
   ScanContentResponse scan_result = 1;
-  
+
   // Certificate configuration
   CertificateConfig config = 2;
-  
+
   // Signing key identifier
   string signing_key_id = 3;
-  
+
   // Certificate context
   CertificateContext context = 4;
 }
@@ -442,16 +442,16 @@ message GenerateCertificateRequest {
 message CertificateConfig {
   // Certificate validity period in seconds
   uint32 validity_period_seconds = 1;
-  
+
   // Enable non-interference verification
   bool enable_non_interference = 2;
-  
+
   // Enable influencing labels
   bool enable_influencing_labels = 3;
-  
+
   // Custom certificate fields
   map<string, string> custom_fields = 4;
-  
+
   // Certificate format
   CertificateFormat format = 5;
 }
@@ -468,13 +468,13 @@ enum CertificateFormat {
 message CertificateContext {
   // Request timestamp
   google.protobuf.Timestamp request_time = 1;
-  
+
   // Client identifier
   string client_id = 2;
-  
+
   // Session identifier
   string session_id = 3;
-  
+
   // Additional metadata
   map<string, string> metadata = 4;
 }
@@ -483,19 +483,19 @@ message CertificateContext {
 message GenerateCertificateResponse {
   // Generated certificate
   EgressCertificate certificate = 1;
-  
+
   // Generation success
   bool success = 2;
-  
+
   // Generation message
   string message = 3;
-  
+
   // Certificate signature
   string signature = 4;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 5;
-  
+
   // Certificate verification URL
   string verification_url = 6;
 }
@@ -504,13 +504,13 @@ message GenerateCertificateResponse {
 message VerifyCertificateRequest {
   // Certificate to verify
   EgressCertificate certificate = 1;
-  
+
   // Certificate signature
   string signature = 2;
-  
+
   // Verification context
   VerificationContext context = 3;
-  
+
   // Verification level
   VerificationLevel level = 4;
 }
@@ -519,31 +519,31 @@ message VerifyCertificateRequest {
 message VerifyCertificateResponse {
   // Verification result
   bool valid = 1;
-  
+
   // Verification reason
   string reason = 2;
-  
+
   // Verification errors
   repeated string errors = 3;
-  
+
   // Signature validity
   bool signature_valid = 4;
-  
+
   // Certificate expiration validity
   bool expiration_valid = 5;
-  
+
   // Non-interference verification
   bool non_interference_valid = 6;
-  
+
   // Policy compliance
   bool policy_compliant = 7;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 8;
-  
+
   // Verification score (0.0 to 1.0)
   float score = 9;
-  
+
   // Certificate details (if valid)
   EgressCertificate certificate = 10;
 }
@@ -552,10 +552,10 @@ message VerifyCertificateResponse {
 message BatchScanContentRequest {
   // Content items to scan
   repeated ContentItem content_items = 1;
-  
+
   // Batch configuration
   BatchConfig config = 2;
-  
+
   // Scan context
   map<string, string> context = 3;
 }
@@ -564,13 +564,13 @@ message BatchScanContentRequest {
 message ContentItem {
   // Content identifier
   string content_id = 1;
-  
+
   // Content text
   string text = 2;
-  
+
   // Content metadata
   map<string, string> metadata = 3;
-  
+
   // Scan priority
   ScanPriority priority = 4;
 }
@@ -579,19 +579,19 @@ message ContentItem {
 message BatchScanContentResponse {
   // Scan results for each content item
   repeated ContentScanResult results = 1;
-  
+
   // Batch statistics
   ContentScanBatchStats stats = 2;
-  
+
   // Total processing time in milliseconds
   uint64 total_processing_time_ms = 3;
-  
+
   // Successful scans
   uint32 successful_scans = 4;
-  
+
   // Failed scans
   uint32 failed_scans = 5;
-  
+
   // Batch errors
   repeated string errors = 6;
 }
@@ -600,13 +600,13 @@ message BatchScanContentResponse {
 message ContentScanResult {
   // Content identifier
   string content_id = 1;
-  
+
   // Scan result
   ScanContentResponse scan_result = 2;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 3;
-  
+
   // Scan success
   bool success = 4;
 }
@@ -615,16 +615,16 @@ message ContentScanResult {
 message ContentScanBatchStats {
   // Total content items processed
   uint32 total_items = 1;
-  
+
   // Successfully scanned items
   uint32 successful_items = 2;
-  
+
   // Failed scans
   uint32 failed_items = 3;
-  
+
   // Average processing time in milliseconds
   uint64 avg_processing_time_ms = 4;
-  
+
   // Scan success rate (0.0 to 1.0)
   float success_rate = 5;
 }
@@ -633,7 +633,7 @@ message ContentScanBatchStats {
 message GetFirewallConfigRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Configuration scope
   ConfigScope scope = 2;
 }
@@ -650,13 +650,13 @@ enum ConfigScope {
 message GetFirewallConfigResponse {
   // Firewall configuration
   FirewallConfig config = 1;
-  
+
   // Configuration version
   string version = 2;
-  
+
   // Last updated timestamp
   google.protobuf.Timestamp last_updated = 3;
-  
+
   // Configuration hash
   string config_hash = 4;
 }
@@ -665,16 +665,16 @@ message GetFirewallConfigResponse {
 message FirewallConfig {
   // Detector configuration
   DetectorConfig detector_config = 1;
-  
+
   // Performance thresholds
   PerformanceThresholds performance_thresholds = 2;
-  
+
   // Policy rules
   repeated FirewallPolicyRule policy_rules = 3;
-  
+
   // Cache configuration
   CacheConfig cache_config = 4;
-  
+
   // Backpressure configuration
   BackpressureConfig backpressure_config = 5;
 }
@@ -683,16 +683,16 @@ message FirewallConfig {
 message PerformanceThresholds {
   // Maximum processing time in milliseconds
   uint64 max_processing_time_ms = 1;
-  
+
   // Maximum memory usage in MB
   uint64 max_memory_mb = 2;
-  
+
   // Maximum CPU usage in cores
   float max_cpu_cores = 3;
-  
+
   // Maximum concurrent scans
   uint32 max_concurrent_scans = 4;
-  
+
   // Cache hit rate threshold (0.0 to 1.0)
   float min_cache_hit_rate = 5;
 }
@@ -701,19 +701,19 @@ message PerformanceThresholds {
 message FirewallPolicyRule {
   // Rule identifier
   string rule_id = 1;
-  
+
   // Rule type
   PolicyRuleType rule_type = 2;
-  
+
   // Rule conditions
   repeated PolicyCondition conditions = 3;
-  
+
   // Rule actions
   repeated PolicyAction actions = 4;
-  
+
   // Rule priority
   uint32 priority = 5;
-  
+
   // Rule enabled
   bool enabled = 6;
 }
@@ -732,13 +732,13 @@ enum PolicyRuleType {
 message PolicyCondition {
   // Condition field
   string field = 1;
-  
+
   // Condition operator
   ConditionOperator operator = 2;
-  
+
   // Condition value
   string value = 3;
-  
+
   // Additional parameters
   map<string, string> parameters = 4;
 }
@@ -759,10 +759,10 @@ enum ConditionOperator {
 message PolicyAction {
   // Action type
   ActionType action_type = 1;
-  
+
   // Action parameters
   map<string, string> parameters = 2;
-  
+
   // Action severity
   ActionSeverity severity = 3;
 }
@@ -791,16 +791,16 @@ enum ActionSeverity {
 message CacheConfig {
   // Enable caching
   bool enabled = 1;
-  
+
   // Maximum cache size
   uint32 max_size = 2;
-  
+
   // Cache TTL in seconds
   uint32 ttl_seconds = 3;
-  
+
   // Redis address for distributed caching
   string redis_addr = 4;
-  
+
   // Cache eviction policy
   EvictionPolicy eviction_policy = 5;
 }
@@ -818,19 +818,19 @@ enum EvictionPolicy {
 message BackpressureConfig {
   // Enable backpressure control
   bool enabled = 1;
-  
+
   // Maximum queue length
   uint32 max_queue_length = 2;
-  
+
   // P95 response time budget in milliseconds
   uint64 p95_response_time_budget_ms = 3;
-  
+
   // Strict mode threshold (0.0 to 1.0)
   float strict_mode_threshold = 4;
-  
+
   // Critical detectors
   repeated string critical_detectors = 5;
-  
+
   // Non-critical detectors
   repeated string non_critical_detectors = 6;
 }
@@ -839,13 +839,13 @@ message BackpressureConfig {
 message UpdateFirewallConfigRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Configuration updates
   map<string, string> config_updates = 2;
-  
+
   // Restart required
   bool restart_required = 3;
-  
+
   // Update reason
   string update_reason = 4;
 }
@@ -854,16 +854,16 @@ message UpdateFirewallConfigRequest {
 message UpdateFirewallConfigResponse {
   // Update success
   bool success = 1;
-  
+
   // Updated configuration keys
   repeated string updated_keys = 2;
-  
+
   // Failed configuration keys
   repeated string failed_keys = 3;
-  
+
   // Update message
   string message = 4;
-  
+
   // Restart required
   bool restart_required = 5;
 }
@@ -872,10 +872,10 @@ message UpdateFirewallConfigResponse {
 message GetFirewallStatsRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Statistics scope
   StatsScope scope = 2;
-  
+
   // Time range
   TimeRange time_range = 3;
 }
@@ -884,13 +884,13 @@ message GetFirewallStatsRequest {
 message GetFirewallStatsResponse {
   // Firewall statistics
   FirewallStatistics statistics = 1;
-  
+
   // Time series data
   repeated TimeSeriesPoint time_series = 2;
-  
+
   // Detector performance statistics
   repeated DetectorPerformanceStats detector_stats = 3;
-  
+
   // Statistics timestamp
   google.protobuf.Timestamp timestamp = 4;
 }
@@ -899,28 +899,28 @@ message GetFirewallStatsResponse {
 message FirewallStatistics {
   // Total content scans
   uint64 total_scans = 1;
-  
+
   // Successful scans
   uint64 successful_scans = 2;
-  
+
   // Failed scans
   uint64 failed_scans = 3;
-  
+
   // Blocked content
   uint64 blocked_content = 4;
-  
+
   // Quarantined content
   uint64 quarantined_content = 5;
-  
+
   // Average processing time in milliseconds
   uint64 avg_processing_time_ms = 6;
-  
+
   // P95 processing time in milliseconds
   uint64 p95_processing_time_ms = 7;
-  
+
   // Cache hit rate (0.0 to 1.0)
   double cache_hit_rate = 8;
-  
+
   // Backpressure activations
   uint64 backpressure_activations = 9;
 }
@@ -929,19 +929,19 @@ message FirewallStatistics {
 message DetectorPerformanceStats {
   // Detector name
   string detector_name = 1;
-  
+
   // Total runs
   uint64 total_runs = 2;
-  
+
   // Average execution time in milliseconds
   uint64 avg_execution_time_ms = 3;
-  
+
   // Early exit triggers
   uint64 early_exit_triggers = 4;
-  
+
   // False positive rate (0.0 to 1.0)
   double false_positive_rate = 5;
-  
+
   // Detection accuracy (0.0 to 1.0)
   double detection_accuracy = 6;
 }
