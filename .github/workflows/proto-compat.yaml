@@ -21,7 +21,7 @@ jobs:
     name: Protobuf Compatibility Tests
     runs-on: ubuntu-latest
     env:
-      CARGO_NET_RETRY: 10
+      CARGO_NET_RETRY: 10  # retry crates.io flakes during protoc-gen-tonic install
     
     strategy:
       fail-fast: false
