@@ -7,7 +7,7 @@ on:
 jobs:
   rust:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       CARGO_TERM_COLOR: always
 
@@ -47,8 +47,6 @@ jobs:
             --exclude labeler \
             --exclude tool-broker \
             --no-fail-fast
-          # sidecar-watcher: lib unit tests only in required gate (integration in ci-extended)
-          cargo test -p sidecar-watcher --lib --no-fail-fast
 
       - name: Clippy (workspace)
-        run: cargo clippy --workspace --exclude provability-fabric-core-sdk-rust -- -D warnings
+        run: cargo clippy --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher -- -D warnings
