@@ -86,19 +86,19 @@ jobs:
         
         # Validate SLO thresholds
         python -c "
-import sys
-latency = float('$LATENCY_P95')
-error_rate = float('$ERROR_RATE')
+          import sys
+          latency = float('$LATENCY_P95')
+          error_rate = float('$ERROR_RATE')
 
-if latency > 5.0:  # 5ms threshold for E2E
-    print(f'❌ Latency P95 {latency}ms exceeds 5ms threshold')
-    sys.exit(1)
+          if latency > 5.0:  # 5ms threshold for E2E
+              print(f'❌ Latency P95 {latency}ms exceeds 5ms threshold')
+              sys.exit(1)
 
-if error_rate > 0.05:  # 5% error rate threshold
-    print(f'❌ Error rate {error_rate*100:.2f}% exceeds 5% threshold')
-    sys.exit(1)
+          if error_rate > 0.05:  # 5% error rate threshold
+              print(f'❌ Error rate {error_rate*100:.2f}% exceeds 5% threshold')
+              sys.exit(1)
 
-print('✅ SLO metrics within acceptable ranges')
+          print('✅ SLO metrics within acceptable ranges')
         "
     
     - name: Export compliance packets
