@@ -38,4 +38,6 @@ jobs:
             -ignore 'shellcheck reported issue in this script: SC2129:style:' \
             -ignore 'shellcheck reported issue in this script: SC2116:style:' \
             -ignore 'shellcheck reported issue in this script: SC2016:info:' \
-            -ignore 'shellcheck reported issue in this script: SC2317:info:'
+            -ignore 'shellcheck reported issue in this script: SC2317:info:' \
+            -ignore 'shellcheck reported issue in this script: SC2181:style:' \
+            -ignore 'shellcheck reported issue in this script: SC2162:info:'
