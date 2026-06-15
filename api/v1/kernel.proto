@@ -9,7 +9,7 @@ option java_package = "com.provability.fabric.api.v1";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "plan.proto";
-import "receipt.proto";
+import "v1/receipt.proto";
 
 // Policy Kernel Service for plan validation and enforcement
 service PolicyKernelService {
