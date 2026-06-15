@@ -1,0 +1,70 @@
+# Protobuf generation and validation (included from root Makefile).
+# SPDX-License-Identifier: Apache-2.0
+
+PROTO_API_DIR := api
+PROTO_V1_DIR := api/v1
+PROTO_FILES := $(wildcard $(PROTO_V1_DIR)/*.proto)
+GO_PROTO_OUT := core/sdk/go/generated
+TS_SDK_DIR := core/sdk/typescript
+RUST_SDK_DIR := core/sdk/rust
+GOLDEN_DIR := tests/fixtures/golden
+API_DOCS := docs/api/api.md
+
+.PHONY: proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust \
+	proto-fixtures proto-compat-test proto-docs
+
+proto-lint:
+	@$(ECHOOK) "Linting protobuf files..."
+	@command -v protoc >/dev/null 2>&1 || { echo "protoc is required"; exit 1; }
+	@for f in $(PROTO_FILES); do \
+		echo "  $$f"; \
+		protoc --proto_path=$(PROTO_API_DIR) --descriptor_set_out=/dev/null "$$f" || exit 1; \
+	done
+	@$(ECHOOK) "Protobuf lint passed"
+
+proto-validate: proto-lint
+
+proto-gen-go:
+	@$(ECHOOK) "Generating Go protobuf bindings..."
+	@mkdir -p $(GO_PROTO_OUT)
+	@protoc --proto_path=$(PROTO_API_DIR) \
+		--go_out=$(GO_PROTO_OUT) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_PROTO_OUT) --go-grpc_opt=paths=source_relative \
+		$(PROTO_FILES)
+	@cd core/sdk/go && go build ./...
+
+proto-gen-ts:
+	@$(ECHOOK) "Generating TypeScript protobuf bindings..."
+	@command -v protoc-gen-ts_proto >/dev/null 2>&1 || { echo "Install ts-proto: npm install -g ts-proto"; exit 1; }
+	@mkdir -p $(TS_SDK_DIR)/generated
+	@protoc --plugin=protoc-gen-ts_proto \
+		--proto_path=$(PROTO_API_DIR) \
+		--ts_proto_out=$(TS_SDK_DIR)/generated \
+		--ts_proto_opt=esModuleInterop=true \
+		--ts_proto_opt=forceLong=string \
+		--ts_proto_opt=useOptionals=messages \
+		$(PROTO_FILES)
+
+proto-gen-rust:
+	@$(ECHOOK) "Generating Rust protobuf bindings (via tonic_build)..."
+	@cd $(RUST_SDK_DIR) && cargo check
+
+proto-gen: proto-gen-go proto-gen-ts proto-gen-rust
+	@$(ECHOOK) "Protobuf code generation complete"
+
+proto-fixtures:
+	@$(ECHOOK) "Refreshing protobuf golden fixtures..."
+	@mkdir -p $(GOLDEN_DIR)
+	@python -c "import json, pathlib; \
+p = pathlib.Path('$(GOLDEN_DIR)/proto_manifest.json'); \
+p.write_text(json.dumps(sorted([pathlib.Path(f).name for f in '$(PROTO_FILES)'.split()]), indent=2) + '\n')"
+	@$(ECHOOK) "Golden fixtures updated under $(GOLDEN_DIR)"
+
+proto-compat-test:
+	@$(ECHOOK) "Checking protobuf backward compatibility..."
+	@python scripts/proto_compat_check.py
+
+proto-docs:
+	@$(ECHOOK) "Generating protobuf API documentation..."
+	@mkdir -p docs/api
+	@python scripts/proto_docs.py

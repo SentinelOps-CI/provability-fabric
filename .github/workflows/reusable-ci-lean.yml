@@ -68,6 +68,7 @@ jobs:
         run: |
           if [ ! -d vendor/mathlib/.git ]; then
             echo "Vendoring mathlib for Lean builds..."
+            rm -rf vendor/mathlib
             chmod +x scripts/vendor-mathlib.sh
             ./scripts/vendor-mathlib.sh
           else

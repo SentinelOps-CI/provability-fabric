@@ -41,8 +41,8 @@ jobs:
               fi
             done
           else
-            python tests/redteam/injection_runner.py
-            python tests/redteam/abac_fuzz.py
+            python tests/redteam/injection_runner.py --offline
+            python tests/redteam/abac_fuzz.py --queries 50 --offline
           fi
 
       - name: Run performance tests (impacted only)

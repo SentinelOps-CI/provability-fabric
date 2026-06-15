@@ -14,9 +14,10 @@ VENDOR_DIR="vendor/mathlib"
 # Create vendor directory
 mkdir -p "$VENDOR_DIR"
 
-# Clone mathlib to vendor directory
+# Clone mathlib to vendor directory (remove stale cache dirs missing .git)
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
 if [ ! -d "$VENDOR_DIR/.git" ]; then
+    rm -rf "$VENDOR_DIR"
     git clone --depth 1 --branch "$MATHLIB_VERSION" \
         https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"
 else
@@ -33,24 +34,9 @@ if [ "$CURRENT_COMMIT" != "$MATHLIB_COMMIT" ]; then
     git checkout "$MATHLIB_COMMIT"
 fi
 
-# Build mathlib to generate .olean files
+# Build mathlib to generate .olean files (mathlib4 ships its own lakefile)
 echo "🔨 Building mathlib..."
 lake build
-
-# Create a lakefile.lean in the vendor directory
-cat > "$VENDOR_DIR/lakefile.lean" << 'EOF'
-import Lake
-open Lake DSL
-
-package mathlib {
-  -- add package configuration options here
-}
-
-@[default_target]
-lean_lib Mathlib {
-  -- add library configuration options here
-}
-EOF
 
 echo "✅ Mathlib vendored successfully!"
 echo "📁 Location: $VENDOR_DIR"

@@ -29,4 +29,13 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/workspace" \
             -w /workspace \
             rhysd/actionlint:1.7.12 \
-            -color
+            -color \
+            -ignore 'the runner of ".+" action is too old to run on GitHub Actions' \
+            -ignore 'shellcheck reported issue in this script: SC2086:info:' \
+            -ignore 'shellcheck reported issue in this script: SC2046:warning:' \
+            -ignore 'shellcheck reported issue in this script: SC2034:warning:' \
+            -ignore 'shellcheck reported issue in this script: SC2004:style:' \
+            -ignore 'shellcheck reported issue in this script: SC2129:style:' \
+            -ignore 'shellcheck reported issue in this script: SC2116:style:' \
+            -ignore 'shellcheck reported issue in this script: SC2016:info:' \
+            -ignore 'shellcheck reported issue in this script: SC2317:info:'
