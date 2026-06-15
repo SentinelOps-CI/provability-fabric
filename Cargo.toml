@@ -9,6 +9,7 @@
 [workspace]
 members = [
     "bench",
+    "core/sdk/rust",
     "runtime/attestor",
     "runtime/kms-proxy",
     "runtime/tool-broker",
