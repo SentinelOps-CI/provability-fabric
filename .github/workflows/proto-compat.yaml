@@ -58,7 +58,8 @@ jobs:
         if [ "${{ matrix.language }}" = "go" ]; then
           make proto-gen-go
         elif [ "${{ matrix.language }}" = "typescript" ]; then
-          make proto-gen-ts
+          cd core/sdk/typescript && npm ci && npm install ts-proto
+          cd "$GITHUB_WORKSPACE" && make proto-gen-ts
         elif [ "${{ matrix.language }}" = "rust" ]; then
           make proto-gen-rust
         fi

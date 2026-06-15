@@ -7,6 +7,7 @@ PROTO_V1_DIR := api/v1
 PROTO_FILES := $(wildcard $(PROTO_V1_DIR)/*.proto)
 GO_PROTO_OUT := core/sdk/go/generated
 TS_SDK_DIR := core/sdk/typescript
+TS_PROTO_PLUGIN := $(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin/protoc-gen-ts_proto
 RUST_SDK_DIR := core/sdk/rust
 GOLDEN_DIR := tests/fixtures/golden
 API_DOCS := docs/api/api.md
@@ -36,10 +37,10 @@ proto-gen-go:
 
 proto-gen-ts:
 	@$(ECHOOK) "Generating TypeScript protobuf bindings..."
-	@PATH="$(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin:$$PATH" command -v protoc-gen-ts_proto >/dev/null 2>&1 || { echo "Install ts-proto in $(TS_SDK_DIR) (npm install ts-proto)"; exit 1; }
+	@test -x "$(TS_PROTO_PLUGIN)" || { echo "Install ts-proto in $(TS_SDK_DIR) (npm install ts-proto)"; exit 1; }
 	@mkdir -p $(TS_SDK_DIR)/generated
-	@PATH="$(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin:$$PATH" protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
-		--plugin=protoc-gen-ts_proto \
+	@protoc --proto_path=$(PROTO_API_DIR) $(if $(wildcard $(PROTOC_INCLUDE)),--proto_path=$(PROTOC_INCLUDE),) \
+		--plugin=protoc-gen-ts_proto=$(TS_PROTO_PLUGIN) \
 		--ts_proto_out=$(TS_SDK_DIR)/generated \
 		--ts_proto_opt=esModuleInterop=true \
 		--ts_proto_opt=forceLong=string \
