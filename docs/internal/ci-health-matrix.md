@@ -1,6 +1,6 @@
 # CI health matrix
 
-Triage snapshot for `main` as of 2026-06-15 after CI hardening PR (post-#117).
+Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
 ## Evidence gate (must stay green)
 
@@ -8,7 +8,7 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR (post-#117).
 |----------|-----|--------|-------|
 | Evidence v0.1 smoke | evidence-schema-only, evidence-validator, smoke | Green | Baselines: [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090) (#111), dispatch [27527807232](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27527807232) (post-#116 sign-off) |
 | Standards Pin Drift Check | check | Green | Uses `make submodules` + `make standards-pin-check` |
-| Documentation Build | build-docs | Investigate | `mkdocs build --strict` — failures may be link/submodule related on generic pushes |
+| Documentation Build | build-docs | Green | `mkdocs build --strict` via `make docs-strict` / docs-build workflow |
 
 ## Standards / token parity
 
@@ -22,29 +22,31 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR (post-#117).
 
 | Workflow | Job | Known failure | Priority | Fix in PR |
 |----------|-----|---------------|----------|-----------|
-| CI | prepare | — | — | Green on main |
+| CI | prepare | — | — | Green (#118) |
 | CI | protobuf-lint (buf) | — | — | Green (#116 proto dedup) |
-| CI | lean | Stale `vendor/mathlib` cache without `.git` | P1 | `rm -rf` before vendor + script fix |
-| CI | go-node | `npm ci` path / prisma chain | P1 | Subshell install steps |
-| CI | extended | Live red-team without kernel | P1 | `--offline` corpus validation in CI |
+| CI | lean | Stale `vendor/mathlib` cache without `.git` | P1 | `rm -rf` before vendor + script fix (#118) |
+| CI | go-node | `npm ci` path / prisma chain | P1 | Subshell install steps (#118) |
+| CI | extended | k8s helm tests in lightweight job | P1 | Skip k8s paths; red-team offline (#118) |
 | CI | rust | Long-running | P2 | Monitor |
 
 ## Protobuf Compatibility Tests (`proto-compat.yaml`)
 
 | Job | Known failure | Fix | Status |
 |-----|---------------|-----|--------|
-| proto-lint | Missing `make proto-lint` | Added `scripts/proto.mk` targets | Fixed |
-| proto-compat | Missing `make proto-gen-*` | Same Makefile include | Fixed |
+| proto-lint | Missing `make proto-lint` | Added `scripts/proto.mk` targets | Fixed (#118) |
+| proto-compat | Missing `make proto-gen-*` | Same Makefile include | Fixed (#118) |
 | proto-* | `actions/upload-artifact@v3` deprecated | Bumped to v4 | Fixed (#116+) |
-| proto-performance | Wrong protoc encode path | Covered by `make proto-gen-go` | Fixed |
+| proto-performance | Wrong protoc encode path | Covered by `make proto-gen-go` | Fixed (#118) |
+| proto-go | protoc-gen-go not on PATH | `GOPATH/bin` in setup-go | Fixed (#118) |
 
 ## Actionlint
 
 | Area | Known failure | Fix | Status |
 |------|---------------|-----|--------|
-| dr-cross.yaml | `local` in workflow script, bad matrix expr | Shell + expression fixes | Fixed |
-| evidence.yaml | Inline Python confused shellcheck | `tools/compliance/generate_soc2_report.py` | Fixed |
-| release.yaml | Broken `curl -d` quoting | Heredoc JSON payload | Fixed |
+| dr-cross.yaml | `local` in workflow script, bad matrix expr | Shell + expression fixes | Fixed (#118) |
+| evidence.yaml | Inline Python confused shellcheck | `tools/compliance/generate_soc2_report.py` | Fixed (#118) |
+| release.yaml | Broken `curl -d` quoting | Heredoc JSON payload | Fixed (#118) |
+| demo-e2e.yml | Embedded Python YAML indent | Re-indented blocks | Fixed (#118) |
 | Other workflows | Deprecated `actions/*@v3` runner warnings | `-ignore` for version migration (tech debt) | Waived in actionlint.yml |
 
 ## Platform legacy / optional lanes
@@ -56,19 +58,21 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR (post-#117).
 | Platform Performance Smoke Tests | Env/services not up on generic push | Platform | P3 |
 | Performance Gate | Baseline not recorded | Bench | P3 |
 | Paper Conformance CI | Lean/paper fixtures | Research | P3 |
+| Integration Tests | Kind/Helm admission timeout | Platform | P2 — dedicated `integration.yaml` |
 
 ## Bench
 
 | Workflow | Known failure | Fix |
 |----------|---------------|-----|
-| Bench SWE-bench Smoke | OpenHands/env on Windows | Document WSL; mock engine path green |
+| Bench SWE-bench Smoke | OpenHands/env on Windows; PyYAML for policy packs | Document WSL; install pyyaml (#118) |
 | bench-swebench-unit | Provider env tests | Covered in stabilization matrix |
+| Bench Nightly Criterion | Compile + run benches on PR | P3 — optional lane |
 
 ## Docker multi-arch
 
-| Workflow | Known failure | Priority |
-|----------|---------------|----------|
-| Multi-Architecture Build & Deploy | Dockerfile deps, build context | P2 — investigate per service log |
+| Workflow | Known failure | Priority | Fix |
+|----------|---------------|----------|-----|
+| Multi-Architecture Build & Deploy | Invalid image tag `:-<sha>` on PR builds | P2 | `type=sha,prefix=sha-` (#118) |
 
 ## CLA / automation
 
