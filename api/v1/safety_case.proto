@@ -31,9 +31,6 @@ service SafetyCaseService {
   
   // Get safety case statistics
   rpc GetSafetyCaseStats(GetSafetyCaseStatsRequest) returns (GetSafetyCaseStatsResponse);
-  
-  // Health check
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 // Safety case for AI system deployment

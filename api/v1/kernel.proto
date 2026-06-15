@@ -7,7 +7,6 @@ option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
 import "v1/plan.proto";
 import "v1/receipt.proto";
 import "v1/egress.proto";
@@ -21,7 +20,7 @@ service PolicyKernelService {
   rpc ValidatePlanWithCache(ValidatePlanWithCacheRequest) returns (ValidatePlanWithCacheResponse);
   
   // Verify access receipts
-  rpc VerifyReceipt(KernelVerifyReceiptRequest) returns (KernelVerifyReceiptResponse);
+  rpc VerifyReceipt(PolicyKernelServiceVerifyReceiptRequest) returns (PolicyKernelServiceVerifyReceiptResponse);
   
   // Batch validate multiple plans
   rpc BatchValidatePlans(BatchValidatePlansRequest) returns (BatchValidatePlansResponse);
@@ -37,9 +36,6 @@ service PolicyKernelService {
   
   // Invalidate cache by policy
   rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
-  
-  // Health check
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
   
   // Get kernel metrics
   rpc GetKernelMetrics(GetKernelMetricsRequest) returns (GetKernelMetricsResponse);
@@ -88,7 +84,7 @@ message ValidatePlanWithCacheResponse {
 }
 
 // Kernel receipt verification request
-message KernelVerifyReceiptRequest {
+message PolicyKernelServiceVerifyReceiptRequest {
   // Receipt identifier
   string receipt_id = 1;
   
@@ -133,7 +129,7 @@ message ReceiptVerificationContext {
 }
 
 // Kernel receipt verification response
-message KernelVerifyReceiptResponse {
+message PolicyKernelServiceVerifyReceiptResponse {
   // Verification result
   bool valid = 1;
   
