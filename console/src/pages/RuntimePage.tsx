@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from 'react-query';
 import {
   CpuChipIcon,
   ClockIcon,
@@ -7,8 +6,6 @@ import {
   ArrowPathIcon,
   DocumentCheckIcon,
 } from '@heroicons/react/24/outline';
-import { getRuntimeSLO, rotateEpoch } from '../services/api';
-
 interface SLOMetrics {
   latency_p50: number;
   latency_p95: number;

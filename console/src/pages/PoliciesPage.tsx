@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useMutation } from 'react-query';
 import { toast } from 'react-hot-toast';
 import {
   PlayIcon,
   DocumentCheckIcon,
   RocketLaunchIcon,
-  ClockIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { compilePolicy, buildPolicy, runProofs, deployPolicy } from '../services/api';
@@ -28,7 +27,6 @@ export default function PoliciesPage() {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [englishPolicy, setEnglishPolicy] = useState('');
   const [showActionDSL, setShowActionDSL] = useState(false);
-  const queryClient = useQueryClient();
 
   // Mock policies for demo
   const [policies, setPolicies] = useState<Policy[]>([

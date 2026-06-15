@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
 import {
   MagnifyingGlassIcon,
   DocumentArrowDownIcon,
@@ -8,7 +7,7 @@ import {
   FunnelIcon,
   DocumentMagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
-import { searchCertificates, downloadCompliancePacket, startReplay, verifyCertificate, buildCompliancePacket, sendTelemetryEvent, downloadReplayArtifact } from '../services/api';
+import { downloadCompliancePacket, startReplay, verifyCertificate, buildCompliancePacket, sendTelemetryEvent, downloadReplayArtifact } from '../services/api';
 import toast from 'react-hot-toast';
 
 interface Certificate {

@@ -11,6 +11,11 @@ on:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   proto-compat:
     name: Protobuf Compatibility Tests
@@ -24,10 +29,10 @@ jobs:
             setup: |
               sudo apt-get update
               sudo apt-get install -y protobuf-compiler
-              go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-              go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+              go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+              go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
               echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-            test: make proto-gen-go && cd core/sdk/go && go build -v ./generated/...
+            test: make proto-gen-go && cd core/sdk/go && go mod tidy && go build -v ./generated/...
           - language: typescript
             setup: |
               sudo apt-get update
@@ -216,8 +221,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y protobuf-compiler
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
     - name: Generate and benchmark
       run: |
@@ -316,6 +322,7 @@ jobs:
 
     - name: Comment on PR
       if: github.event_name == 'pull_request'
+      continue-on-error: true
       uses: actions/github-script@v6
       with:
         script: |
@@ -328,3 +335,9 @@ jobs:
             repo: context.repo.repo,
             body: report
           });
+
+    - name: Require compatibility matrix green
+      if: always() && needs.proto-compat.result != 'success'
+      run: |
+        echo "Protobuf compatibility matrix did not succeed: ${{ needs.proto-compat.result }}"
+        exit 1
