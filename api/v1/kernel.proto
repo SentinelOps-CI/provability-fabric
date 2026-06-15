@@ -177,28 +177,13 @@ message BatchValidatePlansRequest {
   ValidationContext context = 3;
 }
 
-// Batch configuration
-message BatchConfig {
-  // Maximum batch size
-  uint32 max_batch_size = 1;
-  
-  // Timeout in milliseconds
-  uint32 timeout_ms = 2;
-  
-  // Enable parallel processing
-  bool enable_parallel = 3;
-  
-  // Maximum concurrent validations
-  uint32 max_concurrent = 4;
-}
-
 // Batch validation response
 message BatchValidatePlansResponse {
   // Validation results for each plan
   repeated PlanValidationResult plan_results = 1;
   
   // Batch statistics
-  BatchStats stats = 2;
+  PlanValidationBatchStats stats = 2;
   
   // Total processing time in milliseconds
   uint64 total_processing_time_ms = 3;
@@ -231,8 +216,8 @@ message PlanValidationResult {
   bool cache_hit = 5;
 }
 
-// Batch statistics
-message BatchStats {
+// Plan validation batch statistics
+message PlanValidationBatchStats {
   // Total plans processed
   uint32 total_plans = 1;
   
@@ -485,13 +470,6 @@ message GetCacheStatsRequest {
   StatsScope scope = 2;
 }
 
-// Statistics scope
-enum StatsScope {
-  STATS_SCOPE_UNSPECIFIED = 0;
-  STATS_SCOPE_TENANT = 1;
-  STATS_SCOPE_GLOBAL = 2;
-}
-
 // Cache statistics response
 message GetCacheStatsResponse {
   // Hit count
@@ -549,80 +527,6 @@ message InvalidateCacheResponse {
   repeated string affected_keys = 4;
 }
 
-// Health check request
-message HealthCheckRequest {
-  // Service identifier
-  string service = 1;
-  
-  // Health check level
-  HealthCheckLevel level = 2;
-}
-
-// Health check level
-enum HealthCheckLevel {
-  HEALTH_CHECK_LEVEL_UNSPECIFIED = 0;
-  HEALTH_CHECK_LEVEL_BASIC = 1;
-  HEALTH_CHECK_LEVEL_DETAILED = 2;
-  HEALTH_CHECK_LEVEL_CRITICAL = 3;
-}
-
-// Health check response
-message HealthCheckResponse {
-  // Service status
-  ServiceStatus status = 1;
-  
-  // Service version
-  string version = 2;
-  
-  // Uptime in seconds
-  uint64 uptime_seconds = 3;
-  
-  // Service metadata
-  map<string, string> metadata = 4;
-  
-  // Health check details
-  repeated HealthCheckDetail details = 5;
-  
-  // Last health check timestamp
-  google.protobuf.Timestamp last_check = 6;
-}
-
-// Service status
-enum ServiceStatus {
-  SERVICE_STATUS_UNSPECIFIED = 0;
-  SERVICE_STATUS_HEALTHY = 1;
-  SERVICE_STATUS_DEGRADED = 2;
-  SERVICE_STATUS_UNHEALTHY = 3;
-  SERVICE_STATUS_UNKNOWN = 4;
-}
-
-// Health check detail
-message HealthCheckDetail {
-  // Component name
-  string component = 1;
-  
-  // Component status
-  ComponentStatus status = 2;
-  
-  // Component message
-  string message = 3;
-  
-  // Component metrics
-  map<string, string> metrics = 4;
-  
-  // Last check timestamp
-  google.protobuf.Timestamp last_check = 5;
-}
-
-// Component status
-enum ComponentStatus {
-  COMPONENT_STATUS_UNSPECIFIED = 0;
-  COMPONENT_STATUS_HEALTHY = 1;
-  COMPONENT_STATUS_DEGRADED = 2;
-  COMPONENT_STATUS_UNHEALTHY = 3;
-  COMPONENT_STATUS_UNKNOWN = 4;
-}
-
 // Kernel metrics request
 message GetKernelMetricsRequest {
   // Tenant identifier
@@ -642,18 +546,6 @@ enum MetricsScope {
   METRICS_SCOPE_GLOBAL = 2;
   METRICS_SCOPE_PERFORMANCE = 3;
   METRICS_SCOPE_SECURITY = 4;
-}
-
-// Time range
-message TimeRange {
-  // Start timestamp
-  google.protobuf.Timestamp start_time = 1;
-  
-  // End timestamp
-  google.protobuf.Timestamp end_time = 2;
-  
-  // Time granularity in seconds
-  uint32 granularity_seconds = 3;
 }
 
 // Kernel metrics response

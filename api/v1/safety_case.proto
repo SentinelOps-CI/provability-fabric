@@ -912,43 +912,6 @@ message ListSafetyCasesRequest {
   SortOrder sort_order = 6;
 }
 
-// Time range
-message TimeRange {
-  // Start timestamp
-  google.protobuf.Timestamp start_time = 1;
-  
-  // End timestamp
-  google.protobuf.Timestamp end_time = 2;
-}
-
-// Pagination
-message Pagination {
-  // Page number (1-based)
-  uint32 page = 1;
-  
-  // Page size
-  uint32 page_size = 2;
-  
-  // Maximum page size
-  uint32 max_page_size = 3;
-}
-
-// Sort order
-message SortOrder {
-  // Sort field
-  string field = 1;
-  
-  // Sort direction
-  SortDirection direction = 2;
-}
-
-// Sort direction
-enum SortDirection {
-  SORT_DIRECTION_UNSPECIFIED = 0;
-  SORT_DIRECTION_ASC = 1;
-  SORT_DIRECTION_DESC = 2;
-}
-
 // List safety cases response
 message ListSafetyCasesResponse {
   // Safety cases list
@@ -962,24 +925,6 @@ message ListSafetyCasesResponse {
   
   // Processing time in milliseconds
   uint64 processing_time_ms = 4;
-}
-
-// Pagination info
-message PaginationInfo {
-  // Current page
-  uint32 current_page = 1;
-  
-  // Page size
-  uint32 page_size = 2;
-  
-  // Total pages
-  uint32 total_pages = 3;
-  
-  // Has next page
-  bool has_next = 4;
-  
-  // Has previous page
-  bool has_previous = 5;
 }
 
 // Revoke safety case request
