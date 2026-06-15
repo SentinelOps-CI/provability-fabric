@@ -14,7 +14,7 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 | Lane docs | compatibility matrix, `test_lane_separation.py` | `pytest tests/evidence_schema/test_lane_separation.py -q` |
 | Release docs | `docs/roadmap/evidence-v0.2.md`, CHANGELOG, mkdocs | `mkdocs build --strict` |
 
-Last full Evidence smoke matrix (Linux CI, 2026-06-14): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`). Green baselines: PR #110, PR #111 dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090), and closure dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869).
+Last full Evidence smoke matrix (Linux CI, 2026-06-15): all three jobs green (`evidence-schema-only`, `evidence-validator`, `smoke`). Green baselines: PR #110, PR #111 dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090), closure dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869), and post-#116 dispatch [27527807232](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27527807232) (`5394d092`).
 
 ## CI hardening (post-merge)
 
