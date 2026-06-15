@@ -71,6 +71,74 @@ reason = "wasm-sandbox pinned to wasmtime 15.x pending upgrade (#118)"
 crate = "wasi-cap-std-sync"
 reason = "wasm-sandbox pinned to wasmtime 15.x pending upgrade (#118)"
 
+[[advisories.ignore]]
+id = "RUSTSEC-2024-0438"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0046"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2025-0118"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0020"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0021"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0085"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0086"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0087"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0088"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0089"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0091"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0092"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0093"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0094"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0095"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0096"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0149"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
+
 [licenses]
 version = 2
 confidence-threshold = 0.85
