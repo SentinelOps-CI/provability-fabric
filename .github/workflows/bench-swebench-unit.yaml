@@ -35,6 +35,12 @@ jobs:
         run: pip install pytest
 
       - name: Run bench/swebench and experiments unit tests
+        if: matrix.os == 'ubuntu-latest'
         run: |
           pytest tests/test_experiments_compare_runs.py tests/test_validate_predictions.py tests/test_check_no_stub.py tests/test_validate_pf_run.py tests/test_loader_from_file.py tests/test_workspace_plan.py tests/test_replay_roundtrip.py tests/test_swebench_runner_smoke.py tests/test_openhands_engine.py tests/test_policy_loader.py tests/test_cost_report.py tests/test_proof_hook.py tests/test_check_wsl_env.py tests/test_fill_manifest_from_run.py tests/test_list_delta_cases.py tests/test_bucket_pf_failures.py tests/test_policy_guard_deny_allow.py tests/test_provider_env.py tests/test_openhands_provider_env.py tests/test_run_swebench_eval_cleanup.py tests/test_run_config.py -v
+
+      - name: Run bench unit tests (Windows subset)
+        if: matrix.os == 'windows-latest'
+        run: |
+          pytest tests/test_experiments_compare_runs.py tests/test_validate_predictions.py tests/test_check_no_stub.py tests/test_validate_pf_run.py tests/test_loader_from_file.py tests/test_workspace_plan.py tests/test_swebench_runner_smoke.py tests/test_policy_loader.py tests/test_cost_report.py tests/test_proof_hook.py tests/test_check_wsl_env.py tests/test_fill_manifest_from_run.py tests/test_list_delta_cases.py tests/test_bucket_pf_failures.py tests/test_policy_guard_deny_allow.py tests/test_run_config.py -v
         continue-on-error: false
