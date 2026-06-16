@@ -20,6 +20,7 @@ on:
       - "mkdocs.yml"
       - ".markdown-link-check.json"
       - "cmd/specdoc/**"
+      - ".github/workflows/docs-build.yaml"
   workflow_dispatch:
 
 jobs:
