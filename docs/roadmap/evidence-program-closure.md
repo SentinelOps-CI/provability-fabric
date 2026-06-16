@@ -9,8 +9,8 @@ Single-page sign-off for the Evidence v0.1 + v0.2 vision and the repo-wide CI gr
 | Evidence v0.1 | Complete on `main` | [evidence-v0.1-status.md](evidence-v0.1-status.md) |
 | Evidence v0.2 | Complete on `main` | [evidence-v0.2.md](evidence-v0.2.md), [evidence-v0.2-status.md](evidence-v0.2-status.md) |
 | CI hardening (#118) | Merged `3f150b15` | [ci-health-matrix](../internal/ci-health-matrix.md) |
-| Post-merge smoke | Dispatched | [run 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) (post-#118), [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777) (Phase 6 ceremony) |
-| Core CI dispatch | Dispatched | [run 27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) (Phase 6 ceremony) |
+| Post-merge smoke | Dispatched | [run 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) (post-#118), [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777) — **success** (Phase 6 ceremony) |
+| Core CI dispatch | Dispatched | [run 27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) — **success** (Phase 6 ceremony) |
 
 ## Full-green CI criterion
 
@@ -33,6 +33,7 @@ Reusable-only workflows (`workflow_call`) are tracked but not gating until invok
 | #126 | `ci/lean-research` | lean-offline, lean-morph, morph-replay, paper-conformance |
 | #125 | `ci/nightly-batch` | nightly-replay, ci-nightly-pytest, redteam, chaos smoke |
 | #127 | `docs/evidence-program-closure` | Closure sign-off page, CHANGELOG entry |
+| #128 | `ci/post-closure-hotfixes` | actionlint/docs-build/cert-validate hotfixes (**open** — needs approving review) |
 
 ## Org prerequisites (remaining blockers)
 
