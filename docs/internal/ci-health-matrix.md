@@ -91,7 +91,7 @@ Verified on `main` (post-#118): each workflow below runs `make submodules` with 
 | Workflow | Known failure | Fix | Status |
 |----------|---------------|-----|--------|
 | CLA Bot | Wrong org/repo in `cla/cla.json` | Point at `SentinelOps-CI/provability-fabric` | Fixed (#115) |
-| CLA Bot | External CLA API unreachable | **Option B (#118):** removed `push: main` trigger; skip when `/health` fails; PR-only advisory | Fixed (#118) |
+| CLA Bot | External CLA API unreachable | **Option B (#118):** no `push: main` on `cla-check`; skip when `/health` fails; PR-only advisory | Fixed (#118) |
 
 ## Invalid or noisy workflow entries
 
@@ -113,7 +113,9 @@ Verified on `main` (post-#118): each workflow below runs `make submodules` with 
 | 4 | Local check: `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards` |
 | 5 | CI check: `workflow_dispatch` **Evidence v0.1 smoke** or **Standards Pin Drift Check** — `make submodules` must pass |
 
-Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](../../CONTRIBUTING.md).
+**Status (2026-06-16):** Repository secret configured. Evidence smoke green on dispatch [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777).
+
+Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md).
 
 | Secret / service | Workflows blocked | Action |
 |------------------|-------------------|--------|

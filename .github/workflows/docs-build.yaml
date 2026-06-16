@@ -12,10 +12,20 @@ on:
       - "mkdocs.yml"
       - ".markdown-link-check.json"
       - "cmd/specdoc/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "bundles/**/spec.yaml"
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".markdown-link-check.json"
+      - "cmd/specdoc/**"
+      - ".github/workflows/docs-build.yaml"
   workflow_dispatch:
 
 jobs:
-  build-docs:
+  documentation-build:
+    name: Documentation Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
