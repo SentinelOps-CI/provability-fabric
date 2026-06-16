@@ -315,11 +315,15 @@ validate-certs:
 		echo "Clone per external/README.md or pass --allow-missing-schema (not recommended)."; \
 		exit 1; \
 	fi
-	@set -e; shopt -s nullglob; files=(evidence/certs/*/*.cert.json tests/replay/out/**/*.cert.json); \
-	if [ $${#files[@]} -eq 0 ]; then \
+	@found=0; \
+	for f in evidence/certs/*/*.cert.json tests/replay/out/*/*.cert.json; do \
+		if [ -e "$$f" ]; then \
+			found=1; \
+			python tools/cert-validate/validate.py "$$f" || exit 1; \
+		fi; \
+	done; \
+	if [ $$found -eq 0 ]; then \
 		echo "No CERT-V1 *.cert.json fixtures found (egress_certs/ uses a separate schema)."; \
-	else \
-		python tools/cert-validate/validate.py "$${files[@]}"; \
 	fi
 	@$(ECHOOK) "✅ Certificate validation completed"
 
