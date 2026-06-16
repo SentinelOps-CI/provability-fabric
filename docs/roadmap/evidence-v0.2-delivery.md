@@ -57,8 +57,10 @@ Gates align with the [Evidence v0.2 definition of done](evidence-v0.2.md#definit
 | #109 | KIT Python deps in smoke workflow |
 | #110 | Create testbed `out/` before replay report |
 | #111 | Migrate remaining workflows off `submodules: recursive`; `main` workflow_dispatch smoke green (run `27512113090`) |
+| #118 | Repo-wide CI hardening: proto-compat, lean/rust/go-node, deny, multiarch, integration paths (merge `3f150b15`) |
+| #121+ | Post-#118 closure stack: artifact v4, platform/bench/security/lean/nightly sweeps — see [evidence-program-closure.md](evidence-program-closure.md) |
 
-Green baselines: PR #110 (first full matrix after testbed fix) and PR #111 (`main` workflow_dispatch confirmation).
+Green baselines: PR #110 (first full matrix after testbed fix), PR #111 (`main` workflow_dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090)), post-#116 [27527807232](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27527807232), post-#118 dispatch [27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912).
 
 ## Fresh-clone verification checklist
 

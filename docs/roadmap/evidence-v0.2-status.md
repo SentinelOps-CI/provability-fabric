@@ -1,6 +1,15 @@
 # Evidence v0.2 status
 
-Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #110.
+Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16).
+
+## CI hardening #118 (merged)
+
+| Item | Detail |
+|------|--------|
+| Merge commit | `3f150b1569b8dd50061d57ed99f34aa4b8dfffe6` |
+| Post-merge smoke | [workflow_dispatch 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) |
+| Closure stack | #121–#126 (`ci/standards-parity` … `ci/nightly-batch`) |
+| Sign-off page | [evidence-program-closure.md](evidence-program-closure.md) |
 
 ## Implementation (branch stack)
 
