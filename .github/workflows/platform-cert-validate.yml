@@ -5,52 +5,77 @@ name: Platform CERT Validation
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
+    paths:
+      - "evidence/**"
+      - "tools/cert-validate/**"
+      - "external/CERT-V1/**"
+      - "tests/replay/**"
+      - ".github/workflows/platform-cert-validate.yml"
   pull_request:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - "evidence/**"
+      - "tools/cert-validate/**"
+      - "external/CERT-V1/**"
+      - "tests/replay/**"
+      - ".github/workflows/platform-cert-validate.yml"
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM
+    - cron: "0 2 * * *"
+  workflow_dispatch:
 
 jobs:
   validate-certs:
     runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
 
-    - name: Init external standards
-      env:
-        STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
-      run: make submodules
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install jsonschema pyyaml
-    
-    - name: Validate CERT-V1 certificates
-      run: |
-        echo "🔍 Validating all emitted certificates against CERT-V1 schema..."
-        python tools/cert-validate/validate.py evidence/egress_certs/*.json
-        python tools/cert-validate/validate.py evidence/certs/**/*.cert.json
-        echo "✅ All certificates are valid"
-    
-    - name: Check certificate compliance
-      run: |
-        echo "📊 Checking certificate compliance rates..."
-        python tools/compliance/check_compliance.py --threshold 0.999
-    
-    - name: Upload validation report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: cert-validation-report
-        path: |
-          cert-validation-report.json
-          compliance-report.json
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Init external standards
+        env:
+          STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
+        run: make submodules
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install jsonschema pyyaml
+
+      - name: Generate replay CERTs
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=1
+          bash tests/replay/run_replays.sh
+
+      - name: Validate replay CERTs
+        run: |
+          shopt -s nullglob
+          certs=(tests/replay/out/certs/*.cert.json)
+          if [ ${#certs[@]} -eq 0 ]; then
+            echo "No replay CERTs produced" >&2
+            exit 1
+          fi
+          python tools/cert-validate/validate.py "${certs[@]}"
+
+      - name: Check certificate compliance
+        run: |
+          python tools/compliance/check_compliance.py --threshold 0.999
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cert-validation-report
+          path: |
+            cert-validation-report.json
+            compliance-report.json
+            tests/replay/out/certs/

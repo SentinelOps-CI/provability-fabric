@@ -2,8 +2,9 @@ name: PF Reusable CI Caller
 
 on:
   pull_request:
+  workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 4 * * *"
 
 jobs:
   call-pf-ci:
