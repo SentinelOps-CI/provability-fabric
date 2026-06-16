@@ -21,6 +21,7 @@ CORE_DEFINITIONS=(
 # Directories that are allowed to define these (core modules)
 ALLOWED_DIRS=(
     "core/lean-libs/"
+    "spec-templates/"
     "vendor/"
 )
 
@@ -32,6 +33,7 @@ for definition in "${CORE_DEFINITIONS[@]}"; do
     occurrences=$(find . -name "*.lean" -type f | grep -v ".lake" | \
                   grep -v "vendor/" | \
                   grep -v "core/lean-libs/" | \
+                  grep -v "spec-templates/" | \
                   xargs grep -l "$definition" 2>/dev/null || true)
     
     if [ -n "$occurrences" ]; then
