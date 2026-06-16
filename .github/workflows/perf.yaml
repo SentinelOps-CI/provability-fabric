@@ -43,7 +43,7 @@ jobs:
           python scripts/bench.py --count 100000 --output perf-results.json
 
       - name: Upload performance results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: perf-results-${{ github.run_number }}
           path: perf-results.json

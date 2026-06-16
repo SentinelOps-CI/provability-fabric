@@ -12,11 +12,22 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
 ## Standards / token parity
 
-| Workflow | Known failure | Fix | Status |
-|----------|---------------|-----|--------|
-| docs-build | Private submodule checkout | Plain checkout + `make submodules` (#113/#114) | Fixed |
-| cert-validate, replay, egress, platform-* | Same | Already on `make submodules` pattern | OK |
-| nightly-replay | Invalid YAML (triplicate workflow definitions) | Deduplicated workflow (#115) | Fixed |
+Verified on `main` (post-#118): each workflow below runs `make submodules` with `STANDARDS_GITHUB_TOKEN` in the job env.
+
+| Workflow | `make submodules` + token | Notes |
+|----------|---------------------------|-------|
+| `docs-build.yaml` | Yes | Plain checkout + submodules (#113/#114) |
+| `cert-validate.yml` | Yes | |
+| `replay.yml` | Yes | Docker replay runner |
+| `egress.yml` | Yes | |
+| `standards-pin.yml` | Yes | Pin drift gate |
+| `evidence-v01-smoke.yml` | Yes | Evidence gate |
+| `platform-cert-validate.yml` | Yes | |
+| `platform-replay.yml` | Yes | |
+| `nightly-replay.yml` | Yes | Scheduled replay |
+| `morph-replay.yml` | N/A | Uses in-repo `tests/replay/bundles` only |
+
+`actions/upload-artifact@v3` → `@v4` bump tracked in standards-parity PR (#119+).
 
 ## Main CI (`ci.yml` reusable jobs)
 
@@ -92,16 +103,28 @@ Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
 ## Required secrets (org prerequisites)
 
+### `STANDARDS_GITHUB_TOKEN` setup (org admin)
+
+| Step | Action |
+|------|--------|
+| 1 | Create PAT (fine-grained or classic) with **read** on `verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT` |
+| 2 | Repo **Settings → Secrets and variables → Actions → New repository secret** |
+| 3 | Name `STANDARDS_GITHUB_TOKEN`, paste PAT |
+| 4 | Local check: `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards` |
+| 5 | CI check: `workflow_dispatch` **Evidence v0.1 smoke** or **Standards Pin Drift Check** — `make submodules` must pass |
+
+Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](../../CONTRIBUTING.md).
+
 | Secret / service | Workflows blocked | Action |
 |------------------|-------------------|--------|
-| `STANDARDS_GITHUB_TOKEN` | `platform-cert-validate.yml`, `cert-validate.yml`, `replay.yml`, `evidence-v01-smoke.yml`, `standards-pin.yml`, `docs-build.yaml`, `egress.yml`, `morph-replay.yml`, `nightly-replay.yml`, `platform-replay.yml` | Org admin: PAT with read access to `verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT`; verify with `make dev-standards` in CI log |
+| `STANDARDS_GITHUB_TOKEN` | `platform-cert-validate.yml`, `cert-validate.yml`, `replay.yml`, `evidence-v01-smoke.yml`, `standards-pin.yml`, `docs-build.yaml`, `egress.yml`, `nightly-replay.yml`, `platform-replay.yml` | Org admin steps above; each workflow runs `make submodules` with `STANDARDS_GITHUB_TOKEN` env |
 | CLA hosted service | `cla-bot.yaml` (PR only after #118) | **Option B applied:** no `push: main`; skip when `/health` fails. Option A: restore hosted API at URL in `cla/cla.json` |
 | `CI_PAT` (optional) | `release.yaml` cross-repo dispatch | Only if release workflows must pass in closure sweep |
 | `AWS_*` (optional) | `dr-cross.yaml`, `evidence.yaml` | Only if DR/evidence collection scheduled jobs are in scope |
 
 | Secret | Workflows | Action if missing |
 |--------|-----------|-------------------|
-| `STANDARDS_GITHUB_TOKEN` | Evidence smoke, cert/replay/docs build, standards-pin | Add PAT with read access to `verifiable-ai-ci/*` |
+| `STANDARDS_GITHUB_TOKEN` | Evidence smoke, cert/replay/docs build, standards-pin, platform-cert/replay, egress, nightly-replay | Org admin: see setup table above |
 | `GITHUB_TOKEN` | Default | Auto-provided |
 | `CI_PAT` | release.yaml pf-testbed dispatch | Optional; release tags only |
 | `AWS_*` | dr-cross, evidence collection | Optional; scheduled/AWS workflows only |

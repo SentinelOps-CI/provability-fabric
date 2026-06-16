@@ -57,7 +57,7 @@ jobs:
         python tools/replay/generate_report.py replay_artifacts/
     
     - name: Upload replay artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: replay-artifacts

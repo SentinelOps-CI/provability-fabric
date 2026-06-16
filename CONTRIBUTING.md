@@ -100,7 +100,19 @@ make evidence-verify # Go tests, pytest suites, v0.1 + v0.2 testbed scripts
 make docs-strict     # mkdocs build --strict (docs-only PRs)
 ```
 
-`make evidence-verify` requires bash (Linux, WSL, or Git Bash on Windows). Clone external standards per [`external/README.md`](external/README.md). Fork maintainers and org workflows need repository secret **`STANDARDS_GITHUB_TOKEN`** for private `verifiable-ai-ci/*` repos.
+`make evidence-verify` requires bash (Linux, WSL, or Git Bash on Windows). Clone external standards per [`external/README.md`](external/README.md).
+
+#### `STANDARDS_GITHUB_TOKEN` (org admin)
+
+CI workflows that call `make submodules` need a repository secret so GitHub Actions can clone private standards repos (`verifiable-ai-ci/CERT-V1`, `verifiable-ai-ci/TRACE-REPLAY-KIT`). **Org admin** must add the secret; contributors cannot self-serve it on the upstream org repo.
+
+1. Create a fine-grained PAT (or classic PAT) owned by a bot/service account with **read** access to `verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT`.
+2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
+3. Name: `STANDARDS_GITHUB_TOKEN`, value: the PAT.
+4. Verify locally (with the same token exported): `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards`.
+5. Verify in CI: re-run **Standards Pin Drift Check** or **Evidence v0.1 smoke** via `workflow_dispatch`; the `make submodules` step should succeed in the log.
+
+Workflows using this secret are listed in [CI health matrix — Required secrets](docs/internal/ci-health-matrix.md#required-secrets-org-prerequisites). Forks without the secret can still run most gates; standards/replay jobs fail until the secret is configured or submodules are vendored locally.
 
 See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for the fresh-clone checklist and [Evidence v0.2 status](docs/roadmap/evidence-v0.2-status.md) for current delivery gates.
 
@@ -112,7 +124,13 @@ See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for t
 | Docs only | `make docs-strict` | `docs-build.yaml`, `docs-deploy.yaml` |
 | Code (general) | `go test`, `cargo test`, targeted pytest | `ci.yml` reusable jobs |
 
-Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-matrix.md). Fork and org workflows need **`STANDARDS_GITHUB_TOKEN`** for private `verifiable-ai-ci/*` repos.
+Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-matrix.md). Do not admin-merge while required checks are red (see **CI policy** below).
+
+### CI policy
+
+- **No admin merge on red:** merge only when all required status checks for the PR scope are green. Document any exception in the PR body and update the health matrix.
+- **Local gates before CI PRs:** `make dev-standards`, `make evidence-verify` (evidence paths), `make docs-strict` (docs), `make proto-lint proto-validate` (protobuf).
+- **Inventory:** run `scripts/ci_workflow_inventory.sh` on `main` after large workflow changes; see [CI health matrix](docs/internal/ci-health-matrix.md).
 
 ## Reuse and forking
 
