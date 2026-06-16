@@ -5,6 +5,12 @@ All notable changes to Provability-Fabric are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - Evidence program closure (2026-06-16)
+
+### Added
+
+- **Evidence program closure:** [evidence-program-closure.md](roadmap/evidence-program-closure.md) — v0.1+v0.2 vision complete, full-green CI criterion, org prerequisites, Phase 6 ceremony. CI hardening **#118** merged (`3f150b15`); post-merge smoke [27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912). Closure stack PRs **#121–#126** (`ci/standards-parity` through `ci/nightly-batch`). Inventory script: `scripts/ci_workflow_inventory.sh`.
+
 ## [Unreleased] - Bench / eval pipeline hardening
 
 ### Added
