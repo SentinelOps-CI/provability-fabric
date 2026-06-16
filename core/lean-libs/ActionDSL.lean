@@ -46,7 +46,7 @@ inductive ExtendedAction where
 inductive ABACExpr where
   | Attr (key : String) (value : String)
   | Session (key : String) (value : String)
-  | EpochIn (start : Nat) (end : Nat)
+  | EpochIn (start : Nat) (stop : Nat)
   | Scope (tenant : String)
   | And (left : ABACExpr) (right : ABACExpr)
   | Or (left : ABACExpr) (right : ABACExpr)
@@ -68,8 +68,8 @@ def evalABAC (expr : ABACExpr) (ctx : ABACContext) : Bool :=
     ctx.attributes.contains (key, value)
   | ABACExpr.Session key value =>
     ctx.session_data.contains (key, value)
-  | ABACExpr.EpochIn start end =>
-    start ≤ ctx.current_epoch ∧ ctx.current_epoch ≤ end
+  | ABACExpr.EpochIn start stop =>
+    start ≤ ctx.current_epoch ∧ ctx.current_epoch ≤ stop
   | ABACExpr.Scope tenant =>
     ctx.tenant == tenant
   | ABACExpr.And left right =>

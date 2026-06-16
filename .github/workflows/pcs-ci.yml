@@ -120,7 +120,7 @@ jobs:
       - name: Test PCS adapter
         run: |
           cd adapters/pcs
-          go test ./... -count=1
+          go test -tags pcsbench ./... -count=1
 
       - name: PCS RC fixture lock gate
         env:

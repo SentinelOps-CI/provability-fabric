@@ -36,14 +36,20 @@ jobs:
         include:
           - service: sidecar-watcher
             dockerfile: runtime/sidecar-watcher/Dockerfile
+            context: runtime/sidecar-watcher
           - service: egress-firewall
             dockerfile: runtime/egress-firewall/Dockerfile
+            context: runtime/egress-firewall
           - service: attestor
             dockerfile: runtime/attestor/Dockerfile
+            context: runtime/attestor
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Stage workspace Cargo.lock for Docker build
+        run: cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -74,16 +80,17 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,format=short,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

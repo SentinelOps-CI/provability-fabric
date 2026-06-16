@@ -8,15 +8,16 @@ echo "🔧 Vendoring mathlib for offline builds..."
 
 # Configuration
 MATHLIB_VERSION="v4.7.0"
-MATHLIB_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac"
+MATHLIB_COMMIT="a45ae63747140c1b2cbad9d46f518015c047047a"
 VENDOR_DIR="vendor/mathlib"
 
 # Create vendor directory
 mkdir -p "$VENDOR_DIR"
 
-# Clone mathlib to vendor directory
+# Clone mathlib to vendor directory (remove stale cache dirs missing .git)
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
 if [ ! -d "$VENDOR_DIR/.git" ]; then
+    rm -rf "$VENDOR_DIR"
     git clone --depth 1 --branch "$MATHLIB_VERSION" \
         https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"
 else
@@ -33,24 +34,16 @@ if [ "$CURRENT_COMMIT" != "$MATHLIB_COMMIT" ]; then
     git checkout "$MATHLIB_COMMIT"
 fi
 
-# Build mathlib to generate .olean files
-echo "🔨 Building mathlib..."
-lake build
-
-# Create a lakefile.lean in the vendor directory
-cat > "$VENDOR_DIR/lakefile.lean" << 'EOF'
-import Lake
-open Lake DSL
-
-package mathlib {
-  -- add package configuration options here
-}
-
-@[default_target]
-lean_lib Mathlib {
-  -- add library configuration options here
-}
-EOF
+# Populate .olean files (prefer Mathlib's prebuilt cache over a full compile)
+echo "🔨 Fetching mathlib build artifacts..."
+if [ -d .lake/build/lib ] && [ -n "$(ls -A .lake/build/lib 2>/dev/null)" ]; then
+  echo "✅ Mathlib build artifacts already present, skipping fetch"
+elif lake exe cache get; then
+  echo "✅ Downloaded mathlib cache"
+else
+  echo "⚠️  Mathlib cache download failed; falling back to lake build"
+  lake build
+fi
 
 echo "✅ Mathlib vendored successfully!"
 echo "📁 Location: $VENDOR_DIR"

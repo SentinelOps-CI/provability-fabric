@@ -73,8 +73,6 @@ model TenantInvoice {
   
   @@unique([tenantId, periodStart])
   @@index([tenantId, periodStart])
-<<<<<<< Current (Your changes)
-=======
 }
 
 model EgressCertificate {
@@ -125,5 +123,4 @@ model AccessReceipt {
   
   @@index([tenant, timestamp])
   @@index([subjectId, timestamp])
->>>>>>> Incoming (Background Agent changes)
-} 
+}

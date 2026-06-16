@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package provability_fabric.api.v1;
 
-option go_package = "github.com/provability-fabric/api/v1;v1";
+option go_package = "github.com/provability-fabric/core/sdk/go/generated/v1;v1";
 option java_multiple_files = true;
 option java_package = "com.provability.fabric.api.v1";
 
@@ -15,28 +15,28 @@ import "v1/egress.proto";
 service PolicyKernelService {
   // Validate a plan with comprehensive policy checks
   rpc ValidatePlan(ValidatePlanRequest) returns (ValidatePlanResponse);
-  
+
   // Validate a plan with fast-path caching
   rpc ValidatePlanWithCache(ValidatePlanWithCacheRequest) returns (ValidatePlanWithCacheResponse);
-  
+
   // Verify access receipts
   rpc VerifyReceipt(PolicyKernelServiceVerifyReceiptRequest) returns (PolicyKernelServiceVerifyReceiptResponse);
-  
+
   // Batch validate multiple plans
   rpc BatchValidatePlans(BatchValidatePlansRequest) returns (BatchValidatePlansResponse);
-  
+
   // Get kernel configuration
   rpc GetKernelConfig(GetKernelConfigRequest) returns (GetKernelConfigResponse);
-  
+
   // Update kernel configuration
   rpc UpdateKernelConfig(UpdateKernelConfigRequest) returns (UpdateKernelConfigResponse);
-  
+
   // Get cache statistics
   rpc GetCacheStats(GetCacheStatsRequest) returns (GetCacheStatsResponse);
-  
+
   // Invalidate cache by policy
   rpc InvalidateCache(InvalidateCacheRequest) returns (InvalidateCacheResponse);
-  
+
   // Get kernel metrics
   rpc GetKernelMetrics(GetKernelMetricsRequest) returns (GetKernelMetricsResponse);
 }
@@ -45,16 +45,16 @@ service PolicyKernelService {
 message ValidatePlanWithCacheRequest {
   // Plan to validate
   Plan plan = 1;
-  
+
   // Capability token identifier
   string caps_token_id = 2;
-  
+
   // Enable fast-path caching
   bool enable_cache = 3;
-  
+
   // Cache TTL in seconds
   uint32 cache_ttl_seconds = 4;
-  
+
   // Validation context
   ValidationContext context = 5;
 }
@@ -63,22 +63,22 @@ message ValidatePlanWithCacheRequest {
 message ValidatePlanWithCacheResponse {
   // Validation result
   ValidationResult result = 1;
-  
+
   // Approved steps for execution
   repeated ApprovedStep approved_steps = 2;
-  
+
   // Policy Fast-Path signature
   string pf_signature = 3;
-  
+
   // Signature expiration
   google.protobuf.Timestamp signature_expires_at = 4;
-  
+
   // Cache hit indicator
   bool cache_hit = 5;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 6;
-  
+
   // Validation warnings
   repeated string warnings = 7;
 }
@@ -87,28 +87,28 @@ message ValidatePlanWithCacheResponse {
 message PolicyKernelServiceVerifyReceiptRequest {
   // Receipt identifier
   string receipt_id = 1;
-  
+
   // Tenant identifier
   string tenant = 2;
-  
+
   // Subject identifier
   string subject_id = 3;
-  
+
   // Query hash
   string query_hash = 4;
-  
+
   // Result hash
   string result_hash = 5;
-  
+
   // Signature
   string signature = 6;
-  
+
   // Signature algorithm
   string signature_algorithm = 7;
-  
+
   // Timestamp
   google.protobuf.Timestamp timestamp = 8;
-  
+
   // Verification context
   ReceiptVerificationContext context = 9;
 }
@@ -117,13 +117,13 @@ message PolicyKernelServiceVerifyReceiptRequest {
 message ReceiptVerificationContext {
   // Verification timestamp
   google.protobuf.Timestamp verification_time = 1;
-  
+
   // Client identifier
   string client_id = 2;
-  
+
   // Verification level
   VerificationLevel level = 3;
-  
+
   // Additional metadata
   map<string, string> metadata = 4;
 }
@@ -132,25 +132,25 @@ message ReceiptVerificationContext {
 message PolicyKernelServiceVerifyReceiptResponse {
   // Verification result
   bool valid = 1;
-  
+
   // Verification reason
   string reason = 2;
-  
+
   // Verification errors
   repeated string errors = 3;
-  
+
   // Signature validity
   bool signature_valid = 4;
-  
+
   // Timestamp validity
   bool timestamp_valid = 5;
-  
+
   // Policy compliance
   bool policy_compliant = 6;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 7;
-  
+
   // Verification score (0.0 to 1.0)
   float score = 8;
 }
@@ -159,10 +159,10 @@ message PolicyKernelServiceVerifyReceiptResponse {
 message BatchValidatePlansRequest {
   // Plans to validate
   repeated Plan plans = 1;
-  
+
   // Batch configuration
   BatchConfig config = 2;
-  
+
   // Validation context
   ValidationContext context = 3;
 }
@@ -171,19 +171,19 @@ message BatchValidatePlansRequest {
 message BatchValidatePlansResponse {
   // Validation results for each plan
   repeated PlanValidationResult plan_results = 1;
-  
+
   // Batch statistics
   PlanValidationBatchStats stats = 2;
-  
+
   // Total processing time in milliseconds
   uint64 total_processing_time_ms = 3;
-  
+
   // Successful validations
   uint32 successful_validations = 4;
-  
+
   // Failed validations
   uint32 failed_validations = 5;
-  
+
   // Batch errors
   repeated string errors = 6;
 }
@@ -192,16 +192,16 @@ message BatchValidatePlansResponse {
 message PlanValidationResult {
   // Plan identifier
   string plan_id = 1;
-  
+
   // Validation result
   ValidationResult result = 2;
-  
+
   // Approved steps
   repeated ApprovedStep approved_steps = 3;
-  
+
   // Processing time in milliseconds
   uint64 processing_time_ms = 4;
-  
+
   // Cache hit indicator
   bool cache_hit = 5;
 }
@@ -210,16 +210,16 @@ message PlanValidationResult {
 message PlanValidationBatchStats {
   // Total plans processed
   uint32 total_plans = 1;
-  
+
   // Valid plans
   uint32 valid_plans = 2;
-  
+
   // Invalid plans
   uint32 invalid_plans = 3;
-  
+
   // Average processing time in milliseconds
   uint64 avg_processing_time_ms = 4;
-  
+
   // Cache hit rate (0.0 to 1.0)
   float cache_hit_rate = 5;
 }
@@ -228,7 +228,7 @@ message PlanValidationBatchStats {
 message GetKernelConfigRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Configuration scope
   ConfigScope scope = 2;
 }
@@ -237,13 +237,13 @@ message GetKernelConfigRequest {
 message GetKernelConfigResponse {
   // Kernel configuration
   KernelConfig config = 1;
-  
+
   // Configuration version
   string version = 2;
-  
+
   // Last updated timestamp
   google.protobuf.Timestamp last_updated = 3;
-  
+
   // Configuration hash
   string config_hash = 4;
 }
@@ -252,25 +252,25 @@ message GetKernelConfigResponse {
 message KernelConfig {
   // Maximum budget allowed
   double max_budget = 1;
-  
+
   // Maximum epsilon allowed
   double max_epsilon = 2;
-  
+
   // Maximum latency allowed in milliseconds
   double max_latency_ms = 3;
-  
+
   // Allowed tenants
   repeated string allowed_tenants = 4;
-  
+
   // Strict kernel mode
   bool strict_kernel = 5;
-  
+
   // Cache configuration
   CacheConfig cache_config = 6;
-  
+
   // Policy enforcement rules
   repeated PolicyRule policy_rules = 7;
-  
+
   // Performance thresholds
   KernelPerformanceThresholds performance_thresholds = 8;
 }
@@ -279,19 +279,19 @@ message KernelConfig {
 message PolicyRule {
   // Rule identifier
   string rule_id = 1;
-  
+
   // Rule type
   KernelPolicyRuleType rule_type = 2;
-  
+
   // Rule conditions
   repeated PolicyCondition conditions = 3;
-  
+
   // Rule actions
   repeated KernelPolicyAction actions = 4;
-  
+
   // Rule priority
   uint32 priority = 5;
-  
+
   // Rule enabled
   bool enabled = 6;
 }
@@ -310,10 +310,10 @@ enum KernelPolicyRuleType {
 message KernelPolicyAction {
   // Action type
   KernelActionType action_type = 1;
-  
+
   // Action parameters
   map<string, string> parameters = 2;
-  
+
   // Action severity
   ActionSeverity severity = 3;
 }
@@ -333,16 +333,16 @@ enum KernelActionType {
 message KernelPerformanceThresholds {
   // Maximum processing time in milliseconds
   uint64 max_processing_time_ms = 1;
-  
+
   // Maximum memory usage in MB
   uint64 max_memory_mb = 2;
-  
+
   // Maximum CPU usage in cores
   float max_cpu_cores = 3;
-  
+
   // Maximum concurrent validations
   uint32 max_concurrent_validations = 4;
-  
+
   // Cache hit rate threshold (0.0 to 1.0)
   float min_cache_hit_rate = 5;
 }
@@ -351,13 +351,13 @@ message KernelPerformanceThresholds {
 message UpdateKernelConfigRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Configuration updates
   map<string, string> config_updates = 2;
-  
+
   // Restart required
   bool restart_required = 3;
-  
+
   // Update reason
   string update_reason = 4;
 }
@@ -366,16 +366,16 @@ message UpdateKernelConfigRequest {
 message UpdateKernelConfigResponse {
   // Update success
   bool success = 1;
-  
+
   // Updated configuration keys
   repeated string updated_keys = 2;
-  
+
   // Failed configuration keys
   repeated string failed_keys = 3;
-  
+
   // Update message
   string message = 4;
-  
+
   // Restart required
   bool restart_required = 5;
 }
@@ -384,7 +384,7 @@ message UpdateKernelConfigResponse {
 message GetCacheStatsRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Statistics scope
   StatsScope scope = 2;
 }
@@ -393,25 +393,25 @@ message GetCacheStatsRequest {
 message GetCacheStatsResponse {
   // Hit count
   uint64 hit_count = 1;
-  
+
   // Miss count
   uint64 miss_count = 2;
-  
+
   // Hit rate (0.0 to 1.0)
   double hit_rate = 3;
-  
+
   // Total items in cache
   uint64 total_items = 4;
-  
+
   // Evicted items count
   uint64 evicted_count = 5;
-  
+
   // Total requests
   uint64 total_requests = 6;
-  
+
   // Cache size in bytes
   uint64 cache_size_bytes = 7;
-  
+
   // Average item size in bytes
   uint64 avg_item_size_bytes = 8;
 }
@@ -420,13 +420,13 @@ message GetCacheStatsResponse {
 message InvalidateCacheRequest {
   // Policy hash to invalidate
   string policy_hash = 1;
-  
+
   // Tenant identifier
   string tenant = 2;
-  
+
   // Invalidate all caches
   bool invalidate_all = 3;
-  
+
   // Invalidation reason
   string reason = 4;
 }
@@ -435,13 +435,13 @@ message InvalidateCacheRequest {
 message InvalidateCacheResponse {
   // Invalidation success
   bool success = 1;
-  
+
   // Number of invalidated items
   uint64 invalidated_items = 2;
-  
+
   // Invalidation message
   string message = 3;
-  
+
   // Affected cache keys
   repeated string affected_keys = 4;
 }
@@ -450,10 +450,10 @@ message InvalidateCacheResponse {
 message GetKernelMetricsRequest {
   // Tenant identifier
   string tenant = 1;
-  
+
   // Metrics scope
   MetricsScope scope = 2;
-  
+
   // Time range
   TimeRange time_range = 3;
 }
@@ -471,19 +471,19 @@ enum MetricsScope {
 message GetKernelMetricsResponse {
   // Service metrics
   ServiceMetrics service_metrics = 1;
-  
+
   // Performance metrics
   PerformanceMetrics performance_metrics = 2;
-  
+
   // Security metrics
   SecurityMetrics security_metrics = 3;
-  
+
   // Cache metrics
   CacheMetrics cache_metrics = 4;
-  
+
   // Policy metrics
   PolicyMetrics policy_metrics = 5;
-  
+
   // Metrics timestamp
   google.protobuf.Timestamp timestamp = 6;
 }
@@ -492,19 +492,19 @@ message GetKernelMetricsResponse {
 message ServiceMetrics {
   // Total requests
   uint64 total_requests = 1;
-  
+
   // Successful requests
   uint64 successful_requests = 2;
-  
+
   // Failed requests
   uint64 failed_requests = 3;
-  
+
   // Average response time in milliseconds
   double avg_response_time_ms = 4;
-  
+
   // P95 response time in milliseconds
   double p95_response_time_ms = 5;
-  
+
   // P99 response time in milliseconds
   double p99_response_time_ms = 6;
 }
@@ -513,16 +513,16 @@ message ServiceMetrics {
 message PerformanceMetrics {
   // CPU usage percentage
   double cpu_usage_percent = 1;
-  
+
   // Memory usage in MB
   uint64 memory_usage_mb = 2;
-  
+
   // Network I/O in MB/s
   double network_io_mbps = 3;
-  
+
   // Disk I/O in MB/s
   double disk_io_mbps = 4;
-  
+
   // Concurrent connections
   uint32 concurrent_connections = 5;
 }
@@ -531,16 +531,16 @@ message PerformanceMetrics {
 message SecurityMetrics {
   // Policy violations
   uint64 policy_violations = 1;
-  
+
   // Authentication failures
   uint64 auth_failures = 2;
-  
+
   // Authorization failures
   uint64 authz_failures = 3;
-  
+
   // Rate limit violations
   uint64 rate_limit_violations = 4;
-  
+
   // Security alerts
   uint64 security_alerts = 5;
 }
@@ -549,16 +549,16 @@ message SecurityMetrics {
 message CacheMetrics {
   // Cache hits
   uint64 cache_hits = 1;
-  
+
   // Cache misses
   uint64 cache_misses = 2;
-  
+
   // Cache hit rate (0.0 to 1.0)
   double cache_hit_rate = 3;
-  
+
   // Cache size in items
   uint64 cache_size_items = 4;
-  
+
   // Cache evictions
   uint64 cache_evictions = 5;
 }
@@ -567,16 +567,16 @@ message CacheMetrics {
 message PolicyMetrics {
   // Total policy evaluations
   uint64 total_policy_evaluations = 1;
-  
+
   // Policy cache hits
   uint64 policy_cache_hits = 2;
-  
+
   // Policy cache misses
   uint64 policy_cache_misses = 3;
-  
+
   // Policy evaluation time in milliseconds
   double avg_policy_evaluation_time_ms = 4;
-  
+
   // Policy rule hits
   map<string, uint64> policy_rule_hits = 5;
 }

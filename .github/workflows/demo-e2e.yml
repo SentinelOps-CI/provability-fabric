@@ -86,19 +86,19 @@ jobs:
         
         # Validate SLO thresholds
         python -c "
-import sys
-latency = float('$LATENCY_P95')
-error_rate = float('$ERROR_RATE')
+          import sys
+          latency = float('$LATENCY_P95')
+          error_rate = float('$ERROR_RATE')
 
-if latency > 5.0:  # 5ms threshold for E2E
-    print(f'❌ Latency P95 {latency}ms exceeds 5ms threshold')
-    sys.exit(1)
+          if latency > 5.0:  # 5ms threshold for E2E
+              print(f'❌ Latency P95 {latency}ms exceeds 5ms threshold')
+              sys.exit(1)
 
-if error_rate > 0.05:  # 5% error rate threshold
-    print(f'❌ Error rate {error_rate*100:.2f}% exceeds 5% threshold')
-    sys.exit(1)
+          if error_rate > 0.05:  # 5% error rate threshold
+              print(f'❌ Error rate {error_rate*100:.2f}% exceeds 5% threshold')
+              sys.exit(1)
 
-print('✅ SLO metrics within acceptable ranges')
+          print('✅ SLO metrics within acceptable ranges')
         "
     
     - name: Export compliance packets
@@ -155,29 +155,29 @@ print('✅ SLO metrics within acceptable ranges')
         if [ "$REPLAY_COUNT" -gt 0 ]; then
           # Validate low-view match rates
           python -c "
-import json
-import glob
-import sys
+            import json
+            import glob
+            import sys
 
-reports = glob.glob('replay_artifacts/*/lowview_report.json')
-total_jobs = len(reports)
-passing_jobs = 0
+            reports = glob.glob('replay_artifacts/*/lowview_report.json')
+            total_jobs = len(reports)
+            passing_jobs = 0
 
-for report_file in reports:
-    with open(report_file, 'r') as f:
-        report = json.load(f)
-        match_pct = report.get('low_view_match_pct', 0.0)
-        if match_pct >= 0.999:
-            passing_jobs += 1
-        print(f'Replay {report[\"job_id\"]}: {match_pct*100:.3f}% match')
+            for report_file in reports:
+                with open(report_file, 'r') as f:
+                    report = json.load(f)
+                    match_pct = report.get('low_view_match_pct', 0.0)
+                    if match_pct >= 0.999:
+                        passing_jobs += 1
+                    print(f'Replay {report[\"job_id\"]}: {match_pct*100:.3f}% match')
 
-print(f'Replay success rate: {passing_jobs}/{total_jobs}')
+            print(f'Replay success rate: {passing_jobs}/{total_jobs}')
 
-if total_jobs > 0 and passing_jobs / total_jobs < 0.95:
-    print('❌ Replay success rate below 95%')
-    sys.exit(1)
+            if total_jobs > 0 and passing_jobs / total_jobs < 0.95:
+                print('❌ Replay success rate below 95%')
+                sys.exit(1)
 
-print('✅ Replay validation passed')
+            print('✅ Replay validation passed')
           "
         fi
     

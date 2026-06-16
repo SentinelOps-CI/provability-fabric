@@ -1,6 +1,6 @@
 {
   "schema_version": "v0",
-  "signed_bundle_id": "signed-bc8f7124-3571-4397-ae01-b7af1e9f5b6d",
+  "signed_bundle_id": "signed-a489b356-75a3-4ce2-ac90-be587d963364",
   "science_claim_bundle": {
     "bundle_id": "scb-pcs-qc-release-v0.1",
     "schema_version": "v0",
@@ -183,7 +183,7 @@
   },
   "verification_result": {
     "schema_version": "v0",
-    "verification_id": "verification-31ac5758-9219-47cf-b832-0ca8ae07a871",
+    "verification_id": "verification-62af1445-0fea-452a-8f89-4e8bc527f44b",
     "bundle_id": "scb-pcs-qc-release-v0.1",
     "verifier": "Provability Fabric",
     "verifier_version": "0.1.0",
@@ -336,20 +336,20 @@
         "details": {}
       }
     ],
-    "created_at": "2026-01-15T11:00:00Z",
+    "created_at": "2026-06-15T13:00:45Z",
     "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
     "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
-    "signature_or_digest": "sha256:f3f4c58aba310b0e6eede295a313dd8492da570f0281a7ddf9c4e1e75f2df981",
+    "signature_or_digest": "sha256:acec4804c90c7a4b6d17620b11ad8826cd8a2711f562186f4ae2fd17c7129d98",
     "verified_input": {
-      "bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc",
+      "bundle_hash": "sha256:b946dc0d81e164605bb27f39be47fe9489647f9876480e1cbcaab1f2ed7810e5",
       "certificate_id": "cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693",
       "trace_hash": "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
     }
   },
   "signer": "Provability Fabric",
-  "signed_at": "2026-01-15T11:00:00Z",
+  "signed_at": "2026-06-15T13:00:45Z",
   "source_repo": "https://github.com/SentinelOps-CI/provability-fabric",
   "source_commit": "b0dbbbe1c110ec2301d452d2ef1074354cce170f",
-  "signature_or_digest": "sha256:caa0901dabf95d3e87df22dc8485a39328652cc9318171035ecbefb2a60cccc3",
-  "signed_input_bundle_hash": "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
+  "signature_or_digest": "sha256:bf52366727f15855d61af1eb6199d9f97471d8aa397611d6abeb70a8b53c61a0",
+  "signed_input_bundle_hash": "sha256:b946dc0d81e164605bb27f39be47fe9489647f9876480e1cbcaab1f2ed7810e5"
 }

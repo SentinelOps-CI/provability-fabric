@@ -1,8 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useQuery } from 'react-query';
 import {
-  PlayIcon,
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,

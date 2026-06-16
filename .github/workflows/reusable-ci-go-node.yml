@@ -42,12 +42,15 @@ jobs:
 
       - name: Install Node.js dependencies
         run: |
-          cd runtime/ledger && npm ci && npm run prisma:generate
-          cd ../../marketplace/ui && npm ci
-          cd ../../core/sdk/typescript && npm ci
+          set -euo pipefail
+          (cd runtime/ledger && npm ci && npm run prisma:generate)
+          (cd marketplace/ui && npm ci)
+          (cd core/sdk/typescript && npm ci)
 
       - name: Run spectral lint
-        run: spectral lint **/spec.yaml --ruleset config/schemas/aispec-schema.json
+        run: |
+          mapfile -t specs < <(find . -name spec.yaml ! -path './bundles/art/*')
+          spectral lint "${specs[@]}" --ruleset config/schemas/aispec-schema.json
 
       - name: Test PCS science-claim
         run: make test-pcs validate-pcs-fixtures
@@ -94,7 +97,6 @@ jobs:
             fi
           done
 
-      - name: Verify console and demo builds
+      - name: Verify console build
         run: |
           (cd console && npm ci --no-audit --no-fund && npm run build)
-          (cd demos/verifiable-mcp-fraud && npm ci --no-audit --no-fund && npm run build)

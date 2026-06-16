@@ -17,7 +17,7 @@ import (
 
 // Canonical pcs-core RC values (pcs-core/examples/labtrust-release).
 const (
-	rcCertifiedBundleHash = "sha256:68d59a16ac4f5d1e6e5aff61a011be192fbb12f9b4476fa221079a934b1265fc"
+	rcCertifiedBundleHash = "sha256:b946dc0d81e164605bb27f39be47fe9489647f9876480e1cbcaab1f2ed7810e5"
 	rcCertificateID       = "cert-trace-02b3a7c1-35f7-4d23-85c2-dfd60aff7693"
 	rcTraceHash           = "sha256:c3e8a3dc4ad86d533de1dfa4ae7fe2a338c2cff3c945404c96a75216524d58cd"
 	rcPFSourceCommit      = "b0dbbbe1c110ec2301d452d2ef1074354cce170f"

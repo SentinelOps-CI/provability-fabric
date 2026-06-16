@@ -12,7 +12,7 @@
     "clean": "rm -rf dist",
     "lint": "npx eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "proto-gen": "protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=generated --ts_proto_opt=esModuleInterop=true --ts_proto_opt=forceLong=string --ts_proto_opt=useOptionals=messages ../api/v1/*.proto"
+    "proto-gen": "protoc --plugin=protoc-gen-ts_proto --proto_path=../../api --ts_proto_out=generated --ts_proto_opt=esModuleInterop=true --ts_proto_opt=forceLong=string --ts_proto_opt=useOptionals=messages api/v1/*.proto"
   },
   "keywords": [
     "provability-fabric",

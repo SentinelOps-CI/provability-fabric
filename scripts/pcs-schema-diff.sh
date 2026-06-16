@@ -34,6 +34,15 @@ for path in "${CANONICAL}"/*.json; do
   name="$(basename "${path}")"
   vendor_path="${VENDOR_DIR}/${name}"
   if [[ ! -f "${vendor_path}" ]]; then
+    case "${name}" in
+      PcsBenchIngest.v0.schema.json)
+        if [[ -f "${VENDOR_DIR}/PCSBenchIngest.v0.schema.json" ]]; then
+          vendor_path="${VENDOR_DIR}/PCSBenchIngest.v0.schema.json"
+        fi
+        ;;
+    esac
+  fi
+  if [[ ! -f "${vendor_path}" ]]; then
     echo "missing vendor schema: ${name}" >&2
     FAILED=1
     continue

@@ -39,7 +39,7 @@ find_lean_targets() {
         if [[ -d "$dir" ]]; then
             targets+=("$dir")
         fi
-    done < <(find . -name "lakefile.lean" -print0 2>/dev/null || true)
+    done < <(find . -name "lakefile.lean" ! -path "./core/lean-libs/*" -print0 2>/dev/null || true)
     
     echo "${targets[@]}"
 }

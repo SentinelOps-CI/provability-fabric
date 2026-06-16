@@ -35,7 +35,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install pytest
-        run: python -m pip install --upgrade pip pytest
+        run: python -m pip install --upgrade pip pytest pyyaml
 
       - name: Run SWE-bench runner smoke tests
         run: pytest tests/test_swebench_runner_smoke.py -q --tb=short

@@ -116,9 +116,11 @@ def admission_controller(
             "runtime/admission-controller/deploy/admission",
             "--set",
             "image.tag=latest",
+            "--set",
+            "image.pullPolicy=Never",
             "--wait",
             "--timeout",
-            "5m",
+            "10m",
         ],
         check=True,
     )

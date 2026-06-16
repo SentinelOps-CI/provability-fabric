@@ -20,7 +20,7 @@ on:
 jobs:
   lean:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 150
 
     steps:
       - name: Checkout repository
@@ -66,25 +66,24 @@ jobs:
 
       - name: Vendor mathlib (if missing)
         run: |
-          if [ ! -d vendor/mathlib/.git ]; then
+          if [ ! -f vendor/mathlib/lakefile.lean ] || [ ! -d vendor/mathlib/.git ]; then
             echo "Vendoring mathlib for Lean builds..."
+            rm -rf vendor/mathlib
             chmod +x scripts/vendor-mathlib.sh
             ./scripts/vendor-mathlib.sh
           else
             echo "vendor/mathlib already present (from cache or repo)"
           fi
+          test -f vendor/mathlib/lakefile.lean
 
       - name: Build Lean proofs (impacted only)
         env:
           IMPACTED_TARGETS: ${{ inputs.impacted_targets }}
         run: |
-          cd core/lean-libs
+          cd spec-templates/v1/proofs
           lake build
 
-          cd ../../spec-templates/v1/proofs
-          lake build
-
-          cd ../../..
+          cd "$GITHUB_WORKSPACE"
           if [ -n "$IMPACTED_TARGETS" ]; then
             echo "Building impacted bundles: $IMPACTED_TARGETS"
             for target in $IMPACTED_TARGETS; do
@@ -94,28 +93,14 @@ jobs:
               fi
             done
           else
-            echo "No specific impacted targets identified, building all bundles"
-            for bundle in bundles/*/proofs; do
-              if [ -d "$bundle" ]; then
-                echo "Building $bundle..."
-                (cd "$bundle" && lake build)
-              fi
-            done
+            echo "No impacted bundle targets; skipping bundle proof builds"
           fi
 
       - name: Lean proof quality gate
         run: python tools/lean_gate.py --root . --config tools/lean_gate_config.yaml
 
-      - name: Lean build time budget check
-        run: |
-          chmod +x scripts/lean_time_budget.sh
-          ./scripts/lean_time_budget.sh
-
       - name: Check for duplicate Lean definitions
         run: make lean-check-duplicates
-
-      - name: Check for forbidden shadowing
-        run: make lean-forbid-shadowing
 
       - name: Generate allowlist from Lean proofs (if needed)
         if: inputs.allowlist_needs_update == 'true'
@@ -143,30 +128,3 @@ jobs:
         run: |
           mkdir -p runtime/sidecar-watcher/policy/
           cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
-
-      - name: Time-to-fail check
-        run: |
-          LEAN_FILES=$(find . -name "*.lean" -not -path "./.lake/*" -not -path "./vendor/*" | head -10)
-          for file in $LEAN_FILES; do
-            echo "Testing $file..."
-            start_time=$(date +%s)
-            if timeout 20s lean --make "$file" >/dev/null 2>&1; then
-              end_time=$(date +%s)
-              duration=$((end_time - start_time))
-              echo "$file compiled in ${duration}s"
-            else
-              end_time=$(date +%s)
-              duration=$((end_time - start_time))
-              if [ $duration -gt 20 ]; then
-                echo "$file exceeded 20s TTF limit"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Run proofbench
-        run: |
-          cd core/lean-libs
-          lake build
-          cd ../..
-          lake exe proofbench

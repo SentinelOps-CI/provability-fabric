@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -56,11 +56,10 @@ jobs:
 
       - name: Generate session bundles
         run: |
-          # Generate bundles for all sessions in last 24 hours
           python tools/evidence/session_bundle.py \
             --config tools/evidence/session_config.yaml \
-            --start-time $(date -d '24 hours ago' -Iseconds) \
-            --end-time $(date -Iseconds)
+            --start-time "$(date -d '24 hours ago' -Iseconds)" \
+            --end-time "$(date -Iseconds)"
 
       - name: Upload manifest artifact
         uses: actions/upload-artifact@v4
@@ -169,51 +168,7 @@ jobs:
           path: .
 
       - name: Generate compliance report
-        run: |
-          python -c "
-          import json
-          from datetime import datetime
-
-          # Load manifest
-          with open('evidence-manifest.json', 'r') as f:
-              manifest = json.load(f)
-              
-          # Generate markdown report
-          report = f'''# SOC 2 / ISO 42001 Compliance Report
-
-          Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
-          Repository: {manifest['repo']}
-          Run ID: {manifest['run_id']}
-
-          ## Control Coverage Summary
-
-          '''
-
-          # Group artifacts by control
-          control_artifacts = {}
-          for artifact in manifest['artifacts']:
-              control_id = artifact['control_id']
-              if control_id not in control_artifacts:
-                  control_artifacts[control_id] = []
-              control_artifacts[control_id].append(artifact)
-              
-          # Generate control sections
-          for control_id, artifacts in control_artifacts.items():
-              report += f'\n### {control_id}\n\n'
-              report += f'**Artifacts:** {len(artifacts)}\n\n'
-              
-              for artifact in artifacts:
-                  report += f'- **{artifact[\"artifact_name\"]}**\n'
-                  report += f'  - SHA256: `{artifact[\"sha256\"]}`\n'
-                  report += f'  - Link: {artifact[\"link\"]}\n'
-                  report += f'  - Collected: {artifact[\"collected_at\"]}\n\n'
-                  
-          # Write report
-          with open('docs/compliance/soc2.md', 'w') as f:
-              f.write(report)
-              
-          print('Generated compliance report: docs/compliance/soc2.md')
-          "
+        run: python tools/compliance/generate_soc2_report.py evidence-manifest.json docs/compliance/soc2.md
 
       - name: Commit compliance report
         run: |

@@ -29,8 +29,6 @@ interface EvidencePack {
 }
 
 export default function CompliancePage() {
-  const [selectedPack, setSelectedPack] = useState<EvidencePack | null>(null);
-
   // Mock compliance metrics
   const [metrics] = useState<ComplianceMetrics>({
     rls_isolation_blocks: 1247,
