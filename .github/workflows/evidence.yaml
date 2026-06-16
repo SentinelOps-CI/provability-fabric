@@ -18,8 +18,20 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
+  evidence-offline:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.AWS_ROLE_ARN == '' || secrets.EVIDENCE_BUCKET == '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate offline compliance report (no AWS secrets)
+        run: |
+          mkdir -p docs/compliance
+          echo '{"repo":"SentinelOps-CI/provability-fabric","run_id":"offline","artifacts":[]}' > evidence-manifest.json
+          python tools/compliance/generate_soc2_report.py evidence-manifest.json docs/compliance/soc2.md
+
   collect-evidence:
     runs-on: ubuntu-latest
+    if: ${{ secrets.AWS_ROLE_ARN != '' && secrets.EVIDENCE_BUCKET != '' }}
     permissions:
       contents: read
       actions: read
@@ -70,6 +82,7 @@ jobs:
   verify-controls:
     runs-on: ubuntu-latest
     needs: collect-evidence
+    if: ${{ needs.collect-evidence.result == 'success' }}
     permissions:
       contents: read
 
@@ -154,6 +167,7 @@ jobs:
   generate-compliance-report:
     runs-on: ubuntu-latest
     needs: [collect-evidence, verify-controls]
+    if: ${{ needs.collect-evidence.result == 'success' && needs.verify-controls.result == 'success' }}
     permissions:
       contents: write
 

@@ -75,11 +75,13 @@ jobs:
       - name: Install dependencies
         if: matrix.language == 'javascript'
         run: |
-          cd marketplace/ui
-          npm ci
-          cd ../..
-          cd runtime/ledger
-          npm ci
+          set -e
+          for dir in marketplace/ui runtime/ledger console; do
+            if [ -f "$dir/package.json" ]; then
+              echo "Installing $dir"
+              (cd "$dir" && npm ci)
+            fi
+          done
 
       - name: Build code
         if: matrix.language == 'go'
@@ -105,11 +107,13 @@ jobs:
       - name: Build code
         if: matrix.language == 'javascript'
         run: |
-          cd marketplace/ui
-          npm run build
-          cd ../..
-          cd runtime/ledger
-          npm run build
+          set -e
+          for dir in marketplace/ui runtime/ledger console; do
+            if [ -f "$dir/package.json" ] && grep -q '"build"' "$dir/package.json"; then
+              echo "Building $dir"
+              (cd "$dir" && npm run build)
+            fi
+          done
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
