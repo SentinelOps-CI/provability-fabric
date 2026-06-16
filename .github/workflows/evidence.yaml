@@ -18,9 +18,26 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-  evidence-offline:
+  detect-aws:
     runs-on: ubuntu-latest
-    if: ${{ secrets.AWS_ROLE_ARN == '' || secrets.EVIDENCE_BUCKET == '' }}
+    outputs:
+      aws_configured: ${{ steps.detect.outputs.aws_configured }}
+    steps:
+      - id: detect
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          EVIDENCE_BUCKET: ${{ secrets.EVIDENCE_BUCKET }}
+        run: |
+          if [ -n "$AWS_ROLE_ARN" ] && [ -n "$EVIDENCE_BUCKET" ]; then
+            echo "aws_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "aws_configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  evidence-offline:
+    needs: detect-aws
+    if: needs.detect-aws.outputs.aws_configured != 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Generate offline compliance report (no AWS secrets)
@@ -30,8 +47,9 @@ jobs:
           python tools/compliance/generate_soc2_report.py evidence-manifest.json docs/compliance/soc2.md
 
   collect-evidence:
+    needs: detect-aws
+    if: needs.detect-aws.outputs.aws_configured == 'true'
     runs-on: ubuntu-latest
-    if: ${{ secrets.AWS_ROLE_ARN != '' && secrets.EVIDENCE_BUCKET != '' }}
     permissions:
       contents: read
       actions: read

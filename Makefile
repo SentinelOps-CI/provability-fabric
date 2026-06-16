@@ -315,7 +315,12 @@ validate-certs:
 		echo "Clone per external/README.md or pass --allow-missing-schema (not recommended)."; \
 		exit 1; \
 	fi
-	python tools/cert-validate/validate.py evidence/egress_certs/*.json evidence/certs/*/*.cert.json
+	@set -e; shopt -s nullglob; files=(evidence/certs/*/*.cert.json tests/replay/out/**/*.cert.json); \
+	if [ $${#files[@]} -eq 0 ]; then \
+		echo "No CERT-V1 *.cert.json fixtures found (egress_certs/ uses a separate schema)."; \
+	else \
+		python tools/cert-validate/validate.py "$${files[@]}"; \
+	fi
 	@$(ECHOOK) "✅ Certificate validation completed"
 
 lean-check-duplicates:

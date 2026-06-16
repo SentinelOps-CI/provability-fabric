@@ -128,7 +128,7 @@ Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-
 
 ### CI policy
 
-- **No admin merge on red:** merge only when all required status checks for the PR scope are green. Document any exception in the PR body and update the health matrix.
+- **No admin merge on red:** merge only when all required status checks for the PR scope are green. Document any exception in the PR body and update the health matrix. Branch protection on `main` enforces **CI required checks**, **smoke**, **evidence-schema-only**, and **Documentation Build** (applied 2026-06-16).
 - **Local gates before CI PRs:** `make dev-standards`, `make evidence-verify` (evidence paths), `make docs-strict` (docs), `make proto-lint proto-validate` (protobuf).
 - **Inventory:** run `scripts/ci_workflow_inventory.sh` on `main` after large workflow changes; see [CI health matrix](docs/internal/ci-health-matrix.md).
 
