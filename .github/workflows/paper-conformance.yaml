@@ -3,6 +3,11 @@ name: Paper Conformance CI
 on:
   push:
     branches: [main, develop]
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "runtime/labeler/**"
+      - "core/lean-libs/**"
+      - ".github/workflows/paper-conformance.yaml"
   pull_request:
     branches: [main, develop]
   schedule:
@@ -28,9 +33,10 @@ jobs:
 
       - name: Install Lean
         run: |
-          wget https://github.com/leanprover/lean4/releases/download/v4.6.0/lean-4.6.0-linux.tar.gz
-          tar -xzf lean-4.6.0-linux.tar.gz
-          sudo mv lean-4.6.0-linux/bin/* /usr/local/bin/
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          elan toolchain install stable
+          lean --version
 
       - name: Run DFA Equivalence Tests
         run: |
