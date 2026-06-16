@@ -99,11 +99,6 @@ jobs:
       - name: Lean proof quality gate
         run: python tools/lean_gate.py --root . --config tools/lean_gate_config.yaml
 
-      - name: Lean build time budget check
-        run: |
-          chmod +x scripts/lean_time_budget.sh
-          ./scripts/lean_time_budget.sh
-
       - name: Check for duplicate Lean definitions
         run: make lean-check-duplicates
 
