@@ -74,6 +74,7 @@ jobs:
           else
             echo "vendor/mathlib already present (from cache or repo)"
           fi
+          test -f vendor/mathlib/lakefile.lean
 
       - name: Build Lean proofs (impacted only)
         env:

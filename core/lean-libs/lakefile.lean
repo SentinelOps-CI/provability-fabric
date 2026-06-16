@@ -38,4 +38,4 @@ lean_exe ExportDFA {
 }
 
 -- Use vendored mathlib instead of fetching from git
-require mathlib from "../../../vendor/mathlib"
+require mathlib from "../../vendor/mathlib"
