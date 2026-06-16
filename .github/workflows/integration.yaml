@@ -4,6 +4,12 @@
 name: Integration Tests
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "runtime/**"
+      - "tests/integration/**"
+      - ".github/workflows/integration.yaml"
   pull_request:
     paths:
       - "runtime/**"

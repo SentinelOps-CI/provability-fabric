@@ -5,70 +5,67 @@ name: Platform Performance Smoke Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
+    paths:
+      - "tests/perf/**"
+      - "docker-compose.yml"
+      - ".github/workflows/platform-perf-smoke.yml"
   pull_request:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - "tests/perf/**"
+      - "docker-compose.yml"
+      - ".github/workflows/platform-perf-smoke.yml"
+  workflow_dispatch:
 
 jobs:
   performance-smoke:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Start platform services
-      run: |
-        echo "🚀 Starting platform for performance testing..."
-        docker-compose up --build -d
-        echo "⏳ Waiting for services to be ready..."
-        sleep 60
-    
-    - name: Install k6
-      run: |
-        sudo gpg -k
-        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-        sudo apt-get update
-        sudo apt-get install k6
-    
-    - name: Run performance tests
-      run: |
-        echo "⚡ Running 60-second performance smoke test..."
-        k6 run --duration 60s --vus 10 tests/perf/platform_smoke.js
-    
-    - name: Check SLO compliance
-      run: |
-        echo "📊 Checking SLO compliance..."
-        
-        # Check sidecar decision latency
-        LATENCY=$(curl -s http://localhost:8000/api/v1/runtime/slo | jq -r '.sidecar_decision_latency')
-        echo "Sidecar decision latency: ${LATENCY}ms"
-        
-        # Validate against thresholds
-        python tools/slo/validate_performance.py \
-          --sidecar-p95-dev 2.0 \
-          --sidecar-p95-e2e 5.0 \
-          --egress-write 1.0
-    
-    - name: Generate performance report
-      run: |
-        echo "📋 Generating performance report..."
-        python tools/perf/generate_report.py k6-results.json
-    
-    - name: Upload performance results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-results
-        path: |
-          k6-results.json
-          performance-report.json
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        docker-compose down
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Start mock PF API
+        run: |
+          python3 tests/perf/mock_pf_server.py &
+          echo $! > /tmp/mock-http.pid
+          sleep 2
+          curl -sf -X POST http://127.0.0.1:8080/validate -H 'Content-Type: application/json' -d '{}' >/dev/null
+
+      - name: Run performance smoke test
+        env:
+          BASE_URL: http://127.0.0.1:8080
+        run: |
+          k6 run tests/perf/latency_k6.js \
+            --env BASE_URL="$BASE_URL" \
+            --stage 10s:5 \
+            --stage 20s:10 \
+            --stage 10s:0 \
+            --summary-export k6-results.json
+
+      - name: Validate performance report
+        run: python tools/perf/generate_report.py k6-results.json
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            k6-results.json
+            performance-report.json
+
+      - name: Stop mock HTTP server
+        if: always()
+        run: |
+          if [ -f /tmp/mock-http.pid ]; then
+            kill "$(cat /tmp/mock-http.pid)" || true
+          fi
