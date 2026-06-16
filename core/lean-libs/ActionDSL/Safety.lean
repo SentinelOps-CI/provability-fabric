@@ -202,11 +202,12 @@ theorem dfa_safety : ∀ (dfa : ProductDFA) (trace : List String) (ctx : ABACCon
 def parseEvent (event : String) : Option ExtendedAction :=
   -- Simple parsing for demonstration
   -- In practice, this would parse JSON or structured event data
-  if event.contains "read" then
+  let containsSubstr (s sub : String) : Bool := (s.splitOn sub).length > 1
+  if containsSubstr event "read" then
     some (ExtendedAction.Read "default" [])
-  else if event.contains "write" then
+  else if containsSubstr event "write" then
     some (ExtendedAction.Write "default" [])
-  else if event.contains "call" then
+  else if containsSubstr event "call" then
     some (ExtendedAction.Call "default" [])
   else
     none
