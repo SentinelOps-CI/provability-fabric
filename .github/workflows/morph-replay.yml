@@ -33,7 +33,17 @@ jobs:
             (cd tests/replay/bundles && zip -r "../../artifact/replay_zips/${name}.zip" "$name")
           done
 
+      - name: Check for MORPH_API_KEY
+        id: keycheck
+        run: |
+          if [ -z "${{ secrets.MORPH_API_KEY }}" ]; then
+            echo "missing=true" >> $GITHUB_OUTPUT
+          else
+            echo "missing=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Morph replay runner
+        if: steps.keycheck.outputs.missing == 'false'
         env:
           MORPH_API_KEY: ${{ secrets.MORPH_API_KEY }}
         run: |
@@ -45,6 +55,12 @@ jobs:
             --input-glob "${GITHUB_WORKSPACE}/artifact/replay_zips/*.zip" \
             --branches "${{ inputs.branches || 8 }}" \
             --output "${GITHUB_WORKSPACE}/evidence/morph/evidence-pack"
+
+      - name: Skip Morph replay (no MORPH_API_KEY)
+        if: steps.keycheck.outputs.missing == 'true'
+        run: |
+          mkdir -p evidence/morph/evidence-pack
+          echo '{"skipped":true,"reason":"MORPH_API_KEY not set"}' > evidence/morph/evidence-pack/summary.json
 
       - name: Upload evidence pack
         uses: actions/upload-artifact@v4
