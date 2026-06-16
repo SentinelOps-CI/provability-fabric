@@ -29,12 +29,18 @@ jobs:
           fetch-depth: 0
 
       - name: Vendor mathlib
-        run: make vendor-mathlib
-
-      - name: Set up Lean
         run: |
-          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
-          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
+
+      - name: Set up Lean (elan)
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
+          lean --version
 
       - name: Verify vendor/mathlib exists
         run: |
@@ -48,7 +54,7 @@ jobs:
       - name: Verify mathlib commit
         run: |
           cd vendor/mathlib
-          EXPECTED_COMMIT="b5eba595428809e96f3ed113bc7ba776c5f801ac"
+          EXPECTED_COMMIT="a45ae63747140c1b2cbad9d46f518015c047047a"
           ACTUAL_COMMIT=$(git rev-parse HEAD)
           if [ "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]; then
             echo "❌ Mathlib commit mismatch!"
@@ -135,7 +141,7 @@ jobs:
           echo "==========================" >> lean-build-report.md
           echo "" >> lean-build-report.md
           echo "- ✅ All Lean proofs compile without network access" >> lean-build-report.md
-          echo "- ✅ Mathlib vendored at commit: b5eba595428809e96f3ed113bc7ba776c5f801ac" >> lean-build-report.md
+          echo "- ✅ Mathlib vendored at commit: a45ae63747140c1b2cbad9d46f518015c047047a" >> lean-build-report.md
           echo "- ✅ No placeholder proofs ('sorry' or 'by admit') found" >> lean-build-report.md
           echo "- ✅ Network access properly blocked during build" >> lean-build-report.md
           echo "" >> lean-build-report.md
