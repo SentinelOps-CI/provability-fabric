@@ -34,7 +34,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    roots = [Path("evidence/egress_certs"), Path("evidence/certs")]
+    roots = [Path("evidence/egress_certs"), Path("evidence/certs"), Path("tests/replay/out/certs")]
     total = 0
     valid = 0
     for root in roots:

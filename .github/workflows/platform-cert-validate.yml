@@ -10,6 +10,7 @@ on:
       - "evidence/**"
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
+      - "tests/replay/**"
       - ".github/workflows/platform-cert-validate.yml"
   pull_request:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "evidence/**"
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
+      - "tests/replay/**"
       - ".github/workflows/platform-cert-validate.yml"
   schedule:
     - cron: "0 2 * * *"
@@ -40,13 +42,29 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install jsonschema pyyaml
 
-      - name: Validate CERT-V1 certificates
-        run: make validate-certs
+      - name: Generate replay CERTs
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=1
+          bash tests/replay/run_replays.sh
+
+      - name: Validate replay CERTs
+        run: |
+          shopt -s nullglob
+          certs=(tests/replay/out/certs/*.cert.json)
+          if [ ${#certs[@]} -eq 0 ]; then
+            echo "No replay CERTs produced" >&2
+            exit 1
+          fi
+          python tools/cert-validate/validate.py "${certs[@]}"
 
       - name: Check certificate compliance
         run: |
@@ -60,3 +78,4 @@ jobs:
           path: |
             cert-validation-report.json
             compliance-report.json
+            tests/replay/out/certs/
