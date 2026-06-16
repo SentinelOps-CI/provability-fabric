@@ -47,7 +47,7 @@ jobs:
         python tools/compliance/check_compliance.py --threshold 0.999
     
     - name: Upload validation report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: cert-validation-report

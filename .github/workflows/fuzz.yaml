@@ -37,7 +37,7 @@ jobs:
           cargo fuzz run json_actions -- -runs=1000 -max_total_time=120
 
       - name: Upload fuzz artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: fuzz-artifacts

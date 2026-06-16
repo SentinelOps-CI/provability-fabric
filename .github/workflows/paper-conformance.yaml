@@ -346,7 +346,7 @@ jobs:
           cargo bench --all -- --output-format=json > performance_report.json
 
       - name: Upload Performance Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: performance-report
           path: runtime/sidecar-watcher/performance_report.json
@@ -376,7 +376,7 @@ jobs:
           cargo geiger --output-format json > security_report.json
 
       - name: Upload Security Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-report
           path: runtime/sidecar-watcher/security_report.json
@@ -401,7 +401,7 @@ jobs:
           cargo test --doc --all-features
 
       - name: Upload Documentation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: documentation
           path: runtime/sidecar-watcher/target/doc
