@@ -8,8 +8,9 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 |------|--------|
 | Merge commit | `3f150b1569b8dd50061d57ed99f34aa4b8dfffe6` |
 | Post-merge smoke | [workflow_dispatch 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) |
-| Closure stack | #121–#126 (`ci/standards-parity` … `ci/nightly-batch`) |
-| Sign-off page | [evidence-program-closure.md](evidence-program-closure.md) (#127) |
+| Closure stack | #121–#128 (`ci/standards-parity` … `ci/post-closure-hotfixes`) |
+| Sign-off page | [evidence-program-closure.md](evidence-program-closure.md) (#127); hotfixes **#128** merged `de104223` |
+| Post-#128 ceremony | Smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486) |
 | Phase 6 ceremony | Smoke [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777), CI [27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) |
 
 ## Implementation (branch stack)

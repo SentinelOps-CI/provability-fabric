@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Evidence program closure:** [evidence-program-closure.md](roadmap/evidence-program-closure.md) — v0.1+v0.2 vision complete, full-green CI criterion, org prerequisites, Phase 6 ceremony. CI hardening **#118** merged (`3f150b15`); post-merge smoke [27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912). Closure stack PRs **#121–#127** (`ci/standards-parity` through `docs/evidence-program-closure`). Phase 6 dispatches: smoke [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777), CI [27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883). Branch protection applied on `main`. Inventory script: `scripts/ci_workflow_inventory.sh` (exit 1 post-stack — see closure doc).
+- **Evidence program closure:** [evidence-program-closure.md](roadmap/evidence-program-closure.md) — v0.1+v0.2 vision complete, full-green CI criterion, org prerequisites, Phase 6 ceremony. CI hardening **#118** merged (`3f150b15`); closure stack **#121–#128** landed on `main` (`de104223` tip). Post-#128 ceremony: smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486). Branch protection on `main`. Inventory: `scripts/ci_workflow_inventory.sh` (8/67 gated green post-#128 — exit 1; see closure doc).
 
 ## [Unreleased] - Bench / eval pipeline hardening
 
