@@ -324,7 +324,7 @@ lean-check-duplicates:
 
 lean-forbid-shadowing:
 	@$(ECHOOK) "🔍 Checking for forbidden shadowing..."
-	$(if $(filter Windows_NT,$(OS)),@$(ECHOOK) "Skipped on Windows (run scripts/forbid-shadowing.sh in Git Bash)" && exit 0,sh scripts/forbid-shadowing.sh)
+	$(if $(filter Windows_NT,$(OS)),@$(ECHOOK) "Skipped on Windows (run scripts/forbid-shadowing.sh in Git Bash)" && exit 0,bash scripts/forbid-shadowing.sh)
 
 vendor-mathlib:
 	@$(ECHOOK) "📦 Vendoring mathlib for Lean..."
