@@ -24,7 +24,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  Documentation Build:
+  documentation-build:
+    name: Documentation Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
