@@ -12,6 +12,14 @@ on:
       - "mkdocs.yml"
       - ".markdown-link-check.json"
       - "cmd/specdoc/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "bundles/**/spec.yaml"
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".markdown-link-check.json"
+      - "cmd/specdoc/**"
   workflow_dispatch:
 
 jobs:
