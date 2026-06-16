@@ -136,32 +136,3 @@ jobs:
         run: |
           mkdir -p runtime/sidecar-watcher/policy/
           cp /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json
-
-      - name: Time-to-fail check
-        if: false
-        run: |
-          LEAN_FILES=$(find . -name "*.lean" -not -path "./.lake/*" -not -path "./vendor/*" | head -10)
-          for file in $LEAN_FILES; do
-            echo "Testing $file..."
-            start_time=$(date +%s)
-            if timeout 20s lean --make "$file" >/dev/null 2>&1; then
-              end_time=$(date +%s)
-              duration=$((end_time - start_time))
-              echo "$file compiled in ${duration}s"
-            else
-              end_time=$(date +%s)
-              duration=$((end_time - start_time))
-              if [ $duration -gt 20 ]; then
-                echo "$file exceeded 20s TTF limit"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Run proofbench
-        if: false
-        run: |
-          cd core/lean-libs
-          lake build
-          cd ../..
-          lake exe proofbench
