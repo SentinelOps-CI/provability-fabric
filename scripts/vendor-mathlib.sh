@@ -36,7 +36,11 @@ fi
 
 # Build mathlib to generate .olean files (mathlib4 ships its own lakefile)
 echo "🔨 Building mathlib..."
-lake build
+if [ -d "$VENDOR_DIR/.lake/build/lib" ] && [ -n "$(ls -A "$VENDOR_DIR/.lake/build/lib" 2>/dev/null)" ]; then
+  echo "✅ Mathlib build artifacts already present, skipping lake build"
+else
+  lake build
+fi
 
 echo "✅ Mathlib vendored successfully!"
 echo "📁 Location: $VENDOR_DIR"
