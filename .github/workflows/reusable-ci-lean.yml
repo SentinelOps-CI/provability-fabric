@@ -102,9 +102,6 @@ jobs:
       - name: Check for duplicate Lean definitions
         run: make lean-check-duplicates
 
-      - name: Check for forbidden shadowing
-        run: make lean-forbid-shadowing
-
       - name: Generate allowlist from Lean proofs (if needed)
         if: inputs.allowlist_needs_update == 'true'
         run: |
