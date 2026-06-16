@@ -115,7 +115,7 @@ Verified on `main` (post-#118): each workflow below runs `make submodules` with 
 
 **Status (2026-06-16):** Repository secret configured. Evidence smoke green on dispatch [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777).
 
-Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](../../CONTRIBUTING.md).
+Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md).
 
 | Secret / service | Workflows blocked | Action |
 |------------------|-------------------|--------|

@@ -44,7 +44,7 @@ Reusable-only workflows (`workflow_call`) are tracked but not gating until invok
 | `AWS_ROLE_ARN` + `EVIDENCE_BUCKET` (optional) | Org admin | `evidence.yaml` runs `collect-evidence` instead of offline report |
 | Branch protection required checks | Org admin | **Applied** via `gh api` (2026-06-16): CI required checks, smoke, evidence-schema-only, Documentation Build |
 
-Setup steps: [CONTRIBUTING.md](../../CONTRIBUTING.md) and [ci-health-matrix — Required secrets](../internal/ci-health-matrix.md#required-secrets-org-prerequisites).
+Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md) and [ci-health-matrix — Required secrets](../internal/ci-health-matrix.md#required-secrets-org-prerequisites).
 
 ## Verification ceremony (Phase 6)
 
