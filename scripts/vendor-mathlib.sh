@@ -34,11 +34,14 @@ if [ "$CURRENT_COMMIT" != "$MATHLIB_COMMIT" ]; then
     git checkout "$MATHLIB_COMMIT"
 fi
 
-# Build mathlib to generate .olean files (mathlib4 ships its own lakefile)
-echo "🔨 Building mathlib..."
-if [ -d "$VENDOR_DIR/.lake/build/lib" ] && [ -n "$(ls -A "$VENDOR_DIR/.lake/build/lib" 2>/dev/null)" ]; then
-  echo "✅ Mathlib build artifacts already present, skipping lake build"
+# Populate .olean files (prefer Mathlib's prebuilt cache over a full compile)
+echo "🔨 Fetching mathlib build artifacts..."
+if [ -d .lake/build/lib ] && [ -n "$(ls -A .lake/build/lib 2>/dev/null)" ]; then
+  echo "✅ Mathlib build artifacts already present, skipping fetch"
+elif lake exe cache get; then
+  echo "✅ Downloaded mathlib cache"
 else
+  echo "⚠️  Mathlib cache download failed; falling back to lake build"
   lake build
 fi
 
