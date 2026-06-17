@@ -99,7 +99,7 @@ Evidence validation does **not**:
 - Establish theorem soundness, policy correctness, or admission verdicts
 - Replace PCS or Morph proof obligations
 
-### Recommended MoU wording
+### Recommended acceptance wording
 
 > The Evidence lane validates proof artifacts **structurally and digest-bound**. It does **not** perform Lean semantic proof checking. Proof soundness remains an external obligation of the producing system and its verification toolchain.
 

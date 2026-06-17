@@ -1,12 +1,12 @@
 # Evidence v0.2 status
 
-Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16); MoU gap docs through #130 (merged 2026-06-16).
+Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16); evidence acceptance gap docs through #130 (merged 2026-06-16).
 
 ## Public status checkpoint 2026-06-16
 
 | Item | Status |
 |------|--------|
-| **Main SHA** | `9788bb8a` (merge #130 `docs/mou-gap-analysis`) |
+| **Main SHA** | `9788bb8a` (merge #130 evidence acceptance gap analysis) |
 | **D1–D2** Schema + bundle tooling | Complete — v0.1/v0.2 schemas, `pf evidence validate --strict`, compatibility matrix |
 | **D3** Runtime integration | Complete on Linux CI — sidecar binding + cert path guard; Windows `cargo test` deferred to CI authority |
 | **D4** Replay | Complete — v0.1 static + v0.2 deep execute/low-view; cross-platform testbed hardening in gap-closure PR |
@@ -29,7 +29,7 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 | Evidence smoke (validate, replay, testbeds, runtime pytest) | [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) |
 | Core CI | [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486) |
 
-Internal MoU wording: [mou-positioning.md](../internal/mou-positioning.md). Suggested tag (optional, not created): `evidence-v0.2.0-mou`.
+Internal evidence acceptance positioning: [evidence-acceptance-positioning.md](../internal/evidence-acceptance-positioning.md). Suggested tag (optional, not created): `evidence-v0.2.0-acceptance`.
 
 ## CI hardening #118 (merged)
 
@@ -54,7 +54,7 @@ Org secret `STANDARDS_GITHUB_TOKEN` is configured for CI; local clones use HTTPS
 
 ## Acceptance verification record (2026-06-16)
 
-Maintainer packet (private, gitignored): `private/mou-evidence/acceptance-2026-06-16/`
+Maintainer packet (private, gitignored): `private/acceptance-evidence/acceptance-2026-06-16/`
 
 | Gate | Local (`fdca37c4`) | CI authority |
 |------|-------------------|--------------|
@@ -63,7 +63,7 @@ Maintainer packet (private, gitignored): `private/mou-evidence/acceptance-2026-0
 | `mkdocs build --strict` | Pass | Documentation Build on PR #129 |
 | Repo-wide inventory | exit 1 (8/67 gated green) | N/A — see [program closure](evidence-program-closure.md) |
 
-Deep replay report archived at `private/mou-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json`.
+Deep replay report archived at `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json`.
 
 ## CI inventory caveat
 

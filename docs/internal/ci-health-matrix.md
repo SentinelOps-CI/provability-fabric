@@ -2,9 +2,9 @@
 
 Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
-## MoU gap closure fixes (2026-06-16)
+## Evidence acceptance gap closure fixes (2026-06-16)
 
-Prepared on branch `fix/mou-gap-closure-2026-06-16` (requires `workflow` OAuth scope to push):
+Prepared on branch `fix/acceptance-gap-closure-2026-06-16` (requires `workflow` OAuth scope to push):
 
 | Workflow | Fix | Status |
 |----------|-----|--------|
