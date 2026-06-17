@@ -62,16 +62,16 @@ Gates align with the [Evidence v0.2 definition of done](evidence-v0.2.md#definit
 
 Green baselines: PR #110 (first full matrix after testbed fix), PR #111 (`main` workflow_dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090)), post-#116 [27527807232](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27527807232), post-#118 dispatch [27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912).
 
-## MoU replay deliverable mapping
+## Replay acceptance deliverable mapping
 
-| MoU replay tier | PRs | Mechanism |
+| Replay acceptance tier | PRs | Mechanism |
 |-----------------|-----|-----------|
 | v0.1 static / digest replay | #92–#95, #97 | `pf evidence replay` without `--execute`; trace digest + artifact binding |
 | v0.2 KIT import | #99 | `pf evidence trace import --kit-trace` |
 | v0.2 schema + `replay_context` | #100 | v0.2 bundle schema; strict path validation |
 | v0.2 deep execute + low-view | #101, #105 | `pf evidence replay --execute --low-view` via TRACE-REPLAY-KIT |
 
-PR **#92** introduced v0.1 static replay only. MoU deep-replay deliverables cite **#99–#101** and **#105**, not #92 alone.
+PR **#92** introduced v0.1 static replay only. Deep-replay acceptance deliverables cite **#99–#101** and **#105**, not #92 alone.
 
 ## Fresh-clone verification checklist
 

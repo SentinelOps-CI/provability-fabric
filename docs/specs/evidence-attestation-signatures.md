@@ -28,7 +28,7 @@ The validator does **not**:
 
 No `signature` verification hook exists in `core/evidence` today; adding one would be a separate feature with explicit algorithm and key-trust policy.
 
-## Delegated verification (recommended MoU wording)
+## Delegated verification (recommended acceptance wording)
 
 > Evidence bundles **package** attestation artifacts and bind them to claim digests. **Signature verification is delegated** to CERT-V1 tooling and organization-specific verifier policies. Demo placeholders in repository fixtures are illustrative only.
 

@@ -1,8 +1,8 @@
-# MoU positioning (Evidence deliverables 1–5)
+# Evidence acceptance positioning (deliverables 1–5)
 
-Internal reference for MoU-safe claims. Public counterparts live in specs and roadmap pages; this page consolidates exact wording for deliverables D1–D5.
+Internal reference for acceptance-safe claims. Public counterparts live in specs and roadmap pages; this page consolidates exact wording for deliverables D1–D5.
 
-**Checkpoint:** `main` at `9788bb8a` (2026-06-16). Private acceptance packet: `private/mou-evidence/acceptance-2026-06-16/` (gitignored).
+**Checkpoint:** `main` at `9788bb8a` (2026-06-16). Private acceptance packet: `private/acceptance-evidence/acceptance-2026-06-16/` (gitignored).
 
 ## D1 — Schema and specification
 
@@ -40,13 +40,13 @@ Internal reference for MoU-safe claims. Public counterparts live in specs and ro
 
 `pf evidence validate` does **not** include an opt-in `--verify-signatures` hook. Adding one would require algorithm selection, key-trust policy, and CERT-V1 submodule wiring beyond the current structural validator scope.
 
-**MoU-safe delegation:**
+**Acceptance-safe delegation:**
 
 > Evidence bundles package attestation artifacts and bind them to claim digests. Signature verification is delegated to CERT-V1 tooling and organization-specific verifier policies.
 
 ## Suggested release tag (optional)
 
-If tagging after MoU sign-off: `evidence-v0.2.0-mou` or `pcs-pf-v0.1.0-rc3` — follow org release process; tag creation is out of scope for automated closure.
+If tagging after evidence acceptance sign-off: `evidence-v0.2.0-acceptance` or `pcs-pf-v0.1.0-rc3` — follow org release process; tag creation is out of scope for automated closure.
 
 ## Related
 

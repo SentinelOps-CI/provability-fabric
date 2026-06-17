@@ -66,7 +66,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 `scripts/ci_workflow_inventory.sh` on `main` after **#128** merge: **exit 1** (full-green criterion not met). Gains include `proto-compat.yaml` success; remaining red lanes are path-filtered push failures, optional AWS/Morph secrets, and infra-heavy Kind/Litmus jobs. Post-#128 ceremony dispatches: Evidence smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486).
 
-Deep replay acceptance archive (private, local): `private/mou-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
+Deep replay acceptance archive (private, local): `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
 
 Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — WSL `bash` may not see `gh`.
 
