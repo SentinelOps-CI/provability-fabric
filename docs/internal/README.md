@@ -4,7 +4,7 @@ These pages support ongoing development and experiments. They stay outside the p
 
 | Topic | Path |
 |-------|------|
-| MoU deliverable positioning | [mou-positioning.md](mou-positioning.md) |
+| Evidence acceptance positioning | [evidence-acceptance-positioning.md](evidence-acceptance-positioning.md) |
 | CI health matrix | [ci-health-matrix.md](ci-health-matrix.md) |
 | Placeholder inventory | [placeholders/inventory.md](placeholders/inventory.md) |
 | SWE-bench stabilization matrix | [swebench-stabilization-regression-matrix.md](swebench-stabilization-regression-matrix.md) |
