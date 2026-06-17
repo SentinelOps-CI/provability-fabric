@@ -49,7 +49,7 @@ Runtime binding records **what the sidecar emitted** and **optional cross-links*
 - Full claim/proof/trace artifacts (unless packaged into bundles separately)
 - TRACE-REPLAY-KIT execution output (unless referenced in a bundle)
 - Cross-tenant bundle aggregation
-- DSSE signature verification state beyond CERT `sig` field presence
+- DSSE signature verification state beyond CERT `sig` field presence (see [attestation signatures](../specs/evidence-attestation-signatures.md))
 
 ## What validation proves
 

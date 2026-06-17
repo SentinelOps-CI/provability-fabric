@@ -126,6 +126,7 @@ nav:
           - Model: specs/evidence-model-v0.1.md
           - Bundle format: specs/evidence-bundle-v0.1.md
           - Compatibility: specs/evidence-compatibility.md
+          - Attestation signatures: specs/evidence-attestation-signatures.md
           - Lane guide: specs/evidence-lane-guide.md
           - Walkthrough: guides/evidence-bundle-walkthrough.md
           - Replay guarantees: guides/replay-guarantees.md
