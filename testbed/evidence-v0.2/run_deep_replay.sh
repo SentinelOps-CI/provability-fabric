@@ -7,12 +7,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 PF="${PF:-./core/cli/pf/pf}"
-if [[ ! -x "$PF" && ! -f "$PF" && ! -x "./core/cli/pf/pf.exe" ]]; then
+if [[ -f "./core/cli/pf/pf.exe" ]]; then
+  PF="./core/cli/pf/pf.exe"
+elif [[ ! -x "$PF" && ! -f "$PF" ]]; then
   (cd core/cli/pf && go build -o pf .)
   PF="./core/cli/pf/pf"
-fi
-if [[ -x "./core/cli/pf/pf.exe" ]]; then
-  PF="./core/cli/pf/pf.exe"
 fi
 
 EXAMPLE="specs/evidence/v0.2/examples/valid"
@@ -35,6 +34,8 @@ if [[ ! -f external/TRACE-REPLAY-KIT/runner/replay_run.py ]]; then
 fi
 
 echo "== Step 3: execute + low-view =="
+# Windows consoles default to a legacy code page; KIT oracles may emit Unicode.
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 OUT="$(mktemp -d)"
 "$PF" evidence replay --bundle "$BUNDLE" --base-dir "$EXAMPLE" --execute --low-view --out-dir "$OUT/replay"
 echo "Deep replay execute complete."
