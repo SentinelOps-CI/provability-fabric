@@ -1,8 +1,35 @@
 {
-  "name": "egress",
-  "steps": [
-    { "op": "call", "tool": "HTTPGet", "args": {"url": "https://example.com"} },
-    { "op": "emit", "args": {"payload": "response"} }
+  "metadata": {
+    "version": "1.0.0",
+    "created_at": "2024-01-01T00:00:00Z",
+    "system_info": {
+      "name": "egress",
+      "version": "1.0.0"
+    }
+  },
+  "events": [
+    {
+      "id": "event_001",
+      "timestamp": "2024-01-01T00:00:00.000Z",
+      "type": "streaming_egress",
+      "payload": {
+        "url": "https://example.com",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "event_002",
+      "timestamp": "2024-01-01T00:00:01.000Z",
+      "type": "function_call",
+      "payload": {
+        "function": "emit_response",
+        "args": ["response"],
+        "hash": "sha256:486ea46224d1bb4fb680f34f7c9ad25a3b88b22cb0a3f3c949a4ea9964aa1f7c"
+      },
+      "context": {
+        "thread_id": "main",
+        "call_stack": ["main", "emit_response"]
+      }
+    }
   ]
 }
-
