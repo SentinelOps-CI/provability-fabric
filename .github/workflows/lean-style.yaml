@@ -24,10 +24,14 @@ jobs:
         with:
           fetch-depth: 0  # Full history for git operations
 
-      - name: Set up Lean
+      - name: Set up Lean (elan)
         run: |
-          curl -L https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz | tar -xz
-          echo "$PWD/lean-4.7.0-linux/bin" >> $GITHUB_PATH
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
+          lean --version
 
       - name: Make duplicate check script executable
         run: |
