@@ -107,4 +107,4 @@ See also [Evidence attestation signatures](evidence-attestation-signatures.md) f
 
 ## pf check-trace caveat
 
-`pf check-trace` only verifies that a `bundles/` directory exists in the working tree. It is **not** an Evidence bundle validator, traceability checker, or substitute for `pf evidence validate --strict`.
+`pf check-trace` only verifies that a `bundles/` directory exists in the working tree. It is **not** an Evidence bundle validator, traceability checker, substitute for `pf evidence validate --strict`, or substitute for the Evidence replay lane (`pf evidence replay` / TRACE-REPLAY-KIT execute).
