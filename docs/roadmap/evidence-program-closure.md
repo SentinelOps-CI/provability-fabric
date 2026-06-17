@@ -33,7 +33,7 @@ Reusable-only workflows (`workflow_call`) are tracked but not gating until invok
 | #126 | `ci/lean-research` | lean-offline, lean-morph, morph-replay, paper-conformance |
 | #125 | `ci/nightly-batch` | nightly-replay, ci-nightly-pytest, redteam, chaos smoke |
 | #127 | `docs/evidence-program-closure` | Closure sign-off page, CHANGELOG entry |
-| #128 | `ci/post-closure-hotfixes` | actionlint/docs-build/cert-validate hotfixes (**open** — needs approving review) |
+| #128 | `ci/post-closure-hotfixes` | actionlint/docs-build/cert-validate hotfixes — **merged** `de104223` (2026-06-16) |
 
 ## Org prerequisites (remaining blockers)
 
@@ -57,7 +57,12 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 ### Inventory run (2026-06-16)
 
-`scripts/ci_workflow_inventory.sh` on `main` post-closure stack (#121–#127): **exit 1** — 67 gated (push/schedule) workflows, 6 green, 56 red, 23 unknown/no-run (summary from full inventory pass). Evidence smoke and standards-pin green; remaining red lanes are path-filtered push failures, optional AWS/Morph secrets, and infra-heavy Kind/Litmus jobs. Re-run after post-#127 hotfixes land on `main`.
+| Pass | Gated | Green | Red | Unknown |
+|------|------:|------:|----:|--------:|
+| Post-#127 | 67 | 6 | 56 | 21 |
+| Post-#128 (`de104223`) | 67 | 8 | 56 | 21 |
+
+`scripts/ci_workflow_inventory.sh` on `main` after **#128** merge: **exit 1** (full-green criterion not met). Gains include `proto-compat.yaml` success; remaining red lanes are path-filtered push failures, optional AWS/Morph secrets, and infra-heavy Kind/Litmus jobs. Post-#128 ceremony dispatches: Evidence smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486).
 
 Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — WSL `bash` may not see `gh`.
 
