@@ -20,7 +20,7 @@ Every workflow under `.github/workflows/` that triggers on **`push` to `main`** 
 scripts/ci_workflow_inventory.sh
 ```
 
-**Current posture (2026-06-17):** The Evidence lane is implemented with documented green smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` (`0d802f6e`, post-#132) reports **12/67** gated workflows green (exit 1). Do not claim full CI green in release communications until inventory exits 0.
+**Current posture (2026-06-17):** The Evidence lane is **green** on `main` with documented smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` reports **12/67** gated workflows green (`scripts/ci_workflow_inventory.sh` exit **1**). Do not claim full CI green in release communications until inventory exits 0.
 
 Reusable-only workflows (`workflow_call`) are tracked but not gating until invoked.
 
@@ -71,8 +71,9 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Pass | Gated | Green | Red | Unknown |
 |------|------:|------:|----:|--------:|
 | Post-#132 (`0d802f6e`) | 67 | 12 | 52 | 21 |
+| Post-#134 (`f55a98bd`) | 67 | 12 | 52 | 21 |
 
-Local maintainer gates on `0d802f6e`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass. Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success). Four gap-closure workflow fixes remain on branch `ci/gap-closure-workflow-bumps` (**PR #133**, pending `workflow` OAuth scope to push).
+Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 
 Deep replay acceptance archive (private, local): `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
 

@@ -2,16 +2,16 @@
 
 Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
-## Evidence acceptance gap closure fixes (2026-06-16)
+## Evidence acceptance gap closure fixes (2026-06-17)
 
-Prepared on branch `fix/acceptance-gap-closure-2026-06-16` (requires `workflow` OAuth scope to push):
+Merged via PR #134 (`ci/gap-closure-workflow-bumps`):
 
 | Workflow | Fix | Status |
 |----------|-----|--------|
-| `allowlist-sync.yaml` | `actions/checkout@v3` → `@v4` | Local commit; push blocked without workflow scope |
-| `lean-style.yaml` | elan install via `lean-toolchain` | Local commit; push blocked without workflow scope |
-| `performance-gate.yaml` | `actions/cache@v3` → `@v4` | Local commit; push blocked without workflow scope |
-| `integration.yaml` | `actions/cache@v3` → `@v4` | Local commit; push blocked without workflow scope |
+| `allowlist-sync.yaml` | `actions/checkout@v3` → `@v4` | Merged (#134) |
+| `lean-style.yaml` | elan install via `lean-toolchain` | Merged (#134) |
+| `performance-gate.yaml` | `actions/cache@v3` → `@v4` | Merged (#134) |
+| `integration.yaml` | `actions/cache@v3` → `@v4` | Merged (#134) |
 
 ## Evidence gate (must stay green)
 
@@ -251,9 +251,11 @@ Closure criterion (push + schedule on `main`): every row with `push` or `schedul
 ### Inventory stats
 
 - Total workflow files: **85**
-- Green (last main run success): **4** — `evidence-v01-smoke.yml`, `standards-pin.yml`, `scorecards.yml`, `proof-bot.yaml`
-- Red (failure/cancelled/timed out): **60**
+- Gated (push/schedule on `main`): **67**
+- Green (last main run success): **12** — includes Evidence lane (`evidence-v01-smoke.yml`, `standards-pin.yml`, `docs-build.yaml`, `scorecards.yml`, `proof-bot.yaml`, `actionlint.yml`, `ci.yml`, `proto-compat.yaml`, and others; see `scripts/ci_workflow_inventory.sh --list-only`)
+- Red (failure/cancelled/timed out): **52**
 - No main run / unknown: **21**
+- Inventory exit code on `main` (2026-06-17): **1** (repo-wide full-green criterion not met)
 
 ### Blocker summary
 
