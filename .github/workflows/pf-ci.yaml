@@ -72,7 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y docker.io curl jq
+          sudo apt-get install -y curl jq
+          docker version
 
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64
           chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind

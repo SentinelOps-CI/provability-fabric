@@ -44,7 +44,7 @@ jobs:
       - name: Install cargo-criterion
         run: cargo install cargo-criterion
       - name: Run benches (small sample, no regression gate)
-        run: cargo criterion -p provability-fabric-bench -- --sample-size 5 --noplot
+        run: cargo criterion -p provability-fabric-bench -- --sample-size 10 --noplot
 
   save-baseline:
     name: Save baseline (main)

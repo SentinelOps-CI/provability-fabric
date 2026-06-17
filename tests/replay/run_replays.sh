@@ -34,11 +34,12 @@ for b in "$ROOT_DIR/tests/replay/bundles"/*; do
     cert_out_host="$CERT_DIR/${name}_run${i}.cert.json"
 
     # Invoke runner inside container with mounted repo for deterministic env
+    # Image ENTRYPOINT is `python replay_run.py`; pass CLI args directly.
     docker run --rm \
       -e TZ=UTC -e LC_ALL=C.UTF-8 \
       -v "$ROOT_DIR":/work \
       -w /work/external/TRACE-REPLAY-KIT/runner \
-      "$IMAGE_TAG" bash replay_run.sh \
+      "$IMAGE_TAG" \
         --bundle "/work/tests/replay/bundles/$name" \
         --trace "/work/tests/replay/bundles/$name/trace.json" \
         --fixtures "/work/tests/replay/bundles/$name/fixtures" \
