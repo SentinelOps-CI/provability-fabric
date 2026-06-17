@@ -34,7 +34,7 @@ jobs:
       - name: Run DFA Equivalence Tests
         run: |
           cd runtime/sidecar-watcher
-          cargo test test_round_trip_equivalence_5k test_round_trip_equivalence_100 -- --nocapture
+          cargo test test_round_trip_equivalence -- --nocapture
 
       - name: Verify 0 Mismatches
         run: |
