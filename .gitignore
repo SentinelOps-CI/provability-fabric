@@ -268,3 +268,6 @@ workspaces_verify_preflight_smoke/
 
 core/cli/pf/pf
 
+# Private MoU evidence packets (local only; never commit)
+private/
+

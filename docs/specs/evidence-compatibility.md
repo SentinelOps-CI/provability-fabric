@@ -82,4 +82,29 @@ See also [Evidence lane guide](evidence-lane-guide.md).
 | Windows bash testbed | CI runs on `ubuntu-latest`; local Windows may skip live sidecar |
 | Missing submodules | `make dev-standards`; CI fails closed on Evidence smoke |
 | KIT tag `v1.0.0` pending upstream | Commit pins in `tools/standards/versions.json` + `standards-pin-check` |
-| Morph / PCS / CERT sig verification | Documented non-guarantees in replay guide |
+| Morph / PCS / CERT sig verification | Documented non-guarantees in [replay guide](../guides/replay-guarantees.md) and [attestation signatures](evidence-attestation-signatures.md) |
+| Proof semantic checking (Lean) | Structural + digest-bound only — see [Proof artifact semantics](#proof-artifact-semantics) |
+
+## Proof artifact semantics
+
+Evidence bundles may include **proof** role artifacts (`proof.schema.json`). In `--strict` mode, `pf evidence validate`:
+
+- Validates proof JSON against the proof schema
+- Verifies the proof artifact digest matches the bundle manifest entry
+- Ensures digest-bound cross-references (for example from attestation `signed_claim_ref`) are internally consistent
+
+Evidence validation does **not**:
+
+- Invoke Lean or any semantic proof checker
+- Establish theorem soundness, policy correctness, or admission verdicts
+- Replace PCS or Morph proof obligations
+
+### Recommended MoU wording
+
+> The Evidence lane validates proof artifacts **structurally and digest-bound**. It does **not** perform Lean semantic proof checking. Proof soundness remains an external obligation of the producing system and its verification toolchain.
+
+See also [Evidence attestation signatures](evidence-attestation-signatures.md) for signature delegation.
+
+## pf check-trace caveat
+
+`pf check-trace` only verifies that a `bundles/` directory exists in the working tree. It is **not** an Evidence bundle validator, traceability checker, or substitute for `pf evidence validate --strict`.

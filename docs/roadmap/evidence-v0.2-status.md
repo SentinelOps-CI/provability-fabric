@@ -9,9 +9,36 @@ Completion tracker for the Evidence v0.2 integration workstream. Implementation 
 | Merge commit | `3f150b1569b8dd50061d57ed99f34aa4b8dfffe6` |
 | Post-merge smoke | [workflow_dispatch 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) |
 | Closure stack | #121–#128 (`ci/standards-parity` … `ci/post-closure-hotfixes`) |
-| Sign-off page | [evidence-program-closure.md](evidence-program-closure.md) (#127); hotfixes **#128** merged `de104223` |
+| Sign-off page | [evidence-program-closure.md](evidence-program-closure.md) (#127); hotfixes **#128** merged `de104223`; post-#128 sign-off **#129** merged `fdca37c4` |
 | Post-#128 ceremony | Smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486) |
 | Phase 6 ceremony | Smoke [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777), CI [27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) |
+
+## External standards verification (2026-06-16)
+
+| Check | `main` SHA | Result |
+|-------|------------|--------|
+| `make dev-standards` | `fdca37c4` | **Pass** locally (CERT-V1 + TRACE-REPLAY-KIT submodules initialized) |
+| `make standards-pin-check` | `fdca37c4` | **Pass** locally — pins match `tools/standards/versions.json` |
+| CI smoke (`STANDARDS_GITHUB_TOKEN`) | `de104223` | **Pass** — [run 27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (`make submodules` in Linux CI) |
+
+Org secret `STANDARDS_GITHUB_TOKEN` is configured for CI; local clones use HTTPS submodule URLs when the token is not present.
+
+## Acceptance verification record (2026-06-16)
+
+Maintainer packet (private, gitignored): `private/mou-evidence/acceptance-2026-06-16/`
+
+| Gate | Local (`fdca37c4`) | CI authority |
+|------|-------------------|--------------|
+| `pf evidence validate` v0.1/v0.2 `--strict` | Pass | smoke job in 27616315269 |
+| `pf evidence replay --execute --low-view` | Pass (Windows; `PYTHONIOENCODING=utf-8`) | smoke job in 27616315269 |
+| `mkdocs build --strict` | Pass | Documentation Build on PR #129 |
+| Repo-wide inventory | exit 1 (8/67 gated green) | N/A — see [program closure](evidence-program-closure.md) |
+
+Deep replay report archived at `private/mou-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json`.
+
+## CI inventory caveat
+
+Evidence smoke and standards-pin baselines are green. The repository is **not** fully green repo-wide — inventory on `main` post-#128: **8/67** gated workflows green (exit 1). See [evidence-program-closure.md](evidence-program-closure.md).
 
 ## Implementation (branch stack)
 

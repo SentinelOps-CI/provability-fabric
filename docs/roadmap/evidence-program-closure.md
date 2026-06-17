@@ -20,6 +20,8 @@ Every workflow under `.github/workflows/` that triggers on **`push` to `main`** 
 scripts/ci_workflow_inventory.sh
 ```
 
+**Current posture (2026-06-16):** The Evidence lane is implemented with documented green smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` reports **8/67** gated workflows green (exit 1). Do not claim full CI green in release communications until inventory exits 0.
+
 Reusable-only workflows (`workflow_call`) are tracked but not gating until invoked.
 
 ## Closure PR stack (2026-06-16)
@@ -63,6 +65,8 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Post-#128 (`de104223`) | 67 | 8 | 56 | 21 |
 
 `scripts/ci_workflow_inventory.sh` on `main` after **#128** merge: **exit 1** (full-green criterion not met). Gains include `proto-compat.yaml` success; remaining red lanes are path-filtered push failures, optional AWS/Morph secrets, and infra-heavy Kind/Litmus jobs. Post-#128 ceremony dispatches: Evidence smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486).
+
+Deep replay acceptance archive (private, local): `private/mou-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
 
 Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — WSL `bash` may not see `gh`.
 
