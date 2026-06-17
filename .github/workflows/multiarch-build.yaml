@@ -48,8 +48,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Stage workspace Cargo.lock for Docker build
-        run: cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
+        run: |
+          cargo generate-lockfile
+          cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

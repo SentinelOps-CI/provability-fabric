@@ -60,7 +60,7 @@ jobs:
       - name: Run Criterion smoke benchmarks
         run: |
           cd bench
-          cargo bench -p provability-fabric-bench -- --sample-size 5 --noplot
+          cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot
           echo "performance_gate=passed" >> "$GITHUB_OUTPUT"
         id: gates
 

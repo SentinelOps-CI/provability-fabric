@@ -12,5 +12,4 @@ jobs:
     with:
       pr_number: ${{ github.event.pull_request.number || '' }}
       run_phases: "2,3,6"
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    secrets: inherit

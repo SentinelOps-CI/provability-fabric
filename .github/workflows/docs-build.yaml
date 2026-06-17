@@ -92,20 +92,3 @@ jobs:
         run: |
           npm install -g markdown-link-check@3.11.2
           find docs -name "*.md" -exec markdown-link-check -c .markdown-link-check.json -q {} \;
-
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
-          force_orphan: true
-
-      - name: Commit generated docs
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add docs/generated/
-          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-generate documentation from specs"
-          git push

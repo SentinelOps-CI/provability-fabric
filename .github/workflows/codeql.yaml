@@ -124,66 +124,13 @@ jobs:
     name: Security Gates
     runs-on: ubuntu-latest
     needs: analyze
-    if: always()
+    if: always() && needs.analyze.result == 'success'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download CodeQL results
-        uses: actions/download-artifact@v4
-        with:
-          name: codeql-database
-          path: codeql-db
-
-      - name: Check for high severity alerts
+      - name: Verify CodeQL analysis completed
         run: |
-          echo "🔍 Checking for high severity security alerts..."
-
-          # This would parse CodeQL results and check for high severity issues
-          # For now, we'll simulate the check
-          echo "✅ No high severity alerts found"
-
-          # In practice, this would:
-          # 1. Parse CodeQL SARIF output
-          # 2. Filter for high/critical severity alerts
-          # 3. Fail if any are found
-          # 4. Generate a report
-
-      - name: Generate security report
-        run: |
-          echo "📊 Security Analysis Report"
-          echo "=========================="
-          echo "Language: ${{ matrix.language }}"
-          echo "Analysis completed successfully"
-          echo "No critical vulnerabilities detected"
-
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const comment = `## CodeQL Security Analysis
-
-            **Language:** ${{ matrix.language }}
-            **Status:** ✅ Analysis completed
-
-            ### Security Findings:
-            - No critical vulnerabilities detected
-            - No high severity alerts found
-            - Code quality checks passed
-
-            ### Recommendations:
-            - Continue regular security scanning
-            - Monitor for new vulnerabilities
-            - Keep dependencies updated`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+          echo "CodeQL analysis completed for all configured languages."
+          echo "No high severity alerts gate configured in this workflow."
 
   security-trends:
     name: Security Trends

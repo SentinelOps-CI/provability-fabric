@@ -28,10 +28,12 @@ jobs:
       - name: Install Syft
         run: |
           set -euo pipefail
-          curl -sSL -o /tmp/syft.tgz \
+          SYFT_DIR="$(mktemp -d)"
+          curl -sSL -o "$SYFT_DIR/syft.tgz" \
             "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
-          tar -xzf /tmp/syft.tgz -C /tmp
-          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          tar -xzf "$SYFT_DIR/syft.tgz" -C "$SYFT_DIR"
+          SYFT_BIN="$(find "$SYFT_DIR" -type f -name syft | head -1)"
+          test -n "$SYFT_BIN"
           sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
           syft version
 
@@ -66,10 +68,12 @@ jobs:
       - name: Install Grype
         run: |
           set -euo pipefail
-          curl -sSL -o /tmp/grype.tgz \
+          GRYPE_DIR="$(mktemp -d)"
+          curl -sSL -o "$GRYPE_DIR/grype.tgz" \
             "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
-          tar -xzf /tmp/grype.tgz -C /tmp
-          GRYPE_BIN="$(find /tmp -maxdepth 3 -type f -name grype | head -1)"
+          tar -xzf "$GRYPE_DIR/grype.tgz" -C "$GRYPE_DIR"
+          GRYPE_BIN="$(find "$GRYPE_DIR" -type f -name grype | head -1)"
+          test -n "$GRYPE_BIN"
           sudo install -m 0755 "$GRYPE_BIN" /usr/local/bin/grype
           grype version
 
@@ -148,10 +152,12 @@ jobs:
       - name: Install Syft
         run: |
           set -euo pipefail
-          curl -sSL -o /tmp/syft.tgz \
+          SYFT_DIR="$(mktemp -d)"
+          curl -sSL -o "$SYFT_DIR/syft.tgz" \
             "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
-          tar -xzf /tmp/syft.tgz -C /tmp
-          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          tar -xzf "$SYFT_DIR/syft.tgz" -C "$SYFT_DIR"
+          SYFT_BIN="$(find "$SYFT_DIR" -type f -name syft | head -1)"
+          test -n "$SYFT_BIN"
           sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
 
       - name: Download current SBOM

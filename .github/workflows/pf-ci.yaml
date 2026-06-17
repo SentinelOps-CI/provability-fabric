@@ -24,8 +24,6 @@ on:
     secrets:
       CI_PAT:
         required: false
-      GITHUB_TOKEN:
-        required: false
 
 env:
   PYTHON_VERSION: "3.11"

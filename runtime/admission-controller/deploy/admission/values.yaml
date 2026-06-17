@@ -10,6 +10,7 @@ enablePolicy: "true"
 ledger:
   url: "http://ledger:4000/graphql"
 autoscaling:
+  enabled: false
   minReplicas: 1
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
