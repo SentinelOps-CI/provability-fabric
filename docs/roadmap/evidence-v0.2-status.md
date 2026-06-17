@@ -1,6 +1,35 @@
 # Evidence v0.2 status
 
-Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16).
+Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16); MoU gap docs through #130 (merged 2026-06-16).
+
+## Public status checkpoint 2026-06-16
+
+| Item | Status |
+|------|--------|
+| **Main SHA** | `9788bb8a` (merge #130 `docs/mou-gap-analysis`) |
+| **D1–D2** Schema + bundle tooling | Complete — v0.1/v0.2 schemas, `pf evidence validate --strict`, compatibility matrix |
+| **D3** Runtime integration | Complete on Linux CI — sidecar binding + cert path guard; Windows `cargo test` deferred to CI authority |
+| **D4** Replay | Complete — v0.1 static + v0.2 deep execute/low-view; cross-platform testbed hardening in gap-closure PR |
+| **D5** Verification | Evidence smoke green; standards pins verified; program closure docs #127–#130 |
+| **Attestation signatures** | Structural + digest-bound only; DSSE verification external ([attestation signatures](../specs/evidence-attestation-signatures.md)) |
+| **Proof semantics** | Structural + digest-bound only; no Lean checking in Evidence lane |
+| **Docs** | `mkdocs build --strict` passes on maintainer host |
+
+### Explicit non-claims
+
+- **Not** full-repo CI green (inventory: 8/67 gated workflows green on post-#128 `main`)
+- **Not** Windows-local `cargo test emit_evidence` when crates.io SSL blocks downloads
+- **Not** in-validator CERT-V1 / attestation signature verification (`--verify-signatures` out of scope)
+- **Not** semantic proof checking (Lean) inside `pf evidence validate`
+
+### CI authority (Linux)
+
+| Gate | Run |
+|------|-----|
+| Evidence smoke (validate, replay, testbeds, runtime pytest) | [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) |
+| Core CI | [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486) |
+
+Internal MoU wording: [mou-positioning.md](../internal/mou-positioning.md). Suggested tag (optional, not created): `evidence-v0.2.0-mou`.
 
 ## CI hardening #118 (merged)
 

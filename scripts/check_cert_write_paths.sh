@@ -13,6 +13,8 @@ ALLOWLIST=(
 violations=0
 while IFS= read -r line; do
   file="${line%%:*}"
+  # Normalize Windows path separators from ripgrep output.
+  file="${file//\\//}"
   skip=0
   for allowed in "${ALLOWLIST[@]}"; do
     if [[ "$file" == "$allowed" ]]; then

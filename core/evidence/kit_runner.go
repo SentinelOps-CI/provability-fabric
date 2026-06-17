@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // KITRunner executes TRACE-REPLAY-KIT replay_run.py.
@@ -79,6 +80,7 @@ func (r *defaultKITRunner) Run(tracePath, fixturesPath, certOut string) (int, er
 	cmd := exec.Command(r.python(), args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = kitPythonEnv()
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode(), nil
@@ -100,6 +102,7 @@ func (r *defaultKITRunner) CompareLowView(outputFiles []string, minDeterminism f
 	cmd := exec.Command(r.python(), args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = kitPythonEnv()
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode(), nil
@@ -107,4 +110,16 @@ func (r *defaultKITRunner) CompareLowView(outputFiles []string, minDeterminism f
 		return 1, err
 	}
 	return 0, nil
+}
+
+// kitPythonEnv returns os.Environ with PYTHONIOENCODING=utf-8 so KIT oracles
+// can emit Unicode on Windows consoles that default to a legacy code page.
+func kitPythonEnv() []string {
+	const key = "PYTHONIOENCODING="
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, key) {
+			return os.Environ()
+		}
+	}
+	return append(os.Environ(), key+"utf-8")
 }

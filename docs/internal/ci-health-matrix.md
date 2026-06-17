@@ -2,6 +2,17 @@
 
 Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
+## MoU gap closure fixes (2026-06-16)
+
+Prepared on branch `fix/mou-gap-closure-2026-06-16` (requires `workflow` OAuth scope to push):
+
+| Workflow | Fix | Status |
+|----------|-----|--------|
+| `allowlist-sync.yaml` | `actions/checkout@v3` → `@v4` | Local commit; push blocked without workflow scope |
+| `lean-style.yaml` | elan install via `lean-toolchain` | Local commit; push blocked without workflow scope |
+| `performance-gate.yaml` | `actions/cache@v3` → `@v4` | Local commit; push blocked without workflow scope |
+| `integration.yaml` | `actions/cache@v3` → `@v4` | Local commit; push blocked without workflow scope |
+
 ## Evidence gate (must stay green)
 
 | Workflow | Job | Status | Notes |

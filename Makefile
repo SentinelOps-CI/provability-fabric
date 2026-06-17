@@ -79,6 +79,7 @@ dev-standards: submodules standards-pin-check
 
 evidence-verify: dev-standards
 	@$(ECHOOK) "Running Evidence v0.1/v0.2 verification..."
+	@$(ECHOOK) "Note: on Windows use Git Bash; testbed scripts prefer ./core/cli/pf/pf.exe with repo-relative paths."
 	cd core/evidence && go test ./...
 	pytest tests/evidence_schema tests/evidence_validation tests/evidence_replay \
 		tests/evidence_trace tests/runtime_evidence tests/testbed -q

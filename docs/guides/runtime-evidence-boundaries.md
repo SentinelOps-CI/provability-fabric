@@ -89,6 +89,21 @@ Runtime binding does not execute replay. Bundles that include `execution-trace` 
 3. Package certs and traces into v0.1 bundles with `pf evidence bundle pack`.
 4. Validate bundles before archival: `pf evidence validate <bundle> --strict`.
 
+## Runtime E2E verification authority
+
+Deliverable D3 (runtime integration) is verified on **Linux CI** as the authoritative path when local Windows hosts cannot reach crates.io or lack sidecar build prerequisites.
+
+| Check | Local command | CI authority |
+|-------|---------------|--------------|
+| Rust emit integration | `cargo test -p sidecar-watcher -- emit_evidence` | Covered indirectly via Evidence smoke pytest |
+| Linux sidecar binding | `pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q` | [Evidence smoke 27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) job `smoke` |
+
+**Windows caveat:** `cargo test` may fail with `CRYPT_E_NO_REVOCATION_CHECK` or other schannel SSL errors when fetching crates.io. This does not block MoU acceptance when the Linux smoke job above is green on the same commit family.
+
+**MoU wording:**
+
+> Runtime evidence binding is demonstrated by the sidecar emit integration test and Linux pytest path in Evidence v0.1 smoke CI. Local `cargo test emit_evidence` is recommended on Linux/macOS; Windows maintainers may defer to CI authority when network or SSL blocks crate downloads.
+
 ## Related
 
 - [Runtime evidence basic](runtime-evidence-basic.md)
