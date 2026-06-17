@@ -55,10 +55,13 @@ if [ ${#CERT_COUNT[@]} -eq 0 ]; then
   exit 1
 fi
 
-# Low-view determinism check (oracle)
+# Low-view determinism check (oracle) across produced CERTs
+shopt -s nullglob
+CERT_FILES=("$CERT_DIR"/*.cert.json)
+MIN_DETERMINISM=$(python3 -c "print(${LV_THRESHOLD} * 100)")
 python3 "$ROOT_DIR/external/TRACE-REPLAY-KIT/oracles/lowview_equal.py" \
-  --input "$OUT_DIR" \
-  --threshold "$LV_THRESHOLD"
+  "${CERT_FILES[@]}" \
+  --min-determinism "$MIN_DETERMINISM"
 
 echo "Replay runs complete. CERTs at $CERT_DIR"
 
