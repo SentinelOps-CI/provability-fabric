@@ -4,6 +4,8 @@ These pages support ongoing development and experiments. They stay outside the p
 
 | Topic | Path |
 |-------|------|
+| MoU deliverable positioning | [mou-positioning.md](mou-positioning.md) |
+| CI health matrix | [ci-health-matrix.md](ci-health-matrix.md) |
 | Placeholder inventory | [placeholders/inventory.md](placeholders/inventory.md) |
 | SWE-bench stabilization matrix | [swebench-stabilization-regression-matrix.md](swebench-stabilization-regression-matrix.md) |
 | SWE-bench audit notes | [audit-swebench-experiments.md](audit-swebench-experiments.md) |
