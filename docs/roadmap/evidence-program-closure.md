@@ -20,7 +20,7 @@ Every workflow under `.github/workflows/` that triggers on **`push` to `main`** 
 scripts/ci_workflow_inventory.sh
 ```
 
-**Current posture (2026-06-16):** The Evidence lane is implemented with documented green smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` reports **8/67** gated workflows green (exit 1). Do not claim full CI green in release communications until inventory exits 0.
+**Current posture (2026-06-17):** The Evidence lane is implemented with documented green smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` (`0d802f6e`, post-#132) reports **12/67** gated workflows green (exit 1). Do not claim full CI green in release communications until inventory exits 0.
 
 Reusable-only workflows (`workflow_call`) are tracked but not gating until invoked.
 
@@ -65,6 +65,14 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Post-#128 (`de104223`) | 67 | 8 | 56 | 21 |
 
 `scripts/ci_workflow_inventory.sh` on `main` after **#128** merge: **exit 1** (full-green criterion not met). Gains include `proto-compat.yaml` success; remaining red lanes are path-filtered push failures, optional AWS/Morph secrets, and infra-heavy Kind/Litmus jobs. Post-#128 ceremony dispatches: Evidence smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486).
+
+### Acceptance re-verify (2026-06-17)
+
+| Pass | Gated | Green | Red | Unknown |
+|------|------:|------:|----:|--------:|
+| Post-#132 (`0d802f6e`) | 67 | 12 | 52 | 21 |
+
+Local maintainer gates on `0d802f6e`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass. Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success). Four gap-closure workflow fixes remain on branch `ci/gap-closure-workflow-bumps` (**PR #133**, pending `workflow` OAuth scope to push).
 
 Deep replay acceptance archive (private, local): `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
 
