@@ -27,6 +27,7 @@ jobs:
         uses: helm/kind-action@v1
         with:
           node_image: kindest/node:v1.28.0
+          cluster_name: provability-fabric-test
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -57,7 +58,7 @@ jobs:
           docker build -t provability-fabric/ledger:test .
 
           # Load into Kind
-          kind load docker-image provability-fabric/ledger:test
+          kind load docker-image provability-fabric/ledger:test --name provability-fabric-test
 
           # Deploy PostgreSQL
           helm repo add bitnami https://charts.bitnami.com/bitnami

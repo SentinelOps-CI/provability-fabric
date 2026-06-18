@@ -34,6 +34,11 @@ jobs:
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           lean --version
 
+      - name: Vendor mathlib
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
+
       - name: Make duplicate check script executable
         run: |
           chmod +x scripts/check-dup-lean.sh

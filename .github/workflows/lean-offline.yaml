@@ -28,11 +28,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Vendor mathlib
-        run: |
-          chmod +x scripts/vendor-mathlib.sh
-          bash scripts/vendor-mathlib.sh
-
       - name: Set up Lean (elan)
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
@@ -42,6 +37,11 @@ jobs:
           "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           lean --version
+
+      - name: Vendor mathlib
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
 
       - name: Verify vendor/mathlib exists
         run: |
