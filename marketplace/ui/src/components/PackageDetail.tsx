@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   StarIcon, 
@@ -7,8 +7,6 @@ import {
   UserIcon, 
   CodeBracketIcon,
   GlobeAltIcon,
-  TagIcon,
-  CloudArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { marketplaceAPI } from '../services/api';
 import { Package } from '../types';
@@ -22,13 +20,7 @@ export const PackageDetail: React.FC = () => {
   const [installing, setInstalling] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadPackage();
-    }
-  }, [id]);
-
-  const loadPackage = async () => {
+  const loadPackage = useCallback(async () => {
     try {
       setLoading(true);
       const packageData = await marketplaceAPI.getPackage(id!);
@@ -40,7 +32,13 @@ export const PackageDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadPackage();
+    }
+  }, [id, loadPackage]);
 
   const handleInstall = async () => {
     if (!pkg) return;

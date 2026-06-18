@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { StarIcon, ArrowDownTrayIcon, CalendarIcon, UserIcon, CloudArrowDownIcon } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { StarIcon, ArrowDownTrayIcon, CalendarIcon, UserIcon } from '@heroicons/react/24/outline';
 import { marketplaceAPI } from '../services/api';
 import { Package } from '../types';
 import semver from 'semver';
@@ -15,11 +14,7 @@ export const PackageList: React.FC = () => {
   const [installing, setInstalling] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPackages();
-  }, [selectedType, selectedAuthor]);
-
-  const loadPackages = async () => {
+  const loadPackages = useCallback(async () => {
     try {
       setLoading(true);
       const response = await marketplaceAPI.getPackages(selectedType || undefined, selectedAuthor || undefined);
@@ -31,7 +26,11 @@ export const PackageList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedType, selectedAuthor]);
+
+  useEffect(() => {
+    loadPackages();
+  }, [loadPackages]);
 
   const handleInstall = async (pkg: Package) => {
     try {

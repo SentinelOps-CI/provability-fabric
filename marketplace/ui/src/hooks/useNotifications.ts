@@ -11,6 +11,10 @@ export interface Notification {
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  const removeNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newNotification = { id, ...notification };
@@ -24,11 +28,7 @@ export const useNotifications = () => {
     }, duration);
 
     return id;
-  }, []);
-
-  const removeNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  }, []);
+  }, [removeNotification]);
 
   const success = useCallback((title: string, message?: string, duration?: number) => {
     return addNotification({ type: 'success', title, message, duration });
