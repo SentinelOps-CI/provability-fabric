@@ -43,6 +43,11 @@ jobs:
           cd runtime/sidecar-watcher
           docker build -t provability-fabric/sidecar:test .
 
+      - name: Load images into Kind
+        run: |
+          kind load docker-image provability-fabric/attestor:test
+          kind load docker-image provability-fabric/sidecar:test
+
       - name: Deploy Redis
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -70,6 +75,7 @@ jobs:
                 containers:
                 - name: attestor
                   image: provability-fabric/attestor:test
+                  imagePullPolicy: Never
                   ports:
                   - containerPort: 8080
                   env:
@@ -112,6 +118,7 @@ jobs:
               command: ["sh", "-c", "while true; do echo 'demo action'; sleep 5; done"]
             - name: sidecar
               image: provability-fabric/sidecar:test
+              imagePullPolicy: Never
               env:
               - name: ATTESTOR_URL
                 value: "http://attestor-service:8080"
@@ -210,6 +217,7 @@ jobs:
               command: ["sh", "-c", "while true; do echo 'demo action'; sleep 5; done"]
             - name: sidecar
               image: provability-fabric/sidecar:test
+              imagePullPolicy: Never
               env:
               - name: ATTESTOR_URL
                 value: "http://attestor-service:8080"

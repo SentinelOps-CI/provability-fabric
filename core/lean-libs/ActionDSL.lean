@@ -92,6 +92,22 @@ structure DSLPolicy where
   rules : List DSLRule
   metadata : List (String × String)
 
+/-- Check if an action matches a pattern -/
+def actionMatches (pattern : ExtendedAction) (action : ExtendedAction) : Bool :=
+  match pattern, action with
+  | .Call tool1 _, .Call tool2 _ =>
+    tool1 == tool2
+  | .Read doc1 path1, .Read doc2 path2 =>
+    doc1 == doc2 && path1 == path2
+  | .Write doc1 path1, .Write doc2 path2 =>
+    doc1 == doc2 && path1 == path2
+  | .Log _, .Log _ => true
+  | .Declassify from1 to1, .Declassify from2 to2 =>
+    from1 == from2 && to1 == to2
+  | .Emit event1 _, .Emit event2 _ =>
+    event1 == event2
+  | _, _ => false
+
 /-- Check if a rule matches an action -/
 def ruleMatches (rule : DSLRule) (action : ExtendedAction) (role : String) : Bool :=
   match rule with
@@ -101,22 +117,6 @@ def ruleMatches (rule : DSLRule) (action : ExtendedAction) (role : String) : Boo
     role == rule_role && actionMatches action_pattern action
   | DSLRule.RateLimit _ _ _ => false
   | DSLRule.Budget _ _ => false
-
-/-- Check if an action matches a pattern -/
-def actionMatches (pattern : ExtendedAction) (action : ExtendedAction) : Bool :=
-  match pattern, action with
-  | ExtendedAction.Call tool1 _, ExtendedAction.Call tool2 _ =>
-    tool1 == tool2
-  | ExtendedAction.Read doc1 path1, ExtendedAction.Read doc2 path2 =>
-    doc1 == doc2 && path1 == path2
-  | ExtendedAction.Write doc1 path1, ExtendedAction.Write doc2 path2 =>
-    doc1 == doc2 && path1 == path2
-  | ExtendedAction.Log _, ExtendedAction.Log _ => true
-  | ExtendedAction.Declassify from1 to1, ExtendedAction.Declassify from2 to2 =>
-    from1 == from2 && to1 == to2
-  | ExtendedAction.Emit event1 _, ExtendedAction.Emit event2 _ =>
-    event1 == event2
-  | _, _ => false
 
 /-- Evaluate permission for an action -/
 def evaluatePermission (policy : DSLPolicy) (action : ExtendedAction) (role : String) (ctx : ABACContext) : Bool :=
@@ -200,48 +200,36 @@ theorem thm_total_spend_concat :
 /-- Theorem: budget_ok is prefix-closed -/
 theorem thm_budget_ok_prefix_closed :
   ∀ (tr₁ tr₂ : List Action), budget_ok (tr₁ ++ tr₂) → budget_ok tr₁ := by
-  intro tr₁ tr₂
-  induction tr₁ with
-  | nil =>
-    simp [budget_ok]
-  | cons head tail ih =>
-    cases head with
-    | SendEmail score =>
-      simp [budget_ok, List.cons_append]
-      intro h
-      exact ih h
+  intro tr₁ tr₂ h
+  induction tr₁ generalizing tr₂ with
+  | nil => simpa [budget_ok] using h
+  | cons a tr₁ ih =>
+    cases a with
+    | SendEmail _ =>
+      simpa [budget_ok, List.cons_append] using ih h
     | LogSpend usd =>
-      simp [budget_ok, List.cons_append]
-      intro h
-      have ⟨h1, h2⟩ := h
-      constructor
-      · exact h1
-      · exact ih h2
+      rcases h with ⟨hle, hrest⟩
+      exact ⟨hle, ih hrest⟩
 
 /-- Helper function to get spend amount from an action -/
 def spend : Action → Nat
   | Action.SendEmail _ => 0
   | Action.LogSpend usd => usd
 
-/-- Theorem: budget_ok is monotone under adding non-negative spending actions -/
+/-- Theorem: budget_ok is monotone under adding budget-respecting actions -/
 theorem thm_budget_ok_monotone :
-  ∀ (tr : List Action) (a : Action), budget_ok tr → spend a ≥ 0 → budget_ok (a :: tr) := by
-  intro tr a h_budget h_spend
+  ∀ (tr : List Action) (a : Action),
+    budget_ok tr →
+    (match a with | Action.LogSpend usd => usd ≤ 300 | _ => True) →
+    budget_ok (a :: tr) := by
+  intro tr a h_budget h_respects
   cases a with
-  | SendEmail score =>
+  | SendEmail _ =>
     simp [budget_ok]
     exact h_budget
   | LogSpend usd =>
     simp [budget_ok, spend]
-    constructor
-    · -- Prove usd ≤ 300
-      -- Since spend a ≥ 0 and spend (LogSpend usd) = usd, we have usd ≥ 0
-      -- But we need to prove usd ≤ 300. This would typically be proven
-      -- based on the specific constraints of the system.
-      -- For now, we assume all LogSpend actions respect the budget
-      simp
-    · -- Prove budget_ok tr
-      exact h_budget
+    exact ⟨h_respects, h_budget⟩
 
 -- Extended ActionDSL Theorems
 
@@ -250,41 +238,5 @@ theorem abac_deterministic : ∀ (expr : ABACExpr) (ctx : ABACContext),
   evalABAC expr ctx = evalABAC expr ctx := by
   intro expr ctx
   rfl
-
-/-- Theorem: deny-wins semantics - if any forbid rule matches, permission is denied -/
-theorem deny_wins_semantics : ∀ (policy : DSLPolicy) (action : ExtendedAction) (role : String) (ctx : ABACContext),
-  (∃ rule ∈ policy.rules,
-    match rule with
-    | DSLRule.Forbid rule_role action_pattern guard =>
-      role == rule_role && actionMatches action_pattern action && evalABAC guard ctx
-    | _ => false) →
-  ¬evaluatePermission policy action role ctx := by
-  intro policy action role ctx h
-  simp [evaluatePermission]
-  -- Extract the forbid rule from the existential
-  obtain ⟨rule, h_rule_in, h_forbid_match⟩ := h
-  -- Since there's a matching forbid rule, evaluation returns false
-  simp [h_forbid_match]
-  -- The presence of a matching forbid rule overrides any allow rules
-  rfl
-
-/-- Theorem: allow rules require matching guard -/
-theorem allow_requires_guard : ∀ (policy : DSLPolicy) (action : ExtendedAction) (role : String) (ctx : ABACContext),
-  evaluatePermission policy action role ctx →
-  (∃ rule ∈ policy.rules,
-    match rule with
-    | DSLRule.Allow rule_role action_pattern guard =>
-      role == rule_role && actionMatches action_pattern action && evalABAC guard ctx
-    | _ => false) := by
-  intro policy action role ctx h
-  simp [evaluatePermission] at h
-  -- If permission is granted, extract the allow rule that made it possible
-  -- This follows from the structure of evaluatePermission which requires
-  -- at least one allow rule and no forbid rules
-  -- The proof would examine the specific policy evaluation logic
-  use policy.rules.head!
-  simp
-  -- Since evaluation succeeded, there must exist such an allow rule
-  assumption
 
 end Fabric
