@@ -442,6 +442,10 @@ func main() {
 	}
 
 	http.HandleFunc("/mutate", handleAdmissionReview)
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 
 	fmt.Printf("Starting admission controller on port %s\n", port)
 	if err := http.ListenAndServeTLS(":"+port, certFile, keyFile, nil); err != nil {
