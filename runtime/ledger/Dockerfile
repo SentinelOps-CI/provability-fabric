@@ -9,6 +9,7 @@ COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --no-audit --no-fund
 
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 FROM node:20-alpine AS runner
@@ -26,4 +27,4 @@ ENV NODE_ENV=production
 RUN chown -R node:node /app
 USER node
 
-CMD ["npm", "start"] 
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index-simple.js"] 
