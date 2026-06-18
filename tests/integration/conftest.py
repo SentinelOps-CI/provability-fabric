@@ -144,7 +144,7 @@ def ledger_service() -> Generator[str, None, None]:
     ledger_url = "http://localhost:4000"
     for _ in range(30):  # 30 second timeout
         try:
-            response = requests.get(f"{ledger_url}/graphql", timeout=5)
+            response = requests.get(f"{ledger_url}/health", timeout=5)
             if response.status_code == 200:
                 break
         except requests.RequestException:
