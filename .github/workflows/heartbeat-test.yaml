@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+﻿# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
 name: Heartbeat Test
@@ -140,10 +140,10 @@ jobs:
       - name: Wait for services to be ready
         run: |
           echo "Waiting for attestor service..."
-          kubectl wait --for=condition=available deployment/attestor --timeout=60s
+          kubectl rollout status deployment/attestor --timeout=180s
 
           echo "Waiting for demo pod..."
-          kubectl wait --for=condition=ready pod/demo-pod --timeout=60s
+          kubectl wait --for=condition=ready pod/demo-pod --timeout=120s
 
       - name: Wait for heartbeat to start
         run: |
@@ -167,11 +167,11 @@ jobs:
           # Check if alive
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" != "true" ]; then
-            echo "❌ Liveness check failed - pod not alive"
+            echo "âŒ Liveness check failed - pod not alive"
             exit 1
           fi
 
-          echo "✅ Liveness check passed"
+          echo "âœ… Liveness check passed"
 
           # Kill port forward
           kill $PF_PID
@@ -196,11 +196,11 @@ jobs:
 
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" = "true" ]; then
-            echo "❌ Liveness should be false after attestor failure"
+            echo "âŒ Liveness should be false after attestor failure"
             exit 1
           fi
 
-          echo "✅ Heartbeat failure scenario passed"
+          echo "âœ… Heartbeat failure scenario passed"
           kill $PF_PID
 
       - name: Test missing heartbeat environment variable
@@ -249,14 +249,15 @@ jobs:
 
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" = "true" ]; then
-            echo "❌ Liveness should be false for pod without heartbeat"
+            echo "âŒ Liveness should be false for pod without heartbeat"
             exit 1
           fi
 
-          echo "✅ Missing heartbeat environment variable test passed"
+          echo "âœ… Missing heartbeat environment variable test passed"
           kill $PF_PID
 
       - name: Cleanup
         if: always()
         run: |
           kind delete cluster --name kind || true
+

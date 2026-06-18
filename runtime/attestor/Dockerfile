@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+﻿# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
@@ -27,7 +27,7 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 COPY src/ ./src/
 
 # Build the application
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN touch src/main.rs && cargo build --release --target x86_64-unknown-linux-musl
 
 # Runtime stage
 FROM alpine:3.19
