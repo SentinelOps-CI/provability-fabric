@@ -36,6 +36,7 @@ jobs:
           # Install Lean 4 using the official installation script
           curl -L https://raw.githubusercontent.com/leanprover/lean4/master/elan/install.sh | sh
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.elan/bin:$PATH"
           source $HOME/.profile
           lean --version
 

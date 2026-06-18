@@ -28,6 +28,7 @@ jobs:
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
           "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"

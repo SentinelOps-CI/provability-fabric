@@ -450,7 +450,8 @@ def testPrefix : NIPrefix :=
     output_label := Label.Public, created_at := 1234567890, last_updated := 1234567890 }
 
 /-- Example: monitor accepts valid prefix -/
-example : testMonitor.accepts_prefix testPrefix := by
-  simp [NIMonitor.accepts_prefix, testMonitor, testPrefix, NIPrefix.violates_ni]
+example : testMonitor.accepts_prefix testPrefix = true := by
+  simp [NIMonitor.accepts_prefix, testMonitor, testPrefix]
+  simp [NIPrefix.violates_ni]
 
 end Fabric
