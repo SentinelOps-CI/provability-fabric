@@ -33,6 +33,7 @@
     "build": "craco build",
     "build:analyze": "ANALYZE=true craco build",
     "test": "craco test",
+    "test:compatibility": "node -e \\"const s=require('semver');process.exit(s.satisfies('1.0.0','>=1.0.0')?0:1)\\",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
