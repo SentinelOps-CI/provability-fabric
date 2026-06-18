@@ -129,6 +129,10 @@ jobs:
             --set auth.enabled=false \
             --set architecture=standalone
 
+      - name: Wait for Redis
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis --timeout=120s
+
       - name: Deploy attestor service
         run: |
           kubectl apply -f - <<'EOF'
@@ -149,6 +153,7 @@ jobs:
                 containers:
                 - name: attestor
                   image: provability-fabric/attestor:test
+                  imagePullPolicy: Never
                   ports:
                   - containerPort: 8080
                   env:
@@ -170,6 +175,10 @@ jobs:
 
       - name: Deploy ledger service
         run: |
+          helm install postgres bitnami/postgresql \
+            --set auth.postgresPassword=testpass \
+            --set auth.database=provability_fabric
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql --timeout=300s
           kubectl apply -f - <<'EOF'
           apiVersion: apps/v1
           kind: Deployment
@@ -185,11 +194,31 @@ jobs:
                 labels:
                   app: ledger
               spec:
+                initContainers:
+                - name: migrate
+                  image: provability-fabric/ledger:test
+                  imagePullPolicy: Never
+                  command: ["npx", "prisma", "migrate", "deploy"]
+                  env:
+                  - name: DATABASE_URL
+                    value: "postgresql://postgres:testpass@postgres-postgresql:5432/provability_fabric"
                 containers:
                 - name: ledger
                   image: provability-fabric/ledger:test
+                  imagePullPolicy: Never
                   ports:
                   - containerPort: 4000
+                  env:
+                  - name: DATABASE_URL
+                    value: "postgresql://postgres:testpass@postgres-postgresql:5432/provability_fabric"
+                  - name: PORT
+                    value: "4000"
+                  readinessProbe:
+                    httpGet:
+                      path: /health
+                      port: 4000
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
           ---
           apiVersion: v1
           kind: Service

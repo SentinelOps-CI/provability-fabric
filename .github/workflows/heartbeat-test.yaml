@@ -56,6 +56,10 @@ jobs:
             --set auth.enabled=false \
             --set architecture=standalone
 
+      - name: Wait for Redis
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis --timeout=120s
+
       - name: Deploy attestor service
         run: |
           cat <<EOF | kubectl apply -f -

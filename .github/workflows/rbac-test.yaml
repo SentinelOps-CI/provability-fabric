@@ -88,6 +88,7 @@ jobs:
                 initContainers:
                 - name: migrate
                   image: provability-fabric/ledger:test
+                  imagePullPolicy: Never
                   command: ["npx", "prisma", "migrate", "deploy"]
                   env:
                   - name: DATABASE_URL
@@ -95,6 +96,7 @@ jobs:
                 containers:
                 - name: ledger
                   image: provability-fabric/ledger:test
+                  imagePullPolicy: Never
                   ports:
                   - containerPort: 4000
                   env:
