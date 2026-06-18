@@ -199,17 +199,20 @@ theorem thm_total_spend_concat :
 
 /-- Theorem: budget_ok is prefix-closed -/
 theorem thm_budget_ok_prefix_closed :
-  ? (tr1 tr2 : List Action), budget_ok (tr1 ++ tr2) ? budget_ok tr1 := by
-  intro tr1 tr2 h
-  induction tr1 generalizing tr2 with
-  | nil => simpa [budget_ok] using h
-  | cons a tr1 ih =>
+  ∀ (tr₁ tr₂ : List Action), budget_ok (tr₁ ++ tr₂) → budget_ok tr₁ := by
+  intro tr₁ tr₂ h
+  induction tr₁ generalizing tr₂ with
+  | nil =>
+    simp [budget_ok, List.nil_append]
+  | cons a tr₁ ih =>
     cases a with
     | SendEmail _ =>
-      simpa [budget_ok, List.cons_append] using ih tr2 h
+      simp [budget_ok, List.cons_append] at h ⊢
+      exact ih tr₂ h
     | LogSpend usd =>
-      rcases (by simpa [budget_ok, List.cons_append] using h) with ?hle, hrest?
-      exact ?hle, ih tr2 hrest?
+      simp [budget_ok, List.cons_append] at h ⊢
+      obtain ⟨hle, hrest⟩ := h
+      exact ⟨hle, ih tr₂ hrest⟩
 
 /-- Helper function to get spend amount from an action -/
 def spend : Action → Nat
