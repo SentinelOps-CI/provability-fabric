@@ -23,4 +23,4 @@ services:
       - "4000:4000"
     depends_on:
       - postgres
-    command: ["sh", "-c", "npx prisma migrate deploy && npm start"]
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/index-simple.js"]
