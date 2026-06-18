@@ -86,6 +86,7 @@ export class JCSValidator {
         return {
           valid: false,
           errors: ['Input is not valid JSON'],
+          warnings: [],
           canonicalized,
           schemaDigest
         };
