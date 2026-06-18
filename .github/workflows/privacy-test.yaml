@@ -211,18 +211,23 @@ jobs:
         run: |
           cd runtime/sidecar-watcher
 
-          # Start sidecar watcher and verify metrics export under load
-          ./target/release/sidecar-watcher &
+          LEDGER_URL=http://127.0.0.1:3000 ./target/release/sidecar-watcher &
           echo $! > watcher.pid
 
-          sleep 5
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9090/metrics | grep -q .; then
+              break
+            fi
+            sleep 1
+          done
 
           if ! curl -sf http://localhost:9090/metrics | grep -q .; then
             echo "ERROR: sidecar metrics endpoint unavailable"
             exit 1
           fi
 
-          cargo test test_privacy_metrics_export test_epsilon_guard_budget_exhaustion -- --nocapture
+          cargo test test_privacy_metrics_export -- --nocapture
+          cargo test test_epsilon_guard_budget_exhaustion -- --nocapture
 
       - name: Cleanup
         if: always()

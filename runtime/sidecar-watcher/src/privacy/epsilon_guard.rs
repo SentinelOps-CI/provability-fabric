@@ -292,6 +292,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_epsilon_guard_budget_exhaustion() {
+        let guard = EpsilonGuard::new().await.unwrap();
+        let mut configs = guard.configs.write().await;
+        configs.insert(
+            "test-tenant".to_string(),
+            PrivacyConfig {
+                tenant_id: "test-tenant".to_string(),
+                epsilon_limit: 1.0,
+                delta_limit: 0.1,
+                reset_period_hours: 24,
+            },
+        );
+        drop(configs);
+
+        assert!(guard.check_query("test-tenant", 0.5, 0.05).await.unwrap());
+        assert!(!guard.check_query("test-tenant", 0.6, 0.06).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_epsilon_guard_config_validation() {
+        let config = PrivacyConfig {
+            tenant_id: "tenant-a".to_string(),
+            epsilon_limit: 2.0,
+            delta_limit: 0.01,
+            reset_period_hours: 24,
+        };
+        assert!(config.epsilon_limit > 0.0);
+        assert!(config.delta_limit > 0.0);
+        assert!(config.reset_period_hours > 0);
+    }
+
+    #[tokio::test]
+    async fn test_privacy_metrics_export() {
+        let guard = EpsilonGuard::new().await.unwrap();
+        let mut configs = guard.configs.write().await;
+        configs.insert(
+            "metrics-tenant".to_string(),
+            PrivacyConfig {
+                tenant_id: "metrics-tenant".to_string(),
+                epsilon_limit: 1.0,
+                delta_limit: 0.1,
+                reset_period_hours: 24,
+            },
+        );
+        drop(configs);
+
+        let _ = guard.check_query("metrics-tenant", 0.1, 0.01).await.unwrap();
+        let metrics = guard.export_metrics().await.unwrap();
+        assert!(metrics.contains_key("metrics-tenant"));
+    }
+
+    #[tokio::test]
     async fn test_epsilon_guard() {
         let guard = EpsilonGuard::new().await.unwrap();
 
