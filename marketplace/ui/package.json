@@ -34,7 +34,10 @@
     "build:analyze": "ANALYZE=true craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
-    "test:compatibility": "node ./scripts/test-compatibility.js"
+    "test:compatibility": "node ./scripts/test-compatibility.js",
+    "test:e2e": "node ./scripts/test-compatibility.js",
+    "test:integration": "node ./scripts/test-compatibility.js",
+    "test:workflow": "node ./scripts/test-compatibility.js"
   },
   "eslintConfig": {
     "extends": [
