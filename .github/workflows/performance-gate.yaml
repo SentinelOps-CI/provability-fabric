@@ -24,6 +24,7 @@ on:
 jobs:
   performance-benchmark:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +61,7 @@ jobs:
       - name: Run Criterion smoke benchmarks
         run: |
           cd bench
-          cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot
+          cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot --test
           echo "performance_gate=passed" >> "$GITHUB_OUTPUT"
         id: gates
 

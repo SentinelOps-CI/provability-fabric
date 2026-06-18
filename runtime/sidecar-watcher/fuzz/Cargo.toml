@@ -3,6 +3,8 @@ name = "sidecar-watcher-fuzz"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
