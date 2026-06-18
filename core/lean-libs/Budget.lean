@@ -54,23 +54,19 @@ def safety_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
 /-- Theorem: budget_ok is prefix-closed with config -/
 theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
   ∀ (tr₁ tr₂ : List Action), budget_ok cfg (tr₁ ++ tr₂) → budget_ok cfg tr₁ := by
-  intro tr₁ tr₂
-  induction tr₁ with
+  intro tr₁ tr₂ h
+  induction tr₁ generalizing tr₂ with
   | nil =>
-    simp [budget_ok]
-  | cons head tail ih =>
-    cases head with
-    | SendEmail score =>
-      simp [budget_ok, List.cons_append]
-      intro h
-      exact ih h
-    | LogSpend usd =>
-      simp [budget_ok, List.cons_append]
-      intro h
-      have ⟨h1, h2⟩ := h
-      constructor
-      · exact h1
-      · exact ih h2
+    simp [budget_ok, List.nil_append]
+  | cons a tr₁ ih =>
+    cases a with
+    | SendEmail _ =>
+      simp [budget_ok, List.cons_append] at h ⊢
+      exact ih tr₂ h
+    | LogSpend _ =>
+      simp [budget_ok, List.cons_append] at h ⊢
+      obtain ⟨hle, hrest⟩ := h
+      exact ⟨hle, ih tr₂ hrest⟩
 
 /-- Theorem: budget_ok is monotone under adding non-negative spending actions with config -/
 theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
@@ -78,13 +74,11 @@ theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
     budget_ok cfg tr → spend a ≥ 0 → budget_ok cfg (a :: tr) := by
   intro tr a h_budget h_spend
   cases a with
-  | SendEmail score =>
+  | SendEmail _ =>
     simp [budget_ok]
     exact h_budget
-  | LogSpend usd =>
+  | LogSpend _ =>
     simp [budget_ok, spend]
-    constructor
-    · simp
-    · exact h_budget
+    refine And.intro (by simp) h_budget
 
 end Fabric
