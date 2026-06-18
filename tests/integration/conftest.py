@@ -134,15 +134,19 @@ def admission_controller(
 @pytest.fixture(scope="session")
 def ledger_service() -> Generator[str, None, None]:
     """Start ledger service and return URL."""
-    # Start ledger service
+    compose_files = [
+        "runtime/ledger/docker-compose.yml",
+        "runtime/ledger/docker-compose.ci.yml",
+    ]
+    # Start ledger service (CI overlay avoids dev bind mounts that break the image)
     subprocess.run(
-        ["docker", "compose", "-f", "runtime/ledger/docker-compose.yml", "up", "-d"],
+        ["docker", "compose", "-f", compose_files[0], "-f", compose_files[1], "up", "-d", "--build"],
         check=True,
     )
 
-    # Wait for service to be ready
+    # Wait for service to be ready (image build + DB migrate can exceed 30s)
     ledger_url = "http://localhost:4000"
-    for _ in range(30):  # 30 second timeout
+    for _ in range(120):
         try:
             response = requests.get(f"{ledger_url}/health", timeout=5)
             if response.status_code == 200:
@@ -158,7 +162,16 @@ def ledger_service() -> Generator[str, None, None]:
     finally:
         # Cleanup
         subprocess.run(
-            ["docker", "compose", "-f", "runtime/ledger/docker-compose.yml", "down"],
+            [
+                "docker",
+                "compose",
+                "-f",
+                compose_files[0],
+                "-f",
+                compose_files[1],
+                "down",
+                "-v",
+            ],
             check=True,
         )
 

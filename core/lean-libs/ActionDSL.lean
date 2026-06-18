@@ -18,7 +18,6 @@ import Mathlib.Data.List.Basic
 import Mathlib.Data.FP.Basic
 import Mathlib.Data.String.Basic
 import Mathlib.Data.Nat.Basic
-import Fabric.Budget
 
 namespace Fabric
 
@@ -139,6 +138,12 @@ def evaluatePermission (policy : DSLPolicy) (action : ExtendedAction) (role : St
       | DSLRule.Allow _ _ guard => evalABAC guard ctx
       | _ => false
     )
+
+/-- Check if a list of actions respects budget constraints -/
+def budget_ok : List Action → Prop
+  | [] => True
+  | (Action.SendEmail _) :: rest => budget_ok rest
+  | (Action.LogSpend usd) :: rest => usd ≤ 300 ∧ budget_ok rest
 
 /-- Helper lemma: sum of LogSpend amounts in a list -/
 def total_spend : List Action → Nat

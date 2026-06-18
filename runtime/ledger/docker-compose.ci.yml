@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+# CI overlay: no host bind mounts (preserves image build artifacts).
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: provability_fabric
+      POSTGRES_USER: pf_user
+      POSTGRES_PASSWORD: pf_password
+    ports:
+      - "5432:5432"
+
+  ledger:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://pf_user:pf_password@postgres:5432/provability_fabric
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+    command: ["sh", "-c", "npx prisma migrate deploy && npm start"]
