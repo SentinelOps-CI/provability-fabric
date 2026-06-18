@@ -95,6 +95,10 @@ reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
 id = "RUSTSEC-2026-0085"
 reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"
 
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0182"
+reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately (#118)"
 [[advisories.ignore]]
 id = "RUSTSEC-2026-0086"
 reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately"

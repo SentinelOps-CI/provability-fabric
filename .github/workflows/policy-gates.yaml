@@ -34,6 +34,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Vendor mathlib
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
+
       - name: Set up Lean
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/v4.2.1/elan-init.sh | sh -s -- -y --default-toolchain none

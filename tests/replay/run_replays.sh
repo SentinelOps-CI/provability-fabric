@@ -55,13 +55,22 @@ if [ ${#CERT_COUNT[@]} -eq 0 ]; then
   exit 1
 fi
 
-# Low-view determinism check (oracle) across produced CERTs
-shopt -s nullglob
-CERT_FILES=("$CERT_DIR"/*.cert.json)
+# Low-view determinism per bundle (different traces may legitimately differ)
 MIN_DETERMINISM=$(python3 -c "print(${LV_THRESHOLD} * 100)")
-python3 "$ROOT_DIR/external/TRACE-REPLAY-KIT/oracles/lowview_equal.py" \
-  "${CERT_FILES[@]}" \
-  --min-determinism "$MIN_DETERMINISM"
+for b in "$ROOT_DIR/tests/replay/bundles"/*; do
+  [ -d "$b" ] || continue
+  name=$(basename "$b")
+  shopt -s nullglob
+  BUNDLE_CERTS=("$CERT_DIR/${name}_run"*.cert.json)
+  if [ ${#BUNDLE_CERTS[@]} -lt 2 ]; then
+    echo "Bundle $name: ${#BUNDLE_CERTS[@]} cert(s), skipping pairwise determinism"
+    continue
+  fi
+  echo "Low-view determinism for bundle: $name"
+  python3 "$ROOT_DIR/external/TRACE-REPLAY-KIT/oracles/lowview_equal.py" \
+    "${BUNDLE_CERTS[@]}" \
+    --min-determinism "$MIN_DETERMINISM"
+done
 
 echo "Replay runs complete. CERTs at $CERT_DIR"
 
