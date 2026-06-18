@@ -7,8 +7,15 @@ package Fabric {
 
 @[default_target]
 lean_lib ActionDSL {
-  roots := #[`Fabric, `ActionDSL, `ActionDSL.Safety, `Budget]
-  -- add library configuration options here
+  roots := #[`ActionDSL, `ActionDSL.Safety]
+}
+
+lean_lib Budget {
+  roots := #[`Budget]
+}
+
+lean_lib Fabric {
+  roots := #[`Fabric]
 }
 
 lean_lib Capability {

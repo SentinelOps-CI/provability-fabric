@@ -35,21 +35,21 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
   | [] => True
   | (Action.SendEmail _) :: rest => budget_ok cfg rest
   | (Action.LogSpend usd) :: rest =>
-    (usd : Float) ≤ cfg.dailyLimit ∧ budget_ok cfg rest
+    Float.ofNat usd ≤ cfg.dailyLimit ∧ budget_ok cfg rest
 
 /-- Check if a list of generic actions respects budget constraints with config -/
-def budget_ok_generic {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
+def budget_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | [] => True
   | actions => BudgetSpend actions ≤ cfg.dailyLimit
 
 /-- Check if a list of generic actions respects spam constraints with config -/
-def spam_ok_generic {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
+def spam_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | [] => True
   | actions => ∀ (a : ActionG α), a ∈ actions → SpamScore a ≤ cfg.spamLimit
 
 /-- Combined safety check for both budget and spam constraints with config -/
-def safety_ok_generic {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
-  | actions => budget_ok_generic cfg actions ∧ spam_ok_generic cfg actions
+def safety_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
+  | actions => budget_ok_cfg cfg actions ∧ spam_ok_cfg cfg actions
 
 /-- Theorem: budget_ok is prefix-closed with config -/
 theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
