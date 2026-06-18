@@ -139,11 +139,11 @@ def evaluatePermission (policy : DSLPolicy) (action : ExtendedAction) (role : St
       | _ => false
     )
 
-/-- Check if a list of actions respects budget constraints -/
-def budget_ok : List Action → Prop
+/-- Check if a list of actions respects budget constraints (fixed 300 limit) -/
+def budget_ok_default : List Action → Prop
   | [] => True
-  | (Action.SendEmail _) :: rest => budget_ok rest
-  | (Action.LogSpend usd) :: rest => usd ≤ 300 ∧ budget_ok rest
+  | (Action.SendEmail _) :: rest => budget_ok_default rest
+  | (Action.LogSpend usd) :: rest => usd ≤ 300 ∧ budget_ok_default rest
 
 /-- Helper lemma: sum of LogSpend amounts in a list -/
 def total_spend : List Action → Nat
@@ -197,20 +197,20 @@ theorem thm_total_spend_concat :
       rw [ih]
       rw [Nat.add_assoc]
 
-/-- Theorem: budget_ok is prefix-closed -/
+/-- Theorem: budget_ok_default is prefix-closed -/
 theorem thm_budget_ok_prefix_closed :
-  ∀ (tr₁ tr₂ : List Action), budget_ok (tr₁ ++ tr₂) → budget_ok tr₁ := by
+  ∀ (tr₁ tr₂ : List Action), budget_ok_default (tr₁ ++ tr₂) → budget_ok_default tr₁ := by
   intro tr₁ tr₂ h
   induction tr₁ generalizing tr₂ with
   | nil =>
-    simp [budget_ok, List.nil_append]
+    simp [budget_ok_default, List.nil_append]
   | cons a tr₁ ih =>
     cases a with
     | SendEmail _ =>
-      simp [budget_ok, List.cons_append] at h ⊢
+      simp [budget_ok_default, List.cons_append] at h ⊢
       exact ih tr₂ h
     | LogSpend usd =>
-      simp [budget_ok, List.cons_append] at h ⊢
+      simp [budget_ok_default, List.cons_append] at h ⊢
       obtain ⟨hle, hrest⟩ := h
       exact ⟨hle, ih tr₂ hrest⟩
 
@@ -219,19 +219,19 @@ def spend : Action → Nat
   | Action.SendEmail _ => 0
   | Action.LogSpend usd => usd
 
-/-- Theorem: budget_ok is monotone under adding budget-respecting actions -/
+/-- Theorem: budget_ok_default is monotone under adding budget-respecting actions -/
 theorem thm_budget_ok_monotone :
   ∀ (tr : List Action) (a : Action),
-    budget_ok tr →
+    budget_ok_default tr →
     (match a with | Action.LogSpend usd => usd ≤ 300 | _ => True) →
-    budget_ok (a :: tr) := by
+    budget_ok_default (a :: tr) := by
   intro tr a h_budget h_respects
   cases a with
   | SendEmail _ =>
-    simp [budget_ok]
+    simp [budget_ok_default]
     exact h_budget
   | LogSpend usd =>
-    simp [budget_ok, spend]
+    simp [budget_ok_default, spend]
     exact ⟨h_respects, h_budget⟩
 
 -- Extended ActionDSL Theorems

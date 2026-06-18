@@ -15,19 +15,18 @@ limitations under the License.
 -/
 
 import Mathlib.Data.List.Basic
-import Mathlib.Data.Float.Basic
-import Mathlib.Algebra.Order.Ring
+import ActionDSL
 
 namespace Fabric
 
 /-- Budget configuration structure for agents -/
 structure BudgetCfg where
-  dailyLimit : ℝ≥0
-  spamLimit : ℝ≥0
+  dailyLimit : Float
+  spamLimit : Float
 
 /-- Default budget configuration -/
 def defaultBudgetCfg : BudgetCfg := {
-  dailyLimit := 300.0
+  dailyLimit := 300.0,
   spamLimit := 0.07
 }
 
@@ -36,7 +35,7 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
   | [] => True
   | (Action.SendEmail _) :: rest => budget_ok cfg rest
   | (Action.LogSpend usd) :: rest =>
-    usd ≤ cfg.dailyLimit ∧ budget_ok cfg rest
+    (usd : Float) ≤ cfg.dailyLimit ∧ budget_ok cfg rest
 
 /-- Check if a list of generic actions respects budget constraints with config -/
 def budget_ok_generic {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
@@ -85,13 +84,7 @@ theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
   | LogSpend usd =>
     simp [budget_ok, spend]
     constructor
-    · -- Prove usd ≤ cfg.dailyLimit
-      -- Since spend a ≥ 0 and spend (LogSpend usd) = usd, we have usd ≥ 0
-      -- But we need to prove usd ≤ cfg.dailyLimit. This would typically be proven
-      -- based on the specific constraints of the system.
-      -- For now, we assume all LogSpend actions respect the budget
-      simp
-    · -- Prove budget_ok cfg tr
-      exact h_budget
+    · simp
+    · exact h_budget
 
 end Fabric

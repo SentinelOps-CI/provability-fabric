@@ -72,7 +72,7 @@ theorem thm_eps_bound :
 
 /-- Check if budget constraints imply privacy constraints -/
 def budget_implies_privacy : List Action → Prop
-  | tr => budget_ok tr → privacy_ok tr
+  | tr => budget_ok_default tr → privacy_ok tr
 
 /-- Theorem: budget constraints imply privacy constraints -/
 theorem thm_budget_implies_privacy :

@@ -16,60 +16,65 @@ limitations under the License.
 
 import ActionDSL.Safety
 import Lean.Data.Json
+import Lean.Data.Json.FromToJson
 import Init.System.IO
 
+open Lean
 open Fabric.ActionDSL
 
 namespace ExportDFA
 
 /-- DFA export configuration -/
 structure ExportConfig where
-  (bundle_path : String)
-  (output_path : String)
-  (canonicalize : Bool := true)
-  (include_hash : Bool := true)
+  bundle_path : String
+  output_path : String
+  canonicalize : Bool := true
+  include_hash : Bool := true
 
 /-- Canonical JSON export following RFC 8785 -/
 def export_canonical_json (dfa : ProductDFA) (config : ExportConfig) : IO String := do
   let dfa_table := dfa.to_table
+  let exported_at ← IO.monoMsNow
 
   let json_obj := Json.mkObj [
     ("version", Json.str "1.0"),
     ("dfa_type", Json.str "ActionDSL_Safety"),
     ("states", Json.arr (dfa_table.states.map fun (id, accepting) =>
       Json.mkObj [
-        ("id", Json.num id),
+        ("id", (id : Json)),
         ("accepting", Json.bool accepting)
-      ])),
-    ("transitions", Json.arr (dfa_table.transitions.map fun (from, event, to) =>
+      ]).toArray),
+    ("transitions", Json.arr (dfa_table.transitions.map fun (fromState, event, toState) =>
       Json.mkObj [
-        ("from", Json.num from),
+        ("from", (fromState : Json)),
         ("event", Json.str event),
-        ("to", Json.num to)
-      ])),
+        ("to", (toState : Json))
+      ]).toArray),
     ("rate_limiters", Json.arr (dfa_table.rate_limiters.map fun (key, window, bound, tolerance) =>
       Json.mkObj [
         ("key", Json.str key),
-        ("window", Json.num window),
-        ("bound", Json.num bound),
-        ("tolerance", Json.num tolerance)
-      ])),
-    ("initial_state", Json.num dfa_table.initial_state),
+        ("window", (window : Json)),
+        ("bound", (bound : Json)),
+        ("tolerance", (tolerance : Json))
+      ]).toArray),
+    ("initial_state", (dfa_table.initial_state : Json)),
     ("metadata", Json.mkObj [
-      ("exported_at", Json.str (toString (System.monoMsNow ()))),
+      ("exported_at", Json.str (toString exported_at)),
       ("canonical", Json.bool config.canonicalize)
     ])
   ]
 
-  return json_obj.pretty
+  return Json.pretty json_obj
 
-/-- Export DFA to file with hash -/
+/-- Export DFA to file -/
 def export_dfa (config : ExportConfig) : IO Unit := do
   let dfa := compile_to_dfa []
   let json_content ← export_canonical_json dfa config
 
-  let output_dir := System.FilePath.dirName config.output_path
-  IO.FS.createDirAll output_dir
+  let fp := System.FilePath.mk config.output_path
+  match fp.parent with
+  | none => pure ()
+  | some dir => IO.FS.createDirAll dir
   IO.FS.writeFile config.output_path json_content
 
   IO.println s!"DFA exported to: {config.output_path}"
@@ -78,8 +83,7 @@ def export_dfa (config : ExportConfig) : IO Unit := do
 def main (args : List String) : IO UInt32 := do
   match args with
   | ["--bundle", bundle_path, "--out", output_path] =>
-    let config := { bundle_path := bundle_path, output_path := output_path }
-    export_dfa config
+    export_dfa { bundle_path := bundle_path, output_path := output_path }
     return 0
   | _ =>
     IO.println "Usage: export-dfa --bundle <bundle_path> --out <output_path>"
