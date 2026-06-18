@@ -2,7 +2,7 @@
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
-FROM rust:1.75-alpine AS builder
+FROM rust:1.85-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
