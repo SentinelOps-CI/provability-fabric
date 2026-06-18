@@ -70,6 +70,9 @@ jobs:
             echo "Negative CERT tests correctly failed validation"
           fi
 
+      - name: Install cert validation deps
+        run: python -m pip install jsonschema
+
       - name: Validate CERTs
         run: make validate-certs
 
