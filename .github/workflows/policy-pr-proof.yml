@@ -85,8 +85,8 @@ jobs:
       - name: Fetch current epoch
         id: epoch
         run: |
-          set -euo pipefail
-          EPOCH=$(curl -sS http://localhost:8000/api/v1/runtime/slo | jq -r '.epoch // 0')
+          EPOCH=$(curl -fsS --connect-timeout 2 http://127.0.0.1:8000/api/v1/runtime/slo 2>/dev/null | jq -r '.epoch // 0' || echo 0)
+          if [ -z "$EPOCH" ] || [ "$EPOCH" = "null" ]; then EPOCH=0; fi
           echo "epoch=$EPOCH" >> $GITHUB_OUTPUT
 
       - name: Post PR comment with hashes

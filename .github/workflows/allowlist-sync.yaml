@@ -3,6 +3,10 @@
 
 name: Allowlist Sync Validation
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   push:
     branches: [main, develop]
@@ -40,10 +44,18 @@ jobs:
 
       - name: Install Lean 4
         run: |
-          wget -q https://github.com/leanprover/elan/releases/latest/download/elan-x86_64-unknown-linux-gnu.tar.gz
-          tar xzf elan-x86_64-unknown-linux-gnu.tar.gz
-          ./elan-init -y --default-toolchain leanprover/lean4:v4.3.0
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/v4.2.1/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.elan/bin:$PATH"
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          elan toolchain install "$TOOLCHAIN"
+          elan override set "$TOOLCHAIN"
+          lean --version
+
+      - name: Vendor mathlib
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
 
       - name: Build Lean proofs
         run: |
@@ -192,6 +204,7 @@ jobs:
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && failure()
+        continue-on-error: true
         uses: actions/github-script@v6
         with:
           script: |
