@@ -15,14 +15,14 @@
  */
 
 use labeler::{Labeler, LabelerConfig, LabelerState, TaintRule};
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde_json::json;
 use std::collections::HashMap;
 
 /// Generate randomized test payloads for stress testing
 fn generate_randomized_payloads(count: usize) -> Vec<serde_json::Value> {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
     let mut payloads = Vec::new();
 
     for i in 0..count {

@@ -62,7 +62,7 @@ jobs:
       - name: Verify 1k Payloads Processed
         run: |
           cd runtime/labeler
-          cargo test test_labeler_stress_1k_randomized_payloads -- --nocapture | grep -q "Generated 1000 randomized payloads" || exit 1
+          cargo test test_labeler_stress_1k_randomized_payloads -- --nocapture 2>&1 | grep -q "Generated 1000 randomized payloads" || exit 1
 
   # Prompt 75: Labeled Alphabet & Plan-DSL Integration
   events-plan-dsl:
@@ -186,7 +186,7 @@ jobs:
       - name: Verify 10k Prefixes Processed
         run: |
           cd runtime/sidecar-watcher
-          cargo test test_ni_monitor_verdict_consistency -- --nocapture | grep -q "Processed 10000 prefixes" || exit 1
+          cargo test test_ni_monitor_verdict_consistency -- --nocapture 2>&1 | grep -q "Processed 10000 prefixes" || exit 1
 
   # Prompt 80: Cryptographic Envelope + Rekor/TUF + M-of-N Break-Glass
   crypto-envelope-break-glass:
