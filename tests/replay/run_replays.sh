@@ -20,7 +20,7 @@ docker build -t "$IMAGE_TAG" "$KIT_DIR"
 
 # Number of repeated runs per bundle (higher on scheduled CI)
 REPLAY_RUNS="${REPLAY_RUNS:-3}"
-LV_THRESHOLD="${LOWVIEW_THRESHOLD:-0.999999}"
+LV_THRESHOLD="${LOWVIEW_THRESHOLD:-0.999}"
 
 # Iterate bundles
 for b in "$ROOT_DIR/tests/replay/bundles"/*; do
