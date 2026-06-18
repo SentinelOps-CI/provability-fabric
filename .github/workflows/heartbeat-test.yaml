@@ -167,11 +167,11 @@ jobs:
           # Check if alive
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" != "true" ]; then
-            echo "âŒ Liveness check failed - pod not alive"
+            echo "Liveness check failed - pod not alive"
             exit 1
           fi
 
-          echo "âœ… Liveness check passed"
+          echo "Liveness check passed"
 
           # Kill port forward
           kill $PF_PID
@@ -196,11 +196,11 @@ jobs:
 
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" = "true" ]; then
-            echo "âŒ Liveness should be false after attestor failure"
+            echo "Liveness should be false after attestor failure"
             exit 1
           fi
 
-          echo "âœ… Heartbeat failure scenario passed"
+          echo "Heartbeat failure scenario passed"
           kill $PF_PID
 
       - name: Test missing heartbeat environment variable
@@ -249,11 +249,11 @@ jobs:
 
           alive=$(echo "$response" | jq -r '.alive')
           if [ "$alive" = "true" ]; then
-            echo "âŒ Liveness should be false for pod without heartbeat"
+            echo "Liveness should be false for pod without heartbeat"
             exit 1
           fi
 
-          echo "âœ… Missing heartbeat environment variable test passed"
+          echo "Missing heartbeat environment variable test passed"
           kill $PF_PID
 
       - name: Cleanup
