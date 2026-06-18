@@ -30,7 +30,7 @@ jobs:
           for b in tests/replay/bundles/*; do
             [ -d "$b" ] || continue
             name=$(basename "$b")
-            (cd tests/replay/bundles && zip -r "../../artifact/replay_zips/${name}.zip" "$name")
+            (cd tests/replay/bundles && zip -r "../../../artifact/replay_zips/${name}.zip" "$name")
           done
 
       - name: Check for MORPH_API_KEY

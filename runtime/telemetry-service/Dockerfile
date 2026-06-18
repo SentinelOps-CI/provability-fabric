@@ -2,7 +2,7 @@
 # Copyright 2025 SentinelOps
 
 # ---------- builder stage ----------
-FROM rust:1.86-bookworm AS builder
+FROM rust:1.88-bookworm AS builder
 
 WORKDIR /app
 

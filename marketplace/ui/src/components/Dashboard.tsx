@@ -33,11 +33,12 @@ export const Dashboard: React.FC = () => {
       setPackages(packagesResponse.packages || []);
       
       // Load ledger data
+      let ledgerPayload: { capsules?: unknown[] } = { capsules: [] };
       try {
         const ledgerResponse = await fetch('http://localhost:8080/tenant/dev-tenant/capsules');
         if (ledgerResponse.ok) {
-          const ledgerData = await ledgerResponse.json();
-          setLedgerData(ledgerData);
+          ledgerPayload = await ledgerResponse.json();
+          setLedgerData(ledgerPayload);
         } else {
           console.warn('Ledger API not available, using mock data');
           setLedgerData({ capsules: [] });
@@ -58,7 +59,7 @@ export const Dashboard: React.FC = () => {
         totalDownloads,
         averageRating: Math.round(averageRating * 10) / 10,
         activeTenants: 1, // Mock data
-        totalCapsules: ledgerData?.capsules?.length || 0,
+        totalCapsules: ledgerPayload.capsules?.length || 0,
         totalQuotes: 0 // Mock data
       });
       

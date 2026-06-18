@@ -31,10 +31,13 @@ jobs:
         run: |
           cargo install cargo-fuzz
 
+      - name: Set default toolchain to nightly
+        run: rustup default nightly
+
       - name: Run fuzz tests
         run: |
           cd runtime/sidecar-watcher/fuzz
-          cargo fuzz run json_actions -- -runs=1000 -max_total_time=120
+          cargo +nightly fuzz run json_actions -- -runs=1000 -max_total_time=120
 
       - name: Upload fuzz artifacts
         uses: actions/upload-artifact@v4

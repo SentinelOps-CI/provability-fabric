@@ -55,7 +55,7 @@ jobs:
           for b in tests/replay/bundles/*; do
             [ -d "$b" ] || continue
             name=$(basename "$b")
-            (cd tests/replay/bundles && zip -r "../../artifact/replay_zips/${name}.zip" "$name")
+            (cd tests/replay/bundles && zip -r "../../../artifact/replay_zips/${name}.zip" "$name")
           done
           ls -l artifact/replay_zips
 
