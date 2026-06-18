@@ -53,7 +53,7 @@ jobs:
       - name: Export DFA for my-agent bundle
         run: |
           cd core/lean-libs
-          lake exe ExportDFA --bundle ../../bundles/my-agent --out ../../artifact/dfa/dfa.json
+          lake exe ExportDFA -- --bundle ../../bundles/my-agent --out ../../artifact/dfa/dfa.json
           sha256sum ../../artifact/dfa/dfa.json | awk '{print "sha256:"$1}' > ../../artifact/dfa/dfa.sha256.txt
         timeout-minutes: 3 # 180s budget
 

@@ -62,7 +62,7 @@ jobs:
         run: |
           cd core/lean-libs
           lake build ExportDFA
-          lake exe ExportDFA --bundle ../../bundles/my-agent --out ../../artifact/dfa.json
+          lake exe ExportDFA -- --bundle ../../bundles/my-agent --out ../../artifact/dfa.json
           echo "DFA exported successfully"
 
       - name: Export Labeler
