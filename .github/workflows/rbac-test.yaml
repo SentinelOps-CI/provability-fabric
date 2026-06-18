@@ -33,13 +33,13 @@ jobs:
         with:
           version: v3.12.0
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/cli/pf/go.mod
+
       - name: Install dependencies
         run: |
-          # Install Go
-          wget -O go.tar.gz https://go.dev/dl/go1.23.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go.tar.gz
-          echo "$GITHUB_WORKSPACE/bin:/usr/local/go/bin" >> $GITHUB_PATH
-
           # Install Node.js
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y nodejs
