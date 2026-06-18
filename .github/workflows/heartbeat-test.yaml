@@ -26,6 +26,7 @@ jobs:
       - name: Set up Kind
         uses: helm/kind-action@v1
         with:
+          cluster_name: kind
           node_image: kindest/node:v1.28.0
 
       - name: Set up Helm
@@ -254,4 +255,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          kind delete cluster --name provability-fabric-test || true
+          kind delete cluster --name kind || true
