@@ -323,6 +323,7 @@ fn test_labeler_stress_1k_randomized_payloads() {
     let labeler = Labeler::new(config);
     let payloads = generate_randomized_payloads(1000);
 
+    println!("Generated 1000 randomized payloads");
     println!(
         "Generated {} randomized payloads for stress testing",
         payloads.len()

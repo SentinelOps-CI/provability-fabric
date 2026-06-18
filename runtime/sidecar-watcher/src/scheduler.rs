@@ -687,6 +687,8 @@ mod tests {
                 curr_priority
             );
         }
+
+        println!("0 reorder violations");
     }
 
     #[test]

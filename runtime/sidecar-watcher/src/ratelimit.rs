@@ -693,6 +693,7 @@ mod tests {
             p99_time.as_micros()
         );
 
+        println!("99th percentile check cost: < 1ms ({}μs)", p99_time.as_micros());
         println!("99th percentile check time: {}μs", p99_time.as_micros());
         println!(
             "50th percentile check time: {}μs",

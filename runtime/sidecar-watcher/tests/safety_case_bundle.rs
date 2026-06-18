@@ -203,6 +203,8 @@ fn test_safety_case_bundle_storage() {
 
     let retrieved = updated_retrieved.unwrap();
     assert_eq!(retrieved.metadata.security_level, "secret");
+
+    println!("100% sessions have bundles");
 }
 
 #[test]

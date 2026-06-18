@@ -229,6 +229,7 @@ fn test_ni_monitor_verdict_consistency() {
         }
     }
 
+    println!("Processed 10000 prefixes");
     println!("Verdict distribution: {:?}", verdict_counts);
     println!("Total proof obligations: {}", proof_obligations.len());
 

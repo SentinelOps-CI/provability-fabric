@@ -278,8 +278,14 @@ impl BreakGlassManager {
             .get_mut(request_id)
             .ok_or_else(|| format!("Break glass request {} not found", request_id))?;
 
-        // Check if request is still pending
-        if request.status != BreakGlassStatus::Pending {
+        // Check if request is still accepting signatures
+        let (_m, n) = self.config.m_of_n_threshold;
+        if request.status == BreakGlassStatus::Approved && request.signatures.len() >= n {
+            return Err("Maximum signatures already collected".to_string());
+        }
+        if request.status != BreakGlassStatus::Pending
+            && request.status != BreakGlassStatus::Approved
+        {
             return Err("Request is no longer pending".to_string());
         }
 
