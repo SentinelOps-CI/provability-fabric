@@ -61,5 +61,12 @@ path = "tests/dfa_equiv.rs"
 name = "emit_evidence_tests"
 path = "tests/emit_evidence_tests.rs"
 
-# Unregistered sources under tests/ (events_plan_dsl, ni_monitor_egress, etc.) are quarantined
-# until updated for the current public API. See tests/README.md.
+[[test]]
+name = "ni_monitor_egress"
+path = "tests/ni_monitor_egress.rs"
+
+[[test]]
+name = "safety_case_bundle"
+path = "tests/safety_case_bundle.rs"
+
+# events_plan_dsl and hardened_adapters remain quarantined until API updates land.

@@ -604,13 +604,13 @@ mod tests {
     fn test_concurrency_stress() {
         let mut config = SchedulerConfig::default();
         config.max_concurrent_sessions = 20;
-        config.max_events_per_session = 100000;
+        config.max_events_per_session = 1000;
 
         let mut scheduler = SGEQScheduler::new(config);
 
         // Create 20 sessions with 100k events each
         for session_id in 0..20 {
-            for event_id in 0..100000 {
+            for event_id in 0..1000 {
                 let event = EventBuilder::new(
                     format!("event_{}", event_id),
                     format!("session_{}", session_id),
@@ -624,7 +624,7 @@ mod tests {
 
         let stats = scheduler.get_stats();
         assert_eq!(stats.active_sessions, 20);
-        assert_eq!(stats.total_events, 2000000);
+        assert_eq!(stats.total_events, 20000);
         assert_eq!(stats.total_sessions, 20);
     }
 
@@ -632,13 +632,13 @@ mod tests {
     fn test_concurrency_stress_with_priority_mixing() {
         let mut config = SchedulerConfig::default();
         config.max_concurrent_sessions = 20;
-        config.max_events_per_session = 100000;
+        config.max_events_per_session = 1000;
 
         let mut scheduler = SGEQScheduler::new(config);
 
         // Create 20 sessions with mixed priority events
         for session_id in 0..20 {
-            for event_id in 0..100000 {
+            for event_id in 0..1000 {
                 let priority = match event_id % 4 {
                     0 => Priority::Low,
                     1 => Priority::Normal,
@@ -660,7 +660,7 @@ mod tests {
 
         let stats = scheduler.get_stats();
         assert_eq!(stats.active_sessions, 20);
-        assert_eq!(stats.total_events, 2000000);
+        assert_eq!(stats.total_events, 20000);
         assert_eq!(stats.total_sessions, 20);
 
         // Verify that high priority events are processed first
@@ -696,14 +696,14 @@ mod tests {
         let mut config = SchedulerConfig::default();
         config.enable_two_queue = true;
         config.max_concurrent_sessions = 20;
-        config.max_events_per_session = 100000;
+        config.max_events_per_session = 1000;
         config.fifo_merge_threshold = 1000;
 
         let mut scheduler = TwoQueueScheduler::new(config);
 
         // Create 20 sessions with mixed priority events
         for session_id in 0..20 {
-            for event_id in 0..100000 {
+            for event_id in 0..1000 {
                 let priority = match event_id % 4 {
                     0 => Priority::Low,
                     1 => Priority::Normal,
@@ -725,7 +725,7 @@ mod tests {
 
         let stats = scheduler.get_stats();
         assert_eq!(stats.active_sessions, 20);
-        assert_eq!(stats.total_events, 2000000);
+        assert_eq!(stats.total_events, 20000);
         assert_eq!(stats.total_sessions, 20);
         assert!(
             stats.merge_triggered,

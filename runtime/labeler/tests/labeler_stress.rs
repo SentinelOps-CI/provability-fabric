@@ -321,7 +321,18 @@ fn test_labeler_stress_1k_randomized_payloads() {
     };
 
     let labeler = Labeler::new(config);
-    let payloads = generate_randomized_payloads(1000);
+    let payloads = generate_randomized_payloads(999);
+    let mut payloads = payloads;
+    payloads.insert(
+        0,
+        json!({
+            "user": {
+                "credentials": { "password": "secret-pass", "api_key": "sk-test" },
+                "profile": { "ssn": "123-45-6789" }
+            },
+            "system": { "internal_ip": "10.0.0.1" }
+        }),
+    );
 
     println!("Generated 1000 randomized payloads");
     println!(

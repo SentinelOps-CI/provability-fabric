@@ -186,7 +186,7 @@ jobs:
       - name: Verify 10k Prefixes Processed
         run: |
           cd runtime/sidecar-watcher
-          cargo test test_ni_monitor_verdict_consistency -- --nocapture 2>&1 | grep -q "Processed 10000 prefixes" || exit 1
+          cargo test --test ni_monitor_egress test_ni_monitor_verdict_consistency -- --nocapture 2>&1 | grep -q "Processed 10000 prefixes" || exit 1
 
   # Prompt 80: Cryptographic Envelope + Rekor/TUF + M-of-N Break-Glass
   crypto-envelope-break-glass:
@@ -215,6 +215,7 @@ jobs:
   scheduler-clock:
     name: Scheduler & Clock Model
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -280,7 +281,7 @@ jobs:
       - name: Verify 100% Sessions Have Bundles
         run: |
           cd runtime/sidecar-watcher
-          cargo test test_safety_case_bundle_storage -- --nocapture | grep -q "100% sessions have bundles" || exit 1
+          cargo test --test safety_case_bundle test_safety_case_bundle_storage -- --nocapture 2>&1 | grep -q "100% sessions have bundles" || exit 1
 
   # Integration Tests
   integration:
