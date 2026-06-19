@@ -180,11 +180,12 @@ jobs:
         run: |
           echo "Testing heartbeat failure scenario..."
 
-          # Delete attestor pod to simulate failure
-          kubectl delete pod -l app=attestor
+          # Scale attestor to zero so sidecar heartbeats stop updating Redis
+          kubectl scale deployment/attestor --replicas=0
+          kubectl wait --for=delete pod -l app=attestor --timeout=120s || true
 
-          # Wait for attestor to be unavailable
-          sleep 10
+          # Wait for last heartbeat to age past the 15s liveness window
+          sleep 20
 
           # Test liveness endpoint (should fail)
           kubectl port-forward service/attestor-service 8080:8080 &

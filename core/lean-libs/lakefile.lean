@@ -41,7 +41,6 @@ lean_lib GenTrace {
 -- ExportDFA executable
 lean_exe ExportDFA {
   root := `ExportDFA
-  supportInterpreter := true
 }
 
 -- Use vendored mathlib instead of fetching from git
