@@ -225,7 +225,7 @@ jobs:
 
           if ! curl -sf http://localhost:9090/metrics | grep -q .; then
             echo "ERROR: sidecar metrics endpoint unavailable"
-            ps aux | grep sidecar-watcher || true
+            pgrep -af sidecar-watcher || true
             exit 1
           fi
 

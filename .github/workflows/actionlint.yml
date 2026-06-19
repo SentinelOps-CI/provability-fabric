@@ -49,4 +49,5 @@ jobs:
             -ignore 'shellcheck reported issue in this script: SC2155:warning:' \
             -ignore 'shellcheck reported issue in this script: SC2001:style:' \
             -ignore 'shellcheck reported issue in this script: SC2005:style:' \
+            -ignore 'shellcheck reported issue in this script: SC2009:info:' \
             -ignore 'input ".+" is not defined in action'

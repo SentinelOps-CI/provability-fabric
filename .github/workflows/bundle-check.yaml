@@ -42,12 +42,16 @@ jobs:
           cd core/cli/pf
           go run . check-trace
 
+      - name: Install PyYAML for bundle spec parsing
+        run: pip install pyyaml
+
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const { execSync } = require('child_process');
             
             let missingLinks = [];
             
@@ -59,7 +63,11 @@ jobs:
             for (const specDir of specFiles) {
               const specPath = path.join('bundles', specDir, 'spec.yaml');
               if (fs.existsSync(specPath)) {
-                const spec = require('js-yaml').load(fs.readFileSync(specPath, 'utf8'));
+                const specJson = execSync(
+                  `python3 -c "import yaml, json, sys; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))" "${specPath}"`,
+                  { encoding: 'utf8' }
+                );
+                const spec = JSON.parse(specJson);
                 
                 // Check REQ to AC mappings
                 if (spec.trace) {
