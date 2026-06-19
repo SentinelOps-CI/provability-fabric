@@ -68,17 +68,19 @@ theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
       obtain ⟨hle, hrest⟩ := h
       exact ⟨hle, ih tr₂ hrest⟩
 
-/-- Theorem: budget_ok is monotone under adding non-negative spending actions with config -/
+/-- Theorem: budget_ok is monotone under adding budget-respecting actions with config -/
 theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
   ∀ (tr : List Action) (a : Action),
-    budget_ok cfg tr → spend a ≥ 0 → budget_ok cfg (a :: tr) := by
-  intro tr a h_budget h_spend
+    budget_ok cfg tr →
+    (match a with | Action.LogSpend usd => Float.ofNat usd ≤ cfg.dailyLimit | _ => True) →
+    budget_ok cfg (a :: tr) := by
+  intro tr a h_budget h_respects
   cases a with
   | SendEmail _ =>
     simp [budget_ok]
     exact h_budget
   | LogSpend _ =>
     simp [budget_ok, spend]
-    refine And.intro (by simp) h_budget
+    exact ⟨h_respects, h_budget⟩
 
 end Fabric

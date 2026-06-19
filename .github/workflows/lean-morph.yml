@@ -76,6 +76,11 @@ jobs:
           elan override set "$TOOLCHAIN"
           lean --version
 
+      - name: Vendor mathlib
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
+
       - name: Prewarm caches (core libs & templates)
         run: |
           set -e
