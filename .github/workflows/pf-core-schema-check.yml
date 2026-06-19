@@ -8,6 +8,8 @@ on:
       - "runtime/sidecar-watcher/**"
       - "vendor/pf-core/**"
       - "scripts/init_pf_core_vendor.sh"
+      - "scripts/test_admission_parity.sh"
+      - "tests/pf_core_admission_parity/**"
       - ".github/workflows/pf-core-schema-check.yml"
 
 jobs:
@@ -43,3 +45,8 @@ jobs:
         run: |
           cd runtime/sidecar-watcher
           cargo test --lib runtime_observation
+
+      - name: Admission audit normalize parity (PR-4)
+        env:
+          PF_CORE_REF: ${{ github.workspace }}/pf-core-ref
+        run: bash scripts/test_admission_parity.sh
