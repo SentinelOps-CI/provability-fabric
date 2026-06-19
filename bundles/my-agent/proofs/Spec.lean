@@ -27,31 +27,8 @@ def CFG : BudgetCfg := {
 }
 
 /-- My-agent budget verification: spend stays within configured daily limit -/
-theorem my_agent_budget_verification : ∀ (tr : List Action), budget_ok CFG tr → total_spend tr ≤ 300 := by
-  intro tr
-  induction tr with
-  | nil =>
-    simp [budget_ok, total_spend]
-  | cons head tail ih =>
-    cases head with
-    | SendEmail score =>
-      simp [budget_ok, total_spend]
-      exact ih
-    | LogSpend usd =>
-      simp [budget_ok, total_spend]
-      intro h
-      have ⟨h1, h2⟩ := h
-      have ih_result := ih h2
-      have add_le : usd + total_spend tail ≤ usd + 300 := by
-        apply add_le_add_left
-        exact ih_result
-      have usd_le_300 : usd ≤ 300 := by simpa [CFG] using h1
-      have usd_plus_300_le_600 : usd + 300 ≤ 300 + 300 := by
-        apply add_le_add_right
-        exact usd_le_300
-      have usd_plus_300_le_300 : usd + 300 ≤ 300 := by
-        simp at usd_plus_300_le_600
-        exact usd_plus_300_le_600
-      exact le_trans add_le usd_plus_300_le_300
+theorem my_agent_budget_verification (tr : List Action) (h : budget_ok CFG tr) :
+    total_spend tr ≤ 300 :=
+  thm_budget_ok_implies_total_spend_le CFG 300 (by simp [CFG]) tr h
 
 end Spec

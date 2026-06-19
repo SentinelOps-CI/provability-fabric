@@ -83,4 +83,34 @@ theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
     simp [budget_ok]
     exact ⟨h_respects, h_budget⟩
 
+/-- Theorem: budget_ok implies total_spend stays within the configured daily limit -/
+theorem thm_budget_ok_implies_total_spend_le (cfg : BudgetCfg) (limit : Nat)
+    (hlim : cfg.dailyLimit.toNat = limit) :
+    ∀ (tr : List Action), budget_ok cfg tr → total_spend tr ≤ limit := by
+  intro tr
+  induction tr with
+  | nil =>
+    simp [budget_ok, total_spend]
+  | cons head tail ih =>
+    cases head with
+    | SendEmail score =>
+      simp [budget_ok, total_spend]
+      exact ih
+    | LogSpend usd =>
+      simp [budget_ok, total_spend]
+      intro h
+      have ⟨h1, h2⟩ := h
+      have ih_result := ih h2
+      have add_le : usd + total_spend tail ≤ usd + limit := by
+        apply add_le_add_left
+        exact ih_result
+      have usd_le_limit : usd ≤ limit := by simpa [hlim] using h1
+      have usd_plus_limit_le_double : usd + limit ≤ limit + limit := by
+        apply add_le_add_right
+        exact usd_le_limit
+      have usd_plus_limit_le_limit : usd + limit ≤ limit := by
+        simp at usd_plus_limit_le_double
+        exact usd_plus_limit_le_double
+      exact le_trans add_le usd_plus_limit_le_limit
+
 end Fabric
