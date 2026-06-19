@@ -35,7 +35,7 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
   | [] => True
   | (Action.SendEmail _) :: rest => budget_ok cfg rest
   | (Action.LogSpend usd) :: rest =>
-    Float.ofNat usd ≤ cfg.dailyLimit ∧ budget_ok cfg rest
+    usd ≤ cfg.dailyLimit.toNat ∧ budget_ok cfg rest
 
 /-- Check if a list of generic actions respects budget constraints with config -/
 def budget_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
@@ -72,7 +72,7 @@ theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
 theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
   ∀ (tr : List Action) (a : Action),
     budget_ok cfg tr →
-    (match a with | Action.LogSpend usd => Float.ofNat usd ≤ cfg.dailyLimit | _ => True) →
+    (match a with | Action.LogSpend usd => usd ≤ cfg.dailyLimit.toNat | _ => True) →
     budget_ok cfg (a :: tr) := by
   intro tr a h_budget h_respects
   cases a with

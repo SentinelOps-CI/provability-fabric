@@ -33,7 +33,6 @@ theorem test_user_budget_verification : ∀ (tr : List Action), budget_ok CFG tr
   induction tr with
   | nil =>
     simp [budget_ok, total_spend]
-    exact le_refl 0
   | cons head tail ih =>
     cases head with
     | SendEmail score =>
@@ -47,7 +46,7 @@ theorem test_user_budget_verification : ∀ (tr : List Action), budget_ok CFG tr
       have add_le : usd + total_spend tail ≤ usd + 300 := by
         apply add_le_add_left
         exact ih_result
-      have usd_le_300 : usd ≤ 300 := h1
+      have usd_le_300 : usd ≤ 300 := by simpa [CFG] using h1
       have usd_plus_300_le_600 : usd + 300 ≤ 300 + 300 := by
         apply add_le_add_right
         exact usd_le_300

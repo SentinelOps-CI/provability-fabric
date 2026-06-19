@@ -12,4 +12,4 @@ lean_lib Spec {
 
 -- Use vendored mathlib instead of fetching from git
 require mathlib from "../../../vendor/mathlib"
-require fabric from "../../../core/lean-libs"
+require Fabric from "../../../core/lean-libs"
