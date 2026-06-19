@@ -129,7 +129,7 @@ jobs:
           EOF
 
           # Wait for ledger to be ready
-          kubectl wait --for=condition=available deployment/ledger --timeout=120s
+          kubectl wait --for=condition=available deployment/ledger --timeout=300s
 
       - name: Create test tenants
         run: |

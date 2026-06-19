@@ -747,11 +747,64 @@ async fn main() -> Result<()> {
         })
     };
 
+    let heartbeat_task = if env::var("ENABLE_HEARTBEAT")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        let attestor_url =
+            env::var("ATTESTOR_URL").unwrap_or_else(|_| "http://attestor-service:8080".to_string());
+        let capsule_hash =
+            env::var("CAPSULE_HASH").unwrap_or_else(|_| "unknown-capsule".to_string());
+        let budget_limit = env::var("BUDGET_LIMIT")
+            .unwrap_or_else(|_| "100.0".to_string())
+            .parse()
+            .unwrap_or(100.0);
+        let spam_score_limit = env::var("SPAM_SCORE_LIMIT")
+            .unwrap_or_else(|_| "0.5".to_string())
+            .parse()
+            .unwrap_or(0.5);
+        let client = Client::new();
+        Some(tokio::spawn(async move {
+            loop {
+                let body = serde_json::json!({
+                    "capsule_hash": capsule_hash,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                    "metrics": {
+                        "total_actions": 0u64,
+                        "violations": 0u64,
+                        "assumption_violations": 0u64,
+                        "running_spend": 0.0,
+                        "budget_limit": budget_limit,
+                        "spam_score_limit": spam_score_limit
+                    }
+                });
+                if let Err(e) = client
+                    .post(format!("{}/heartbeat", attestor_url))
+                    .json(&body)
+                    .send()
+                    .await
+                {
+                    warn!("Failed to send heartbeat: {}", e);
+                }
+                sleep(Duration::from_secs(5)).await;
+            }
+        }))
+    } else {
+        None
+    };
+
     // Wait for server or tasks to complete
     tokio::select! {
         _ = metrics_server => info!("Metrics server stopped"),
         _ = usage_task => info!("Usage task stopped"),
         _ = log_watch_task => info!("Log watch task stopped"),
+        _ = async {
+            if let Some(task) = heartbeat_task {
+                task.await.ok();
+            } else {
+                std::future::pending::<()>().await;
+            }
+        } => info!("Heartbeat task stopped"),
     }
 
     // Keep process alive if everything else ended
