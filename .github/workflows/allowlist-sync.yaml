@@ -74,31 +74,34 @@ jobs:
         run: |
           echo "Comparing generated allowlist with committed version..."
 
-          # Check if committed allowlist exists
           if [ ! -f "runtime/sidecar-watcher/policy/allowlist.json" ]; then
-            echo "❌ Committed allowlist not found!"
+            echo "Committed allowlist not found!"
             exit 1
           fi
 
-          # Compare generated vs committed
-          if ! diff -u runtime/sidecar-watcher/policy/allowlist.json /tmp/generated_allowlist.json; then
-            echo ""
-            echo "❌ ALLOWLIST SYNC VALIDATION FAILED!"
-            echo "The committed allowlist differs from what would be generated from Lean proofs."
-            echo ""
-            echo "To fix this:"
-            echo "1. Run: python3 tools/gen_allowlist_from_lean.py . runtime/sidecar-watcher/policy/allowlist.json"
-            echo "2. Commit the updated allowlist.json"
-            echo "3. Ensure all Lean proofs are properly defined for tools that need access"
-            echo ""
-            echo "Differences found:"
-            echo "- Left side: committed allowlist"
-            echo "- Right side: generated from Lean"
-            exit 1
-          else
-            echo "✅ Allowlist sync validation PASSED!"
-            echo "Committed allowlist matches generated allowlist from Lean proofs."
-          fi
+          python3 - <<'PY'
+          import json
+          import sys
+
+          VOLATILE = {"generation_timestamp", "lean_environment", "workspace_hash", "validation_status"}
+
+          def canonical(path: str) -> dict:
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              for key in VOLATILE:
+                  data.pop(key, None)
+              return data
+
+          committed = canonical("runtime/sidecar-watcher/policy/allowlist.json")
+          generated = canonical("/tmp/generated_allowlist.json")
+
+          if committed != generated:
+              print("ALLOWLIST SYNC VALIDATION FAILED")
+              print("Committed and generated allowlists differ (ignoring volatile metadata).")
+              sys.exit(1)
+
+          print("Allowlist sync validation passed")
+          PY
 
       - name: Validate allowlist structure
         run: |
