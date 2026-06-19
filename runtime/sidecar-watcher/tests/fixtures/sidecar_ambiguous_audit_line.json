@@ -1,0 +1,16 @@
+{
+  "request_id": "obs-mcp-ambiguous",
+  "trace_id": "trace-mcp-ambiguous",
+  "event_id": "ev-mcp-ambiguous",
+  "agent_id": "agent-1",
+  "tenant": "tenant-a",
+  "tool_effect": "mcp.invoke",
+  "resource": "mcp:filesystem/read",
+  "policy_decision": "allowed",
+  "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "policy_bundle": "policy/default.v0",
+  "audit_bundle": "evidence/mcp-audit.v0",
+  "runtime_ref": "provability-fabric/sidecar-watcher",
+  "timestamp": "2026-06-18T12:00:00Z",
+  "reason": "ambiguous mcp.invoke without capability_hint"
+}

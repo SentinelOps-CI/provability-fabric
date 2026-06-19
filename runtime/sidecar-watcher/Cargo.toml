@@ -80,3 +80,7 @@ path = "tests/hardened_adapters.rs"
 [[test]]
 name = "egress_evidence_enforcement"
 path = "tests/egress_evidence_enforcement.rs"
+
+[[test]]
+name = "runtime_observation_tests"
+path = "tests/runtime_observation_tests.rs"
