@@ -21,6 +21,7 @@ services:
 
   ledger:
     build: .
+    volumes: !reset []
     environment:
       DATABASE_URL: postgresql://pf_user:pf_password@postgres:5432/provability_fabric
       PORT: 4000
@@ -29,4 +30,4 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
+    command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index-simple.js"]

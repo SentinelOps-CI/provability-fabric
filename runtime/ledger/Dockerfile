@@ -12,7 +12,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --no-audit --no-fu
 
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+RUN rm -rf dist && npm run build
+RUN test -f dist/index-simple.js
 
 FROM node:20-bookworm-slim AS runner
 

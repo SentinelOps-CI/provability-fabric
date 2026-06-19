@@ -89,7 +89,7 @@ jobs:
                 - name: migrate
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
-                  command: ["npx", "prisma", "migrate", "deploy"]
+                  command: ["npx", "prisma", "db", "push", "--skip-generate"]
                   env:
                   - name: DATABASE_URL
                     value: "postgresql://postgres:testpass@postgres-postgresql:5432/provability_fabric"
