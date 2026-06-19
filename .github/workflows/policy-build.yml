@@ -39,7 +39,7 @@ jobs:
     
     - name: Start platform services
       run: |
-        docker compose up --build -d api-gateway spec-service proof-service build-orchestrator
+        docker compose up --build -d spec-service proof-service build-orchestrator
         sleep 30
     
     - name: Detect changed policies
