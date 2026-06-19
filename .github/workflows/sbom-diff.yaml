@@ -82,7 +82,6 @@ jobs:
 
       - name: Scan for vulnerabilities
         run: |
-          # Scan the SBOM for vulnerabilities
           grype sbom:./sbom.json -o json > vulns.json
 
           # Extract critical vulnerabilities only (High findings are tracked, not gated)
