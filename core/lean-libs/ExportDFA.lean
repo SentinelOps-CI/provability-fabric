@@ -79,8 +79,8 @@ def export_dfa (config : ExportConfig) : IO Unit := do
 
   IO.println s!"DFA exported to: {config.output_path}"
 
-/-- Main entry point -/
-def main (args : List String) : IO UInt32 := do
+/-- CLI entry (invoked from module `main` below). -/
+def exportMain (args : List String) : IO UInt32 := do
   let runExport (bundle_path output_path : String) : IO UInt32 := do
     export_dfa { bundle_path := bundle_path, output_path := output_path }
     return 0
@@ -95,3 +95,6 @@ def main (args : List String) : IO UInt32 := do
     return 1
 
 end ExportDFA
+
+def main (args : List String) : IO UInt32 :=
+  ExportDFA.exportMain args

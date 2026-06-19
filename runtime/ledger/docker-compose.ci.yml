@@ -29,4 +29,4 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index-simple.js"]
+    command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
