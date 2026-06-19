@@ -1,0 +1,54 @@
+{
+  "capabilities": [
+    {
+      "effect_kind": "file.read",
+      "id": "cap:file-read",
+      "resource_pattern": "/data/*"
+    },
+    {
+      "effect_kind": "file.write",
+      "id": "cap:file-write",
+      "resource_pattern": "/data/*"
+    },
+    {
+      "effect_kind": "network.egress",
+      "id": "cap:network",
+      "resource_pattern": "*"
+    },
+    {
+      "effect_kind": "email.send",
+      "id": "cap:email-send",
+      "resource_pattern": "mailto:*"
+    },
+    {
+      "effect_kind": "handoff.delegate",
+      "id": "cap:handoff",
+      "resource_pattern": "agent:*"
+    },
+    {
+      "effect_kind": "mcp.invoke",
+      "id": "cap:mcp-invoke",
+      "resource_pattern": "mcp:*"
+    },
+    {
+      "effect_kind": "mcp.invoke",
+      "id": "cap:mcp-alt",
+      "resource_pattern": "mcp:alt/*"
+    },
+    {
+      "effect_kind": "lab.release",
+      "id": "cap:lab-release",
+      "resource_pattern": "lab:*"
+    }
+  ],
+  "principal_roles_by_capability": {
+    "cap:email-send": ["email_user", "agent"],
+    "cap:file-read": ["file_reader", "file_admin", "agent"],
+    "cap:file-write": ["file_admin"],
+    "cap:handoff": ["handoff_delegate", "agent"],
+    "cap:lab-release": ["lab_operator"],
+    "cap:mcp-alt": ["mcp_user"],
+    "cap:mcp-invoke": ["mcp_user", "agent"],
+    "cap:network": ["network_user"]
+  }
+}
