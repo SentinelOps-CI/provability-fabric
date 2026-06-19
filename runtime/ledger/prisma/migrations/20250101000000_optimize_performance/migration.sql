@@ -4,9 +4,6 @@
 -- Migration: Optimize database performance with partitioning and indices
 -- This migration improves query performance for large datasets
 
--- Enable partitioning extension
-CREATE EXTENSION IF NOT EXISTS pg_partman;
-
 -- Create partitioned tables for time-series data
 -- Partition by month for better query performance and maintenance
 

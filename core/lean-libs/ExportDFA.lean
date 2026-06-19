@@ -81,12 +81,17 @@ def export_dfa (config : ExportConfig) : IO Unit := do
 
 /-- Main entry point -/
 def main (args : List String) : IO UInt32 := do
-  match args with
-  | ["--bundle", bundle_path, "--out", output_path] =>
+  let runExport (bundle_path output_path : String) : IO UInt32 := do
     export_dfa { bundle_path := bundle_path, output_path := output_path }
     return 0
+  match args with
+  | ["--bundle", bundle_path, "--out", output_path] =>
+    runExport bundle_path output_path
+  | [bundle_path, output_path] =>
+    runExport bundle_path output_path
   | _ =>
-    IO.println "Usage: export-dfa --bundle <bundle_path> --out <output_path>"
+    IO.println "Usage: export-dfa <bundle_path> <output_path>"
+    IO.println "   or: export-dfa --bundle <bundle_path> --out <output_path>"
     return 1
 
 end ExportDFA
