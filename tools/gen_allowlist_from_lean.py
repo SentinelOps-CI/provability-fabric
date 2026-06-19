@@ -362,7 +362,7 @@ class AllowlistGenerator:
                     # Extract policy information
                     policy_name = file_path.stem
                     policies[policy_name] = {
-                        "file": str(file_path.relative_to(self.workspace_root)),
+                        "file": self.rel_path(file_path),
                         "theorems": self.extract_theorems(content),
                         "lemmas": self.extract_lemmas(content),
                         "axioms": self.extract_axioms(content),

@@ -151,18 +151,26 @@ jobs:
 
             The DFA export is ready for use in the runtime system.`;
 
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                comment_id: botComment.id,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: commentBody
-              });
-            } else {
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: commentBody
-              });
-            }
+            const postComment = async (body) => {
+              try {
+                if (botComment) {
+                  await github.rest.issues.updateComment({
+                    comment_id: botComment.id,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body
+                  });
+                } else {
+                  await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body
+                  });
+                }
+              } catch (error) {
+                core.warning(`Could not post PR comment: ${error.message}`);
+              }
+            };
+
+            await postComment(commentBody);

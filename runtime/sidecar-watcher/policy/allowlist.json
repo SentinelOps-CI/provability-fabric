@@ -148,7 +148,7 @@
   "capabilities": {},
   "policies": {
     "Policy": {
-      "file": "proofs\\Policy.lean",
+      "file": "proofs/Policy.lean",
       "theorems": [
         "soundness",
         "completeness",
@@ -159,7 +159,7 @@
       "axioms": []
     },
     "Spec": {
-      "file": "bundles\\art\\budget_control\\proofs\\Spec.lean",
+      "file": "bundles/art/budget_control/proofs/Spec.lean",
       "theorems": [
         "thm_budget_ok",
         "thm_privacy_ok",
@@ -170,7 +170,7 @@
       "axioms": []
     },
     "GammaSpecAdjunction": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\GammaSpecAdjunction.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/GammaSpecAdjunction.lean",
       "theorems": [],
       "lemmas": [
         "locallyRingedSpaceAdjunction_unit",
@@ -179,7 +179,7 @@
       "axioms": []
     },
     "Specialization": {
-      "file": "vendor\\mathlib\\Mathlib\\Topology\\Specialization.lean",
+      "file": "vendor/mathlib/Mathlib/Topology/Specialization.lean",
       "theorems": [],
       "lemmas": [
         "toEquiv_symm",
@@ -189,7 +189,7 @@
       "axioms": []
     },
     "Hom": {
-      "file": "vendor\\mathlib\\Mathlib\\Topology\\Spectral\\Hom.lean",
+      "file": "vendor/mathlib/Mathlib/Topology/Spectral/Hom.lean",
       "theorems": [
         "isSpectralMap_id",
         "coe_id"
@@ -198,7 +198,7 @@
       "axioms": []
     },
     "Arctan": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Arctan.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Arctan.lean",
       "theorems": [
         "continuousOn_tan",
         "continuous_tan",
@@ -225,7 +225,7 @@
       "axioms": []
     },
     "Basic": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\PrimeSpectrum\\Basic.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Basic.lean",
       "theorems": [
         "gc",
         "gc_set",
@@ -250,25 +250,25 @@
       "axioms": []
     },
     "Inner": {
-      "file": "vendor\\mathlib\\Mathlib\\MeasureTheory\\Function\\SpecialFunctions\\Inner.lean",
+      "file": "vendor/mathlib/Mathlib/MeasureTheory/Function/SpecialFunctions/Inner.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "RCLike": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecificLimits\\RCLike.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/RCLike.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "ProjectiveSpecialLinearGroup": {
-      "file": "vendor\\mathlib\\Mathlib\\LinearAlgebra\\Matrix\\ProjectiveSpecialLinearGroup.lean",
+      "file": "vendor/mathlib/Mathlib/LinearAlgebra/Matrix/ProjectiveSpecialLinearGroup.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "SpecialLinearGroup": {
-      "file": "vendor\\mathlib\\Mathlib\\LinearAlgebra\\Matrix\\SpecialLinearGroup.lean",
+      "file": "vendor/mathlib/Mathlib/LinearAlgebra/Matrix/SpecialLinearGroup.lean",
       "theorems": [
         "coe_inv",
         "coe_mul",
@@ -282,7 +282,7 @@
       "axioms": []
     },
     "Spectrum": {
-      "file": "vendor\\mathlib\\Mathlib\\Algebra\\Algebra\\Spectrum.lean",
+      "file": "vendor/mathlib/Mathlib/Algebra/Algebra/Spectrum.lean",
       "theorems": [
         "algebraMap_image",
         "image",
@@ -292,7 +292,7 @@
       "axioms": []
     },
     "Alternating": {
-      "file": "vendor\\mathlib\\Mathlib\\GroupTheory\\SpecificGroups\\Alternating.lean",
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Alternating.lean",
       "theorems": [
         "alternatingGroup_eq_sign_ker",
         "closure_three_cycles_eq_alternating",
@@ -303,7 +303,7 @@
       "axioms": []
     },
     "Cyclic": {
-      "file": "vendor\\mathlib\\Mathlib\\GroupTheory\\SpecificGroups\\Cyclic.lean",
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Cyclic.lean",
       "theorems": [
         "isCyclic_of_card_pow_eq_one_le"
       ],
@@ -311,7 +311,7 @@
       "axioms": []
     },
     "Dihedral": {
-      "file": "vendor\\mathlib\\Mathlib\\GroupTheory\\SpecificGroups\\Dihedral.lean",
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Dihedral.lean",
       "theorems": [
         "one_def",
         "nat_card",
@@ -323,7 +323,7 @@
       "axioms": []
     },
     "KleinFour": {
-      "file": "vendor\\mathlib\\Mathlib\\GroupTheory\\SpecificGroups\\KleinFour.lean",
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/KleinFour.lean",
       "theorems": [],
       "lemmas": [
         "not_isCyclic"
@@ -331,7 +331,7 @@
       "axioms": []
     },
     "Quaternion": {
-      "file": "vendor\\mathlib\\Mathlib\\GroupTheory\\SpecificGroups\\Quaternion.lean",
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Quaternion.lean",
       "theorems": [
         "one_def",
         "a_one_pow_n",
@@ -343,7 +343,7 @@
       "axioms": []
     },
     "SpecificFunctions": {
-      "file": "vendor\\mathlib\\Mathlib\\Geometry\\Manifold\\MFDeriv\\SpecificFunctions.lean",
+      "file": "vendor/mathlib/Mathlib/Geometry/Manifold/MFDeriv/SpecificFunctions.lean",
       "theorems": [
         "hasMFDerivWithinAt",
         "hasMFDerivAt",
@@ -379,19 +379,19 @@
       "axioms": []
     },
     "SpecificDegree": {
-      "file": "vendor\\mathlib\\Mathlib\\Data\\Polynomial\\SpecificDegree.lean",
+      "file": "vendor/mathlib/Mathlib/Data/Polynomial/SpecificDegree.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "SpecificAsymptotics": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\Asymptotics\\SpecificAsymptotics.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/Asymptotics/SpecificAsymptotics.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Arsinh": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Arsinh.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Arsinh.lean",
       "theorems": [
         "arsinh_zero",
         "sinh_surjective",
@@ -415,19 +415,19 @@
       "axioms": []
     },
     "Bernstein": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Bernstein.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Bernstein.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "CompareExp": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\CompareExp.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/CompareExp.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Exp": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Exp.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Exp.lean",
       "theorems": [
         "continuous_exp",
         "continuous_exp",
@@ -457,7 +457,7 @@
       "axioms": []
     },
     "ExpDeriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\ExpDeriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/ExpDeriv.lean",
       "theorems": [
         "differentiable_exp",
         "deriv_exp",
@@ -472,7 +472,7 @@
       "axioms": []
     },
     "Exponential": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Exponential.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Exponential.lean",
       "theorems": [
         "hasStrictFDerivAt_exp_zero",
         "hasFDerivAt_exp_zero",
@@ -483,13 +483,13 @@
       "axioms": []
     },
     "Gaussian": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Gaussian.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gaussian.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "ImproperIntegrals": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\ImproperIntegrals.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/ImproperIntegrals.lean",
       "theorems": [
         "integral_exp_Iic_zero",
         "integral_exp_neg_Ioi_zero",
@@ -500,7 +500,7 @@
       "axioms": []
     },
     "Integrals": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Integrals.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Integrals.lean",
       "theorems": [
         "intervalIntegrable_pow",
         "intervalIntegrable_id",
@@ -554,19 +554,19 @@
       "axioms": []
     },
     "JapaneseBracket": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\JapaneseBracket.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/JapaneseBracket.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "NonIntegrable": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\NonIntegrable.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/NonIntegrable.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "PolarCoord": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\PolarCoord.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/PolarCoord.lean",
       "theorems": [
         "polarCoord_source_ae_eq_univ",
         "polarCoord_source",
@@ -576,13 +576,13 @@
       "axioms": []
     },
     "PolynomialExp": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\PolynomialExp.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/PolynomialExp.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Polynomials": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Polynomials.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Polynomials.lean",
       "theorems": [
         "isEquivalent_atTop_lead",
         "tendsto_atTop_iff_leadingCoeff_nonneg",
@@ -595,7 +595,7 @@
       "axioms": []
     },
     "SmoothTransition": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\SmoothTransition.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/SmoothTransition.lean",
       "theorems": [
         "zero",
         "zero_iff_nonpos",
@@ -609,13 +609,13 @@
       "axioms": []
     },
     "Sqrt": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Sqrt.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Sqrt.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Stirling": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Stirling.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Stirling.lean",
       "theorems": [
         "stirlingSeq_zero",
         "stirlingSeq_one",
@@ -631,13 +631,13 @@
       "axioms": []
     },
     "FloorPow": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecificLimits\\FloorPow.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/FloorPow.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Normed": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecificLimits\\Normed.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/Normed.lean",
       "theorems": [
         "tendsto_norm_atTop_atTop",
         "summable_geometric_iff_norm_lt_one"
@@ -646,7 +646,7 @@
       "axioms": []
     },
     "Analytic": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\Analytic.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Analytic.lean",
       "theorems": [
         "analyticOn_cexp",
         "analyticAt_cexp"
@@ -655,7 +655,7 @@
       "axioms": []
     },
     "Arg": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\Arg.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Arg.lean",
       "theorems": [
         "range_exp_mul_I",
         "arg_zero",
@@ -671,7 +671,7 @@
       "axioms": []
     },
     "Circle": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\Circle.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Circle.lean",
       "theorems": [
         "injective_arg",
         "leftInverse_expMapCircle_arg",
@@ -684,7 +684,7 @@
       "axioms": []
     },
     "Log": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\Log.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Log.lean",
       "theorems": [
         "range_exp",
         "log_zero",
@@ -700,7 +700,7 @@
       "axioms": []
     },
     "LogBounds": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\LogBounds.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/LogBounds.lean",
       "theorems": [],
       "lemmas": [
         "logTaylor_zero"
@@ -708,7 +708,7 @@
       "axioms": []
     },
     "LogDeriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Complex\\LogDeriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/LogDeriv.lean",
       "theorems": [
         "isOpenMap_exp"
       ],
@@ -716,7 +716,7 @@
       "axioms": []
     },
     "Beta": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Gamma\\Beta.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/Beta.lean",
       "theorems": [
         "differentiable_one_div_Gamma"
       ],
@@ -724,7 +724,7 @@
       "axioms": []
     },
     "BohrMollerup": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Gamma\\BohrMollerup.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/BohrMollerup.lean",
       "theorems": [
         "convexOn_log_Gamma",
         "convexOn_Gamma",
@@ -739,13 +739,13 @@
       "axioms": []
     },
     "Deligne": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Gamma\\Deligne.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/Deligne.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Base": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Log\\Base.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/Base.lean",
       "theorems": [
         "log_div_log",
         "logb_zero",
@@ -773,7 +773,7 @@
       "axioms": []
     },
     "Deriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\Convex\\SpecificFunctions\\Deriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/Convex/SpecificFunctions/Deriv.lean",
       "theorems": [
         "strictConcaveOn_sqrt_mul_log_Ioi",
         "strictConcaveOn_sin_Icc",
@@ -783,7 +783,7 @@
       "axioms": []
     },
     "Monotone": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Log\\Monotone.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/Monotone.lean",
       "theorems": [
         "log_mul_self_monotoneOn",
         "log_div_self_antitoneOn",
@@ -793,7 +793,7 @@
       "axioms": []
     },
     "NegMulLog": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Log\\NegMulLog.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/NegMulLog.lean",
       "theorems": [],
       "lemmas": [
         "continuous_mul_log",
@@ -812,7 +812,7 @@
       "axioms": []
     },
     "Asymptotics": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Pow\\Asymptotics.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Asymptotics.lean",
       "theorems": [
         "tendsto_rpow_div",
         "tendsto_rpow_neg_div"
@@ -823,7 +823,7 @@
       "axioms": []
     },
     "Complex": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Complex.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Complex.lean",
       "theorems": [
         "continuousOn_tan",
         "continuous_tan",
@@ -836,25 +836,25 @@
       "axioms": []
     },
     "Continuity": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Pow\\Continuity.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Continuity.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "NNReal": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Pow\\NNReal.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/NNReal.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Real": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Pow\\Real.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Real.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Angle": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Angle.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Angle.lean",
       "theorems": [
         "continuous_coe",
         "coe_coeHom",
@@ -895,7 +895,7 @@
       "axioms": []
     },
     "ArctanDeriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\ArctanDeriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/ArctanDeriv.lean",
       "theorems": [
         "differentiable_arctan",
         "deriv_arctan"
@@ -904,7 +904,7 @@
       "axioms": []
     },
     "Bounds": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Bounds.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Bounds.lean",
       "theorems": [],
       "lemmas": [
         "one_sub_sq_div_two_le_cos"
@@ -912,7 +912,7 @@
       "axioms": []
     },
     "Chebyshev": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Chebyshev.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Chebyshev.lean",
       "theorems": [
         "complex_ofReal_eval_T",
         "complex_ofReal_eval_U",
@@ -924,19 +924,19 @@
       "axioms": []
     },
     "ComplexDeriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\ComplexDeriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/ComplexDeriv.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "EulerSineProd": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\EulerSineProd.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/EulerSineProd.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Inverse": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Inverse.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Inverse.lean",
       "theorems": [
         "range_arcsin",
         "strictMonoOn_arcsin",
@@ -958,7 +958,7 @@
       "axioms": []
     },
     "InverseDeriv": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\InverseDeriv.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/InverseDeriv.lean",
       "theorems": [
         "deriv_arcsin",
         "differentiableOn_arcsin",
@@ -969,13 +969,13 @@
       "axioms": []
     },
     "Series": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\SpecialFunctions\\Trigonometric\\Series.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Series.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Pow": {
-      "file": "vendor\\mathlib\\Mathlib\\Analysis\\Convex\\SpecificFunctions\\Pow.lean",
+      "file": "vendor/mathlib/Mathlib/Analysis/Convex/SpecificFunctions/Pow.lean",
       "theorems": [],
       "lemmas": [
         "strictConcaveOn_sqrt",
@@ -984,7 +984,7 @@
       "axioms": []
     },
     "IsOpenComapC": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\PrimeSpectrum\\IsOpenComapC.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/IsOpenComapC.lean",
       "theorems": [
         "isOpen_imageOfDf",
         "imageOfDf_eq_comap_C_compl_zeroLocus",
@@ -994,7 +994,7 @@
       "axioms": []
     },
     "Maximal": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\PrimeSpectrum\\Maximal.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Maximal.lean",
       "theorems": [
         "toPrimeSpectrum_injective",
         "toPrimeSpectrum_range",
@@ -1006,13 +1006,13 @@
       "axioms": []
     },
     "Noetherian": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\PrimeSpectrum\\Noetherian.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Noetherian.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Scheme": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\ProjectiveSpectrum\\Scheme.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/Scheme.lean",
       "theorems": [
         "disjoint",
         "carrier_ne_top"
@@ -1023,13 +1023,13 @@
       "axioms": []
     },
     "StructureSheaf": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\ProjectiveSpectrum\\StructureSheaf.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/StructureSheaf.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "Topology": {
-      "file": "vendor\\mathlib\\Mathlib\\AlgebraicGeometry\\ProjectiveSpectrum\\Topology.lean",
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/Topology.lean",
       "theorems": [
         "gc_ideal",
         "gc_set",
@@ -1048,7 +1048,7 @@
       "axioms": []
     },
     "Quasispectrum": {
-      "file": "vendor\\mathlib\\Mathlib\\Algebra\\Algebra\\Quasispectrum.lean",
+      "file": "vendor/mathlib/Mathlib/Algebra/Algebra/Quasispectrum.lean",
       "theorems": [],
       "lemmas": [
         "val_one",
@@ -1057,19 +1057,19 @@
       "axioms": []
     },
     "gentrace_spec": {
-      "file": "tests\\lean\\gentrace_spec.lean",
+      "file": "tests/lean/gentrace_spec.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "lakefile": {
-      "file": "spec-templates\\v1\\proofs\\lakefile.lean",
+      "file": "spec-templates/v1/proofs/lakefile.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
     },
     "PolicyTrace": {
-      "file": "spec-templates\\v1\\proofs\\PolicyTrace.lean",
+      "file": "spec-templates/v1/proofs/PolicyTrace.lean",
       "theorems": [],
       "lemmas": [],
       "axioms": []
