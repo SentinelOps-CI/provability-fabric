@@ -208,13 +208,15 @@ jobs:
           echo $! > ledger.pid
 
       - name: Run privacy load test
+        env:
+          KUBECONFIG: /dev/null
         run: |
           cd runtime/sidecar-watcher
 
           LEDGER_URL=http://127.0.0.1:3000 ./target/release/sidecar-watcher &
           echo $! > watcher.pid
 
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             if curl -sf http://localhost:9090/metrics | grep -q .; then
               break
             fi
@@ -223,6 +225,7 @@ jobs:
 
           if ! curl -sf http://localhost:9090/metrics | grep -q .; then
             echo "ERROR: sidecar metrics endpoint unavailable"
+            ps aux | grep sidecar-watcher || true
             exit 1
           fi
 

@@ -206,6 +206,7 @@ jobs:
                 - name: ledger
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
+                  command: ["sh", "-c", "node dist/index-simple.js"]
                   ports:
                   - containerPort: 4000
                   env:

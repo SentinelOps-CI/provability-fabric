@@ -80,7 +80,7 @@ theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
     simp [budget_ok]
     exact h_budget
   | LogSpend _ =>
-    simp [budget_ok, spend]
+    simp [budget_ok]
     exact ⟨h_respects, h_budget⟩
 
 end Fabric

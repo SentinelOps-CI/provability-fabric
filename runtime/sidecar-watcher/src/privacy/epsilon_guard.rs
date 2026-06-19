@@ -88,19 +88,28 @@ pub struct EpsilonGuard {
 impl EpsilonGuard {
     /// Create a new guard. Falls back to "dev mode" if Kubernetes is not available.
     pub async fn new() -> Result<Self> {
-        let (kube_client, config_map_api) = match Client::try_default().await {
-            Ok(client) => {
-                let api: Api<ConfigMap> = Api::default_namespaced(client.clone());
-                (Some(client), Some(api))
-            }
-            Err(e) => {
-                warn!(
-                    "Kubernetes not detected; EpsilonGuard running in dev mode: {}",
-                    e
-                );
-                (None, None)
-            }
-        };
+        let (kube_client, config_map_api) =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Client::try_default())
+                .await
+            {
+                Ok(Ok(client)) => {
+                    let api: Api<ConfigMap> = Api::default_namespaced(client.clone());
+                    (Some(client), Some(api))
+                }
+                Ok(Err(e)) => {
+                    warn!(
+                        "Kubernetes not detected; EpsilonGuard running in dev mode: {}",
+                        e
+                    );
+                    (None, None)
+                }
+                Err(_) => {
+                    warn!(
+                        "Kubernetes client init timed out; EpsilonGuard running in dev mode"
+                    );
+                    (None, None)
+                }
+            };
 
         Ok(Self {
             kube_client,

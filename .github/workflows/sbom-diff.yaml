@@ -82,19 +82,9 @@ jobs:
 
       - name: Scan for vulnerabilities
         run: |
-          grype sbom:./sbom.json -o json > vulns.json
-
-          # Extract critical vulnerabilities only (High findings are tracked, not gated)
-          HIGH_CRITICAL=$(cat vulns.json | jq -r '.matches[] | select(.vulnerability.severity == "Critical") | .vulnerability.id' | sort | uniq)
-
-          if [ -n "$HIGH_CRITICAL" ]; then
-            echo "❌ Critical vulnerabilities found:"
-            echo "$HIGH_CRITICAL"
-            echo "::error::Critical vulnerabilities detected in dependencies"
-            exit 1
-          else
-            echo "✅ No critical vulnerabilities found"
-          fi
+          # .grype.yaml documents approved exceptions for transitive deps on this branch.
+          grype sbom:./sbom.json --fail-on critical
+          echo "No critical vulnerabilities found"
 
   license-check:
     name: License Compliance Check
