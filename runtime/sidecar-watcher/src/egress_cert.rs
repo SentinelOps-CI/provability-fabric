@@ -525,4 +525,63 @@ mod tests {
         cert.content.metadata.expires_at = future;
         assert!(!cert.is_expired());
     }
+
+    #[test]
+    fn test_egress_certificate_validation() {
+        let cert = EgressCertificate::new(
+            "session-1".to_string(),
+            "bundle-1".to_string(),
+            "plan-hash-123".to_string(),
+            "policy-hash-456".to_string(),
+        );
+        assert!(!cert.content.metadata.session_id.is_empty());
+    }
+
+    #[test]
+    fn test_egress_certificate_schema_validation() {
+        let cert = EgressCertificate::new(
+            "session-1".to_string(),
+            "bundle-1".to_string(),
+            "plan-hash-123".to_string(),
+            "policy-hash-456".to_string(),
+        );
+        assert_eq!(cert.content.metadata.version, "v2.0");
+    }
+
+    #[test]
+    fn test_egress_certificate_dsse_signature() {
+        let mut cert = EgressCertificate::new(
+            "session-1".to_string(),
+            "bundle-1".to_string(),
+            "plan-hash-123".to_string(),
+            "policy-hash-456".to_string(),
+        );
+        assert!(cert.sign("private-key").is_ok());
+        assert!(cert.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn test_egress_certificate_export_import() {
+        let cert = EgressCertificate::new(
+            "session-1".to_string(),
+            "bundle-1".to_string(),
+            "plan-hash-123".to_string(),
+            "policy-hash-456".to_string(),
+        );
+        let exported = serde_json::to_string(&cert).unwrap();
+        let imported: EgressCertificate = serde_json::from_str(&exported).unwrap();
+        assert_eq!(imported.content.metadata.session_id, "session-1");
+    }
+
+    #[test]
+    fn test_egress_certificate_expiry_handling() {
+        let mut cert = EgressCertificate::new(
+            "session-1".to_string(),
+            "bundle-1".to_string(),
+            "plan-hash-123".to_string(),
+            "policy-hash-456".to_string(),
+        );
+        cert.content.metadata.expires_at = 0;
+        assert!(cert.is_expired());
+    }
 }

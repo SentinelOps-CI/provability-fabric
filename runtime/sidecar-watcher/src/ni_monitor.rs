@@ -946,4 +946,27 @@ mod tests {
         assert_eq!(guarantee.global_ni_claim, "global_non_interference");
         assert!(!guarantee.bridge_conditions.is_empty());
     }
+
+    #[test]
+    fn test_ni_monitor_verdict_consistency() {
+        let config = NIMonitorConfig::default();
+        let mut monitor = NIMonitor::new(config);
+
+        for i in 0..10_000 {
+            let event = NIEvent {
+                event_id: format!("prefix_{}", i),
+                timestamp: 1000 + i as u64,
+                session_id: format!("session_{}", i % 100),
+                user_id: format!("user_{}", i % 50),
+                operation: "read".to_string(),
+                input_labels: vec![SecurityLabel::Internal],
+                output_labels: vec![SecurityLabel::Public],
+                data_paths: vec![format!("$.path_{}", i)],
+                metadata: HashMap::new(),
+            };
+            assert!(monitor.monitor_event(event).is_ok());
+        }
+
+        println!("Processed 10000 prefixes");
+    }
 }

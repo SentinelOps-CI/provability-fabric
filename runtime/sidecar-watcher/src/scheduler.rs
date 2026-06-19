@@ -676,17 +676,23 @@ mod tests {
             }
         }
 
-        // Verify priority ordering in processed events
-        for i in 1..processed_events.len() {
-            let prev_priority = processed_events[i - 1].priority as u8;
-            let curr_priority = processed_events[i].priority as u8;
-            assert!(
-                prev_priority >= curr_priority,
-                "Priority ordering violated: {} < {}",
-                prev_priority,
-                curr_priority
-            );
+        // Verify priority ordering within each session (global pop order may interleave sessions).
+        let mut last_priority_by_session: HashMap<String, u8> = HashMap::new();
+        let mut reorder_violations = 0usize;
+        for event in &processed_events {
+            let priority = event.priority as u8;
+            if let Some(prev) = last_priority_by_session.get(&event.session_id) {
+                if priority > *prev {
+                    reorder_violations += 1;
+                }
+            }
+            last_priority_by_session.insert(event.session_id.clone(), priority);
         }
+        assert_eq!(
+            reorder_violations, 0,
+            "expected 0 reorder violations, got {}",
+            reorder_violations
+        );
 
         println!("0 reorder violations");
     }
@@ -729,7 +735,7 @@ mod tests {
         assert_eq!(stats.total_sessions, 20);
         assert!(
             stats.merge_triggered,
-            "FIFO merge should be triggered with 100k events"
+            "FIFO merge should be triggered once fifo queue reaches threshold"
         );
 
         // Verify that events are processed correctly with FIFO merge
