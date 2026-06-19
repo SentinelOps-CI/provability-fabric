@@ -235,7 +235,17 @@ async function startServer() {
     }
   })
 
-  // Apollo Server setup with context
+  // Listen before Apollo init so /health is reachable during CI startup waits
+  await new Promise<void>((resolve) => {
+    app.listen(port, () => {
+      console.log(`🚀 Provability-Fabric Ledger running on port ${port}`)
+      console.log(`📊 Health check: http://localhost:${port}/health`)
+      console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
+      console.log(`📡 API Status: http://localhost:${port}/api/status`)
+      resolve()
+    })
+  })
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
@@ -243,11 +253,10 @@ async function startServer() {
 
   await server.start()
 
-  app.use('/graphql', 
+  app.use('/graphql',
     expressMiddleware(server, {
       context: async ({ req }) => {
-        // For development, create a mock user context
-        return { 
+        return {
           user: {
             tid: 'dev-tenant',
             sub: 'dev-user',
@@ -257,13 +266,6 @@ async function startServer() {
       }
     })
   )
-
-  app.listen(port, () => {
-    console.log(`🚀 Provability-Fabric Ledger running on port ${port}`)
-    console.log(`📊 Health check: http://localhost:${port}/health`)
-    console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
-    console.log(`📡 API Status: http://localhost:${port}/api/status`)
-  })
 }
 
 startServer().catch(console.error) 

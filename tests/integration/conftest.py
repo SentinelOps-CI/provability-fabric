@@ -144,17 +144,30 @@ def ledger_service() -> Generator[str, None, None]:
         check=True,
     )
 
-    # Wait for service to be ready (image build + DB migrate can exceed 30s)
+    # Wait for service to be ready (image build + DB migrate can exceed 2m on CI)
     ledger_url = "http://localhost:4000"
-    for _ in range(120):
+    for _ in range(90):
         try:
             response = requests.get(f"{ledger_url}/health", timeout=5)
             if response.status_code == 200:
                 break
         except requests.RequestException:
             pass
-        time.sleep(1)
+        time.sleep(2)
     else:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                compose_files[0],
+                "-f",
+                compose_files[1],
+                "logs",
+                "ledger",
+            ],
+            check=False,
+        )
         raise RuntimeError("Ledger service failed to start")
 
     try:

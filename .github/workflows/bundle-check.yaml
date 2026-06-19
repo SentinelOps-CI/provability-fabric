@@ -90,6 +90,19 @@ jobs:
               }
             }
             
+            const postComment = async (body) => {
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body
+                });
+              } catch (error) {
+                core.warning(`Could not post PR comment: ${error.message}`);
+              }
+            };
+
             if (missingLinks.length > 0) {
               const comment = `## Bundle Verification Failed
               
@@ -99,19 +112,8 @@ jobs:
               
               Please ensure all requirements map to acceptance criteria and all acceptance criteria have corresponding test vectors.`;
               
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-              
+              await postComment(comment);
               core.setFailed('Bundle verification failed');
             } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '✅ Bundle verification passed - all traceability links are present.'
-              });
+              await postComment('✅ Bundle verification passed - all traceability links are present.');
             } 
