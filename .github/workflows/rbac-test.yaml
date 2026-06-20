@@ -311,12 +311,16 @@ jobs:
 
             _RBAC tests completed successfully._`;
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } catch (error) {
+              core.warning(`Could not post PR comment: ${error.message}`);
+            }
 
       - name: Cleanup
         if: always()
