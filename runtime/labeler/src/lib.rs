@@ -236,14 +236,31 @@ impl Labeler {
             }
         }
 
-        // Check if current path matches any taint rules
-        let path_str = state.current_path.to_string();
-        if let Some(label) = self.path_rules.get(&path_str) {
-            return Ok(label.clone());
+        if let Some(label) = self.match_path_rule(&state.current_path.to_string()) {
+            return Ok(label);
         }
 
         // Default label for strings
         Ok(self.config.default_label.clone())
+    }
+
+    /// Match configured taint rules against an absolute JSON path.
+    fn match_path_rule(&self, path_str: &str) -> Option<String> {
+        if let Some(label) = self.path_rules.get(path_str) {
+            return Some(label.clone());
+        }
+
+        for (rule_path, label) in &self.path_rules {
+            let suffix = rule_path.strip_prefix('$').unwrap_or(rule_path.as_str());
+            if suffix.is_empty() {
+                continue;
+            }
+            if path_str.ends_with(suffix) {
+                return Some(label.clone());
+            }
+        }
+
+        None
     }
 
     /// Label array value
