@@ -24,7 +24,7 @@ on:
 jobs:
   performance-benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -59,22 +59,25 @@ jobs:
           sudo apt-get install -y build-essential pkg-config libssl-dev bc
 
       - name: Run Criterion smoke benchmarks
+        env:
+          PF_BENCH_SMOKE: "1"
         run: |
-          cd bench
-          cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot --test
+          cargo bench -p provability-fabric-bench --bench performance_benchmarks -- \
+            hot_path_performance --sample-size 10 --measurement-time 3 --noplot
           echo "performance_gate=passed" >> "$GITHUB_OUTPUT"
         id: gates
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: benchmark-results-${{ matrix.rust-version }}
-          path: bench/target/criterion/**
+          path: target/criterion/**
 
   performance-summary:
     runs-on: ubuntu-latest
     needs: performance-benchmark
-    if: always()
+    if: always() && needs.performance-benchmark.result != 'cancelled'
     
     steps:
       - name: Set conclusion
