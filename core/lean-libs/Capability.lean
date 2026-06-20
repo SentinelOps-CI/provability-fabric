@@ -80,7 +80,7 @@ theorem thm_allowed_implies_no_forbidden :
       cases h_mem with
       | head =>
         exact absurd h_forbidden h_not_forbidden
-      | tail h_in_as =>
+      | @List.Mem.tail _ h_in_as =>
         exact ih_result ⟨a, ⟨h_in_as, h_forbidden⟩⟩
 
 /-- Check if a specific tool is allowed for a specific agent -/
