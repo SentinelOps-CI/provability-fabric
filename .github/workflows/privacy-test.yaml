@@ -198,8 +198,7 @@ jobs:
 
       - name: Build sidecar watcher
         run: |
-          cd runtime/sidecar-watcher
-          cargo build --release
+          cargo build --release -p sidecar-watcher
 
       - name: Start mock ledger service
         run: |
@@ -211,12 +210,16 @@ jobs:
         env:
           KUBECONFIG: /dev/null
         run: |
-          cd runtime/sidecar-watcher
+          SIDECAR_BIN=target/release/sidecar-watcher
+          if [ ! -x "$SIDECAR_BIN" ]; then
+            echo "ERROR: sidecar binary not found at $SIDECAR_BIN"
+            exit 1
+          fi
 
-          LEDGER_URL=http://127.0.0.1:3000 ./target/release/sidecar-watcher &
+          LEDGER_URL=http://127.0.0.1:3000 "$SIDECAR_BIN" &
           echo $! > watcher.pid
 
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             if curl -sf http://localhost:9090/metrics | grep -q .; then
               break
             fi
@@ -229,8 +232,8 @@ jobs:
             exit 1
           fi
 
-          cargo test test_privacy_metrics_export -- --nocapture
-          cargo test test_epsilon_guard_budget_exhaustion -- --nocapture
+          cargo test -p sidecar-watcher test_privacy_metrics_export -- --nocapture
+          cargo test -p sidecar-watcher test_epsilon_guard_budget_exhaustion -- --nocapture
 
       - name: Cleanup
         if: always()
