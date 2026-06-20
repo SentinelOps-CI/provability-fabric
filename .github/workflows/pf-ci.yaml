@@ -194,19 +194,11 @@ jobs:
                 labels:
                   app: ledger
               spec:
-                initContainers:
-                - name: migrate
-                  image: provability-fabric/ledger:test
-                  imagePullPolicy: Never
-                  command: ["npx", "prisma", "migrate", "deploy"]
-                  env:
-                  - name: DATABASE_URL
-                    value: "postgresql://postgres:testpass@postgres-postgresql:5432/provability_fabric"
                 containers:
                 - name: ledger
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
-                  command: ["sh", "-c", "node dist/index-simple.js"]
+                  command: ["sh", "-c", "npx prisma migrate deploy && node dist/index-simple.js"]
                   ports:
                   - containerPort: 4000
                   env:
@@ -218,8 +210,9 @@ jobs:
                     httpGet:
                       path: /health
                       port: 4000
-                    initialDelaySeconds: 10
+                    initialDelaySeconds: 15
                     periodSeconds: 5
+                    failureThreshold: 12
           ---
           apiVersion: v1
           kind: Service
@@ -237,11 +230,13 @@ jobs:
       - name: Wait for core services
         run: |
           kubectl wait --for=condition=available deployment/attestor --timeout=300s
-          kubectl wait --for=condition=available deployment/ledger --timeout=600s || {
+          if ! kubectl rollout status deployment/ledger --timeout=900s; then
+            kubectl get pods -l app=ledger -o wide || true
             kubectl describe deployment/ledger || true
-            kubectl logs deployment/ledger --tail=100 || true
+            kubectl describe pods -l app=ledger || true
+            kubectl logs deployment/ledger -c ledger --tail=100 2>/dev/null || true
             exit 1
-          }
+          fi
 
   trust-fire:
     name: Run TRUST-FIRE Phases 2/3/6 and Gate on PASS
