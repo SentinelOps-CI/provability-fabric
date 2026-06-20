@@ -43,10 +43,10 @@ jobs:
           export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
           if ! "$HOME/.elan/bin/elan" toolchain list | grep -Fq "$TOOLCHAIN"; then
-            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN" || true
           fi
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
-          lean --version
+          "$HOME/.elan/bin/lean" --version
 
       - name: Vendor mathlib
         timeout-minutes: 20

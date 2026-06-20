@@ -40,7 +40,7 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
 /-- Check if a list of generic actions respects budget constraints with config -/
 def budget_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | [] => True
-  | actions => BudgetSpend actions ≤ (cfg.dailyLimit : Float)
+  | actions => BudgetSpend actions ≤ Nat.cast cfg.dailyLimit
 
 /-- Check if a list of generic actions respects spam constraints with config -/
 def spam_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
@@ -109,7 +109,7 @@ theorem thm_budget_ok_implies_total_spend_le (cfg : BudgetCfg) (limit : Nat)
     | LogSpend usd =>
       simp [budget_ok, total_spend] at h ⊢
       obtain ⟨h_sum, h_rest⟩ := h
-      rw [hlim] at h_sum ⊢
+      rw [hlim] at h_sum
       exact h_sum
 
 end Fabric

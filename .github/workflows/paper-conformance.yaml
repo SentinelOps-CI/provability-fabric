@@ -237,15 +237,12 @@ jobs:
 
       - name: Run Scheduler & Clock Model Tests
         run: |
+          set -o pipefail
           cargo test -p sidecar-watcher \
             test_concurrency_stress_with_priority_mixing \
             test_two_queue_concurrency_stress \
-            -- --nocapture
-
-      - name: Verify 0 Reorder Violations
-        run: |
-          cargo test -p sidecar-watcher test_concurrency_stress_with_priority_mixing -- --nocapture 2>&1 \
-            | grep -q "0 reorder violations" || exit 1
+            -- --nocapture 2>&1 | tee scheduler-test.log
+          grep -q "0 reorder violations" scheduler-test.log
 
   # Prompt 82: Replay Determinism & Drift Detector
   replay-determinism:
