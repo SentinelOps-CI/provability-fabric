@@ -7,8 +7,8 @@ import { ApolloServer } from '@apollo/server'
 import { expressMiddleware } from '@apollo/server/express4'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth-simple'
-import { BillingService, billingMiddleware } from './billing'
+import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth-simple.js'
+import { BillingService, billingMiddleware } from './billing.js'
 
 const prisma = new PrismaClient()
 
