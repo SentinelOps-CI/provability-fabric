@@ -54,6 +54,7 @@ jobs:
           # Build ledger image
           cd runtime/ledger
           npm install
+          rm -rf dist node_modules/.cache/tsbuildinfo
           npm run build
           docker build -t provability-fabric/ledger:test .
 
