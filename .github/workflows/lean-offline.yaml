@@ -29,6 +29,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache Lean toolchain and mathlib artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cache/lake
+            vendor/mathlib/.lake
+            vendor/mathlib/.git
+          key: lean-offline-${{ hashFiles('lean-toolchain', 'scripts/vendor-mathlib.sh') }}
+          restore-keys: |
+            lean-offline-
+
       - name: Set up Lean (elan)
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
@@ -40,6 +52,7 @@ jobs:
           lean --version
 
       - name: Vendor mathlib
+        timeout-minutes: 20
         run: |
           chmod +x scripts/vendor-mathlib.sh
           bash scripts/vendor-mathlib.sh
