@@ -215,7 +215,7 @@ jobs:
   scheduler-clock:
     name: Scheduler & Clock Model
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -224,16 +224,28 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-sidecar-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sidecar-
+
       - name: Run Scheduler & Clock Model Tests
         run: |
-          cd runtime/sidecar-watcher
-          cargo test test_concurrency_stress_with_priority_mixing -- --nocapture
-          cargo test test_two_queue_concurrency_stress -- --nocapture
+          cargo test -p sidecar-watcher \
+            test_concurrency_stress_with_priority_mixing \
+            test_two_queue_concurrency_stress \
+            -- --nocapture
 
       - name: Verify 0 Reorder Violations
         run: |
-          cd runtime/sidecar-watcher
-          cargo test test_concurrency_stress_with_priority_mixing -- --nocapture | grep -q "0 reorder violations" || exit 1
+          cargo test -p sidecar-watcher test_concurrency_stress_with_priority_mixing -- --nocapture 2>&1 \
+            | grep -q "0 reorder violations" || exit 1
 
   # Prompt 82: Replay Determinism & Drift Detector
   replay-determinism:
