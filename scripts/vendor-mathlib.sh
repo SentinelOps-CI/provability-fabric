@@ -38,11 +38,12 @@ fi
 echo "🔨 Fetching mathlib build artifacts..."
 if [ -d .lake/build/lib ] && [ -n "$(ls -A .lake/build/lib 2>/dev/null)" ]; then
   echo "✅ Mathlib build artifacts already present, skipping fetch"
-elif lake exe cache get; then
+elif timeout 900 lake exe cache get; then
   echo "✅ Downloaded mathlib cache"
 else
-  echo "⚠️  Mathlib cache download failed; falling back to lake build"
-  lake build
+  echo "❌ Mathlib cache download failed or timed out after 15 minutes"
+  echo "   CI should restore vendor/mathlib/.lake from cache; avoid full lake build here."
+  exit 1
 fi
 
 echo "✅ Mathlib vendored successfully!"
