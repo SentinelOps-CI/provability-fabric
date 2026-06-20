@@ -40,7 +40,7 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
 /-- Check if a list of generic actions respects budget constraints with config -/
 def budget_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | [] => True
-  | actions => BudgetSpend actions ≤ (cfg.dailyLimit : Float)
+  | actions => BudgetSpend actions ≤ Float.ofNat cfg.dailyLimit
 
 /-- Check if a list of generic actions respects spam constraints with config -/
 def spam_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
