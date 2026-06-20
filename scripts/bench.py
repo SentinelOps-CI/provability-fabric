@@ -7,6 +7,7 @@ Performance benchmark for sidecar watcher.
 """
 
 import json
+import os
 import subprocess
 import time
 import psutil
@@ -36,9 +37,17 @@ def measure_processing_time(actions: List[str]) -> List[float]:
     times = []
 
     # Start sidecar watcher process
+    bin_path = os.environ.get("SIDECAR_BIN")
+    if bin_path:
+        cmd = [bin_path]
+        cwd = None
+    else:
+        cmd = ["cargo", "run", "--release", "--bin", "sidecar-watcher"]
+        cwd = "runtime/sidecar-watcher"
+
     process = subprocess.Popen(
-        ["cargo", "run", "--bin", "sidecar-watcher"],
-        cwd="runtime/sidecar-watcher",
+        cmd,
+        cwd=cwd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

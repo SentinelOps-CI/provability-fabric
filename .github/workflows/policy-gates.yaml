@@ -349,7 +349,12 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Build sidecar watcher
+        run: cargo build --release --bin sidecar-watcher --manifest-path runtime/sidecar-watcher/Cargo.toml
+
       - name: Run performance benchmarks
+        env:
+          SIDECAR_BIN: runtime/sidecar-watcher/target/release/sidecar-watcher
         run: |
           mkdir -p bench
           python scripts/bench.py --count 1000 --output bench/benchmark_results.json
