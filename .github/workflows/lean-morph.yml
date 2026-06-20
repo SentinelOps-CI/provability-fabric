@@ -84,7 +84,9 @@ jobs:
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
           export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
-          elan toolchain install "$TOOLCHAIN"
+          if ! elan toolchain list | grep -Fq "$TOOLCHAIN"; then
+            elan toolchain install "$TOOLCHAIN"
+          fi
           elan override set "$TOOLCHAIN"
           lean --version
 

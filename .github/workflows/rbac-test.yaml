@@ -198,31 +198,40 @@ jobs:
 
           # Test 1: Tenant A publishes capsule
           echo "Testing tenant A capsule publication..."
-          curl -X POST http://localhost:4000/graphql \
+          CREATE_RESP=$(curl -s -X POST http://localhost:4000/graphql \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TENANT_A_TOKEN" \
             -d '{
               "query": "mutation { createCapsule(hash: \"test-capsule-a\", specSig: \"test-sig\", riskScore: 0.5) { id hash } }"
-            }'
+            }')
+          echo "$CREATE_RESP"
+          if echo "$CREATE_RESP" | grep -q '"errors"'; then
+            echo "❌ Tenant A capsule publication failed"
+            kill $PF_PID
+            exit 1
+          fi
 
           # Test 2: Tenant B tries to access Tenant A's capsule (should fail)
           echo "Testing tenant isolation - Tenant B accessing Tenant A's capsule..."
-          RESPONSE=$(curl -s -w "%{http_code}" -X POST http://localhost:4000/graphql \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:4000/graphql \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TENANT_B_TOKEN" \
             -d '{
               "query": "query { capsule(hash: \"test-capsule-a\") { id hash } }"
             }')
 
-          HTTP_CODE="${RESPONSE: -3}"
-          if [ "$HTTP_CODE" != "403" ] && [ "$HTTP_CODE" != "404" ]; then
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          if echo "$BODY" | grep -q '"capsule":null'; then
+            echo "✅ Tenant isolation test passed - cross-tenant query returned null"
+          elif [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "404" ]; then
+            echo "✅ Tenant isolation test passed"
+          else
             echo "❌ Tenant isolation failed - Tenant B was able to access Tenant A's capsule"
-            echo "Response: $RESPONSE"
+            echo "Response: $BODY (HTTP $HTTP_CODE)"
             kill $PF_PID
             exit 1
           fi
-
-          echo "✅ Tenant isolation test passed"
 
           # Test 3: SQL injection attempt
           echo "Testing SQL injection prevention..."

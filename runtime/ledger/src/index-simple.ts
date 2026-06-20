@@ -55,10 +55,52 @@ const typeDefs = `#graphql
 
   type Mutation {
     createCapsule(hash: String!, specSig: String!, riskScore: Float!, reason: String): Capsule!
+    publish(hash: String!, specSig: String!, risk: Float!, reason: String): Capsule!
     updateCapsule(hash: String!, riskScore: Float!, reason: String): Capsule!
     createPremiumQuote(capsuleHash: String!, riskScore: Float!, annualUsd: Float!): PremiumQuote!
   }
 `
+
+function userFromRequest(req: express.Request) {
+  const auth = req.headers.authorization
+  if (auth?.startsWith('Bearer ')) {
+    try {
+      const payloadPart = auth.slice(7).split('.')[1]
+      const payload = JSON.parse(
+        Buffer.from(payloadPart.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+      )
+      if (typeof payload.tid === 'string' && payload.tid.length > 0) {
+        return {
+          tid: payload.tid,
+          sub: payload.sub ?? 'test-user',
+          email: 'test@example.com',
+        }
+      }
+    } catch {
+      // fall through to dev defaults
+    }
+  }
+  return {
+    tid: 'dev-tenant',
+    sub: 'dev-user',
+    email: 'dev@example.com',
+  }
+}
+
+async function ensureDefaultTenants() {
+  const tenants = [
+    { id: 'dev-tenant', name: 'Development Tenant', auth0Id: 'dev-tenant' },
+    { id: 'tenant-a', name: 'Tenant A', auth0Id: 'tenant-a' },
+    { id: 'tenant-b', name: 'Tenant B', auth0Id: 'tenant-b' },
+  ]
+  for (const tenant of tenants) {
+    await prisma.tenant.upsert({
+      where: { id: tenant.id },
+      create: tenant,
+      update: {},
+    })
+  }
+}
 
 // GraphQL resolvers with tenant scoping
 const resolvers = {
@@ -121,6 +163,21 @@ const resolvers = {
         }
       })
     },
+    publish: async (_: any, { hash, specSig, risk, reason }: any, { user }: { user: any }) => {
+      return await prisma.capsule.create({
+        data: {
+          hash,
+          specSig,
+          riskScore: risk,
+          reason,
+          tenantId: user.tid
+        },
+        include: {
+          tenant: true,
+          premiumQuotes: true
+        }
+      })
+    },
     updateCapsule: async (_: any, { hash, riskScore, reason }: any, { user }: { user: any }) => {
       return await prisma.capsule.update({
         where: { hash },
@@ -149,6 +206,8 @@ const resolvers = {
 }
 
 async function startServer() {
+  await ensureDefaultTenants()
+
   const app = express()
   const port = process.env.PORT || 8080
 
@@ -255,15 +314,9 @@ async function startServer() {
 
   app.use('/graphql',
     expressMiddleware(server, {
-      context: async ({ req }) => {
-        return {
-          user: {
-            tid: 'dev-tenant',
-            sub: 'dev-user',
-            email: 'dev@example.com'
-          }
-        }
-      }
+      context: async ({ req }) => ({
+        user: userFromRequest(req),
+      }),
     })
   )
 }

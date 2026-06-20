@@ -190,7 +190,7 @@ def ledger_service() -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="session")
-def demo_agent_image() -> Generator[str, None, None]:
+def demo_agent_image(kind_cluster: str) -> Generator[str, None, None]:
     """Build demo agent container image."""
     # Create demo agent Dockerfile
     demo_dir = Path("demo/agent")
@@ -226,6 +226,18 @@ sleep 3600  # Keep container running
         check=True,
     )
 
+    subprocess.run(
+        [
+            "kind",
+            "load",
+            "docker-image",
+            "provability-fabric/demo-agent:latest",
+            "--name",
+            kind_cluster,
+        ],
+        check=True,
+    )
+
     yield "provability-fabric/demo-agent:latest"
 
     # Cleanup
@@ -235,7 +247,7 @@ sleep 3600  # Keep container running
 
 
 @pytest.fixture(scope="session")
-def violation_agent_image() -> Generator[str, None, None]:
+def violation_agent_image(kind_cluster: str) -> Generator[str, None, None]:
     """Build violation agent container image."""
     # Create violation agent Dockerfile
     demo_dir = Path("demo/violation-agent")
@@ -253,7 +265,7 @@ CMD ["/agent.sh"]
     (demo_dir / "agent.sh").write_text(
         """#!/bin/sh
 # Demo agent that emits over-budget actions
-echo '{"action": "LogSpend", "usd": 500.0, "payload": "violation"}' >&1
+echo '{"action": "LogSpend", "usd_amount": 500.0, "payload": "violation"}' >&1
 sleep 3600  # Keep container running
 """
     )
@@ -266,6 +278,18 @@ sleep 3600  # Keep container running
             "-t",
             "provability-fabric/violation-agent:latest",
             str(demo_dir),
+        ],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "kind",
+            "load",
+            "docker-image",
+            "provability-fabric/violation-agent:latest",
+            "--name",
+            kind_cluster,
         ],
         check=True,
     )

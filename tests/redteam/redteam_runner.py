@@ -68,8 +68,9 @@ class RedTeamRunner:
     def deploy_test_agent(self, case: AttackCase) -> Optional[str]:
         """Deploy a test agent pod for the attack case."""
         try:
-            # Create a unique pod name
-            pod_name = f"redteam-{case.id}-{int(time.time())}"
+            # Pod names must be RFC 1123 subdomains (no underscores)
+            safe_case_id = case.id.replace("_", "-").lower()
+            pod_name = f"redteam-{safe_case_id}-{int(time.time())}"
 
             # Create pod manifest
             pod_manifest = {

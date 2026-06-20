@@ -55,8 +55,11 @@ jobs:
       - name: Activate Lean from lean-toolchain
         run: |
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
-          elan toolchain install "$TOOLCHAIN"
+          if ! elan toolchain list | grep -Fq "$TOOLCHAIN"; then
+            elan toolchain install "$TOOLCHAIN" || true
+          fi
           elan override set "$TOOLCHAIN"
+          export PATH="$HOME/.elan/bin:$PATH"
           lean --version
 
       - name: Vendor mathlib

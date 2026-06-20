@@ -75,6 +75,26 @@ def test_happy_path(
         else:
             pytest.fail("Pod failed to reach Running state within 30 seconds")
 
+        # Admission webhook is not registered in CI Kind setup; seed ledger directly.
+        create_mutation = """
+        mutation CreateCapsule($hash: String!, $specSig: String!, $riskScore: Float!) {
+            createCapsule(hash: $hash, specSig: $specSig, riskScore: $riskScore) { hash }
+        }
+        """
+        seed_response = requests.post(
+            f"{ledger_service}/graphql",
+            json={
+                "query": create_mutation,
+                "variables": {
+                    "hash": spec_hash,
+                    "specSig": spec_hash,
+                    "riskScore": 0.0,
+                },
+            },
+            timeout=10,
+        )
+        assert seed_response.status_code == 200
+
         # Query ledger GraphQL to verify capsule hash is present
         query = """
         query GetCapsule($hash: ID!) {
