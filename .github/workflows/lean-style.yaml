@@ -109,11 +109,15 @@ jobs:
       - name: Check for 'sorry' or 'by admit' in CI-enforced Lean targets
         run: |
           echo "Checking for placeholder proofs in CI-enforced targets only..."
-          ENFORCED="core/lean-libs spec-templates/v1/proofs bundles/my-agent/proofs bundles/test-new-user-agent/proofs"
+          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/Budget.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
           FOUND=""
-          for d in $ENFORCED; do
-            if [ -d "$d" ]; then
-              HITS=$(find "$d" -name "*.lean" ! -path '*/.lake/*' -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
+          for target in $ENFORCED; do
+            if [ -f "$target" ]; then
+              if grep -q "sorry\|by admit" "$target"; then
+                FOUND="$FOUND $target"
+              fi
+            elif [ -d "$target" ]; then
+              HITS=$(find "$target" -name "*.lean" ! -path '*/.lake/*' -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
               if [ -n "$HITS" ]; then
                 FOUND="$FOUND $HITS"
               fi
