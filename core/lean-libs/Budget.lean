@@ -21,12 +21,12 @@ namespace Fabric
 
 /-- Budget configuration structure for agents -/
 structure BudgetCfg where
-  dailyLimit : Float
+  dailyLimit : Nat
   spamLimit : Float
 
 /-- Default budget configuration -/
 def defaultBudgetCfg : BudgetCfg := {
-  dailyLimit := 300.0,
+  dailyLimit := 300,
   spamLimit := 0.07
 }
 
@@ -35,12 +35,12 @@ def budget_ok (cfg : BudgetCfg) : List Action → Prop
   | [] => True
   | (Action.SendEmail _) :: rest => budget_ok cfg rest
   | (Action.LogSpend usd) :: rest =>
-    usd ≤ cfg.dailyLimit.toNat ∧ budget_ok cfg rest
+    total_spend (Action.LogSpend usd :: rest) ≤ cfg.dailyLimit ∧ budget_ok cfg rest
 
 /-- Check if a list of generic actions respects budget constraints with config -/
 def budget_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | [] => True
-  | actions => BudgetSpend actions ≤ cfg.dailyLimit
+  | actions => BudgetSpend actions ≤ (cfg.dailyLimit : Float)
 
 /-- Check if a list of generic actions respects spam constraints with config -/
 def spam_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
@@ -50,6 +50,11 @@ def spam_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
 /-- Combined safety check for both budget and spam constraints with config -/
 def safety_ok_cfg {α : Type} (cfg : BudgetCfg) : List (ActionG α) → Prop
   | actions => budget_ok_cfg cfg actions ∧ spam_ok_cfg cfg actions
+
+private theorem total_spend_append_le (tr₁ tr₂ : List Action) :
+    total_spend tr₁ ≤ total_spend (tr₁ ++ tr₂) := by
+  rw [thm_total_spend_concat]
+  exact Nat.le_add_right _ _
 
 /-- Theorem: budget_ok is prefix-closed with config -/
 theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
@@ -63,16 +68,21 @@ theorem thm_budget_ok_prefix_closed_cfg (cfg : BudgetCfg) :
     | SendEmail _ =>
       simp [budget_ok, List.cons_append] at h ⊢
       exact ih tr₂ h
-    | LogSpend _ =>
-      simp [budget_ok, List.cons_append] at h ⊢
+    | LogSpend usd =>
+      simp [budget_ok, List.cons_append, total_spend] at h ⊢
       obtain ⟨hle, hrest⟩ := h
-      exact ⟨hle, ih tr₂ hrest⟩
+      have prefix_le :
+          usd + total_spend tr₁ ≤ usd + total_spend (tr₁ ++ tr₂) :=
+        Nat.add_le_add_left (total_spend_append_le tr₁ tr₂) usd
+      exact ⟨le_trans prefix_le hle, ih tr₂ hrest⟩
 
 /-- Theorem: budget_ok is monotone under adding budget-respecting actions with config -/
 theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
   ∀ (tr : List Action) (a : Action),
     budget_ok cfg tr →
-    (match a with | Action.LogSpend usd => usd ≤ cfg.dailyLimit.toNat | _ => True) →
+    (match a with
+     | Action.LogSpend usd => total_spend (Action.LogSpend usd :: tr) ≤ cfg.dailyLimit
+     | _ => True) →
     budget_ok cfg (a :: tr) := by
   intro tr a h_budget h_respects
   cases a with
@@ -85,32 +95,21 @@ theorem thm_budget_ok_monotone_cfg (cfg : BudgetCfg) :
 
 /-- Theorem: budget_ok implies total_spend stays within the configured daily limit -/
 theorem thm_budget_ok_implies_total_spend_le (cfg : BudgetCfg) (limit : Nat)
-    (hlim : cfg.dailyLimit.toNat = limit) :
+    (hlim : cfg.dailyLimit = limit) :
     ∀ (tr : List Action), budget_ok cfg tr → total_spend tr ≤ limit := by
-  intro tr
+  intro tr h
   induction tr with
   | nil =>
     simp [budget_ok, total_spend]
   | cons head tail ih =>
     cases head with
-    | SendEmail score =>
-      simp [budget_ok, total_spend]
-      exact ih
+    | SendEmail _ =>
+      simp [budget_ok, total_spend] at h ⊢
+      exact ih h
     | LogSpend usd =>
-      simp [budget_ok, total_spend]
-      intro h
-      have ⟨h1, h2⟩ := h
-      have ih_result := ih h2
-      have add_le : usd + total_spend tail ≤ usd + limit := by
-        apply add_le_add_left
-        exact ih_result
-      have usd_le_limit : usd ≤ limit := by simpa [hlim] using h1
-      have usd_plus_limit_le_double : usd + limit ≤ limit + limit := by
-        apply add_le_add_right
-        exact usd_le_limit
-      have usd_plus_limit_le_limit : usd + limit ≤ limit := by
-        simp at usd_plus_limit_le_double
-        exact usd_plus_limit_le_double
-      exact le_trans add_le usd_plus_limit_le_limit
+      simp [budget_ok, total_spend] at h ⊢
+      obtain ⟨h_sum, h_rest⟩ := h
+      rw [hlim] at h_sum ⊢
+      exact h_sum
 
 end Fabric
