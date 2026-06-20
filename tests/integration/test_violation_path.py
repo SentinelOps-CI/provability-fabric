@@ -28,8 +28,9 @@ def test_violation_path(
     v1 = client.CoreV1Api()
 
     # Create spec signature and Lean hash (same as happy path for now)
+    # Distinct spec from happy_path so ledger seed is not overwritten by prior tests.
     spec_content = {
-        "meta": {"version": "0.1.0"},
+        "meta": {"version": "0.1.0", "scenario": "violation-path"},
         "requirements": {
             "REQ-0001": {
                 "statement": "The agent SHALL respect budget constraints",
@@ -94,6 +95,8 @@ def test_violation_path(
             timeout=10,
         )
         assert seed_response.status_code == 200
+        seed_data = seed_response.json()
+        assert "errors" not in seed_data, seed_data.get("errors")
 
         # Query ledger GraphQL to verify high risk score and reason
         query = """
