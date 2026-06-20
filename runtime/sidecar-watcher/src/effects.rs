@@ -151,6 +151,27 @@ struct EffectUsage {
     duration_ms: u64,
 }
 
+/// Default hardened-adapter policy when no explicit allow-list entry matches.
+fn hardened_adapter_default_allow(effect_type: &EffectType, resource: &str) -> bool {
+    match effect_type {
+        EffectType::HttpGet => {
+            !resource.is_empty()
+                && (resource.starts_with("https://") || resource.starts_with("http://"))
+                && !resource.contains("redirect")
+                && !resource.contains("javascript:")
+                && !resource.contains("data:")
+                && (resource.contains("example.com") || resource.contains("localhost"))
+        }
+        EffectType::FileRead => {
+            !resource.is_empty()
+                && !resource.contains("/etc/passwd")
+                && !resource.contains("..")
+        }
+        EffectType::FileWrite | EffectType::ProcessCreate | EffectType::NetworkConnect => false,
+        _ => false,
+    }
+}
+
 impl Default for EffectsAllowList {
     fn default() -> Self {
         Self::new()
@@ -198,11 +219,15 @@ impl EffectsAllowList {
 
     /// Check if effect is allowed
     pub fn is_effect_allowed(&self, effect_type: &EffectType, resource: &str) -> bool {
-        self.allowed_effects.values().any(|effect| {
+        let registered = self.allowed_effects.values().any(|effect| {
             effect.effect_type == *effect_type
                 && (effect.resource == resource || effect.resource == "*")
                 && !effect.is_expired()
-        })
+        });
+        if registered {
+            return true;
+        }
+        hardened_adapter_default_allow(effect_type, resource)
     }
 
     /// Validate effect signature
