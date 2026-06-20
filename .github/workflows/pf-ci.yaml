@@ -237,7 +237,11 @@ jobs:
       - name: Wait for core services
         run: |
           kubectl wait --for=condition=available deployment/attestor --timeout=300s
-          kubectl wait --for=condition=available deployment/ledger --timeout=300s
+          kubectl wait --for=condition=available deployment/ledger --timeout=600s || {
+            kubectl describe deployment/ledger || true
+            kubectl logs deployment/ledger --tail=100 || true
+            exit 1
+          }
 
   trust-fire:
     name: Run TRUST-FIRE Phases 2/3/6 and Gate on PASS
