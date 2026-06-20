@@ -16,7 +16,7 @@ mkdir -p "$VENDOR_DIR"
 
 # Clone mathlib to vendor directory (remove stale cache dirs missing .git)
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
-if [ ! -d "$VENDOR_DIR/.git" ]; then
+if [ ! -d "$VENDOR_DIR/.git" ] || [ ! -f "$VENDOR_DIR/lakefile.lean" ]; then
     rm -rf "$VENDOR_DIR"
     git clone --depth 1 --branch "$MATHLIB_VERSION" \
         https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"
