@@ -15,7 +15,7 @@ limitations under the License.
 -/
 
 import Fabric
-import Fabric.Capability
+import Capability
 
 namespace Spec
 
