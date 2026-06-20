@@ -113,7 +113,7 @@ jobs:
           FOUND=""
           for d in $ENFORCED; do
             if [ -d "$d" ]; then
-              HITS=$(find "$d" -name "*.lean" -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
+              HITS=$(find "$d" -name "*.lean" ! -path '*/.lake/*' -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
               if [ -n "$HITS" ]; then
                 FOUND="$FOUND $HITS"
               fi
