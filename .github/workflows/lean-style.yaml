@@ -151,7 +151,7 @@ jobs:
           echo "🔍 Checking for duplicate core definitions..."
           
           # Check for duplicate Action definitions
-          action_defs=$(find bundles -name "*.lean" -exec grep -l "inductive Action" {} \; 2>/dev/null || true)
+          action_defs=$(find bundles -name "*.lean" ! -path '*/.lake/*' -exec grep -l "inductive Action" {} \; 2>/dev/null || true)
           if [ -n "$action_defs" ]; then
             echo "❌ Found duplicate Action definitions in:"
             echo "$action_defs"
@@ -159,7 +159,7 @@ jobs:
           fi
           
           # Check for duplicate budget_ok definitions
-          budget_defs=$(find bundles -name "*.lean" -exec grep -l "def budget_ok" {} \; 2>/dev/null || true)
+          budget_defs=$(find bundles -name "*.lean" ! -path '*/.lake/*' -exec grep -l "def budget_ok" {} \; 2>/dev/null || true)
           if [ -n "$budget_defs" ]; then
             echo "❌ Found duplicate budget_ok definitions in:"
             echo "$budget_defs"
