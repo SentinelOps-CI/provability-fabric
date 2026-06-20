@@ -198,7 +198,7 @@ jobs:
                 - name: ledger
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
-                  command: ["sh", "-c", "npx prisma migrate deploy && node dist/index-simple.js"]
+                  command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index-simple.js"]
                   ports:
                   - containerPort: 4000
                   env:
