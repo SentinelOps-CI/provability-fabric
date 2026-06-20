@@ -97,7 +97,7 @@ def test_violation_path(
 
         # Query ledger GraphQL to verify high risk score and reason
         query = """
-        query GetCapsule($hash: ID!) {
+        query GetCapsule($hash: String!) {
             capsule(hash: $hash) {
                 hash
                 specSig

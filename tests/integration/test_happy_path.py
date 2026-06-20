@@ -97,7 +97,7 @@ def test_happy_path(
 
         # Query ledger GraphQL to verify capsule hash is present
         query = """
-        query GetCapsule($hash: ID!) {
+        query GetCapsule($hash: String!) {
             capsule(hash: $hash) {
                 hash
                 specSig
