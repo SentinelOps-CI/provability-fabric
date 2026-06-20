@@ -34,6 +34,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Lean toolchain and mathlib artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cache/lake
+            vendor/mathlib/.lake
+            vendor/mathlib/.git
+          key: policy-gates-lean-${{ hashFiles('lean-toolchain', 'scripts/vendor-mathlib.sh') }}
+          restore-keys: |
+            policy-gates-lean-
+
       - name: Set up Lean
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/v4.2.1/elan-init.sh | sh -s -- -y --default-toolchain none
@@ -48,6 +60,7 @@ jobs:
           lean --version
 
       - name: Vendor mathlib
+        timeout-minutes: 20
         run: |
           chmod +x scripts/vendor-mathlib.sh
           bash scripts/vendor-mathlib.sh
