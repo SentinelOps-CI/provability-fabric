@@ -327,9 +327,12 @@ fn test_labeler_stress_1k_randomized_payloads() {
         0,
         json!({
             "user": {
-                "credentials": { "password": "secret-pass", "api_key": "sk-test" },
-                "profile": { "ssn": "123-45-6789" }
+                "password": "secret-pass",
+                "email": "user@example.com"
             },
+            "financial": { "credit_card": "4111111111111111" },
+            "healthcare": { "diagnosis": "test-condition" },
+            "business": { "strategy": "confidential-plan" },
             "system": { "internal_ip": "10.0.0.1" }
         }),
     );
