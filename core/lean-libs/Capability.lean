@@ -83,12 +83,9 @@ theorem thm_allowed_implies_no_forbidden :
         contradiction
       | tail h_tail_mem =>
         -- a ∈ tail, apply induction hypothesis
-        have h_exists_tail : ∃ (a : Action), a ∈ tail ∧ forbidden_tool_action a := by
-          exists a
-          constructor
-          · exact h_tail_mem
-          · exact h_forbidden
-        contradiction
+        have h_exists_tail : ∃ (a : Action), a ∈ tail ∧ forbidden_tool_action a :=
+          ⟨a, h_tail_mem, h_forbidden⟩
+        exact ih_result h_exists_tail
 
 /-- Check if a specific tool is allowed for a specific agent -/
 def agent_can_use_tool (agent_id : String) (tool : Tool) : Prop :=
@@ -144,13 +141,8 @@ theorem thm_test_agent_2_allowed :
       cases head with
       | SendEmail score =>
         simp [action_tool, agent_can_use_tool]
-        left
-        rfl
       | LogSpend usd =>
         simp [action_tool, agent_can_use_tool]
-        right
-        left
-        rfl
     · -- Prove agent_allowed_trace "test-agent-2" tail
       exact ih
 

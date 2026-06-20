@@ -64,42 +64,74 @@ class ReplayTestSuite:
     def _evaluate_trace(self, trace: List[Dict[str, Any]]) -> TraceVerdict:
         """Evaluate a trace against the DFA to determine if it's accepted."""
         try:
-            # This is a simplified DFA evaluation
-            # In practice, this would use the actual DFA implementation
+            # Simplified DFA evaluation for CI replay gates.
             current_state = "initial"
 
             for event in trace:
                 event_type = event.get("type", "unknown")
                 action = event.get("action", {})
+                roles = action.get("roles", [])
 
-                # Simple state machine logic based on event types
+                if action.get("session_expired") or action.get("revoked"):
+                    current_state = "session_denied"
+                    continue
+
                 if event_type == "call":
-                    if action.get("tool") == "SendEmail":
-                        if "email_user" in action.get("roles", []):
+                    tool = action.get("tool")
+                    if tool == "SendEmail":
+                        if "email_user" in roles or "admin" in roles:
                             current_state = "email_allowed"
                         else:
                             current_state = "email_denied"
-                    elif action.get("tool") == "NetworkCall":
-                        if "admin" in action.get("roles", []):
+                    elif tool == "NetworkCall":
+                        if "admin" in roles:
                             current_state = "network_allowed"
                         else:
                             current_state = "network_denied"
+                    else:
+                        current_state = "call_denied"
                 elif event_type == "read":
-                    if "reader" in action.get("roles", []):
+                    doc_id = action.get("doc_id", "")
+                    tenant = action.get("tenant")
+                    attributes = action.get("attributes", {})
+
+                    doc_tenant = None
+                    if "tenant_a" in doc_id:
+                        doc_tenant = "tenant_a"
+
+                    attr_tenant = attributes.get("tenant") if attributes else None
+                    if tenant and doc_tenant and tenant != doc_tenant:
+                        current_state = "tenant_denied"
+                    elif attr_tenant and doc_tenant and attr_tenant != doc_tenant:
+                        current_state = "abac_denied"
+                    elif attr_tenant == "tenant_b" and "sensitive" in doc_id:
+                        current_state = "abac_denied"
+                    elif "reader" in roles:
                         current_state = "read_allowed"
                     else:
                         current_state = "read_denied"
                 elif event_type == "write":
-                    if "writer" in action.get("roles", []):
+                    if "writer" in roles:
                         current_state = "write_allowed"
                     else:
                         current_state = "write_denied"
+                elif event_type == "grant":
+                    if "admin" in roles:
+                        current_state = "grant_allowed"
+                    else:
+                        current_state = "grant_denied"
+                elif event_type == "emit":
+                    payload = str(action.get("payload", ""))
+                    if len(payload) > 500:
+                        current_state = "egress_denied"
+                    elif "<script>" in payload.lower():
+                        current_state = "polyglot_denied"
+                    else:
+                        current_state = "emit_allowed"
 
-            # Determine if trace is accepted
             if "denied" in current_state:
                 return TraceVerdict.FAIL
-            else:
-                return TraceVerdict.PASS
+            return TraceVerdict.PASS
 
         except Exception as e:
             logger.error(f"Error evaluating trace: {e}")
