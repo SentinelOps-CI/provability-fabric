@@ -9,7 +9,10 @@ Performance benchmark for sidecar watcher.
 import json
 import os
 import subprocess
+import tempfile
 import time
+import urllib.error
+import urllib.request
 import psutil
 import statistics
 from typing import List, Dict, Any
@@ -23,20 +26,43 @@ def generate_test_actions(count: int) -> List[str]:
         if i % 3 == 0:
             action = {
                 "action": "SendEmail",
-                "score": 0.05,
-                "payload": f"test{i}@example.com",
+                "spam_score": 0.05,
             }
         else:
-            action = {"action": "LogSpend", "usd": 10.0, "payload": f"test{i}"}
+            action = {"action": "LogSpend", "usd_amount": 10.0}
         actions.append(json.dumps(action))
     return actions
 
 
+def _wait_for_sidecar_health(timeout_s: float = 30) -> None:
+    """Wait until the sidecar HTTP health endpoint responds."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8006/health", timeout=1) as resp:
+                if resp.status == 200:
+                    return
+        except (urllib.error.URLError, TimeoutError, OSError):
+            time.sleep(0.2)
+    raise RuntimeError("Sidecar watcher failed to start")
+
+
+def _stop_sidecar(process: subprocess.Popen) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
 def measure_processing_time(actions: List[str]) -> List[float]:
-    """Measure processing time for each action."""
+    """Measure log-write latency while the sidecar processes actions from LOG_FILE."""
     times = []
 
-    # Start sidecar watcher process
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".log") as log_file:
+        log_path = log_file.name
+
     bin_path = os.environ.get("SIDECAR_BIN")
     if bin_path:
         cmd = [bin_path]
@@ -48,36 +74,37 @@ def measure_processing_time(actions: List[str]) -> List[float]:
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         env={
-            **subprocess.os.environ,
+            **os.environ,
+            "LOG_FILE": log_path,
             "SPEC_SIG": "benchmark-test",
             "LIMIT_BUDGET": "1000.0",
             "LIMIT_SPAMSCORE": "0.07",
+            "ENABLE_HEARTBEAT": "0",
         },
     )
 
     try:
-        # Send actions and measure time
-        for action in actions:
-            start_time = time.perf_counter()
-            process.stdin.write(action + "\n")
-            process.stdin.flush()
-            end_time = time.perf_counter()
-            times.append((end_time - start_time) * 1_000_000)  # Convert to microseconds
+        _wait_for_sidecar_health()
 
-        # Close stdin to signal end
-        process.stdin.close()
+        with open(log_path, "a", encoding="utf-8") as log:
+            for action in actions:
+                start_time = time.perf_counter()
+                log.write(action + "\n")
+                log.flush()
+                end_time = time.perf_counter()
+                times.append((end_time - start_time) * 1_000_000)
 
-        # Wait for process to finish
-        process.wait(timeout=10)
-
-    except subprocess.TimeoutExpired:
-        process.kill()
-        raise RuntimeError("Sidecar watcher process timed out")
+        # Sidecar tails LOG_FILE on a 1s poll loop; allow time to ingest the batch.
+        time.sleep(min(30, max(3, len(actions) / 200)))
+    finally:
+        _stop_sidecar(process)
+        try:
+            os.unlink(log_path)
+        except OSError:
+            pass
 
     return times
 
