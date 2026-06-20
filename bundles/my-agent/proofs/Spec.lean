@@ -22,7 +22,7 @@ open Fabric
 
 /-- My-agent specific budget configuration -/
 def CFG : BudgetCfg := {
-  dailyLimit := 300.0,
+  dailyLimit := 300,
   spamLimit := 0.07
 }
 
