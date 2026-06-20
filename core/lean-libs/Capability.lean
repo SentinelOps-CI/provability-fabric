@@ -17,6 +17,7 @@ limitations under the License.
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Set.Basic
 import Mathlib.Logic.Basic
+import ActionDSL
 
 namespace Fabric
 

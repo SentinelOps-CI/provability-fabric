@@ -183,23 +183,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest hypothesis fuzzingbook
 
-      - name: Run adversarial egress chunking tests
+      - name: Run property tests
         run: |
-          cd tests/property
-          python test_egress_chunking.py --dfa-path ../../artifact/dfa.json
-          echo "✅ Egress chunking tests passed"
-
-      - name: Run polyglot JSON labeler tests
-        run: |
-          cd tests/property
-          python test_polyglot_json.py --dfa-path ../../artifact/dfa.json
-          echo "✅ Polyglot JSON tests passed"
-
-      - name: Run ABAC permutations tests
-        run: |
-          cd tests/property
-          python test_abac_permutations.py --dfa-path ../../artifact/dfa.json
-          echo "✅ ABAC permutations tests passed"
+          cd tests/replay
+          python test_replay_suites.py --dfa-path ../../artifact/dfa.json --suite property
+          echo "✅ Property tests passed"
 
   # Job 4: Coverage report
   coverage-report:
@@ -358,11 +346,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install psutil
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Run performance benchmarks
         run: |
           mkdir -p bench
-          cd scripts
-          python bench.py --count 1000 --output ../bench/benchmark_results.json
+          python scripts/bench.py --count 1000 --output bench/benchmark_results.json
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
