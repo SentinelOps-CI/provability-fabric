@@ -69,10 +69,10 @@ theorem thm_allowed_implies_no_forbidden :
     | intro a h_and =>
       have ⟨h_mem, h_forbidden⟩ := h_and
       simp at h_mem  -- Empty list has no elements
-  | cons head tl ih =>
+  | cons head as ih =>
     simp [allowed_trace] at h_allowed
-    have ⟨h_not_forbidden, h_tl_allowed⟩ := h_allowed
-    have ih_result := ih h_tl_allowed
+    have ⟨h_not_forbidden, h_as_allowed⟩ := h_allowed
+    have ih_result := ih h_as_allowed
     intro h_exists
     cases h_exists with
     | intro a h_and =>
@@ -80,8 +80,8 @@ theorem thm_allowed_implies_no_forbidden :
       cases h_mem with
       | head =>
         exact absurd h_forbidden h_not_forbidden
-      | @List.Mem.tail _ h_in_tl =>
-        exact ih_result ⟨a, ⟨h_in_tl, h_forbidden⟩⟩
+      | tail h_in_as =>
+        exact ih_result ⟨a, ⟨h_in_as, h_forbidden⟩⟩
 
 /-- Check if a specific tool is allowed for a specific agent -/
 def agent_can_use_tool (agent_id : String) (tool : Tool) : Prop :=
