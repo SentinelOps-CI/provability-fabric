@@ -54,8 +54,16 @@ jobs:
           lean --version
 
       - name: Vendor mathlib
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: |
+          if [ -d vendor/mathlib/.lake/build/lib ] && [ -n "$(ls -A vendor/mathlib/.lake/build/lib 2>/dev/null)" ]; then
+            cd vendor/mathlib
+            if [ "$(git rev-parse HEAD)" = "a45ae63747140c1b2cbad9d46f518015c047047a" ]; then
+              echo "Cached vendored mathlib ready, skipping vendor script"
+              exit 0
+            fi
+            cd ../..
+          fi
           chmod +x scripts/vendor-mathlib.sh
           bash scripts/vendor-mathlib.sh
 

@@ -30,7 +30,10 @@ CURRENT_COMMIT=$(git rev-parse HEAD)
 if [ "$CURRENT_COMMIT" != "$MATHLIB_COMMIT" ]; then
     echo "⚠️  Warning: Expected commit $MATHLIB_COMMIT, got $CURRENT_COMMIT"
     echo "🔄 Checking out correct commit..."
-    git fetch origin "$MATHLIB_VERSION"
+    if ! timeout 300 git fetch --depth 1 origin "$MATHLIB_COMMIT"; then
+        echo "❌ git fetch timed out after 5 minutes"
+        exit 1
+    fi
     git checkout "$MATHLIB_COMMIT"
 fi
 
