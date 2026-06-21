@@ -81,8 +81,8 @@ theorem thm_allowed_implies_no_forbidden :
       cases h_mem with
       | head =>
         exact absurd h_forbidden h_not_forbidden
-      | tail h =>
-        exact ih_result ⟨a, ⟨h, h_forbidden⟩⟩
+      | tail _ h_mem =>
+        exact ih_result ⟨a, ⟨h_mem, h_forbidden⟩⟩
 
 /-- Check if a specific tool is allowed for a specific agent -/
 def agent_can_use_tool (agent_id : String) (tool : Tool) : Prop :=
