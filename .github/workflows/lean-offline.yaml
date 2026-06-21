@@ -37,7 +37,7 @@ jobs:
             ~/.cache/lake
             vendor/mathlib/.lake
             vendor/mathlib/.git
-          key: lean-offline-${{ hashFiles('lean-toolchain', 'scripts/vendor-mathlib.sh') }}
+          key: lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637
           restore-keys: |
             lean-offline-
 
@@ -99,6 +99,7 @@ jobs:
           echo "🌐 Network access blocked for offline build"
 
       - name: Build Lean proofs (offline)
+        timeout-minutes: 35
         run: |
           echo "🔨 Building Lean proofs in offline mode..."
 

@@ -18,8 +18,11 @@ mkdir -p "$VENDOR_DIR"
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
 if [ ! -d "$VENDOR_DIR/.git" ] || [ ! -f "$VENDOR_DIR/lakefile.lean" ]; then
     rm -rf "$VENDOR_DIR"
-    git clone --depth 1 --branch "$MATHLIB_VERSION" \
-        https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"
+    if ! timeout 600 git clone --depth 1 --branch "$MATHLIB_VERSION" \
+        https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"; then
+        echo "git clone timed out after 10 minutes"
+        exit 1
+    fi
 else
     echo "✅ Mathlib already exists in vendor directory"
 fi
