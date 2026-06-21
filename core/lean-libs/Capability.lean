@@ -57,7 +57,8 @@ def allowed_trace : List Action → Prop
   | [] => True
   | (a :: rest) => ¬ forbidden_tool_action a ∧ allowed_trace rest
 
-/-- Theorem: allowed traces contain no forbidden tools -/
+/-- Theorem: allowed traces contain no forbidden tools.
+    Mem.tail case uses `rest` suffix to avoid Lean 4.7 binder tokenization. -/
 theorem thm_allowed_implies_no_forbidden :
   ∀ (tr : List Action), allowed_trace tr → (¬ ∃ (a : Action), a ∈ tr ∧ forbidden_tool_action a) := by
   intro tr h_allowed
