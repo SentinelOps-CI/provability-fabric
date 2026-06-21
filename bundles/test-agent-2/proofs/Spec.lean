@@ -15,12 +15,10 @@ limitations under the License.
 -/
 
 import Fabric
-import Capability
 
 namespace Spec
 
 open Fabric
-open Fabric.Capability
 
 /-- Test-agent-2 specific budget configuration -/
 def CFG : BudgetCfg := {
