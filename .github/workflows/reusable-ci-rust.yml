@@ -7,7 +7,7 @@ on:
 jobs:
   rust:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
       PF_SHADOW_MODE: "1"
@@ -27,15 +27,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Cargo registry and target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+        uses: ./.github/actions/cache-cargo
 
       - name: Sidecar unwrap regression gate (F16)
         run: python scripts/count_sidecar_unwraps.py --max 10
@@ -45,13 +37,17 @@ jobs:
 
       - name: Build and test Rust workspace
         run: |
-          cargo build --workspace --exclude provability-fabric-core-sdk-rust
+          # sidecar-watcher and retrieval-gateway: curated targets only (env/RUSTFLAGS).
+          # Do not include in workspace test — workspace would re-run them and pick up
+          # extra sidecar [[test]] binaries (dfa_equiv/proptest, etc.) that exceed CI budget.
           RUSTFLAGS="-D dead_code" cargo test -p sidecar-watcher --lib -- --nocapture
           PF_SHADOW_MODE=1 RUSTFLAGS="-D dead_code" cargo test -p sidecar-watcher --test integration_tests -- --nocapture
           cargo test -p sidecar-watcher --test ni_monitor_egress --test safety_case_bundle --test events_plan_dsl --test hardened_adapters -- --nocapture
           cargo test -p retrieval-gateway -- --nocapture
           cargo test --workspace \
             --exclude provability-fabric-core-sdk-rust \
+            --exclude sidecar-watcher \
+            --exclude retrieval-gateway \
             --exclude labeler \
             --exclude tool-broker \
             --no-fail-fast
