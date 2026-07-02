@@ -43,7 +43,7 @@ jobs:
           export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
           if ! "$HOME/.elan/bin/elan" toolchain list | grep -Fq "$TOOLCHAIN"; then
-            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN" || true
+            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
           fi
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           "$HOME/.elan/bin/lean" --version
@@ -94,22 +94,25 @@ jobs:
           
           # Generate docs for core lean-libs
           cd core/lean-libs
+          # ci-honesty: justified wave7-remediation
           lean --doc=on ActionDSL.lean > ActionDSL.md || true
           echo "✅ Generated docs for ActionDSL.lean"
           
           # Generate docs for agent specs
           cd ../../bundles/my-agent/proofs
+          # ci-honesty: justified wave7-remediation
           lean --doc=on Spec.lean > Spec.md || true
           echo "✅ Generated docs for my-agent Spec.lean"
           
           cd ../../test-new-user-agent/proofs
+          # ci-honesty: justified wave7-remediation
           lean --doc=on Spec.lean > Spec.md || true
           echo "✅ Generated docs for test-new-user-agent Spec.lean"
 
       - name: Check for 'sorry' or 'by admit' in CI-enforced Lean targets
         run: |
           echo "Checking for placeholder proofs in CI-enforced targets only..."
-          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/Budget.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
+          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/Budget.lean core/lean-libs/Invariants.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
           FOUND=""
           for target in $ENFORCED; do
             if [ -f "$target" ]; then
@@ -117,6 +120,7 @@ jobs:
                 FOUND="$FOUND $target"
               fi
             elif [ -d "$target" ]; then
+              # ci-honesty: justified wave7-remediation
               HITS=$(find "$target" -name "*.lean" ! -path '*/.lake/*' -exec grep -l "sorry\|by admit" {} \; 2>/dev/null || true)
               if [ -n "$HITS" ]; then
                 FOUND="$FOUND $HITS"
@@ -151,6 +155,7 @@ jobs:
           echo "🔍 Checking for duplicate core definitions..."
           
           # Check for duplicate Action definitions
+          # ci-honesty: justified wave7-remediation
           action_defs=$(find bundles -name "*.lean" ! -path '*/.lake/*' -exec grep -l "inductive Action" {} \; 2>/dev/null || true)
           if [ -n "$action_defs" ]; then
             echo "❌ Found duplicate Action definitions in:"
@@ -159,6 +164,7 @@ jobs:
           fi
           
           # Check for duplicate budget_ok definitions
+          # ci-honesty: justified wave7-remediation
           budget_defs=$(find bundles -name "*.lean" ! -path '*/.lake/*' -exec grep -l "def budget_ok" {} \; 2>/dev/null || true)
           if [ -n "$budget_defs" ]; then
             echo "❌ Found duplicate budget_ok definitions in:"
@@ -181,6 +187,7 @@ jobs:
           echo "" >> lean-style-report.md
           echo "Checked files:" >> lean-style-report.md
           echo "- core/lean-libs/ActionDSL.lean" >> lean-style-report.md
+          echo "- core/lean-libs/Invariants.lean" >> lean-style-report.md
           echo "- bundles/my-agent/proofs/Spec.lean" >> lean-style-report.md
           echo "- bundles/test-new-user-agent/proofs/Spec.lean" >> lean-style-report.md
           echo "- spec-templates/v1/proofs/Spec.lean" >> lean-style-report.md

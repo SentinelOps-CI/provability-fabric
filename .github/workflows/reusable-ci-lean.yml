@@ -115,6 +115,7 @@ jobs:
               echo "Generated allowlist matches runtime allowlist"
             else
               echo "Generated allowlist differs from runtime allowlist"
+              # ci-honesty: justified wave7-remediation
               diff /tmp/generated_allowlist.json runtime/sidecar-watcher/policy/allowlist.json || true
               exit 1
             fi

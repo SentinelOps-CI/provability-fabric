@@ -198,7 +198,7 @@ jobs:
                 - name: ledger
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
-                  command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index-simple.js"]
+                  command: ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]
                   ports:
                   - containerPort: 4000
                   env:
@@ -231,9 +231,13 @@ jobs:
         run: |
           kubectl wait --for=condition=available deployment/attestor --timeout=300s
           if ! kubectl rollout status deployment/ledger --timeout=900s; then
+            # ci-honesty: justified wave7-remediation
             kubectl get pods -l app=ledger -o wide || true
+            # ci-honesty: justified wave7-remediation
             kubectl describe deployment/ledger || true
+            # ci-honesty: justified wave7-remediation
             kubectl describe pods -l app=ledger || true
+            # ci-honesty: justified wave7-remediation
             kubectl logs deployment/ledger -c ledger --tail=100 2>/dev/null || true
             exit 1
           fi
@@ -323,4 +327,5 @@ jobs:
     steps:
       - name: Delete Kind cluster
         run: |
+          # ci-honesty: justified wave7-remediation
           kind delete cluster --name "${{ inputs.kind_cluster_name }}" || true

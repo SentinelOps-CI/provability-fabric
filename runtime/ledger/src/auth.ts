@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express'
 import { expressjwt as jwt } from 'express-jwt'
 import jwksRsa from 'jwks-rsa'
 import { PrismaClient } from '@prisma/client'
+import type { PeerCertificate } from 'tls'
 
 const prisma = new PrismaClient()
 
@@ -28,7 +29,7 @@ export const authMiddleware = jwt({
     jwksUri: process.env.JWKS_URI || `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
     // Add certificate chain pinning
     requestAgent: new (require('https').Agent)({
-      checkServerIdentity: (host: string, cert: any) => {
+      checkServerIdentity: (host: string, cert: PeerCertificate) => {
         // Certificate chain pinning validation
         const expectedPins = process.env.CERTIFICATE_PINS?.split(',') || [];
         const certFingerprint = require('crypto')
@@ -72,6 +73,7 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
 
     // Add tenant info to request
     req.user.tid = tenant.id
+    ;(req.user as { tenantId?: string }).tenantId = tenant.id
     next()
   } catch (error) {
     console.error('Tenant validation error:', error)
@@ -103,7 +105,13 @@ export const getTenantScopedPrisma = (tenantId: string) => {
   return prisma.$extends({
     query: {
       capsule: {
-        async $allOperations({ args, query }) {
+        async $allOperations({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>
+          query: (args: Record<string, unknown>) => Promise<unknown>
+        }) {
           if ('where' in args && args.where !== undefined) {
             args.where = { ...args.where, tenantId }
           } else if ('data' in args && args.data !== undefined) {
@@ -113,7 +121,13 @@ export const getTenantScopedPrisma = (tenantId: string) => {
         }
       },
       premiumQuote: {
-        async $allOperations({ args, query }) {
+        async $allOperations({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>
+          query: (args: Record<string, unknown>) => Promise<unknown>
+        }) {
           if ('where' in args && args.where !== undefined) {
             args.where = { ...args.where, tenantId }
           } else if ('data' in args && args.data !== undefined) {

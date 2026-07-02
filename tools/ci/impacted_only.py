@@ -13,12 +13,13 @@ Usage:
 
 import argparse
 import json
+import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Set
 import yaml
-import logging
 
 # Configure logging
 logging.basicConfig(
@@ -422,13 +423,46 @@ def main():
         print(json.dumps(build_plan, indent=2))
     
     elif args.build_impacted:
-        # Build impacted proofs
         if not args.output_dir:
             logger.error("--output-dir required for --build-impacted")
             sys.exit(1)
-        
-        # Build impacted proofs: run lake build for impacted targets (see tools/select_impacted.py)
-        logger.info("Build impacted proofs: use select_impacted.py and lake build for listed targets")
+
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        base_ref = os.environ.get("CI_BASE_REF", "main")
+        head_ref = os.environ.get("CI_HEAD_REF", "HEAD")
+        changed_files = optimizer._get_changed_files(base_ref, head_ref)
+        if not changed_files:
+            logger.warning("No changed files; writing empty build plan")
+            impacted_proofs = {
+                "directly_impacted": [],
+                "transitively_impacted": [],
+                "unimpacted": [],
+                "build_order": [],
+            }
+        else:
+            impacted_proofs = optimizer.analyzer.analyze_changes(changed_files)
+
+        build_plan = optimizer.analyzer.generate_build_plan(impacted_proofs)
+        build_plan["directly_impacted"] = impacted_proofs.get("directly_impacted", [])
+        build_plan["transitively_impacted"] = impacted_proofs.get(
+            "transitively_impacted", []
+        )
+
+        plan_path = output_dir / "build_plan.json"
+        plan_path.write_text(json.dumps(build_plan, indent=2), encoding="utf-8")
+
+        script_path = output_dir / "build_impacted.sh"
+        lines = ["#!/usr/bin/env bash", "set -euo pipefail"]
+        for step in build_plan.get("build_steps", []):
+            lines.append(step["command"])
+        if len(lines) == 2:
+            lines.append('echo "No impacted Lean proofs to build"')
+        script_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        script_path.chmod(0o755)
+
+        logger.info("Build impacted proofs plan written to %s", plan_path)
     
     else:
         parser.print_help()

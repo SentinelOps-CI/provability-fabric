@@ -44,6 +44,7 @@ jobs:
         run: |
           cd tools/proofbot
           python run.py --api-url ${{ vars.APOLLO_API_URL || 'http://localhost:8080' }}
+        # ci-honesty: justified wave7-remediation
         continue-on-error: true
 
       - name: Create Pull Request

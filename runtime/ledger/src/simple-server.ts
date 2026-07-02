@@ -29,7 +29,7 @@ const resolvers = {
     health: () => 'healthy'
   },
   Mutation: {
-    echo: (_: any, { message }: { message: string }) => `Echo: ${message}`
+    echo: (_parent: unknown, { message }: { message: string }) => `Echo: ${message}`
   }
 }
 

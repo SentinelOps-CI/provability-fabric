@@ -43,14 +43,11 @@ Provability Fabric offers three distinct on-ramps that allow teams to adopt the 
 
 ### Getting Started
 ```bash
-# Install CLI
-go install github.com/provability-fabric/core/cli/cmd/so@latest
+# Install the pf CLI from the repository
+cd core/cli/pf && go install .
 
-# Compile policy
-so policy compile --in policy.md --out build/
-
-# Generate certificate
-so cert generate --policy build/action_dsl.json --out cert.json
+# Verify installation
+pf --help
 ```
 
 [📖 Full Documentation →](./standards-only/)
@@ -75,14 +72,12 @@ so cert generate --policy build/action_dsl.json --out cert.json
 
 ### Getting Started
 ```bash
-# Set up nightly replay
-so trace run --trace fixtures/trace.json --out replay-output/
+# Evidence validate (requires pf CLI — see standards-only on-ramp)
+pf evidence validate --bundle examples/evidence-basic/
 
-# Compare with previous runs
-so trace compare-lowview --in replay-output/ --threshold 0.999999
-
-# Generate evidence report
-so trace report --in replay-output/
+# Replay (Linux/WSL; requires TRACE-REPLAY-KIT submodule)
+make submodules
+bash tests/replay/run_replays.sh
 ```
 
 [📖 Full Documentation →](./evidence-replay/)
@@ -109,14 +104,14 @@ so trace report --in replay-output/
 
 ### Getting Started
 ```bash
-# Deploy full platform
-docker compose up -d --build
+# Deploy platform services (default profile)
+docker compose up -d
 
-# Configure sidecar
-so deploy --epoch stable --sidecar enabled
+# Add ledger GraphQL + MCP
+docker compose --profile ledger up -d
 
-# Enable advanced features
-so deploy --feature mpc-fintech --feature privacy --feature rag-guard
+# Full stack including console and monitoring
+docker compose --profile full up -d --build
 ```
 
 [📖 Full Documentation →](./full-platform/)
@@ -153,12 +148,12 @@ so deploy --feature mpc-fintech --feature privacy --feature rag-guard
 
 2. **Configure Sidecar Integration**
    ```bash
-   so deploy --sidecar enabled --epoch stable
+   docker compose up -d runtime-sidecar
    ```
 
 3. **Enable Advanced Features**
    ```bash
-   so deploy --feature mpc-fintech --feature privacy
+   docker compose --profile enforcement up -d
    ```
 
 ## Choosing the Right On-Ramp
@@ -187,17 +182,17 @@ so deploy --feature mpc-fintech --feature privacy --feature rag-guard
 - [Standards-Only Guide](./standards-only/)
 - [Evidence + Replay Guide](./evidence-replay/)
 - [Full Platform Guide](./full-platform/)
-- [CLI Reference](../../docs/reference/cli-reference.md)
+- [CLI Reference](../docs/reference/cli-reference.md)
 
 ### Examples
-- [Standards-Only Examples](../examples/standards-only/)
-- [Evidence + Replay Examples](../examples/evidence-replay/)
-- [Full Platform Examples](../examples/full-platform/)
+- [Evidence basic example](../examples/evidence-basic/)
+- [Forensic replay example](../examples/forensic-replay-basic/)
+- [Runtime evidence example](../examples/runtime-evidence-basic/)
 
 ### Community
 - [GitHub Discussions](https://github.com/SentinelOps-CI/provability-fabric/discussions)
 - [Discord Community](https://discord.gg/provability-fabric)
-- [Documentation Site](https://docs.provability-fabric.io)
+- [Documentation Site](https://provability-fabric.org/)
 
 ## Getting Help
 

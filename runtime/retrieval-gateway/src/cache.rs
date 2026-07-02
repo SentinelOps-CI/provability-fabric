@@ -1,15 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::Arc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
-use uuid::Uuid;
+use tracing::{debug, info};
 
-use crate::storage::SearchResult;
+use crate::SearchResult;
 
 /// Cache key combining question hash and label set for semantic caching
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -105,19 +104,22 @@ impl SemanticCache {
         let cache = Arc::new(RwLock::new(HashMap::new()));
         let stats = Arc::new(RwLock::new(HashMap::new()));
         
-        let cache_clone = cache.clone();
-        let stats_clone = stats.clone();
-        let config_clone = config.clone();
-        
-        let cleanup_handle = tokio::spawn(async move {
-            Self::cleanup_task(cache_clone, stats_clone, config_clone).await;
-        });
+        let cleanup_handle = if config.cleanup_interval_seconds == 0 {
+            None
+        } else {
+            let cache_clone = cache.clone();
+            let stats_clone = stats.clone();
+            let config_clone = config.clone();
+            Some(tokio::spawn(async move {
+                Self::cleanup_task(cache_clone, stats_clone, config_clone).await;
+            }))
+        };
         
         Self {
             cache,
             stats,
             config,
-            cleanup_handle: Some(cleanup_handle),
+            cleanup_handle,
         }
     }
     
@@ -133,29 +135,29 @@ impl SemanticCache {
             label_set: label_set.to_vec(),
             tenant: tenant.to_string(),
         };
-        
-        let cache = self.cache.read().await;
-        let tenant_cache = cache.get(tenant)?;
-        
-        if let Some(entry) = tenant_cache.get(&cache_key) {
-            // Check if entry is expired
-            if self.is_expired(entry) {
-                debug!("Cache entry expired for tenant {}: {:?}", tenant, cache_key);
-                return None;
-            }
-            
-            // Update access statistics
-            self.update_access_stats(tenant, &cache_key).await;
-            
-            debug!("Cache hit for tenant {}: {:?}", tenant, cache_key);
-            Some(entry.results.clone())
-        } else {
-            // Try semantic similarity if enabled
-            if self.config.enable_semantic_similarity {
-                self.find_semantically_similar(tenant, &cache_key).await
+
+        let hit = {
+            let cache = self.cache.read().await;
+            let tenant_cache = cache.get(tenant)?;
+            if let Some(entry) = tenant_cache.get(&cache_key) {
+                if self.is_expired(entry) {
+                    debug!("Cache entry expired for tenant {}: {:?}", tenant, cache_key);
+                    return None;
+                }
+                Some(entry.results.clone())
+            } else if self.config.enable_semantic_similarity {
+                self.find_semantically_similar_locked(&cache, tenant, &cache_key)
             } else {
                 None
             }
+        };
+
+        if let Some(results) = hit {
+            self.update_access_stats(tenant, &cache_key).await;
+            debug!("Cache hit for tenant {}: {:?}", tenant, cache_key);
+            Some(results)
+        } else {
+            None
         }
     }
     
@@ -191,19 +193,19 @@ impl SemanticCache {
             ttl_seconds: ttl_seconds.unwrap_or(self.config.default_ttl_seconds),
         };
         
-        let mut cache = self.cache.write().await;
-        let tenant_cache = cache.entry(tenant.to_string()).or_insert_with(HashMap::new);
-        
-        // Check if we need to evict entries due to size limits
-        if tenant_cache.len() >= self.config.max_entries_per_tenant {
-            self.evict_entries(tenant, tenant_cache).await;
+        {
+            let mut cache = self.cache.write().await;
+            let tenant_cache = cache.entry(tenant.to_string()).or_insert_with(HashMap::new);
+
+            if tenant_cache.len() >= self.config.max_entries_per_tenant {
+                self.evict_entries(tenant, tenant_cache).await;
+            }
+
+            tenant_cache.insert(cache_key.clone(), entry);
         }
-        
-        tenant_cache.insert(cache_key, entry);
-        
-        // Update statistics
+
         self.update_put_stats(tenant).await;
-        
+
         debug!("Cached results for tenant {}: {:?}", tenant, cache_key);
         Ok(())
     }
@@ -287,22 +289,22 @@ impl SemanticCache {
         now > entry.created_at + entry.ttl_seconds
     }
     
-    /// Find semantically similar cache entries
-    async fn find_semantically_similar(
+    /// Find semantically similar cache entries while holding the read lock.
+    fn find_semantically_similar_locked(
         &self,
+        cache: &HashMap<String, HashMap<CacheKey, CacheEntry>>,
         tenant: &str,
         cache_key: &CacheKey,
     ) -> Option<Vec<SearchResult>> {
-        let cache = self.cache.read().await;
         let tenant_cache = cache.get(tenant)?;
-        
+
         let mut best_match: Option<(&CacheEntry, f64)> = None;
-        
+
         for (_, entry) in tenant_cache.iter() {
             if self.is_expired(entry) {
                 continue;
             }
-            
+
             let similarity = self.calculate_similarity(cache_key, &entry.key);
             if similarity >= self.config.similarity_threshold {
                 if let Some((_, best_similarity)) = best_match {
@@ -314,18 +316,24 @@ impl SemanticCache {
                 }
             }
         }
-        
-        if let Some((entry, similarity)) = best_match {
-            debug!("Semantic cache hit with similarity {:.2} for tenant {}: {:?}", 
-                   similarity, tenant, cache_key);
-            
-            // Update access statistics
-            self.update_access_stats(tenant, &entry.key).await;
-            
-            Some(entry.results.clone())
-        } else {
-            None
-        }
+
+        best_match.map(|(entry, similarity)| {
+            debug!(
+                "Semantic cache hit with similarity {:.2} for tenant {}: {:?}",
+                similarity, tenant, cache_key
+            );
+            entry.results.clone()
+        })
+    }
+
+    /// Find semantically similar cache entries
+    async fn find_semantically_similar(
+        &self,
+        tenant: &str,
+        cache_key: &CacheKey,
+    ) -> Option<Vec<SearchResult>> {
+        let cache = self.cache.read().await;
+        self.find_semantically_similar_locked(&cache, tenant, cache_key)
     }
     
     /// Calculate similarity between two cache keys
@@ -366,9 +374,14 @@ impl SemanticCache {
         });
         
         // Remove oldest/least accessed entries
-        let to_remove = entries.len() - self.config.max_entries_per_tenant + 1;
-        for (key, _) in entries.iter().take(to_remove) {
-            tenant_cache.remove(*key);
+        let to_remove = entries.len().saturating_sub(self.config.max_entries_per_tenant) + 1;
+        let keys_to_remove: Vec<CacheKey> = entries
+            .iter()
+            .take(to_remove)
+            .map(|(key, _)| (*key).clone())
+            .collect();
+        for key in keys_to_remove {
+            tenant_cache.remove(&key);
         }
         
         debug!("Evicted {} entries from cache for tenant {}", to_remove, tenant);
@@ -488,12 +501,15 @@ impl Drop for SemanticCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::SearchResult;
+    use crate::SearchResult;
     use std::collections::HashMap;
     
     #[tokio::test]
     async fn test_cache_basic_operations() {
-        let cache = SemanticCache::new();
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
         let tenant = "test-tenant";
         let question_hash = "test-hash";
         let labels = vec!["label1".to_string(), "label2".to_string()];
@@ -528,7 +544,10 @@ mod tests {
     
     #[tokio::test]
     async fn test_cache_tenant_isolation() {
-        let cache = SemanticCache::new();
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
         let tenant1 = "tenant1";
         let tenant2 = "tenant2";
         let question_hash = "test-hash";
@@ -559,7 +578,10 @@ mod tests {
     
     #[tokio::test]
     async fn test_cache_invalidation() {
-        let cache = SemanticCache::new();
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
         let tenant = "test-tenant";
         let question_hash = "test-hash";
         let labels = vec!["label1".to_string()];

@@ -19,6 +19,9 @@ SKIP_DIRS = {
     ".git",
     "node_modules",
     "target",
+    "build",
+    "dist",
+    "site",
     "__pycache__",
     ".venv",
     "venv",
@@ -42,6 +45,8 @@ GATE_SKIP_PATHS = frozenset({
     "scripts/check_no_placeholder.py",
     "services/evidence-service/evidence-service",
     "services/evidence-service/evidence-service.exe",
+    "core/cli/pf/pf",
+    "core/cli/pf/pf.exe",
 })
 
 
@@ -74,6 +79,47 @@ FORBIDDEN = [
 
 # Comment-only lines containing these are ignored for any pattern (EX-001)
 EXCUSE_COMMENT_SUBSTRINGS = ("test stub", "unit test stub", "Synchronous unit test stub")
+
+
+def load_placeholderignore(repo_root: Path) -> set[str]:
+    path = repo_root / ".placeholderignore"
+    if not path.exists():
+        return set()
+    patterns: set[str] = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            patterns.add(line.rstrip("/"))
+    return patterns
+
+
+def path_matches_placeholderignore(rel_path: str, patterns: set[str]) -> bool:
+    norm = rel_path.replace("\\", "/")
+    for pattern in patterns:
+        if pattern.startswith("*."):
+            if norm.endswith(pattern[1:]):
+                return True
+            continue
+        if norm == pattern or norm.startswith(pattern + "/"):
+            return True
+    return False
+
+
+def is_probably_binary(path: Path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            head = f.read(8192)
+    except OSError:
+        return True
+    if not head:
+        return False
+    if b"\x00" in head[:1024]:
+        return True
+    if head[:4] == b"\x7fELF" or head[:2] == b"MZ":
+        return True
+    return False
 
 
 def load_allowlist(repo_root: Path) -> set[str]:
@@ -119,14 +165,18 @@ def line_has_excuse_comment(line: str) -> bool:
 
 
 def should_skip_path(rel_path: str) -> bool:
-    if rel_path.replace("\\", "/") in GATE_SKIP_PATHS:
+    norm = rel_path.replace("\\", "/")
+    if norm in GATE_SKIP_PATHS:
         return True
-    if rel_path.endswith(".exe"):
+    if norm.endswith(".exe"):
         return True
-    for prefix in SKIP_PATH_PREFIXES:
-        if rel_path.startswith(prefix):
+    parts = norm.split("/")
+    if parts and parts[-1] in {"pf", "evidence-service"}:
+        if norm.startswith("core/cli/pf/") or norm.startswith("services/evidence-service/"):
             return True
-    parts = rel_path.replace("\\", "/").split("/")
+    for prefix in SKIP_PATH_PREFIXES:
+        if norm.startswith(prefix):
+            return True
     if any(p in SKIP_DIRS for p in parts):
         return True
     if parts and parts[-1] in SKIP_FILES:
@@ -134,14 +184,23 @@ def should_skip_path(rel_path: str) -> bool:
     return False
 
 
-def check_file(repo_root: Path, rel_path: str, allowlist: set[str]) -> list[tuple[int, str, str]]:
+def check_file(
+    repo_root: Path,
+    rel_path: str,
+    allowlist: set[str],
+    placeholderignore: set[str],
+) -> list[tuple[int, str, str]]:
     hits = []
     if path_is_allowlisted(rel_path, allowlist):
+        return hits
+    if path_matches_placeholderignore(rel_path, placeholderignore):
         return hits
     if should_skip_path(rel_path):
         return hits
     path = repo_root / rel_path
     if not path.is_file():
+        return hits
+    if is_probably_binary(path):
         return hits
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -160,6 +219,7 @@ def check_file(repo_root: Path, rel_path: str, allowlist: set[str]) -> list[tupl
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     allowlist = load_allowlist(repo_root)
+    placeholderignore = load_placeholderignore(repo_root)
     total_hits = []
     for root, _dirs, files in os.walk(repo_root, topdown=True):
         _dirs[:] = [d for d in _dirs if d not in SKIP_DIRS and not d.startswith(".")]
@@ -182,7 +242,9 @@ def main() -> int:
             rel_str = str(rel).replace("\\", "/")
             if rel_str.startswith(".") or ".." in rel_str:
                 continue
-            for line_no, desc, snippet in check_file(repo_root, rel_str, allowlist):
+            for line_no, desc, snippet in check_file(
+                repo_root, rel_str, allowlist, placeholderignore
+            ):
                 total_hits.append((rel_str, line_no, desc, snippet))
     if total_hits:
         print("no-runtime-placeholders: forbidden placeholder/stub patterns found:", file=sys.stderr)

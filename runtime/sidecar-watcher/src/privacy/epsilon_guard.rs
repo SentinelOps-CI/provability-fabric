@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
-#![allow(dead_code)]
 
 use anyhow::{anyhow, Context, Result};
 use k8s_openapi::api::core::v1::ConfigMap;
@@ -176,6 +175,14 @@ impl EpsilonGuard {
         let accountant = accountants
             .entry(tenant_id.to_string())
             .or_insert_with(|| MomentsAccountant::new(0.0, 0.0));
+
+        if accountant.is_exhausted(config.epsilon_limit, config.delta_limit) {
+            warn!(
+                "Privacy budget exhausted for tenant {} (reset every {}h)",
+                tenant_id, config.reset_period_hours
+            );
+            return Ok(false);
+        }
 
         // Check if adding this query would exceed budget
         let test_epsilon = accountant.epsilon + query_epsilon;

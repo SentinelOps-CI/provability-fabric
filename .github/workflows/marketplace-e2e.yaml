@@ -163,7 +163,11 @@ jobs:
       - name: Run unit tests
         run: |
           cd marketplace/ui
-          npm test -- --coverage --watchAll=false --passWithNoTests
+          if find src -name '*.test.*' -o -name '*.spec.*' 2>/dev/null | grep -q .; then
+            npm test -- --coverage --watchAll=false
+          else
+            echo "No Jest unit tests in marketplace/ui; compatibility suite runs next (F11)"
+          fi
 
       - name: Test UI compatibility blocking
         run: |

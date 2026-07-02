@@ -17,7 +17,9 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime};
+
+use crate::time_util;
 
 /// Custom serialization for std::time::Instant
 mod instant_serde {
@@ -186,10 +188,7 @@ impl ReplaySession {
             expected_time,
             actual_time,
             drift_ms,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+            timestamp: time_util::unix_millis(),
         };
 
         self.drift_measurements.push(measurement);
@@ -223,10 +222,7 @@ impl ReplaySession {
             events: self.events.clone(),
             chunk_info: self.generate_chunk_info(),
             drift_measurements: self.drift_measurements.clone(),
-            export_timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+            export_timestamp: time_util::unix_millis(),
         }
     }
 
@@ -237,7 +233,7 @@ impl ReplaySession {
         let mut chunk_sequence = 0;
 
         for event in &self.events {
-            let event_bytes = serde_json::to_vec(event).unwrap();
+            let event_bytes = serde_json::to_vec(event).unwrap_or_default();
 
             if current_chunk.len() + event_bytes.len() > self.config.chunk_bytes {
                 // Flush current chunk
@@ -368,11 +364,9 @@ impl ReplayManager {
 
     /// Check drift for session
     pub fn check_drift(&mut self, session_id: &str, expected_time: u64, actual_time: u64) -> bool {
-        let session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| format!("Session {} not found", session_id))
-            .unwrap();
+        let Some(session) = self.sessions.get_mut(session_id) else {
+            return false;
+        };
 
         let drift_detected = session.check_drift(expected_time, actual_time);
 
@@ -390,10 +384,7 @@ impl ReplayManager {
             expected_time,
             actual_time,
             drift_ms: actual_time.abs_diff(expected_time),
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+            timestamp: time_util::unix_millis(),
         };
 
         self.drift_alarms.push(alarm);
@@ -464,6 +455,7 @@ impl ReplayVerifier {
         replay1: &ReplayExport,
         replay2: &ReplayExport,
     ) -> ReplayVerificationResult {
+        let _drift_threshold = self.config.drift_threshold_ms;
         let mut result = ReplayVerificationResult {
             deterministic: true,
             errors: Vec::new(),
@@ -527,11 +519,10 @@ impl ReplayVerifier {
 
     /// Compare byte-level determinism
     pub fn verify_byte_identical(&self, replay1: &ReplayExport, replay2: &ReplayExport) -> bool {
-        // Serialize both replays and compare
-        let bytes1 = serde_json::to_vec(replay1).unwrap();
-        let bytes2 = serde_json::to_vec(replay2).unwrap();
-
-        bytes1 == bytes2
+        match (serde_json::to_vec(replay1), serde_json::to_vec(replay2)) {
+            (Ok(bytes1), Ok(bytes2)) => bytes1 == bytes2,
+            _ => false,
+        }
     }
 
     /// Check redaction-equivalent view

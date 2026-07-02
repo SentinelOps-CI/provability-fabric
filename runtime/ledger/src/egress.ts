@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import { enforceDsse, verifyEnvelope, type DsseEnvelope } from './crypto/dsse.js';
 
 const prisma = new PrismaClient();
 
@@ -101,7 +102,7 @@ export async function getEgressCertificatesByTenant(tenant: string, limit: numbe
       take: limit,
     });
 
-    return certificates.map(cert => ({
+    return certificates.map((cert: (typeof certificates)[number]) => ({
       cert_id: cert.certId,
       plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
@@ -135,7 +136,7 @@ export async function getEgressCertificatesByPlan(planId: string): Promise<Egres
       orderBy: { timestamp: 'desc' },
     });
 
-    return certificates.map(cert => ({
+    return certificates.map((cert: (typeof certificates)[number]) => ({
       cert_id: cert.certId,
       plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
@@ -177,7 +178,7 @@ export async function getCertificatesWithViolations(limit: number = 100): Promis
       take: limit,
     });
 
-    return certificates.map(cert => ({
+    return certificates.map((cert: (typeof certificates)[number]) => ({
       cert_id: cert.certId,
       plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
@@ -214,7 +215,7 @@ export async function getCertificatesWithNIFailures(limit: number = 100): Promis
       take: limit,
     });
 
-    return certificates.map(cert => ({
+    return certificates.map((cert: (typeof certificates)[number]) => ({
       cert_id: cert.certId,
       plan_id: cert.planId ?? undefined,
       tenant: cert.tenant,
@@ -313,24 +314,28 @@ export async function getCertificatesWithViolationsHandler(req: Request, res: Re
 // Verify certificate signature
 export function verifyCertificateSignature(certificate: EgressCertificate): boolean {
   try {
-    // Create certificate data for verification
-    const certData = {
-      cert_id: certificate.cert_id,
-      plan_id: certificate.plan_id,
-      tenant: certificate.tenant,
-      detector_flags: certificate.detector_flags,
-      near_dupe_score: certificate.near_dupe_score,
-      policy_hash: certificate.policy_hash,
-      text_hash: certificate.text_hash,
-      timestamp: certificate.timestamp,
-    };
+    if (
+      certificate.text_hash.length !== 64 ||
+      certificate.policy_hash.length !== 64
+    ) {
+      return false;
+    }
 
-    const certBytes = JSON.stringify(certData);
-    const certHash = crypto.createHash('sha256').update(certBytes).digest();
-    
-    // Signature verification: requires trust root PEM/JWKS (see docs/specs/dsse-verify-contract.md).
-    // Structural validation only until Ed25519 verify is wired with public key from config.
-    return certificate.text_hash.length === 64 && certificate.policy_hash.length === 64;
+    const envelopeRaw = (certificate as EgressCertificate & { dsse_envelope?: string })
+      .dsse_envelope;
+    if (envelopeRaw) {
+      const envelope = JSON.parse(envelopeRaw) as DsseEnvelope;
+      if (enforceDsse()) {
+        return verifyEnvelope(envelope);
+      }
+      return true;
+    }
+
+    if (!enforceDsse()) {
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error('Error verifying certificate signature:', error);
     return false;

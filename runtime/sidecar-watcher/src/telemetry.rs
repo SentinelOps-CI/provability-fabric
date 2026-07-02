@@ -46,18 +46,24 @@ impl TelemetryClient {
         metrics: Arc<Mutex<HeartbeatMetrics>>,
     ) -> Self {
         // Create optimized HTTP client with connection pooling
-        let client = reqwest::Client::builder()
-            .pool_max_idle_per_host(10) // Optimize for typical load
-            .pool_idle_timeout(Duration::from_secs(90)) // Keep connections alive
-            .http2_prior_knowledge() // Force HTTP/2 for better performance
-            .timeout(Duration::from_secs(30)) // Request timeout
-            .connect_timeout(Duration::from_secs(10)) // Connection timeout
-            .tcp_keepalive(Some(Duration::from_secs(30))) // TCP keepalive
+        let client = match reqwest::Client::builder()
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .http2_prior_knowledge()
+            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .tcp_keepalive(Some(Duration::from_secs(30)))
             .build()
-            .expect("Failed to create HTTP client");
+        {
+            Ok(client) => Some(client),
+            Err(e) => {
+                eprintln!("Failed to create HTTP client: {e}");
+                None
+            }
+        };
 
         Self {
-            client: Some(client),
+            client,
             attestor_url,
             capsule_hash,
             assumption_monitor,
@@ -107,7 +113,9 @@ impl TelemetryClient {
         };
 
         // Use the optimized client from the struct
-        let client = self.client.as_ref().expect("Client not initialized");
+        let Some(client) = self.client.as_ref() else {
+            return Err("HTTP client not initialized".into());
+        };
         
         // Record connection reuse metrics
         let pool_status = client.get_pool_status();
@@ -142,7 +150,9 @@ impl TelemetryClient {
             reason,
         };
 
-        let client = self.client.as_ref().expect("Client not initialized");
+        let Some(client) = self.client.as_ref() else {
+            return Err("HTTP client not initialized".into());
+        };
         
         let response = client
             .post(&format!("{}/terminate", self.attestor_url))

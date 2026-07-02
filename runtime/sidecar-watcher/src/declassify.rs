@@ -48,7 +48,7 @@ impl SecurityLabel {
             "confidential" => Ok(SecurityLabel::Confidential),
             "secret" => Ok(SecurityLabel::Secret),
             s if s.starts_with("custom:") => {
-                let name = s.strip_prefix("custom:").unwrap();
+                let name = &s["custom:".len()..];
                 Ok(SecurityLabel::Custom(name.to_string()))
             }
             _ => Err(format!("Unknown security label: {}", s)),

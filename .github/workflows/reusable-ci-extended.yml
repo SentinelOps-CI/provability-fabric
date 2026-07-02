@@ -92,6 +92,24 @@ jobs:
               --ignore=tests/integration/test_violation_path.py
           fi
 
+      - name: Set up Node.js (DSSE TypeScript toolchain)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install DSSE TypeScript dependencies
+        run: |
+          set -euo pipefail
+          cd core/crypto/dsse-ts
+          if [ -f package-lock.json ]; then
+            npm ci --no-fund --no-audit
+          else
+            npm install --no-fund --no-audit
+          fi
+
+      - name: Run cross-language DSSE tests (F01)
+        run: python tests/crypto/test_cross_lang_dsse.py
+
       - name: Sign spec bundles
         if: github.event_name == 'push'
         env:
@@ -104,6 +122,7 @@ jobs:
           sudo mv cosign-bin /usr/local/bin/cosign
 
           if [ -d "bundles" ]; then
+            # ci-honesty: justified wave7-remediation
             SIG_FILES=$(find bundles -name "spec.sig" 2>/dev/null || true)
             if [ -n "$SIG_FILES" ]; then
               find bundles -name "spec.sig" -exec cosign sign-blob --bundle {}.bundle {} \;

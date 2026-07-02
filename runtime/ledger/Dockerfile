@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --include=dev --no-audit --no-fu
 COPY . .
 RUN npx prisma generate
 RUN rm -rf dist node_modules/.cache/tsbuildinfo && npm run build
-RUN test -f dist/index-simple.js
+RUN test -f dist/index.js
 
 FROM node:20-bookworm-slim AS runner
 
@@ -30,7 +30,8 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 4000
 
 ENV NODE_ENV=production
+ENV PROFILE=production
 RUN chown -R node:node /app
 USER node
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index-simple.js"] 
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"] 

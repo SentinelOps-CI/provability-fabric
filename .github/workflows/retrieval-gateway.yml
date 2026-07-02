@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: Retrieval Gateway
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "runtime/retrieval-gateway/**"
+      - "core/crypto/dsse-rs/**"
+      - "tests/fixtures/crypto/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/retrieval-gateway.yml"
+  pull_request:
+    paths:
+      - "runtime/retrieval-gateway/**"
+      - "core/crypto/dsse-rs/**"
+      - "tests/fixtures/crypto/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+jobs:
+  build-test:
+    name: Build and test retrieval-gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-retrieval-gateway"
+
+      - name: cargo build -p retrieval-gateway
+        run: cargo build -p retrieval-gateway
+
+      - name: cargo test -p retrieval-gateway
+        run: cargo test -p retrieval-gateway

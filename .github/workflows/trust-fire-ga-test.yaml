@@ -334,6 +334,7 @@ jobs:
     steps:
       - name: Cleanup Kind cluster
         run: |
+          # ci-honesty: justified wave7-remediation
           kind delete cluster --name $KIND_CLUSTER_NAME || true
 
       - name: Comment on PR

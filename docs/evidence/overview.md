@@ -60,21 +60,29 @@ This runs `tools/cert-validate/validate.py` against the schema at `external/CERT
 - optional `morph`: environment snapshot info when running on Morph
 - `sig`: signature for the CERT payload
 
-See also: [Standards](../specs/standards.md), [Replay](replay.md), the CERT-V1 repository for the full schema, and the [Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md) for the planned bundle format and surface map.
+See also: [Standards](../specs/standards.md), [Replay](replay.md), the CERT-V1 repository for the full schema, and the [Evidence program closure](../roadmap/evidence-program-closure.md) for current delivery status.
 
 ## Evidence surface map
 
-Today the repository exposes several evidence-related paths. Evidence v0.1 (in progress) adds a
-JSON bundle lane without replacing these surfaces.
+The repository exposes several evidence-related paths. **Evidence v0.1 and v0.2 are complete on `main`** — schemas, Go implementation, CLI commands, pytest/CI smoke, and deep replay testbeds. These JSON bundle lanes do not replace runtime CERT-V1 or PCS surfaces.
 
-| Surface | Location | Role |
-|---------|----------|------|
-| Runtime CERT-V1 | `evidence/certs/<session>/<seq>.cert.json` | Sidecar-emitted certificates |
-| Sidecar log | `evidence/logs/sidecar.jsonl` | Hash-chained JSONL events |
-| TRACE-REPLAY-KIT | `tests/replay/out/certs/` (and trace outputs) | Replay-oriented CERTs and traces |
-| SWE-bench runs | `runs/<run_id>/<instance_id>/` | Run logs, metadata, replay bundles |
-| PCS science claims | `config/schemas/pcs/EvidenceBundle.v0.schema.json` | Distinct domain; not v0.1 bundles |
-| Spec archives | `so bundle pack` | tar.gz spec bundles; out of v0.1 scope |
+| Surface | Location | Role | Status |
+|---------|----------|------|--------|
+| Evidence v0.1 bundles | `specs/evidence/v0.1/`, `pf evidence pack/validate` | Digest-bound JSON bundle lane | **Complete** — [v0.1 status](../roadmap/evidence-v0.1-status.md) |
+| Evidence v0.2 bundles | `specs/evidence/v0.2/`, `pf evidence replay --execute` | Deep replay + `replay_context` | **Complete** — [v0.2 status](../roadmap/evidence-v0.2-status.md) |
+| Runtime CERT-V1 | `evidence/certs/<session>/<seq>.cert.json` | Sidecar-emitted certificates | Production path (Linux CI) |
+| Sidecar log | `evidence/logs/sidecar.jsonl` | Hash-chained JSONL events | Production path |
+| TRACE-REPLAY-KIT | `tests/replay/out/certs/` (and trace outputs) | Replay-oriented CERTs and traces | Submodule + CI |
+| SWE-bench runs | `runs/<run_id>/<instance_id>/` | Run logs, metadata, replay bundles | Mock engine on Windows; real on Linux/WSL |
+| PCS science claims | `config/schemas/pcs/EvidenceBundle.v0.schema.json` | Distinct domain; not Evidence JSON | Separate lane |
+| Spec archives | `so bundle pack` | tar.gz spec bundles | Out of Evidence v0.1/v0.2 scope |
 
-Planned v0.1 additions (`specs/evidence/v0.1/`, `pf evidence …`) are tracked in the
-[Evidence v0.1 roadmap](../roadmap/evidence-v0.1.md).
+### Quick verification
+
+```bash
+make dev-standards
+make evidence-verify   # Go tests, pytest, v0.1 + v0.2 testbed scripts
+pf evidence validate --strict specs/evidence/v0.2/examples/valid/manifest.json
+```
+
+Schema references: [v0.1 README](https://github.com/SentinelOps-CI/provability-fabric/blob/main/specs/evidence/v0.1/README.md), [v0.2 README](https://github.com/SentinelOps-CI/provability-fabric/blob/main/specs/evidence/v0.2/README.md), [compatibility matrix](../specs/evidence-compatibility.md).

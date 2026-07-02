@@ -47,6 +47,17 @@ Open `http://127.0.0.1:8000` to preview. A static build with `mkdocs build` writ
 
 The nested `docs/mkdocs.yml` mirrors the root navigation for partial builds. Prefer the root `mkdocs.yml` for the full public site. The `internal/` tree stays outside navigation.
 
+## Editor tooling (VS Code)
+
+Two VS Code extensions live in the repository; they serve different audiences:
+
+| Path | Package / purpose |
+|------|-------------------|
+| [`vscode-extension/`](https://github.com/SentinelOps-CI/provability-fabric/tree/main/vscode-extension) | **Provability Fabric DSL** — ActionDSL / Plan DSL syntax highlighting, compile and validate commands for policy authors |
+| [`tools/vscode-ext/`](https://github.com/SentinelOps-CI/provability-fabric/tree/main/tools/vscode-ext) | **PF CLI tools** — integrates with the `pf` CLI for evidence, replay, and workspace tasks |
+
+Install from source via **Extensions: Install from VSIX** after `npm run package` in the respective directory, or open the folder in VS Code development host (F5). Do not mix the two when publishing — they have distinct `package.json` names and activation events.
+
 ## Contributing
 
 - Follow the structure and naming above; use clear language without emojis

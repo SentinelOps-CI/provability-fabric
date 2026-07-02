@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use crate::time_util;
 use tokio::fs;
 use tokio::sync::RwLock;
 
@@ -182,10 +184,7 @@ impl SnapshotStorage {
             session_id: core_cert.session_id.clone(),
             tenant_id: core_cert.tenant_id.clone(),
             snapshot_type,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            created_at: time_util::unix_secs(),
             size_bytes: 0,            // Will be updated after storage
             file_path: String::new(), // Will be set after file creation
             tags,
@@ -319,10 +318,7 @@ impl SnapshotStorage {
 
     /// Generate snapshot ID
     fn generate_snapshot_id(&self, decision_id: &str) -> String {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = time_util::unix_secs();
         format!("snapshot_{}_{}", decision_id, timestamp)
     }
 

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/verifiable-ai-ci/CERT-V1/v1.0.0/schema/cert-v1.json",
+  "cert_type": "trace_replay",
+  "version": "1.0.0",
+  "timestamp": "2026-06-17T05:58:32.611748Z",
+  "replay_id": "fedac781428bba62",
+  "trace_metadata": {
+    "version": "1.0.0",
+    "created_at": "2024-01-01T00:00:00Z",
+    "system_info": {
+      "name": "simple_call_test",
+      "version": "1.0.0"
+    }
+  },
+  "environment": {
+    "locale": "en_US.UTF-8",
+    "timezone": "UTC",
+    "seed": 42,
+    "versions": {
+      "python": "3.11.0",
+      "system_lib": "1.0.0"
+    }
+  },
+  "results": [
+    {
+      "event_id": "event_001",
+      "status": "success",
+      "type": "function_call",
+      "result": "Executed add_numbers"
+    }
+  ],
+  "summary": {
+    "total_events": 1,
+    "successful_events": 1,
+    "failed_events": 0
+  },
+  "signature": {
+    "algorithm": "sha256",
+    "hash": "a50f1fb1e4f64ae6bad6c2fc5bca79e251d58bac967b6ce4286a6d4026196fb4"
+  }
+}

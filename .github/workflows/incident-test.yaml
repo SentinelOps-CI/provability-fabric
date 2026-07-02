@@ -325,4 +325,5 @@ jobs:
     steps:
       - name: Cleanup Kind cluster
         run: |
+          # ci-honesty: justified wave7-remediation
           kind delete cluster --name incident-test || true

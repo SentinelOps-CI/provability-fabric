@@ -9,11 +9,11 @@ Provability-Fabric now includes comprehensive Model Context Protocol (MCP) integ
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Security & Constraints](#security--constraints)
+2. [Security & Constraints](#security-constraints)
 3. [API Reference](#api-reference)
 4. [Usage Examples](#usage-examples)
 5. [Configuration](#configuration)
-6. [Monitoring & Compliance](#monitoring--compliance)
+6. [Monitoring & Compliance](#monitoring-compliance)
 7. [Development Guide](#development-guide)
 8. [Troubleshooting](#troubleshooting)
 

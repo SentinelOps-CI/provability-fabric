@@ -33,6 +33,7 @@ Bundle pack and digest coverage lives in Go (`core/evidence/bundle_test.go`, run
 
 ## Related docs
 
-- [Evidence model v0.1](../../docs/specs/evidence-model-v0.1.md)
-- [Evidence bundle v0.1](../../docs/specs/evidence-bundle-v0.1.md)
-- [Compatibility matrix](../../docs/specs/evidence-compatibility.md)
+- [Evidence model v0.1](../../../docs/specs/evidence-model-v0.1.md)
+- [Evidence bundle v0.1](../../../docs/specs/evidence-bundle-v0.1.md)
+- [Compatibility matrix](../../../docs/specs/evidence-compatibility.md)
+- [Evidence v0.2 schemas](../v0.2/README.md) — opt-in deep replay lane

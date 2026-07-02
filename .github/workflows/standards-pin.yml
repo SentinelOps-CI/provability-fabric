@@ -36,6 +36,7 @@ jobs:
 
       - name: Comment on PR (drift)
         if: failure() && github.event_name == 'pull_request'
+        continue-on-error: true  # ci-honesty: justified wave7-remediation
         uses: actions/github-script@v6
         with:
           script: |

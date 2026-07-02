@@ -41,6 +41,8 @@ use sidecar_watcher::assumption::{Assumption, AssumptionMonitor};
 use sidecar_watcher::egress_cert::{
     BridgeGuarantee, EgressCertificate, PermissionEvidence, ProofHashes as CertProofHashes,
 };
+use sidecar_watcher::env_config;
+use sidecar_watcher::time_util;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Action {
@@ -68,7 +70,6 @@ struct UsageEvent {
     ts: String,
 }
 
-#[allow(dead_code)]
 struct Metrics {
     total_actions: Counter,
     violations: Counter,
@@ -185,7 +186,6 @@ impl Metrics {
     }
 }
 
-#[allow(dead_code)]
 struct Watcher {
     // Shared Prometheus registry registered with our metrics
     registry: Arc<Registry>,
@@ -214,7 +214,6 @@ struct Watcher {
     signing_key_id: String,
 }
 
-#[allow(dead_code)]
 impl Watcher {
     async fn new() -> Result<Self> {
         // Build a single registry and register all metrics on it
@@ -228,6 +227,11 @@ impl Watcher {
         // Initialize NI monitor with default config
         let ni_config = NIMonitorConfig::default();
         let ni_monitor = NIMonitor::new(ni_config);
+
+        if std::env::var("PF_DETERMINISTIC_EGRESS").is_ok() {
+            let profile = deterministic_egress::EgressProfile::default();
+            info!("Deterministic egress enabled: profile {}", profile.name);
+        }
 
         // Try to load DFA from file if available
         let dfa_interpreter = match env::var("DFA_PATH") {
@@ -289,10 +293,7 @@ impl Watcher {
 
         // 1. DFA Step Evaluation (if DFA is loaded)
         if let Some(ref mut dfa) = self.dfa_interpreter {
-            let current_time = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            let current_time = time_util::unix_millis();
 
             match dfa.process_event(&action.action_type, current_time) {
                 Ok(_) => {
@@ -312,10 +313,7 @@ impl Watcher {
         // 2. IFC Checks (Information Flow Control) with MonNI bridge
         let ni_event = NIEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: time_util::unix_secs(),
             session_id: self.tenant_id.clone(),
             user_id: "system".to_string(),
             operation: action.action_type.clone(),
@@ -344,12 +342,15 @@ impl Watcher {
 
         // 3. Permission Epochs (existing budget checks)
         if let (Some(epsilon), Some(delta)) = (action.privacy_epsilon, action.privacy_delta) {
-            let runtime = tokio::runtime::Runtime::new()?;
-            let allowed = runtime.block_on(self.epsilon_guard.check_query(
-                &self.tenant_id,
-                epsilon,
-                delta,
-            ))?;
+            let allowed = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.block_on(self.epsilon_guard.check_query(
+                    &self.tenant_id,
+                    epsilon,
+                    delta,
+                ))?
+            } else {
+                return Err(anyhow::anyhow!("async runtime required for privacy checks"));
+            };
 
             if !allowed {
                 self.metrics.privacy_violations.inc();
@@ -362,13 +363,14 @@ impl Watcher {
         }
 
         // Update privacy budget metric from guard (store epsilon * 1000)
-        let runtime = tokio::runtime::Runtime::new()?;
-        if let Ok((remaining_epsilon, _)) =
-            runtime.block_on(self.epsilon_guard.get_remaining_budget(&self.tenant_id))
-        {
-            self.metrics
-                .privacy_budget_remaining
-                .set((remaining_epsilon * 1000.0) as i64);
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            if let Ok((remaining_epsilon, _)) =
+                handle.block_on(self.epsilon_guard.get_remaining_budget(&self.tenant_id))
+            {
+                self.metrics
+                    .privacy_budget_remaining
+                    .set((remaining_epsilon * 1000.0) as i64);
+            }
         }
 
         // 4. Witness Checks (existing budget and spam checks)
@@ -397,7 +399,11 @@ impl Watcher {
 
         // 5. Generate egress certificate with PAB hashes
         let cert_start_time = Instant::now();
-        let certificate = self.generate_egress_certificate(action);
+        let Some(certificate) = self.generate_egress_certificate(action) else {
+            self.metrics.cert_issuance_failures.inc();
+            self.log_violation("egress certificate denied: missing or placeholder evidence hashes");
+            return Ok(false);
+        };
         let cert_duration = cert_start_time.elapsed();
 
         // Track certificate issuance metrics
@@ -445,7 +451,9 @@ impl Watcher {
 
         if let Ok(mut log_file) = File::create("/tmp/guard_trips.log") {
             use std::io::Write;
-            let _ = writeln!(log_file, "{}", serde_json::to_string(&trip).unwrap());
+            if let Ok(line) = serde_json::to_string(&trip) {
+                let _ = writeln!(log_file, "{line}");
+            }
         }
     }
 
@@ -484,32 +492,56 @@ impl Watcher {
     /// This method creates an egress certificate that includes the proof carries code
     /// hashes from the PAB, providing cryptographic verification of the system's
     /// correctness without requiring Lean proof execution at runtime.
-    fn generate_egress_certificate(&self, action: &Action) -> EgressCertificate {
+    fn generate_egress_certificate(&self, action: &Action) -> Option<EgressCertificate> {
         let session_id = self.tenant_id.clone();
         let bundle_id = format!("bundle_{}", self.spec_sig);
-        let plan_hash = std::env::var("PLAN_HASH").unwrap_or_else(|_| "test-plan-hash".to_string());
-        let policy_hash = std::env::var("POLICY_HASH").unwrap_or_else(|_| "test-policy-hash".to_string());
+        let plan_hash = env_config::resolve_evidence_hash("PLAN_HASH", "test-plan-hash").ok()?;
+        let policy_hash =
+            env_config::resolve_evidence_hash("POLICY_HASH", "test-policy-hash").ok()?;
 
         let mut cert = EgressCertificate::new(session_id, bundle_id, plan_hash, policy_hash.clone());
 
         // Add proof hashes from PAB (these would be loaded from the PAB manifest)
         let proof_hashes = CertProofHashes {
-            automata_hash: std::env::var("AUTOMATA_HASH").unwrap_or_else(|_| "test-automata-hash".to_string()),
-            labeler_hash: std::env::var("LABELER_HASH").unwrap_or_else(|_| "test-labeler-hash".to_string()),
+            automata_hash: env_config::resolve_evidence_hash("AUTOMATA_HASH", "test-automata-hash")
+                .ok()?,
+            labeler_hash: env_config::resolve_evidence_hash("LABELER_HASH", "test-labeler-hash")
+                .ok()?,
             policy_hash,
-            ni_monitor_hash: std::env::var("NI_MONITOR_HASH").unwrap_or_else(|_| "test-ni-monitor-hash".to_string()),
+            ni_monitor_hash: env_config::resolve_evidence_hash(
+                "NI_MONITOR_HASH",
+                "test-ni-monitor-hash",
+            )
+            .ok()?,
         };
         cert.add_proof_hashes(proof_hashes);
 
-        // Add permission evidence
+        // Add permission evidence from NI monitor state
+        let monni_statuses = self.ni_monitor.get_monni_status();
+        let path_witness_ok = monni_statuses
+            .values()
+            .all(|s| matches!(s, NIMonitorStatus::Accept | NIMonitorStatus::Inapplicable));
+        let label_derivation_ok = path_witness_ok;
+        let bridge = self.ni_monitor.generate_bridge_guarantee();
+        let permit_decision = if path_witness_ok && label_derivation_ok && bridge.local_checks_ok {
+            "accept"
+        } else {
+            "reject"
+        }
+        .to_string();
+
         let permission_evidence = PermissionEvidence {
-            permit_decision: "accept".to_string(),
-            path_witness_ok: true,
-            label_derivation_ok: true,
+            permit_decision,
+            path_witness_ok,
+            label_derivation_ok,
             epoch: 1,
             principal_id: "system".to_string(),
             action_type: action.action_type.clone(),
-            resource_id: std::env::var("RESOURCE_ID").unwrap_or_else(|_| "test-resource-id".to_string()),
+            resource_id: env_config::resolve_evidence_hash(
+                env_config::EVIDENCE_RESOURCE_ID_ENV,
+                "test-resource-id",
+            )
+            .ok()?,
             field_path: None,
             abac_attributes: std::collections::HashMap::new(),
             session_attributes: std::collections::HashMap::new(),
@@ -517,27 +549,22 @@ impl Watcher {
             tenant: self.tenant_id.clone(),
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
         cert.add_permission_evidence(permission_evidence);
 
-        // Add bridge guarantee
+        // Add bridge guarantee from NI monitor checks
         let bridge_guarantee = BridgeGuarantee {
-            theorem_reference: "ni-bridge".to_string(),
-            local_checks_ok: true,
-            global_ni_claim: "global_non_interference".to_string(),
-            proof_verification: true,
-            bridge_conditions: vec![
-                "All prefixes respect label ordering".to_string(),
-                "No non-interference violations".to_string(),
-                "Monitor state is consistent".to_string(),
-                "Proof hashes match expected values".to_string(),
-            ],
+            theorem_reference: bridge.theorem_reference,
+            local_checks_ok: bridge.local_checks_ok,
+            global_ni_claim: bridge.global_ni_claim,
+            proof_verification: bridge.proof_verification,
+            bridge_conditions: bridge.bridge_conditions,
         };
         cert.content.bridge_guarantee = bridge_guarantee;
 
-        cert
+        Some(cert)
     }
 
     /// Track replay pass rate (aggregated, no PII)
@@ -636,29 +663,35 @@ impl Watcher {
         let log_file =
             env::var("LOG_FILE").unwrap_or_else(|_| "/var/log/container.log".to_string());
 
-        loop {
+        let lines = tokio::task::spawn_blocking(move || -> Vec<String> {
+            let mut collected = Vec::new();
             if let Ok(file) = File::open(&log_file) {
                 let reader = BufReader::new(file);
-
                 for line in reader.lines().map_while(Result::ok) {
-                    if line.contains("\"action\"") {
-                        if let Ok(action) = serde_json::from_str::<Action>(&line) {
-                            if let Err(e) = self.process_action(&action) {
-                                error!("Failed to process action: {}", e);
-                            }
-                        }
-                    } else if line.contains("\"assumption\"") {
-                        if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
-                            if let Err(e) = self.process_assumption(assumption) {
-                                error!("Failed to process assumption: {}", e);
-                            }
-                        }
+                    collected.push(line);
+                }
+            }
+            collected
+        })
+        .await?;
+
+        for line in lines {
+            if line.contains("\"action\"") {
+                if let Ok(action) = serde_json::from_str::<Action>(&line) {
+                    if let Err(e) = self.process_action(&action) {
+                        error!("Failed to process action: {}", e);
+                    }
+                }
+            } else if line.contains("\"assumption\"") {
+                if let Ok(assumption) = serde_json::from_str::<Assumption>(&line) {
+                    if let Err(e) = self.process_assumption(assumption) {
+                        error!("Failed to process assumption: {}", e);
                     }
                 }
             }
-
-            sleep(Duration::from_secs(1)).await;
         }
+
+        Ok(())
     }
 }
 
@@ -667,12 +700,17 @@ async fn metrics_handler(
     registry: Arc<Registry>,
 ) -> Result<Response<Body>, hyper::Error> {
     let mut buffer = String::new();
-    encode(&mut buffer, &registry).unwrap();
+    if encode(&mut buffer, &registry).is_err() {
+        return Ok(Response::builder()
+            .status(500)
+            .body(Body::from("metrics encode failed"))
+            .unwrap_or_else(|_| Response::new(Body::empty())));
+    }
 
     Ok(Response::builder()
         .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
         .body(Body::from(buffer))
-        .unwrap())
+        .unwrap_or_else(|_| Response::new(Body::empty())))
 }
 
 #[tokio::main]
@@ -684,6 +722,9 @@ async fn main() -> Result<()> {
     // Load privacy configurations (will log a warning in dev mode without K8s)
     if let Err(e) = watcher.epsilon_guard.load_configs().await {
         warn!("Failed to load privacy configs: {}", e);
+    }
+    if let Ok(metrics) = watcher.epsilon_guard.export_metrics().await {
+        info!("Loaded privacy metrics for {} tenant(s)", metrics.len());
     }
 
     // Start Prometheus /metrics server using the registry from Watcher

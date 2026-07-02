@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -39,6 +40,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# PostgreSQL unquoted identifiers: lowercase letters, digits, underscore; must not start with digit.
+_TABLE_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+
+def _validate_table_name(table_name: str, allowlist: set[str]) -> None:
+    """Reject dynamic SQL table names outside the configured allowlist."""
+    if not table_name:
+        raise ValueError("table name must not be empty")
+    if not _TABLE_NAME_RE.match(table_name):
+        raise ValueError(
+            f"invalid table name {table_name!r}: must match {_TABLE_NAME_RE.pattern}"
+        )
+    if table_name not in allowlist:
+        raise ValueError(
+            f"table {table_name!r} is not in the configured hot_storage allowlist"
+        )
+
 
 class DataRetentionManager:
     """Manages data retention and storage optimization."""
@@ -48,6 +66,27 @@ class DataRetentionManager:
         self.pg_conn = None
         self.s3_client = None
         self.bq_client = None
+        self._table_allowlist = self._build_table_allowlist()
+
+    def _build_table_allowlist(self) -> set[str]:
+        """Collect validated table names from hot_storage config."""
+        hot_config = self.config.get("hot_storage", {})
+        allowlist: set[str] = set()
+        for table_config in hot_config.get("tables", []):
+            name = table_config.get("name")
+            if not name:
+                continue
+            if not _TABLE_NAME_RE.match(name):
+                raise ValueError(
+                    f"invalid table name in config {name!r}: must match {_TABLE_NAME_RE.pattern}"
+                )
+            allowlist.add(name)
+        if not allowlist:
+            logger.warning("hot_storage.tables allowlist is empty")
+        return allowlist
+
+    def _assert_table_allowed(self, table_name: str) -> None:
+        _validate_table_name(table_name, self._table_allowlist)
 
     def _load_config(self, config_file: Path) -> Dict:
         """Load configuration from YAML file."""
@@ -119,6 +158,7 @@ class DataRetentionManager:
 
         for table_config in hot_config["tables"]:
             table_name = table_config["name"]
+            self._assert_table_allowed(table_name)
             try:
                 # Get table size before cleanup
                 with self.pg_conn.cursor() as cursor:
@@ -201,6 +241,7 @@ class DataRetentionManager:
 
         for table_config in self.config["hot_storage"]["tables"]:
             table_name = table_config["name"]
+            self._assert_table_allowed(table_name)
             try:
                 # Query data for rollup
                 with self.pg_conn.cursor() as cursor:

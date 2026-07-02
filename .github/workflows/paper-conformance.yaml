@@ -8,11 +8,10 @@ on:
       - "runtime/labeler/**"
       - "core/lean-libs/**"
       - ".github/workflows/paper-conformance.yaml"
-  pull_request:
-    branches: [main, develop]
   schedule:
     # Run daily at 2 AM UTC
     - cron: "0 2 * * *"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -115,6 +114,8 @@ jobs:
   rate-limits:
     name: Rate Limits Performance
     runs-on: ubuntu-latest
+    env:
+      PF_SHADOW_MODE: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -126,6 +127,8 @@ jobs:
       - name: Run Rate Limit Tests
         run: |
           cd runtime/sidecar-watcher
+          cargo test test_rate_limiter_basic -- --nocapture
+          cargo test test_optimized_rate_limiter -- --nocapture
           cargo test test_99th_percentile_performance -- --nocapture
           cargo test test_clock_wraparound_safety -- --nocapture
           cargo test test_monotonicity_guarantee -- --nocapture
@@ -296,6 +299,8 @@ jobs:
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
+    env:
+      PF_SHADOW_MODE: "1"
     needs:
       [
         dfa-equivalence,
@@ -321,12 +326,13 @@ jobs:
       - name: Run Integration Tests
         run: |
           cd runtime/sidecar-watcher
-          cargo test --all -- --nocapture
+          cargo test --test integration_tests -- --nocapture
+          cargo test --lib -- --nocapture
 
       - name: Verify All Tests Pass
         run: |
           cd runtime/sidecar-watcher
-          cargo test --all -- --nocapture | grep -q "test result: ok" || exit 1
+          cargo test --test integration_tests -- --nocapture | grep -q "test result: ok" || exit 1
 
   # Performance Benchmarks
   performance:

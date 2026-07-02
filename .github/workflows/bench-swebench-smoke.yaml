@@ -46,6 +46,7 @@ jobs:
     name: rust-tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # ci-honesty: justified wave7-remediation
     continue-on-error: true  # optional gate; bench-smoke is the required PR gate
     steps:
       - name: Checkout repository

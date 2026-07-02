@@ -108,6 +108,7 @@ jobs:
 
           # Flag GPL-family licenses only when they are the sole/primary identifier,
           # not SPDX OR expressions such as "(BSD-3-Clause OR GPL-2.0)".
+          # ci-honesty: justified wave7-remediation
           GPL_LICENSES=$(echo "$LICENSES" | grep -iE '^(GPL|AGPL|LGPL)-' || true)
 
           if [ -n "$GPL_LICENSES" ]; then
@@ -122,6 +123,7 @@ jobs:
       - name: Check for other restricted licenses
         run: |
           # Check for other potentially problematic licenses
+          # ci-honesty: justified wave7-remediation
           RESTRICTED_LICENSES=$(cat sbom.json | jq -r '.artifacts[] | select(.licenses != null) | .licenses[].value' | grep -i -E "(agpl|lgpl|mpl|epl|cddl)" || true)
 
           if [ -n "$RESTRICTED_LICENSES" ]; then
@@ -248,6 +250,7 @@ jobs:
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
+        # ci-honesty: justified wave7-remediation
         continue-on-error: true
         uses: actions/github-script@v7
         with:

@@ -8,6 +8,8 @@ use crate::policy_adapter::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fs;
 use tracing::{error, info, warn}; // for naming consistency in docs
 
 /// Runtime event that triggers permitD evaluation
@@ -57,6 +59,7 @@ pub struct PermitEnforcementHook {
     policy_adapter: PolicyAdapter,
     enforcement_stats: EnforcementStats,
     feature_flags: HashMap<String, bool>,
+    enabled_tools: HashSet<String>,
 }
 
 /// Enforcement statistics
@@ -88,7 +91,51 @@ impl PermitEnforcementHook {
             policy_adapter: PolicyAdapter::new(config),
             enforcement_stats: EnforcementStats::default(),
             feature_flags,
+            enabled_tools: Self::load_enabled_tools(),
         }
+    }
+
+    fn load_enabled_tools() -> HashSet<String> {
+        let mut enabled = HashSet::new();
+        for tool in crate::env_config::enabled_tools_override() {
+            enabled.insert(tool);
+        }
+        let allowlist_paths = [
+            "policy/allowlist.json",
+            "runtime/sidecar-watcher/policy/allowlist.json",
+        ];
+        for path in allowlist_paths {
+            if let Ok(data) = fs::read_to_string(path) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                    if let Some(tools) = json.get("tools").and_then(|t| t.as_object()) {
+                        for (name, entry) in tools {
+                            let can_use = entry
+                                .get("can_use")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false);
+                            if can_use {
+                                enabled.insert(name.clone());
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        // Dev fallback: known platform tools when manifest has default_deny entries.
+        if enabled.is_empty() && !crate::env_config::is_production_profile() {
+            for tool in [
+                "SendEmail",
+                "LogSpend",
+                "LogAction",
+                "NetworkCall",
+                "ReadFile",
+                "DatabaseQuery",
+            ] {
+                enabled.insert(tool.to_string());
+            }
+        }
+        enabled
     }
 
     /// Process a runtime event and enforce permitD
@@ -385,9 +432,8 @@ impl PermitEnforcementHook {
     }
 
     /// Check if a tool is enabled
-    fn is_tool_enabled(&self, _tool: &str) -> bool {
-        // Tool allowlist from config; default allow until manifest is loaded
-        true
+    fn is_tool_enabled(&self, tool: &str) -> bool {
+        self.enabled_tools.contains(tool)
     }
 
     /// Get enforcement mode as string

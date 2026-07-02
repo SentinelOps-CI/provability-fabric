@@ -2,7 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 import { Request, Response, NextFunction } from 'express';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
 /**
  * Cache invalidation configuration
@@ -18,7 +18,7 @@ interface CacheConfig {
  */
 export class CacheInvalidationService {
   private config: CacheConfig;
-  private axiosInstance: any;
+  private axiosInstance: AxiosInstance;
 
   constructor(config: CacheConfig) {
     this.config = config;
@@ -92,7 +92,7 @@ export function cacheInvalidationMiddleware(cacheService: CacheInvalidationServi
     const originalSend = res.send;
     
     // Override send method to trigger cache invalidation
-    res.send = function(body: any) {
+    res.send = function(body?: unknown) {
       // Call original send
       const result = originalSend.call(this, body);
       

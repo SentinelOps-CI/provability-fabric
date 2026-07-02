@@ -1,0 +1,11 @@
+# Generated / build output (mkdocs, dist, site)
+build/
+dist/
+site/
+
+# Compiled CLI binaries (not source)
+core/cli/pf/pf
+core/cli/pf/pf.exe
+
+# WASM artifacts
+*.wasm

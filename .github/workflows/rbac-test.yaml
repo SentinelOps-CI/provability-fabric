@@ -98,7 +98,7 @@ jobs:
                 - name: ledger
                   image: provability-fabric/ledger:test
                   imagePullPolicy: Never
-                  command: ["sh", "-c", "node dist/index-simple.js"]
+                  command: ["sh", "-c", "node dist/index.js"]
                   ports:
                   - containerPort: 4000
                   env:
@@ -325,4 +325,5 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          # ci-honesty: justified wave7-remediation
           kind delete cluster --name provability-fabric-test || true

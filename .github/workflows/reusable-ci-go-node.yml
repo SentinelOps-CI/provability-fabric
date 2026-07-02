@@ -82,6 +82,8 @@ jobs:
       - name: Test Node.js ledger
         run: |
           cd runtime/ledger
+          python ../../scripts/count_ledger_any.py --max 20
+          npm run typecheck:server
           npm run test
 
       - name: Test Node.js core SDK (TypeScript)

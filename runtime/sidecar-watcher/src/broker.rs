@@ -257,19 +257,24 @@ impl BrokerIntegration {
     }
 
     fn verify_receipt(&self, receipt: &AccessReceipt) -> Result<()> {
-        // Basic receipt validation
-        if receipt.receipt_id.is_empty() {
-            return Err(anyhow::anyhow!("Receipt ID is empty"));
-        }
-        if receipt.tenant.is_empty() {
-            return Err(anyhow::anyhow!("Receipt tenant is empty"));
-        }
-        if receipt.sig.is_empty() {
-            return Err(anyhow::anyhow!("Receipt signature is empty"));
-        }
+        pf_dsse::verify_access_receipt(
+            &pf_dsse::AccessReceiptPayload {
+                receipt_id: receipt.receipt_id.clone(),
+                tenant: receipt.tenant.clone(),
+                subject_id: receipt.subject_id.clone(),
+                query_hash: receipt.query_hash.clone(),
+                index_shard: receipt.index_shard.clone(),
+                timestamp: receipt.timestamp,
+                result_hash: receipt.result_hash.clone(),
+                result_count: 0,
+                query_time_ms: 0,
+                signature: String::new(),
+            },
+            &receipt.sign_alg,
+            &receipt.sig,
+        )
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-        // Signature verification requires trust root (PEM/JWKS); structural validation only until wired
-        // For now, just validate structure
         info!("Receipt verified: {}", receipt.receipt_id);
         Ok(())
     }

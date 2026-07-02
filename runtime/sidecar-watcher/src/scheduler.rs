@@ -16,7 +16,8 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 /// Custom serialization for std::time::Instant
@@ -144,33 +145,32 @@ impl SGEQScheduler {
 
     /// Schedule an event
     pub fn schedule_event(&mut self, event: ScheduledEvent) -> Result<(), String> {
-        // Check session limits
-        if self.active_sessions.lock().unwrap().len() >= self.config.max_concurrent_sessions {
+        let session_id = event.session_id.clone();
+        let mut session_events = self.session_events.lock();
+        let mut active_sessions = self.active_sessions.lock();
+
+        if active_sessions.len() >= self.config.max_concurrent_sessions
+            && !active_sessions.contains(&session_id)
+        {
             return Err("Maximum concurrent sessions exceeded".to_string());
         }
 
-        // Check per-session event limits
-        let session_events = self.session_events.lock().unwrap();
-        if let Some(events) = session_events.get(&event.session_id) {
+        if let Some(events) = session_events.get(&session_id) {
             if events.len() >= self.config.max_events_per_session {
                 return Err("Maximum events per session exceeded".to_string());
             }
         }
 
-        // Add to global queue
         self.event_queue.push(event.clone());
-
-        // Add to session-specific queue
-        let mut session_events = self.session_events.lock().unwrap();
-        let session_id = event.session_id.clone();
+        {
+            let mut seq = self.sequence_counter.lock();
+            *seq = seq.saturating_add(1);
+        }
         session_events
             .entry(session_id.clone())
             .or_default()
             .push_back(event);
-
-        // Mark session as active
-        self.active_sessions.lock().unwrap().insert(session_id);
-
+        active_sessions.insert(session_id);
         Ok(())
     }
 
@@ -181,8 +181,8 @@ impl SGEQScheduler {
 
     /// Get events for a specific session
     pub fn get_session_events(&self, session_id: &str) -> Vec<ScheduledEvent> {
-        let session_events = self.session_events.lock().unwrap();
-        session_events
+        self.session_events
+            .lock()
             .get(session_id)
             .map(|events| events.iter().cloned().collect())
             .unwrap_or_default()
@@ -190,16 +190,15 @@ impl SGEQScheduler {
 
     /// Complete a session
     pub fn complete_session(&mut self, session_id: &str) {
-        self.active_sessions.lock().unwrap().remove(session_id);
-        let mut session_events = self.session_events.lock().unwrap();
-        session_events.remove(session_id);
+        self.active_sessions.lock().remove(session_id);
+        self.session_events.lock().remove(session_id);
     }
 
     /// Get scheduler statistics
     pub fn get_stats(&self) -> SchedulerStats {
-        let active_sessions = self.active_sessions.lock().unwrap().len();
+        let active_sessions = self.active_sessions.lock().len();
         let total_events = self.event_queue.len();
-        let session_events = self.session_events.lock().unwrap();
+        let session_events = self.session_events.lock();
         let total_sessions = session_events.len();
 
         SchedulerStats {
@@ -239,40 +238,41 @@ impl TwoQueueScheduler {
 
     /// Schedule an event
     pub fn schedule_event(&mut self, event: ScheduledEvent) -> Result<(), String> {
-        // Check session limits
-        if self.active_sessions.lock().unwrap().len() >= self.config.max_concurrent_sessions {
+        let session_id = event.session_id.clone();
+        let mut session_events = self.session_events.lock();
+        let mut active_sessions = self.active_sessions.lock();
+
+        if active_sessions.len() >= self.config.max_concurrent_sessions
+            && !active_sessions.contains(&session_id)
+        {
             return Err("Maximum concurrent sessions exceeded".to_string());
         }
 
-        // Check per-session event limits
-        let session_events = self.session_events.lock().unwrap();
-        if let Some(events) = session_events.get(&event.session_id) {
+        if let Some(events) = session_events.get(&session_id) {
             if events.len() >= self.config.max_events_per_session {
                 return Err("Maximum events per session exceeded".to_string());
             }
         }
 
-        // Route to appropriate queue based on priority
         if event.priority == Priority::Critical || event.priority == Priority::High {
             self.priority_queue.push(event.clone());
         } else {
             self.fifo_queue.push_back(event.clone());
         }
 
-        // Add to session-specific queue
-        let mut session_events = self.session_events.lock().unwrap();
-        let session_id = event.session_id.clone();
         session_events
             .entry(session_id.clone())
             .or_default()
             .push_back(event);
+        active_sessions.insert(session_id);
 
-        // Mark session as active
-        self.active_sessions.lock().unwrap().insert(session_id);
-
-        // Check if FIFO merge should be triggered
         if !self.merge_triggered && self.fifo_queue.len() >= self.config.fifo_merge_threshold {
             self.merge_triggered = true;
+        }
+
+        {
+            let mut seq = self.sequence_counter.lock();
+            *seq = seq.saturating_add(1);
         }
 
         Ok(())
@@ -306,8 +306,8 @@ impl TwoQueueScheduler {
 
     /// Get events for a specific session
     pub fn get_session_events(&self, session_id: &str) -> Vec<ScheduledEvent> {
-        let session_events = self.session_events.lock().unwrap();
-        session_events
+        self.session_events
+            .lock()
             .get(session_id)
             .map(|events| events.iter().cloned().collect())
             .unwrap_or_default()
@@ -315,18 +315,17 @@ impl TwoQueueScheduler {
 
     /// Complete a session
     pub fn complete_session(&mut self, session_id: &str) {
-        self.active_sessions.lock().unwrap().remove(session_id);
-        let mut session_events = self.session_events.lock().unwrap();
-        session_events.remove(session_id);
+        self.active_sessions.lock().remove(session_id);
+        self.session_events.lock().remove(session_id);
     }
 
     /// Get scheduler statistics
     pub fn get_stats(&self) -> TwoQueueSchedulerStats {
-        let active_sessions = self.active_sessions.lock().unwrap().len();
+        let active_sessions = self.active_sessions.lock().len();
         let priority_events = self.priority_queue.len();
         let fifo_events = self.fifo_queue.len();
         let total_events = priority_events + fifo_events;
-        let session_events = self.session_events.lock().unwrap();
+        let session_events = self.session_events.lock();
         let total_sessions = session_events.len();
 
         TwoQueueSchedulerStats {
@@ -489,10 +488,12 @@ mod tests {
 
         let event1 = EventBuilder::new("test1".to_string(), "session1".to_string())
             .with_priority(Priority::High)
+            .with_sequence_number(1)
             .build();
 
         let event2 = EventBuilder::new("test2".to_string(), "session1".to_string())
             .with_priority(Priority::Low)
+            .with_sequence_number(2)
             .build();
 
         scheduler.schedule_event(event1.clone()).unwrap();

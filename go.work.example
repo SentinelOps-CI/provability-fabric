@@ -1,0 +1,29 @@
+go 1.23
+
+use (
+	./adapters/gochi-cert-middleware
+	./adapters/pcs
+	./cmd/specdoc
+	./core/cli/pf
+	./core/crypto/dsse
+	./core/evidence
+	./core/policy-kernel
+	./core/sdk/go
+	./marketplace/api
+	./runtime/admission-controller
+	./runtime/retrieval-gateway
+	./services/api-gateway
+	./services/build-orchestrator
+	./services/evidence-service
+	./services/policy-diff-service
+	./services/proof-service
+	./services/replay-service
+	./services/spec-service
+	./tools/billing
+	./tools/explain-state-repl
+	./tools/metering
+	./tools/pcs-validate
+	./tools/pr-bot
+	./tools/privacy
+	./tools/specgraph
+)

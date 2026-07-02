@@ -4,7 +4,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::time_util;
 
 /// Enhanced permission certificate with evidence and NI alignment
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,10 +133,7 @@ pub struct CertificateSignature {
 impl PermissionCertificate {
     /// Create a new permission certificate
     pub fn new(session_id: String, bundle_id: String, plan_hash: String, epoch: u64) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         Self {
             metadata: PermissionCertMetadata {
@@ -218,10 +216,7 @@ impl PermissionCertificate {
     /// Generate a unique certificate ID
     fn generate_cert_id() -> String {
         let mut hasher = Sha256::new();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let timestamp = time_util::unix_nanos();
         hasher.update(timestamp.to_string().as_bytes());
         format!("cert_{:x}", hasher.finalize())
     }
@@ -229,7 +224,7 @@ impl PermissionCertificate {
     /// Calculate the certificate hash
     pub fn calculate_hash(&self) -> String {
         let mut hasher = Sha256::new();
-        let cert_data = serde_json::to_string(self).unwrap();
+        let cert_data = serde_json::to_string(self).unwrap_or_default();
         hasher.update(cert_data.as_bytes());
         format!("{:x}", hasher.finalize())
     }
@@ -237,10 +232,7 @@ impl PermissionCertificate {
     /// Validate the certificate
     pub fn validate(&self) -> Result<(), String> {
         // Check if certificate has expired
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         if now > self.metadata.expires_at {
             return Err("Certificate has expired".to_string());
@@ -283,10 +275,7 @@ pub struct PermissionEventBuilder {
 impl PermissionEventBuilder {
     /// Create a new event builder
     pub fn new(event_type: EventType, principal: Principal, action: Action) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         Self {
             event: PermissionEvent {
@@ -352,10 +341,7 @@ impl PermissionEventBuilder {
     /// Generate a unique event ID
     fn generate_event_id() -> String {
         let mut hasher = Sha256::new();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let timestamp = time_util::unix_nanos();
         hasher.update(timestamp.to_string().as_bytes());
         format!("event_{:x}", hasher.finalize())
     }

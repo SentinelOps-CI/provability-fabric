@@ -97,8 +97,14 @@ export class BillingService {
       }
     })
 
-    const totalCpuMs = usageEvents.reduce((sum, event) => sum + event.cpuMs, 0)
-    const totalNetBytes = usageEvents.reduce((sum, event) => sum + event.netBytes, 0)
+    const totalCpuMs = usageEvents.reduce(
+      (sum: number, event: { cpuMs: number }) => sum + event.cpuMs,
+      0
+    )
+    const totalNetBytes = usageEvents.reduce(
+      (sum: number, event: { netBytes: number }) => sum + event.netBytes,
+      0
+    )
     const costUsd = this.calculateCost(totalCpuMs, totalNetBytes)
 
     // Create or update invoice
@@ -156,8 +162,14 @@ export class BillingService {
       }
     })
 
-    const totalCpuMs = usageEvents.reduce((sum, event) => sum + event.cpuMs, 0)
-    const totalNetBytes = usageEvents.reduce((sum, event) => sum + event.netBytes, 0)
+    const totalCpuMs = usageEvents.reduce(
+      (sum: number, event: { cpuMs: number }) => sum + event.cpuMs,
+      0
+    )
+    const totalNetBytes = usageEvents.reduce(
+      (sum: number, event: { netBytes: number }) => sum + event.netBytes,
+      0
+    )
     const costUsd = this.calculateCost(totalCpuMs, totalNetBytes)
 
     // Create or update invoice

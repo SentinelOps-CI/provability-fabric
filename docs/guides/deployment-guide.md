@@ -693,6 +693,66 @@ fi
 echo "All health checks passed"
 ```
 
+## Runtime components (`runtime/`)
+
+Docker Compose profiles:
+
+| Profile | Command | Runtime services started |
+|---------|---------|--------------------------|
+| _(default)_ | `docker compose up` | `runtime-sidecar` (as `runtime-sidecar`) |
+| `ledger` | `docker compose --profile ledger up` | + `ledger` |
+| `enforcement` | `docker compose --profile enforcement up` | + `egress-firewall` |
+| `full` | `docker compose --profile full up` | + ledger, enforcement, retrieval-gateway, tool-broker, wasm-sandbox, console, demos, monitoring |
+
+### Component inventory
+
+| Component | Role | Compose | Build / run |
+|-----------|------|---------|-------------|
+| `sidecar-watcher` | Policy sidecar, NI monitor, egress certs | **wired** (`runtime-sidecar`) | `cargo build -p sidecar-watcher` |
+| `ledger` | GraphQL + MCP ledger | **wired** (`ledger`, profiles `ledger` / `full`) | `cd runtime/ledger && npm ci && npm run build` |
+| `egress-firewall` | Egress PII/secrets filtering | **wired** (`enforcement` / `full`) | `cargo build -p egress-firewall` |
+| `retrieval-gateway` | Retrieval receipts + ABAC | **wired** (`full`) | `cargo build -p retrieval-gateway` |
+| `tool-broker` | Tool plan broker (demo binary) | **wired** (`full`, batch) | `cargo build -p tool-broker` |
+| `wasm-sandbox` | WASM adapter sandbox CLI | **wired** (`full`, CLI via `compose run`) | `cargo build -p wasm-sandbox` |
+| `labeler` | Proof-carrying JSON path labeler (library) | standalone | `cargo test -p labeler` |
+| `admission-controller` | K8s admission webhook | standalone | `cd runtime/admission-controller && go build .` |
+| `attestor` | TEE attestation helper | standalone | `cargo build -p attestor` |
+| `incident-bot` | Alertmanager / K8s incident bot | standalone | `cd runtime/incident-bot && npm ci && npm run build` |
+| `jwks-manager` | JWKS rotation utility | standalone | `cargo build -p jwks-manager` |
+| `kms-proxy` | KMS signing proxy | standalone | `cargo build -p kms-proxy` |
+| `mpc-fintech` | MPC network experiments | experimental | `cargo build -p mpc-fintech` |
+| `rag-guard` | RAG ingress guard (Node) | standalone | `cd runtime/rag-guard && npm ci && npm test` |
+| `telemetry-service` | Telemetry aggregation | standalone | `cargo build -p telemetry-service` |
+| `privacy` | (legacy path; epsilon guard lives in sidecar) | n/a | see `sidecar-watcher/src/privacy/` |
+
+Validate compose topology:
+
+```bash
+./scripts/docker-compose-smoke.sh
+# or manually:
+docker compose --profile full config
+```
+
+### Production trust-chain environment (F01 / F02)
+
+In production and `full` compose profiles, set fail-closed trust defaults:
+
+| Variable | Production value | Purpose |
+|----------|------------------|---------|
+| `PF_ENFORCE_DSSE` | `1` | Reject unsigned or invalid DSSE envelopes (ledger, sidecar, SDK, Go kernel). |
+| `PF_ENABLED_TOOLS` | _(empty)_ | Deny-by-default tool allow-list for sidecar; comma-separate tool names to permit. |
+| `PF_PROFILE` | `production` | Activates production evidence-hash resolution and disables shadow bypass. |
+| `PF_TRUST_ROOT_PEM` | PEM of trust anchor | Required when `PF_ENFORCE_DSSE=1` for signature verification. |
+
+Development profiles may omit these for ergonomics; never ship production without `PF_ENFORCE_DSSE=1` and an explicit `PF_ENABLED_TOOLS` allow-list.
+
+Cross-language DSSE contract tests: `python tests/crypto/test_cross_lang_dsse.py`.
+
+
+Standalone components ship their own `Dockerfile` where containerization is supported
+(`admission-controller`, `attestor`, `incident-bot`, `jwks-manager`, `telemetry-service`).
+Use those Dockerfiles directly or wire them into your cluster manifests.
+
 ## Conclusion
 
 Successful production deployment requires:

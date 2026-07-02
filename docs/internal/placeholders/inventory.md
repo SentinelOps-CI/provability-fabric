@@ -2,6 +2,8 @@
 
 This document lists places in the repository that use placeholder values, stub implementations, or explicit TODOs for missing behavior. For v1 scope decisions (KMS/Vault, bundle hash, DSSE, SWE-bench, Lean, docs placeholders), see [decisions-v1.md](decisions-v1.md). For removal prompts, proof tests, and status tracking, see [burn-down.md](burn-down.md). It does not list UI input placeholder text, lockfile entries, or legitimate control-flow returns.
 
+**Wave 0 reconciliation (2026-07-01):** Trust-chain rows reset to OPEN in [burn-down.md](burn-down.md) per [full-repo-audit-2026-07-01.md](../full-repo-audit-2026-07-01.md). Runtime source no longer contains `dsse:placeholder` or `vec![0u8; 32]` signing keys; structural-only signature verification and permissive enforcement remain.
+
 ---
 
 ## 1. Explicit placeholders (string/values)
@@ -11,9 +13,9 @@ This document lists places in the repository that use placeholder values, stub i
 | `core/cli/pf/main.go` | `BundleHash: "placeholder-hash"` (bundle hash not calculated from actual bundle) |
 | `runtime/sidecar-watcher/src/main.rs` | `plan_hash_placeholder`, `policy_hash_placeholder`, `automata_hash_placeholder`, `labeler_hash_placeholder`, `ni_monitor_hash_placeholder`, `resource_placeholder`, `attestation_token_placeholder`, `attestation_sig_placeholder` in test/example data |
 | `runtime/sidecar-watcher/src/revocation.rs` | `policy_hash_placeholder`, `dfa_hash_placeholder`, `labeler_hash_placeholder` (would be actual hashes) |
-| `runtime/sidecar-watcher/src/permit_enforcement.rs` | `CERT_SIG` fallback `"dsse:placeholder"`; multiple "return true as a placeholder" for policy/check functions |
-| `runtime/sidecar-watcher/src/policy_adapter.rs` | Four functions "For now, return true as a placeholder" (policy/DFA/labeler checks) |
-| `runtime/retrieval-gateway/src/receipt.rs` | `let signing_key = vec![0u8; 32]; // Placeholder key` |
+| `runtime/sidecar-watcher/src/permit_enforcement.rs` | `CERT_SIG` from env or unconfigured; `is_tool_enabled` defaults true (manifest allowlist not wired) |
+| `runtime/sidecar-watcher/src/policy_adapter.rs` | Shadow mode always allows; path/label checks simulated |
+| `runtime/retrieval-gateway/src/receipt.rs` | Signing key from env; **no Cargo.toml** — crate unbuildable (F05) |
 | `runtime/mpc-fintech/src/compliance.rs` | "Placeholder implementations for other validation types" |
 | `runtime/ledger/prisma/migrations/.../rollback.sql` | `'rollback_checksum_placeholder'` |
 | `services/evidence-service/main.go` | kms/vault signers: "not implemented"; placeholder compliance files `audit-proof.json`, `conformance.md` |
@@ -34,11 +36,11 @@ This document lists places in the repository that use placeholder values, stub i
 | `runtime/wasm-sandbox/README.md` | Documents that `scan_for_prohibited_ops` is a stub (returns empty) |
 | `runtime/sidecar-watcher/src/concurrency.rs` | "Process event (placeholder - would call actual processing logic)"; "Process individual event (placeholder)" |
 | `core/policy-kernel/cache.go` | "This is a placeholder for Redis synchronization logic"; Redis get/set/delete/close "not implemented" / "TODO" |
-| `core/policy-kernel/engine.go` | "TODO: Implement actual signature verification" |
+| `core/policy-kernel/engine.go` | `verifyReceipt` structural validation only; returns nil without Ed25519 verify |
 | `core/cli/pf/platform_commands.go` | "Simple aggregation stub; in production call a report generator script" |
 | `core/crypto/wasm_pool.rs` | "For now, return a placeholder" (in some path) |
 | `api/v1/BUF_USAGE.md` | Suggests adding buf.gen.yaml to generate stubs for Go/TypeScript |
-| `tools/ci/impacted_only.py` | "Build impacted proofs functionality not yet implemented" |
+| `tools/ci/impacted_only.py` | `--build-impacted` logs guidance only; does not run `lake build` |
 
 ---
 

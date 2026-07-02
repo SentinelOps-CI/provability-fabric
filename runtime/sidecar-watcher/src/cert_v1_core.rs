@@ -15,7 +15,8 @@
  */
 
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::time_util;
 
 /// CERT-V1 Core Certificate (Hot Path)
 ///
@@ -76,10 +77,7 @@ impl CertV1Core {
         tenant_id: String,
         session_id: String,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         Self {
             bundle_id,

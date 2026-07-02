@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::info;
 
 use crate::policy_adapter::PolicyAdapter;
+
+fn unix_timestamp_secs() -> Result<u64> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .context("system clock before UNIX epoch")
+}
+
+fn read_lock<T>(lock: &RwLock<T>) -> Result<RwLockReadGuard<'_, T>> {
+    lock.read().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))
+}
+
+fn write_lock<T>(lock: &RwLock<T>) -> Result<RwLockWriteGuard<'_, T>> {
+    lock.write().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))
+}
 
 /// Revocation manager for handling epoch-based permission revocation
 pub struct RevocationManager {
@@ -78,7 +93,9 @@ impl RevocationManager {
 
     /// Get current epoch
     pub fn get_current_epoch(&self) -> u64 {
-        *self.current_epoch.read().unwrap()
+        read_lock(&self.current_epoch)
+            .map(|epoch| *epoch)
+            .unwrap_or(1)
     }
 
     /// Revoke a principal's permissions
@@ -133,7 +150,7 @@ impl RevocationManager {
     ) -> Result<()> {
         // Bump epoch
         let new_epoch = {
-            let mut epoch = self.current_epoch.write().unwrap();
+            let mut epoch = write_lock(&self.current_epoch)?;
             *epoch += 1;
             *epoch
         };
@@ -145,15 +162,11 @@ impl RevocationManager {
             reason: reason.to_string(),
             revoked_by: revoked_by.to_string(),
             ttl_hours,
-            expires_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-                + (ttl_hours * 3600),
+            expires_at: unix_timestamp_secs()? + (ttl_hours * 3600),
         };
 
         {
-            let mut revoked = self.revoked_principals.write().unwrap();
+            let mut revoked = write_lock(&self.revoked_principals)?;
             revoked.insert(principal_id.to_string(), revocation_record);
         }
 
@@ -180,7 +193,7 @@ impl RevocationManager {
 
         // Check if principal is already revoked
         let is_already_revoked = {
-            let revoked = self.revoked_principals.read().unwrap();
+            let revoked = read_lock(&self.revoked_principals)?;
             revoked.contains_key(principal_id)
         };
 
@@ -207,34 +220,30 @@ impl RevocationManager {
     fn create_approval_token(&self, request: &RevocationRequest) -> Result<String> {
         // In a real implementation, this would create a secure approval token
         // For now, we'll create a simple hash-based token
-        let token_data = format!(
-            "{}:{}:{}",
-            request.principal_id, request.reason, request.requested_by
-        );
-        let token = format!("approval_{:x}", md5::compute(token_data.as_bytes()));
+        let token = format!("approval_{}", uuid::Uuid::new_v4());
         Ok(token)
     }
 
     /// Take epoch snapshot for audit trail
     fn take_epoch_snapshot(&self, epoch: u64) -> Result<()> {
+        let policy_hash = read_lock(&self.policy_adapter)
+            .map(|adapter| format!("epoch-{}", adapter.get_current_epoch()))
+            .unwrap_or_else(|_| String::new());
         let snapshot = EpochSnapshot {
             epoch,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            policy_hash: std::env::var("POLICY_HASH").unwrap_or_default(),
+            timestamp: unix_timestamp_secs()?,
+            policy_hash,
             dfa_hash: std::env::var("DFA_HASH").unwrap_or_default(),
             labeler_hash: std::env::var("LABELER_HASH").unwrap_or_default(),
-            total_principals: 0,                                // Would be actual count
+            total_principals: 0, // Would be actual count
             revoked_principals: {
-                let revoked = self.revoked_principals.read().unwrap();
+                let revoked = read_lock(&self.revoked_principals)?;
                 revoked.len() as u64
             },
         };
 
         {
-            let mut history = self.epoch_history.write().unwrap();
+            let mut history = write_lock(&self.epoch_history)?;
             history.push(snapshot);
         }
 
@@ -251,7 +260,9 @@ impl RevocationManager {
 
     /// Check if a principal is revoked at a specific epoch
     pub fn is_principal_revoked(&self, principal_id: &str, epoch: u64) -> bool {
-        let revoked = self.revoked_principals.read().unwrap();
+        let Ok(revoked) = read_lock(&self.revoked_principals) else {
+            return false;
+        };
         if let Some(record) = revoked.get(principal_id) {
             record.revoked_at_epoch <= epoch
         } else {
@@ -261,36 +272,32 @@ impl RevocationManager {
 
     /// Get revocation statistics
     pub fn get_revocation_stats(&self) -> RevocationStats {
-        let revoked = self.revoked_principals.read().unwrap();
-        let history = self.epoch_history.read().unwrap();
+        let revoked = read_lock(&self.revoked_principals)
+            .map(|guard| guard.clone())
+            .unwrap_or_default();
+        let history = read_lock(&self.epoch_history)
+            .map(|guard| guard.len())
+            .unwrap_or(0);
+        let current_time = unix_timestamp_secs().unwrap_or(0);
 
         RevocationStats {
             current_epoch: self.get_current_epoch(),
             total_revocations: revoked.len() as u64,
             active_revocations: revoked
                 .values()
-                .filter(|r| {
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs()
-                        < r.expires_at
-                })
+                .filter(|r| current_time < r.expires_at)
                 .count() as u64,
-            epoch_history_count: history.len() as u64,
+            epoch_history_count: history as u64,
         }
     }
 
     /// Clean up expired revocations
     pub fn cleanup_expired_revocations(&mut self) -> Result<u64> {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let current_time = unix_timestamp_secs()?;
 
         let mut expired_count = 0;
         {
-            let mut revoked = self.revoked_principals.write().unwrap();
+            let mut revoked = write_lock(&self.revoked_principals)?;
             let expired_keys: Vec<String> = revoked
                 .iter()
                 .filter(|(_, record)| record.expires_at < current_time)

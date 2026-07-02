@@ -19,8 +19,16 @@ use sha2::{Digest, Sha256};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::{Duration, Instant};
+
+fn read_witness<T>(lock: &RwLock<T>) -> Option<RwLockReadGuard<'_, T>> {
+    lock.read().ok()
+}
+
+fn write_witness<T>(lock: &RwLock<T>) -> Option<RwLockWriteGuard<'_, T>> {
+    lock.write().ok()
+}
 
 /// Merkle proof for a single field
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,7 +130,7 @@ impl<K: Clone + PartialEq + Hash, V: Clone> LruCache<K, V> {
 
         // Find and move to front
         if let Some(pos) = self.entries.iter().position(|(k, _, _)| k == key) {
-            let (k, v, timestamp) = self.entries.remove(pos).unwrap();
+            let (k, v, timestamp) = self.entries.remove(pos)?;
             self.entries.push_front((k, v, timestamp));
             Some(self.entries[0].1.clone())
         } else {
@@ -242,23 +250,25 @@ impl OptimizedWitnessChecker {
     pub fn verify_proof(&self, proof: &MerkleProof) -> bool {
         // Check Bloom filter first (fast pre-filter)
         let proof_key = self.create_proof_key(proof);
-        if !self
-            .bloom_filter
-            .read()
-            .unwrap()
-            .might_contain(&proof_key.field_commit_root)
+        if !read_witness(&self.bloom_filter)
+            .map(|filter| filter.might_contain(&proof_key.field_commit_root))
+            .unwrap_or(false)
         {
             return false; // Definitely not in cache
         }
 
         // Check LRU cache
-        if let Some(cached_result) = self.proof_cache.write().unwrap().get(&proof_key) {
-            return cached_result;
+        if let Some(mut cache) = write_witness(&self.proof_cache) {
+            if let Some(cached_result) = cache.get(&proof_key) {
+                return cached_result;
+            }
         }
 
         // Verify proof and cache result
         let result = self.verify_merkle_proof(proof);
-        self.proof_cache.write().unwrap().insert(proof_key, result);
+        if let Some(mut cache) = write_witness(&self.proof_cache) {
+            cache.insert(proof_key, result);
+        }
         result
     }
 
@@ -282,12 +292,17 @@ impl OptimizedWitnessChecker {
 
     /// Add proof to Bloom filter (for pre-filtering)
     pub fn add_to_bloom_filter(&self, root_hash: [u8; 32]) {
-        self.bloom_filter.write().unwrap().add(&root_hash);
+        if let Some(mut filter) = write_witness(&self.bloom_filter) {
+            filter.add(&root_hash);
+        }
     }
 
     /// Process batch queue
     pub fn process_batch_queue(&self) -> usize {
-        let mut queue = self.batch_queue.write().unwrap();
+        let mut queue = match write_witness(&self.batch_queue) {
+            Some(queue) => queue,
+            None => return 0,
+        };
         let mut processed = 0;
         let batch_size = self.cache_config.batch_size;
 
@@ -369,15 +384,18 @@ impl OptimizedWitnessChecker {
     /// Get cache statistics
     pub fn get_cache_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
-        let cache = self.proof_cache.read().unwrap();
-        stats.insert("cache_size".to_string(), cache.entries.len());
-        stats.insert("cache_capacity".to_string(), cache.capacity);
+        if let Some(cache) = read_witness(&self.proof_cache) {
+            stats.insert("cache_size".to_string(), cache.entries.len());
+            stats.insert("cache_capacity".to_string(), cache.capacity);
+        }
         stats
     }
 
     /// Clear cache
     pub fn clear_cache(&self) {
-        self.proof_cache.write().unwrap().entries.clear();
+        if let Some(mut cache) = write_witness(&self.proof_cache) {
+            cache.entries.clear();
+        }
     }
 }
 

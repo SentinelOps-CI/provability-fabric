@@ -10,7 +10,7 @@ dev-up:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs
+.PHONY: help build test test-windows go-work clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs
 
 include scripts/proto.mk
 
@@ -241,6 +241,22 @@ test:
 	python tests/integration/test_platform_integration.py
 	@$(ECHOOK) "🧪 Running demo tests..."
 	cd demos/verifiable-mcp-fraud && npm test
+
+# Windows-native smoke: CLI + Rust only; use WSL for bash/Lean/replay gates.
+test-windows:
+	@$(ECHOOK) "🧪 Windows smoke (CLI + Rust; Linux-only paths skipped)..."
+	cd core/cli/pf && go test ./...
+	cargo test --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher --exclude labeler --exclude tool-broker
+	@$(ECHOOK) "✅ Windows smoke complete — run full gates in WSL: make evidence-verify"
+
+go-work:
+	@$(ECHOOK) "Creating go.work from go.work.example..."
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -Command "Copy-Item -Force go.work.example go.work"
+else
+	cp go.work.example go.work
+endif
+	@$(ECHOOK) "✅ go.work ready (gitignored). Run: go work sync"
 
 clean:
 	@$(ECHOOK) "🧹 Cleaning build artifacts..."

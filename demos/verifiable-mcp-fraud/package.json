@@ -10,7 +10,7 @@
     "dev:agent": "ts-node --esm src/mcp-client-agent.ts",
     "dev:simulator": "ts-node --esm src/transaction-simulator.ts",
     "test": "jest",
-    "lint": "npx eslint src/ scripts/ --ext .ts",
+    "lint": "eslint src scripts",
     "demo": "npm run demo:setup && npm run demo:run",
     "demo:setup": "ts-node --esm scripts/setup-demo.ts",
     "demo:run": "ts-node --esm scripts/run-demo.ts"
@@ -24,17 +24,17 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint": "~8.57.0",
+    "@eslint/js": "^9.17.0",
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.6",
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
+    "eslint": "^9.17.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.18.0"
   },
   "keywords": [
     "mcp",

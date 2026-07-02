@@ -9,7 +9,7 @@ This document tracks every placeholder value, stub implementation, and TODO-as-b
 
 See [inventory.md](inventory.md) for the full inventory and [decisions-v1.md](decisions-v1.md) for scope decisions.
 
-**Last updated:** Placeholder burn-down v1 implementation (Phases 1–10). Gate `make no-runtime-placeholders` and CI-enforced Lean sorry check in place; completed IDs set to DONE; PR links TBD. **Bench/SWE-bench technical debt (audit item 7):** Engine tuning constants moved to `bench/swebench/constants.py` (single source of truth, optional PF_* env overrides); entry points (pf CLI vs Python runner) documented in bench/swebench/README.md (Known limitations, Entry points, Reproducibility sections).
+**Last updated:** Wave 0 audit reconciliation (2026-07-01). Reset falsely-DONE trust-chain rows per [full-repo-audit-2026-07-01.md](../full-repo-audit-2026-07-01.md) and [remediation-tracker.md](../remediation-tracker.md). Gate `make no-runtime-placeholders` still fails on `build/` artifacts and embedded binary strings; runtime trust stubs remain OPEN.
 
 ---
 
@@ -64,17 +64,18 @@ Every item marked DONE must satisfy:
 ## 1. Explicit placeholders (literal values)
 
 **Status legend:** OPEN | IN PROGRESS | DONE | ALLOWED (EXAMPLE)  
+**Audit:** finding ID(s) from [full-repo-audit-2026-07-01.md](../full-repo-audit-2026-07-01.md) when OPEN due to reconciliation  
 **PR:** link or TBD  
 **Owner:** team/area (runtime, core, services, adapters, tools, lean, bench)
 
-| ID | Location | Placeholder | Removal prompt(s) | Proof tests (must exist) | Owner | Status | PR |
-|----|----------|-------------|-------------------|--------------------------|-------|--------|-----|
-| PH-001 | core/cli/pf/main.go | BundleHash: "placeholder-hash" | P4 | go test ./core/cli/pf/... -run TestBundleDigestFromBytes + make no-runtime-placeholders | core/cli | DONE | TBD |
-| PH-002 | runtime/sidecar-watcher/src/main.rs | *_hash_placeholder, attestation_*_placeholder in test/example data | P6 (+ P3.5 manifest wiring) | cargo test -p sidecar-watcher (fixture-based plan + manifest load) + gate | runtime/sidecar | DONE | TBD |
-| PH-003 | runtime/sidecar-watcher/src/revocation.rs | policy_hash_placeholder, dfa_hash_placeholder, labeler_hash_placeholder | P6 | cargo test -p sidecar-watcher -- revocation + gate | runtime/sidecar | DONE | TBD |
-| PH-004 | runtime/sidecar-watcher/src/permit_enforcement.rs | CERT_SIG fallback "dsse:placeholder" | P6 (+ P2 trust root/DSSE) | cargo test -p sidecar-watcher -- dsse_verification + gate | runtime/sidecar | DONE | TBD |
-| PH-005 | runtime/sidecar-watcher/src/policy_adapter.rs | "return true as placeholder" checks | P6 | cargo test -p sidecar-watcher -- policy_checks_deny_by_default + gate | runtime/sidecar | DONE | TBD |
-| PH-006 | runtime/retrieval-gateway/src/receipt.rs | let signing_key = vec![0u8; 32]; // Placeholder key | P8 (+ P2/P3 fixtures) | cargo test -p retrieval-gateway -- receipt_dsse + gate | runtime/retrieval | DONE | TBD |
+| ID | Location | Placeholder | Removal prompt(s) | Proof tests (must exist) | Owner | Status | Audit | PR |
+|----|----------|-------------|-------------------|--------------------------|-------|--------|-------|-----|
+| PH-001 | core/cli/pf/main.go | BundleHash: "placeholder-hash" | P4 | go test ./core/cli/pf/... -run TestBundleDigestFromBytes + make no-runtime-placeholders | core/cli | DONE | — | TBD |
+| PH-002 | runtime/sidecar-watcher/src/main.rs | *_hash_placeholder, attestation_*_placeholder in test/example data | P6 (+ P3.5 manifest wiring) | cargo test -p sidecar-watcher (fixture-based plan + manifest load) + gate | runtime/sidecar | DONE | — | TBD |
+| PH-003 | runtime/sidecar-watcher/src/revocation.rs | policy_hash_placeholder, dfa_hash_placeholder, labeler_hash_placeholder | P6 | cargo test -p sidecar-watcher -- revocation + gate | runtime/sidecar | DONE | — | TBD |
+| PH-004 | runtime/sidecar-watcher/src/permit_enforcement.rs | CERT_SIG unconfigured fallback; no real DSSE verify | P6 (+ P2 trust root/DSSE) | cargo test -p sidecar-watcher -- dsse_verification + gate | runtime/sidecar | OPEN | F01, F02 | TBD |
+| PH-005 | runtime/sidecar-watcher/src/policy_adapter.rs + permit_enforcement.rs | Shadow mode always allows; `is_tool_enabled` default true | P6 | cargo test -p sidecar-watcher -- policy_checks_deny_by_default + gate | runtime/sidecar | OPEN | F02, F25 | TBD |
+| PH-006 | runtime/retrieval-gateway/src/receipt.rs | env signing key; crate unbuildable (no Cargo.toml) | P8 (+ P2/P3 fixtures) | cargo test -p retrieval-gateway -- receipt_dsse + gate | runtime/retrieval | OPEN | F05 | TBD |
 | PH-007 | runtime/mpc-fintech/src/compliance.rs | placeholder validation branches | P7.1 | cargo test -p mpc-fintech -- compliance_validation + gate | runtime/mpc | DONE | TBD |
 | PH-008 | runtime/ledger/prisma/migrations/.../rollback.sql | rollback_checksum_placeholder | P9.1 | migration snapshot test or schema lint + gate | runtime/ledger | DONE | TBD |
 | PH-009 | services/evidence-service/main.go | kms/vault "not implemented"; placeholder compliance files | P5 | go test ./services/evidence-service/... + artifact content test + gate | services/evidence | DONE | TBD |
@@ -88,34 +89,34 @@ Every item marked DONE must satisfy:
 
 ## 2. Stub implementations (no real logic)
 
-| ID | Location | Stub | Removal prompt(s) | Proof tests | Owner | Status | PR |
-|----|----------|------|-------------------|-------------|-------|--------|-----|
+| ID | Location | Stub | Removal prompt(s) | Proof tests | Owner | Status | Audit | PR |
+|----|----------|------|-------------------|-------------|-------|--------|-------|-----|
 | ST-001 | bench/swebench/runner.py | stub patch engine _stub_* | P12 | pytest bench/swebench/test_runner.py::test_solver_disabled_mode + gate | bench | DONE | TBD |
 | ST-002 | runtime/wasm-sandbox/README.md + impl | scan_for_prohibited_ops documented as stub | P13 | cargo test -p wasm-sandbox -- scan_prohibited_ops + gate | runtime/wasm | DONE | TBD |
 | ST-003 | runtime/sidecar-watcher/src/concurrency.rs | placeholder event processing | P6 | cargo test -p sidecar-watcher -- concurrency_pipeline + gate | runtime/sidecar | DONE | TBD |
 | ST-004 | core/policy-kernel/cache.go | Redis sync + ops placeholder/TODO | P10 | go test ./core/policy-kernel/... -run TestRedisCache* + gate | core/policy | DONE | TBD |
-| ST-005 | core/policy-kernel/engine.go | signature verification TODO | P10 | go test ./core/policy-kernel/... -run TestSignatureVerification* + gate | core/policy | DONE | TBD |
+| ST-005 | core/policy-kernel/engine.go | signature verification structural-only (`verifyReceipt` returns nil) | P10 | go test ./core/policy-kernel/... -run TestSignatureVerification* + gate | core/policy | OPEN | F01 | TBD |
 | ST-006 | core/cli/pf/platform_commands.go | aggregation stub | P4 | go test ./core/cli/pf/... -run TestPlatformAggregationReport + gate | core/cli | DONE | TBD |
 | ST-007 | core/crypto/wasm_pool.rs | one path returns placeholder | P13.1 | cargo test -p core-crypto -- wasm_pool + gate | core/crypto | DONE | TBD |
-| ST-008 | tools/ci/impacted_only.py | "Build impacted proofs" not implemented | P14 | pytest tools/ci/test_impacted_only.py + gate | tools/ci | DONE | TBD |
+| ST-008 | tools/ci/impacted_only.py | `--build-impacted` logs only; no lake build execution | P14 | pytest tools/ci/test_impacted_only.py + gate | tools/ci | OPEN | F12 | TBD |
 
 ---
 
 ## 3. TODO / FIXME (unimplemented behavior in runtime paths)
 
-| ID | Location | TODO behavior | Removal prompt(s) | Proof tests | Owner | Status | PR |
-|----|----------|---------------|-------------------|-------------|-------|--------|-----|
-| TD-001 | runtime/tool-broker/src/main.rs | tenant/risk/throttling/sig verify | P7 | cargo test -p tool-broker (tenant + throttle + sig) + gate | runtime/broker | DONE | TBD |
-| TD-002 | runtime/tool-broker/src/ratelimit.rs | budget tracking | P7 | cargo test -p tool-broker -- ratelimit + gate | runtime/broker | DONE | TBD |
-| TD-003 | runtime/sidecar-watcher/src/broker.rs | sig verification TODO | P6 | cargo test -p sidecar-watcher -- plan_sig_strict + gate | runtime/sidecar | DONE | TBD |
-| TD-004 | runtime/sidecar-watcher/src/plan.rs | sig verification TODO | P6 | same as above + "CI forbids insecure" test | runtime/sidecar | DONE | TBD |
-| TD-005 | runtime/ledger/src/receipts.ts | Ed25519 verify TODO | P9 | pnpm -w test runtime/ledger -- receipts_verify + gate | runtime/ledger | DONE | TBD |
-| TD-006 | runtime/ledger/src/mcp/mcp-proxy.ts | proper rate limiting + counters | P9 | TS tests w/ fake timers + gate | runtime/ledger | DONE | TBD |
-| TD-007 | runtime/ledger/src/mcp/jcs-validator.ts | hit-rate tracking TODO | P9 | TS tests + gate | runtime/ledger | DONE | TBD |
-| TD-008 | runtime/ledger/src/egress.ts | signature verification TODO | P9 | TS tests + gate | runtime/ledger | DONE | TBD |
-| TD-009 | core/sdk/typescript/src/index.ts | gRPC client null; trace verify TODO | P11.1 | pnpm -w test core/sdk/typescript + gate | core/sdk | DONE | TBD |
-| TD-010 | core/sdk/typescript/src/client.ts | connection logic TODO | P11.1 | same | core/sdk | DONE | TBD |
-| TD-011 | core/sdk/typescript/src/middleware/express.ts | retry logic TODO | P11.1 | same | core/sdk | DONE | TBD |
+| ID | Location | TODO behavior | Removal prompt(s) | Proof tests | Owner | Status | Audit | PR |
+|----|----------|---------------|-------------------|-------------|-------|--------|-------|-----|
+| TD-001 | runtime/tool-broker/src/main.rs | tenant/risk/throttling/sig verify (structural-only receipt check) | P7 | cargo test -p tool-broker (tenant + throttle + sig) + gate | runtime/broker | OPEN | F01 | TBD |
+| TD-002 | runtime/tool-broker/src/ratelimit.rs | budget tracking TODO | P7 | cargo test -p tool-broker -- ratelimit + gate | runtime/broker | OPEN | F01 | TBD |
+| TD-003 | runtime/sidecar-watcher/src/broker.rs | sig verification structural-only | P6 | cargo test -p sidecar-watcher -- plan_sig_strict + gate | runtime/sidecar | OPEN | F01 | TBD |
+| TD-004 | runtime/sidecar-watcher/src/plan.rs | sig verification structural-only | P6 | same as above + "CI forbids insecure" test | runtime/sidecar | OPEN | F01 | TBD |
+| TD-005 | runtime/ledger/src/receipts.ts | Ed25519 verify TODO (length/alg check only) | P9 | pnpm -w test runtime/ledger -- receipts_verify + gate | runtime/ledger | OPEN | F01, F11 | TBD |
+| TD-006 | runtime/ledger/src/mcp/mcp-proxy.ts | proper rate limiting + counters TODO | P9 | TS tests w/ fake timers + gate | runtime/ledger | OPEN | F04, F11 | TBD |
+| TD-007 | runtime/ledger/src/mcp/jcs-validator.ts | hit-rate tracking TODO | P9 | TS tests + gate | runtime/ledger | OPEN | F11 | TBD |
+| TD-008 | runtime/ledger/src/egress.ts | signature verification TODO | P9 | TS tests + gate | runtime/ledger | OPEN | F01 | TBD |
+| TD-009 | core/sdk/typescript/src/index.ts | gRPC client null; trace verify returns `{ valid: true }` | P11.1 | pnpm -w test core/sdk/typescript + gate | core/sdk | OPEN | F17, F18 | TBD |
+| TD-010 | core/sdk/typescript/src/client.ts | connection logic TODO | P11.1 | same | core/sdk | OPEN | F17 | TBD |
+| TD-011 | core/sdk/typescript/src/middleware/express.ts | retry logic TODO | P11.1 | same | core/sdk | OPEN | F17 | TBD |
 | TD-012 | core/cli/pf/src/revoke.rs | revoked_by auth context TODO | P4.2 | go test ./core/cli/pf/... -run TestRevokeAuthContext + gate | core/cli | DONE | TBD |
 | TD-013 | vscode-extension/src/extension.ts | webview comms TODO | P17 | pnpm test vscode-extension (or npm) + gate | tooling/vscode | DONE | TBD |
 | TD-014 | tools/create-sentinel-app/index.js | replay is echo "todo" | P15 | node smoke test for generated app + gate | tools/scaffold | DONE | TBD |

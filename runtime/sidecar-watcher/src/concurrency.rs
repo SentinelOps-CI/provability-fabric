@@ -46,6 +46,11 @@ impl<T: Default + Clone> LockFreeRingBuffer<T> {
         }
     }
 
+    /// Report configured buffer capacity.
+    pub fn slot_capacity(&self) -> usize {
+        self.capacity
+    }
+
     /// Push item to ring buffer (using interior mutability)
     #[inline(always)]
     pub fn push(&self, item: T) -> Result<(), T> {
@@ -217,51 +222,6 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
 
         println!("Worker {} processed {} events", worker_id, processed_count);
     }
-
-    /// Worker loop for processing events (legacy method)
-    fn worker_loop(
-        worker_id: usize,
-        ring_buffer: Arc<LockFreeRingBuffer<T>>,
-        shutdown_rx: mpsc::Receiver<()>,
-    ) {
-        let mut processed_count = 0;
-        let mut last_yield_time = Instant::now();
-
-        loop {
-            // Check for shutdown signal
-            if shutdown_rx.try_recv().is_ok() {
-                break;
-            }
-
-            // Process events from ring buffer
-            let mut batch_count = 0;
-            while let Some(event) = ring_buffer.pop() {
-                // Process event (delegate to handler when wired)
-                Self::process_event(worker_id, event);
-                batch_count += 1;
-                processed_count += 1;
-
-                // Yield periodically to avoid starving other threads
-                if batch_count >= 100 || last_yield_time.elapsed() >= Duration::from_micros(50) {
-                    thread::yield_now();
-                    last_yield_time = Instant::now();
-                    break;
-                }
-            }
-
-            // If no events, yield to avoid busy waiting
-            if batch_count == 0 {
-                thread::yield_now();
-            }
-        }
-
-        println!("Worker {} processed {} events", worker_id, processed_count);
-    }
-
-    /// Process individual event (no-op until handler is wired)
-    fn process_event(worker_id: usize, event: T) {
-        std::hint::black_box((worker_id, event));
-    }
 }
 
 /// Epoch-based policy management with ArcSwap
@@ -337,6 +297,11 @@ impl<K: Clone + PartialEq, V: Clone> LockFreeHashMap<K, V> {
             bucket_count,
             mask: bucket_count - 1,
         }
+    }
+
+    /// Number of hash buckets backing this map.
+    pub fn bucket_count(&self) -> usize {
+        self.bucket_count
     }
 
     /// Get value by key (lock-free read)

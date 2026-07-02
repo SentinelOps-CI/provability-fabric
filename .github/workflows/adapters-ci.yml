@@ -23,9 +23,9 @@ jobs:
       - name: Type check import
         run: |
           cd adapters/express-cert-middleware
-          npm init -y >/dev/null 2>&1 || true
+          if [ ! -f package.json ]; then npm init -y >/dev/null 2>&1; fi
           npm i -D typescript @types/node
-          npx tsc --init >/dev/null 2>&1 || true
+          if [ ! -f tsconfig.json ]; then npx tsc --init >/dev/null 2>&1; fi
           echo "import './index';" > check.ts
           npx tsc --noEmit check.ts
       - name: Validate emitted CERT shape (sample)

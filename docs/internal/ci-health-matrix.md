@@ -1,5 +1,39 @@
 # CI health matrix
 
+Triage snapshot for `main`. Automated inventory: `scripts/ci_workflow_inventory.sh --markdown` (bash/WSL) or `scripts/ci_workflow_inventory.ps1 -Markdown` (Windows). Latest report: [ci-inventory-latest.md](ci-inventory-latest.md) when generated locally.
+
+**Baseline (2026-07-03 audit, session 2):** 13/68 gated workflows green on `main`; inventory exit code 1. Target: **68/68** with honest gates (Wave 7). **PR #144 not merged** — head `518735c6`; branch checks partially green on PR ([smoke 28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952), [Documentation Build 28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001), [deny 28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163)); **`CI required checks`** and GitHub review still pending.
+
+**Phase 0–1 local prep (2026-07-03):** Placeholder gate, CI honesty gate (`ci.yml`), replay contract test in `integration.yaml`, compose smoke in `integration.yaml`, sidecar `integration_tests` in reusable Rust CI, DSSE cross-lang test in extended CI, `retrieval-gateway.yml` wired. Local gate commands pass; **main CI proof pending merge**.
+
+## Workflow cluster remediation checklist (Wave 7)
+
+Work one cluster per PR; mark green only after **two consecutive** successful `main` runs. Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+
+| Cluster | Workflows | Wave deps | Status | Next action |
+|---------|-----------|-----------|--------|-------------|
+| **Replay** | `platform-replay.yml`, `nightly-replay.yml`, `replay.yml`, `morph-replay.yml`, `platform-cert-validate.yml` | Wave 1 (F10) | **Pending main merge** | Submodule `CMD []` verified; contract test wired — merge PR-M0, then two green `main` runs (PR-C1 if drift) |
+| **Security** | `codeql.yaml`, `cargo-deny.yml`, `wasm-scan.yaml`, `scorecards.yml` | Wave 1 (F20) | **Pending main merge** | `scorecards.yml` green on `main`; CodeQL/cargo-deny/wasm-scan fixes local — prove twice post-merge |
+| **Lean** | `lean-offline.yaml`, `lean-style.yaml`, `lean-morph.yaml`, `paper-conformance.yaml` | Wave 3, 6 | **Pending main merge** | `PF_SHADOW_MODE=1` wired; Invariants.lean sorry-free locally — two green `paper-conformance.yaml` on `main` |
+| **Platform** | `slo-gates.yaml`, `operational-excellence.yaml`, `billing-test.yaml`, `integration.yaml`, `demo-e2e.yml` | Waves 1, 5 | **Pending main merge** | F06 smokes + replay + compose smoke + MCP tenant test wired — triage post-merge |
+| **Bench** | `bench-nightly-criterion.yaml`, `performance-gate.yaml`, `bench-swebench-smoke.yaml` | Wave 1 (F23) | **Mixed** | `bench-swebench-smoke.yaml` green on `main`; Criterion baseline refresh via `workflow_dispatch` post-merge |
+| **Evidence (gate)** | `evidence-v01-smoke.yml`, `evidence.yaml`, `cert-validate.yml`, `standards-pin.yml` | Waves 0–2 | **Green** | Keep green; do not weaken |
+| **Core CI** | `ci.yml`, `proto-compat.yaml`, `actionlint.yml` | Wave 0–1 | **Green** | `ci.yml` includes `ci-honesty` gate (`audit_ci_honesty.py`) |
+| **Remaining** | ~30 workflows (docker, marketplace, DR, automation) | Per triage | **Pending main merge** | See [ci-inventory-latest.md](ci-inventory-latest.md); one workflow per PR |
+
+### Inventory automation
+
+```bash
+# Bash / WSL / Git Bash
+scripts/ci_workflow_inventory.sh              # exit 1 if any gated workflow not green
+scripts/ci_workflow_inventory.sh --markdown   # writes docs/internal/ci-inventory-latest.md
+
+# Windows PowerShell
+scripts/ci_workflow_inventory.ps1 -Markdown
+```
+
+---
+
 Triage snapshot for `main` as of 2026-06-15 after CI hardening PR #118.
 
 ## Evidence acceptance gap closure fixes (2026-06-17)

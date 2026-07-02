@@ -9,11 +9,13 @@
 [workspace]
 members = [
     "bench",
+    "core/crypto/dsse-rs",
     "core/sdk/rust",
     "runtime/attestor",
     "runtime/kms-proxy",
     "runtime/tool-broker",
     "runtime/sidecar-watcher",
+    "runtime/retrieval-gateway",
     "runtime/labeler",
     "runtime/wasm-sandbox",
     "adapters/http-get",

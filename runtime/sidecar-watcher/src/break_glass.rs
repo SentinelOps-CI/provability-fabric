@@ -19,6 +19,13 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn unix_timestamp_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 /// Break glass configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BreakGlassConfig {
@@ -160,10 +167,7 @@ pub struct BreakGlassManager {
 impl BreakGlassManager {
     /// Create new break glass manager
     pub fn new(config: BreakGlassConfig) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         Self {
             config,
@@ -216,10 +220,7 @@ impl BreakGlassManager {
             return Err("Justification is required for break glass requests".to_string());
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         let expires_at = now + self.config.ttl_seconds;
 
@@ -299,10 +300,7 @@ impl BreakGlassManager {
             return Err("Signer has already signed this request".to_string());
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         let new_signature = BreakGlassSignature {
             signer_id,
@@ -315,10 +313,8 @@ impl BreakGlassManager {
 
         request.signatures.push(new_signature);
 
-        // Check if we have enough signatures (after adding the new signature)
-        let (m, _n) = self.config.m_of_n_threshold;
-        let signature_count = request.signatures.len();
-        let has_enough_signatures = signature_count >= m;
+        let has_enough_signatures =
+            Self::signature_threshold_met(&self.config, request.signatures.len());
         let user_id = request.user_id.clone();
 
         if has_enough_signatures {
@@ -333,10 +329,8 @@ impl BreakGlassManager {
     }
 
     /// Check if signature threshold is met
-    fn check_signature_threshold(&self, request: &BreakGlassRequest) -> bool {
-        let (m, n) = self.config.m_of_n_threshold;
-        let signature_count = request.signatures.len();
-
+    fn signature_threshold_met(config: &BreakGlassConfig, signature_count: usize) -> bool {
+        let (m, _n) = config.m_of_n_threshold;
         signature_count >= m
     }
 
@@ -385,10 +379,7 @@ impl BreakGlassManager {
 
     /// Check for expired requests and auto-page if needed
     pub fn check_expired_and_auto_page(&mut self) -> Vec<String> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         let mut expired_requests = Vec::new();
         let mut auto_paged_requests = Vec::new();
@@ -549,10 +540,7 @@ impl BreakGlassManager {
 
     /// Log audit event
     fn log_audit_event(&self, event_type: &str, request_id: &str, user_id: &str) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         println!(
             "[AUDIT] {} - Break Glass {} - Request: {}, User: {}",
@@ -562,10 +550,7 @@ impl BreakGlassManager {
 
     /// Periodic cleanup
     pub fn periodic_cleanup(&mut self) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         // Only cleanup every hour
         if now - self.last_cleanup < 3600 {
@@ -610,10 +595,7 @@ pub struct PostMortemStub {
 impl PostMortemStub {
     /// Create new post-mortem stub
     pub fn new(request: &BreakGlassRequest) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         Self {
             request_id: request.request_id.clone(),

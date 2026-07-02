@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 SentinelOps Platform Contributors
-#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -168,9 +167,7 @@ impl EgressManager {
             session_id: self.session_id.clone(),
             sequence: self.sequence_counter,
             data: chunk,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs(),
+            timestamp: sidecar_watcher::time_util::unix_secs(),
             chunk_hash,
             metadata: std::collections::HashMap::new(),
         };
@@ -221,4 +218,20 @@ pub struct EgressStats {
     pub buffer_size: usize,
     pub pending_events: usize,
     pub last_flush_ms: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_egress_manager_chunks() {
+        let profile = EgressProfile::default();
+        let mut manager = EgressManager::new(profile, "session-1".to_string());
+        let events = manager.write_egress(b"hello world").await.unwrap();
+        assert!(!events.is_empty());
+        let stats = manager.get_stats();
+        assert!(stats.total_events >= 1);
+        assert_eq!(manager.get_profile().name, "EGRESS-DET-P1");
+    }
 }

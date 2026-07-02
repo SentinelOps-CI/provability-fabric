@@ -58,6 +58,13 @@ jobs:
           npm ci
           npx prisma generate
 
+      - name: Ledger typing gate (F27)
+        run: python scripts/count_ledger_any.py --max 20
+
+      - name: Ledger strict typecheck
+        working-directory: runtime/ledger
+        run: npm run typecheck:server
+
       - name: Build billing tool
         working-directory: tools/billing
         run: |

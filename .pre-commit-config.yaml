@@ -1,0 +1,70 @@
+# Local gates mirroring critical CI checks (F36). Install: pip install pre-commit && pre-commit install
+# See CONTRIBUTING.md — Local pre-commit gates
+
+minimum_pre_commit_version: "3.0.0"
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.4
+    hooks:
+      - id: actionlint
+        args: [-color]
+
+  - repo: local
+    hooks:
+      - id: no-runtime-placeholders
+        name: no-runtime-placeholders (P1)
+        entry: python scripts/check_no_placeholder.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: select-impacted-smoke
+        name: select_impacted unit smoke
+        entry: python -m pytest tools/test_select_impacted.py -q
+        language: system
+        pass_filenames: false
+        files: ^tools/select_impacted\.py$
+
+      - id: audit-ci-honesty
+        name: CI honesty audit (report only)
+        entry: python scripts/audit_ci_honesty.py --warn-only
+        language: system
+        pass_filenames: false
+        files: ^\.github/workflows/
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^(tools|scripts|tests|bench/swebench)/.*\.py$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(tools|scripts|tests|bench/swebench)/.*\.py$
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        files: \.go$
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        args: [--manifest-path, Cargo.toml, --]

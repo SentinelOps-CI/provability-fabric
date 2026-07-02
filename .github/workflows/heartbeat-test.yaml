@@ -259,5 +259,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          # ci-honesty: justified wave7-remediation
           kind delete cluster --name kind || true
 

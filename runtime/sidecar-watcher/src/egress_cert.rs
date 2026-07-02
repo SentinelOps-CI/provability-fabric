@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::error::Error;
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::time_util;
 
 /// Egress certificate configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,10 +206,7 @@ impl EgressCertificate {
         plan_hash: String,
         policy_hash: String,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         let metadata = EgressCertMetadata {
             certificate_id: Self::generate_certificate_id(),
@@ -247,10 +245,7 @@ impl EgressCertificate {
     /// Generate a unique certificate ID
     fn generate_certificate_id() -> String {
         let mut hasher = Sha256::new();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let timestamp = time_util::unix_nanos();
         hasher.update(timestamp.to_string().as_bytes());
         format!("cert_{:x}", hasher.finalize())
     }
@@ -311,17 +306,14 @@ impl EgressCertificate {
     /// Get certificate hash for transparency log
     pub fn get_certificate_hash(&self) -> String {
         let mut hasher = Sha256::new();
-        let content_json = serde_json::to_string(&self.content).unwrap();
+        let content_json = serde_json::to_string(&self.content).unwrap_or_default();
         hasher.update(content_json.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 
     /// Check if certificate is expired
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
         now > self.content.metadata.expires_at
     }
 
@@ -353,10 +345,7 @@ impl Default for NIVerdict {
 
 impl Default for RateLimitStatus {
     fn default() -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         Self {
             overall_status: "within_limits".to_string(),
@@ -517,11 +506,7 @@ mod tests {
         assert!(cert.is_expired());
 
         // Set expiry to future
-        let future = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + 3600;
+        let future = crate::time_util::unix_secs() + 3600;
         cert.content.metadata.expires_at = future;
         assert!(!cert.is_expired());
     }

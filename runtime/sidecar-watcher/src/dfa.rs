@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -132,8 +131,6 @@ struct RateLimiter {
     window_ms: u32,
     bound: u32,
     events: VecDeque<u32>, // Ring buffer of timestamps in milliseconds
-    head: usize,
-    tail: usize,
     count: usize,
 }
 
@@ -143,8 +140,6 @@ impl RateLimiter {
             window_ms,
             bound,
             events: VecDeque::with_capacity(bound as usize * 2),
-            head: 0,
-            tail: 0,
             count: 0,
         }
     }

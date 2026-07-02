@@ -6,6 +6,7 @@ use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use regex::Regex;
 use std::collections::HashSet;
+use lazy_static::lazy_static;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -240,12 +241,20 @@ pub struct NonInterferencePolicy {
     pub require_llm_verification: bool,
 }
 
+lazy_static! {
+    static ref EMAIL_REGEX: Regex =
+        Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").expect("email regex");
+    static ref PHONE_REGEX: Regex =
+        Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").expect("phone regex");
+    static ref SSN_REGEX: Regex = Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").expect("ssn regex");
+}
+
 /// Email PII detector
 pub struct EmailDetector;
 
 impl PiiDetector for EmailDetector {
     fn detect(&self, text: &str) -> PiiResult {
-        let email_regex = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
+        let email_regex = &*EMAIL_REGEX;
         let matches: Vec<_> = email_regex.find_iter(text).collect();
         
         let locations: Vec<Location> = matches.iter().map(|m| Location {
@@ -274,7 +283,7 @@ pub struct PhoneDetector;
 
 impl PiiDetector for PhoneDetector {
     fn detect(&self, text: &str) -> PiiResult {
-        let phone_regex = Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").unwrap();
+        let phone_regex = &*PHONE_REGEX;
         let matches: Vec<_> = phone_regex.find_iter(text).collect();
         
         let locations: Vec<Location> = matches.iter().map(|m| Location {
@@ -303,7 +312,7 @@ pub struct SsnDetector;
 
 impl PiiDetector for SsnDetector {
     fn detect(&self, text: &str) -> PiiResult {
-        let ssn_regex = Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap();
+        let ssn_regex = &*SSN_REGEX;
         let matches: Vec<_> = ssn_regex.find_iter(text).collect();
         
         let locations: Vec<Location> = matches.iter().map(|m| Location {

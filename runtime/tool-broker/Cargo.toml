@@ -5,6 +5,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
+pf-dsse = { path = "../../core/crypto/dsse-rs" }
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }

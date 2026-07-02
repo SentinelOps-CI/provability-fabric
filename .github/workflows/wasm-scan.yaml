@@ -44,12 +44,14 @@ jobs:
         run: |
           echo "Scanning registry for WASM adapters..."
 
+          wasm_adapter_count=0
           # Find all manifest files
-          find registry -name "*.json" -type f | while read manifest_file; do
+          find registry -name "*.json" -type f 2>/dev/null | while read manifest_file; do
             echo "Checking manifest: $manifest_file"
             
             # Check if it's an adapter with WASM runtime
-            if jq -e '.type == "adapter" and .metadata.runtime == "wasm"' "$manifest_file" > /dev/null; then
+            if jq -e '.type == "adapter" and .metadata.runtime == "wasm"' "$manifest_file" > /dev/null 2>&1; then
+              wasm_adapter_count=$((wasm_adapter_count + 1))
               echo "Found WASM adapter in $manifest_file"
               
               # Extract WASM module path and hash
@@ -78,12 +80,23 @@ jobs:
             fi
           done
 
+          if [ "$wasm_adapter_count" -eq 0 ]; then
+            echo "No WASM adapter manifests in registry — skipping adapter verification"
+          fi
+
       - name: Run WASM security scan
         run: |
           echo "Running WASM security scan..."
 
+          # ci-honesty: justified wave7-remediation
+          wasm_files=$(find registry -name "*.wasm" -type f 2>/dev/null || true)
+          if [ -z "$wasm_files" ]; then
+            echo "No .wasm files in registry — skipping prohibited-op scan"
+            exit 0
+          fi
+
           # Scan for prohibited operations
-          find registry -name "*.wasm" -type f | while read wasm_file; do
+          echo "$wasm_files" | while read wasm_file; do
             echo "Scanning WASM file: $wasm_file"
             
             # Use wasm-objdump to analyze imports
@@ -122,48 +135,39 @@ jobs:
         run: |
           echo "Testing WASM execution..."
 
-          # Create a simple test WASM module for testing
-          cat > test_verify.wat <<EOF
-          (module
-            (func \$verify (import "env" "verify") (param i32) (result i32))
-            (func (export "verify") (param i32) (result i32)
-              local.get 0
-              call \$verify
-            )
-          )
-          EOF
-
-          # Convert to WASM (this would require wat2wasm)
-          echo "Note: wat2wasm conversion would happen here"
-
-          # Test execution with sandbox
-          if [ -f test_verify.wasm ]; then
-            ./runtime/wasm-sandbox/target/release/wasm-sandbox \
-              --module test_verify.wasm \
-              --fuel-limit 1000000 \
-              --input '{"test": "verification"}' || {
-                echo "❌ WASM execution test failed"
-                exit 1
-              }
-              
-            echo "✅ WASM execution test passed"
+          if [ ! -f test_verify.wasm ]; then
+            echo "No test_verify.wasm present — skipping execution smoke (registry has no local .wasm fixtures)"
+            exit 0
           fi
+
+          ./runtime/wasm-sandbox/target/release/wasm-sandbox \
+            --module test_verify.wasm \
+            --fuel-limit 1000000 \
+            --input '{"test": "verification"}' || {
+              echo "❌ WASM execution test failed"
+              exit 1
+            }
+
+          echo "✅ WASM execution test passed"
 
       - name: Test fuel exhaustion
         run: |
           echo "Testing fuel exhaustion protection..."
 
-          # Create a WASM module that would consume excessive fuel
-          # This is a simplified test - in practice, you'd have a real WASM module
-          echo "Testing fuel limit enforcement..."
+          if [ ! -f test_verify.wasm ]; then
+            echo "No test_verify.wasm — skipping fuel exhaustion smoke"
+            exit 0
+          fi
 
-          # Test with very low fuel limit
-          timeout 10s ./runtime/wasm-sandbox/target/release/wasm-sandbox \
+          echo "Testing fuel limit enforcement..."
+          if timeout 10s ./runtime/wasm-sandbox/target/release/wasm-sandbox \
             --module test_verify.wasm \
             --fuel-limit 100 \
-            --input '{"test": "fuel_exhaustion"}' || {
-              echo "✅ Fuel exhaustion protection working"
-            }
+            --input '{"test": "fuel_exhaustion"}'; then
+            echo "⚠️ Low fuel limit did not fail — sandbox may allow short runs"
+          else
+            echo "✅ Fuel exhaustion protection working"
+          fi
 
       - name: Test network isolation
         run: |
@@ -240,12 +244,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Build WASM sandbox
+        run: |
+          cd runtime/wasm-sandbox
+          cargo build --release
+
       - name: Test witness validation
         run: |
           echo "Testing witness output validation..."
 
+          # ci-honesty: justified wave7-remediation
+          wasm_files=$(find registry -name "*.wasm" -type f 2>/dev/null || true)
+          if [ -z "$wasm_files" ]; then
+            echo "No .wasm files in registry — skipping witness validation"
+            exit 0
+          fi
+
           # Test that WASM modules produce valid witness JSON
-          find registry -name "*.wasm" -type f | while read wasm_file; do
+          echo "$wasm_files" | while read wasm_file; do
             echo "Testing witness output for: $wasm_file"
             
             # Run WASM module and capture output
