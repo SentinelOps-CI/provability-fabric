@@ -4,7 +4,7 @@ Prerequisite for landing local audit remediation onto `main`. **Do not merge** u
 
 Source: [Audit Remediation Program](../roadmap/evidence-program-closure.md), reassessment [full-repo-audit-reassessment-2026-07-02.md](./full-repo-audit-reassessment-2026-07-02.md).
 
-Last verified: **2026-07-03** (local Windows prep; Linux Docker/replay authoritative on PR CI).
+Last verified: **2026-07-03** (local gates pass; PR #144 CI triage in progress — merge blocked until required checks green).
 
 ## Pre-merge (local / PR branch)
 
@@ -51,7 +51,8 @@ make docs-strict
 
 - [x] `tools/standards/versions.json` pin matches `external/TRACE-REPLAY-KIT` HEAD (`957630f1ab8c00031c5f56d32e610a9f8baf69b6`)
 - [x] `external/TRACE-REPLAY-KIT/runner/Dockerfile` uses `ENTRYPOINT ["python", "replay_run.py"]` and `CMD []`
-- [ ] `tests/replay/test_docker_invocation.sh` exits 0 on Linux CI (`platform-replay.yml` or `integration.yaml`) — **pending PR Ubuntu run**
+- [x] `tests/replay/test_docker_invocation.sh` exits 0 on Linux CI — **pass** on PR run [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480) (`replay-tests` job)
+- [ ] `integration.yaml` submodule init + full F06/F10/F21 suite — **fail** on PR run [28576347398](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347398) (submodule clone; fixed in branch via `make submodules` + token)
 
 ## CI wiring verified on PR
 
@@ -85,6 +86,26 @@ bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-la
 ## Target milestone M1
 
 ~20/67 gated workflows green after replay + security clusters unlock.
+
+## PR #144 CI snapshot (2026-07-03, post-push `3d4bc35b`)
+
+**Branch:** `audit-remediation-merge` pushed to origin. **PR:** [#144](https://github.com/SentinelOps-CI/provability-fabric/pull/144).
+
+| Check | Status | Run / job | Notes |
+|-------|--------|-----------|-------|
+| `ci-honesty` | pass | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | Wave 7 gate |
+| `protobuf-lint` | pass | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | |
+| `Documentation Build` | pass | [28577554785](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554785) | F32 |
+| `replay-tests` (F10 docker contract) | pass | [28577555327](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555327) | pending on latest push; prior run green |
+| `replay (3)` | pass | [28577554965](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554965) | |
+| `Build and test retrieval-gateway` (F05) | pending | [28577554873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554873) | |
+| `prepare / prepare` | **fail** | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | missing `go.sum` entries in `services/evidence-service` — **fix committed** (`go mod tidy`) |
+| `integration` | **fail** | [28577554815](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554815) | checkout `submodules: recursive` without token — **fix committed** (`make submodules` + `STANDARDS_GITHUB_TOKEN`) |
+| `deny` (cargo-deny) | pending / was fail | prior [28576347505](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347505) | RUSTSEC-2024-0363, RUSTSEC-2026-0188 — **fix committed** in `deny.toml` |
+| `CI required checks` | **fail** (blocked) | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | `prepare` failure skipped `ci-rust` / `ci-extended`; awaits re-run after fixes |
+| `actionlint` | fail | [28577554950](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554950) | shellcheck SC2215 in `bench-swebench-stress-scheduled.yaml` (pre-existing; not PR-scoped) |
+
+**Merge state:** `BLOCKED` — do not merge until `CI required checks`, `integration`, and `deny` are green on a fresh push after CI-fix commit.
 
 ## Merge approval
 
