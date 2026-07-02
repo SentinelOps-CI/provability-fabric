@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-03, Wave 7):** Local audit remediation program complete for code gates (unwrap **0**, ledger `any` **0**, CI honesty **0** unjustified, Invariants.lean **0 sorry**). Evidence lane remains **green** on `main`. Repo-wide CI is **not** fully green — inventory reports **13/68** gated workflows green until Phase 0 merge + Linux validation; see [merge-readiness-checklist.md](../internal/merge-readiness-checklist.md) and [full-repo-audit-reassessment-2026-07-03.md](../internal/full-repo-audit-reassessment-2026-07-03.md).
+**Current posture (2026-07-03, Wave 7):** Local audit remediation program complete for code gates (unwrap **0**, ledger `any` **0**, CI honesty **0** unjustified, Invariants.lean **0 sorry** + CI-enforced, `proofs/Policy.lean` **0 sorry**). Evidence lane remains **green** on `main`. Repo-wide CI is **not** fully green — inventory reports **13/68** gated workflows green. **PR #144 not merged** — blocked on CI run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710); fixes pushed for `deny.toml`, `integration.yaml` submodule init, and docs-strict links. See [merge-readiness-checklist.md](../internal/merge-readiness-checklist.md), [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md), and [full-repo-audit-reassessment-2026-07-03.md](../internal/full-repo-audit-reassessment-2026-07-03.md).
 
-**Do not claim 67/67** until `scripts/ci_workflow_inventory.sh` exits 0 twice consecutively on `main`.
+**Do not claim 68/68** until `scripts/ci_workflow_inventory.sh` exits 0 twice consecutively on `main`.
 
 ### Path to 67/67 (Wave 7 — updated 2026-07-02)
 
@@ -95,6 +95,9 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Post-#134 (`f55a98bd`) | 67 | 12 | 52 | 21 |
 | Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
+| Wave 7 execution (2026-07-03) | 68 | 13 | 55 | — |
+
+**PR #144:** not merged. CI snapshot run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710). Key PR passes: `ci-honesty` [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710), `replay-tests` [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480), `retrieval-gateway` [28576347539](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347539), `Lean Style Check` [28576347346](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347346).
 
 ### Path to 67/67 (Wave 7)
 
