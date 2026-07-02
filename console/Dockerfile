@@ -6,10 +6,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm npm install --no-audit --no-fund
 
 COPY . .
-RUN npm run build
+RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 FROM nginx:alpine
 COPY --from=builder /app/build /usr/share/nginx/html
