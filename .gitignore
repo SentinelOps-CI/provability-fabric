@@ -118,7 +118,6 @@ go.work
 
 # Rust build artifacts
 target/
-Cargo.lock
 
 # Python
 __pycache__/

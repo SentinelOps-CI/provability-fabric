@@ -99,13 +99,17 @@ bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-la
 | `replay-tests` (F10 docker contract) | pass | [28577555327](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555327) | pending on latest push; prior run green |
 | `replay (3)` | pass | [28577554965](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554965) | |
 | `Build and test retrieval-gateway` (F05) | pending | [28577554873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554873) | |
-| `prepare / prepare` | **fail** | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | missing `go.sum` entries in `services/evidence-service` — **fix committed** (`go mod tidy`) |
-| `integration` | **fail** | [28577554815](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554815) | checkout `submodules: recursive` without token — **fix committed** (`make submodules` + `STANDARDS_GITHUB_TOKEN`) |
-| `deny` (cargo-deny) | pending / was fail | prior [28576347505](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347505) | RUSTSEC-2024-0363, RUSTSEC-2026-0188 — **fix committed** in `deny.toml` |
-| `CI required checks` | **fail** (blocked) | [28577555178](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577555178) | `prepare` failure skipped `ci-rust` / `ci-extended`; awaits re-run after fixes |
+| `prepare / prepare` | pass | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | fixed via `go.sum` commit `3d21f080` |
+| `ci-lean / lean` | pass | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | |
+| `deny` (cargo-deny) | pass | [28578169132](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578169132) | fixed via `deny.toml` commit `3d21f080` |
+| `integration` | **fail** | [28578169208](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578169208) | `test_cargo_lock_present` — `Cargo.lock` gitignored; **fix staged** (un-ignore + commit lockfile) |
+| `ci-extended / extended` | **fail** | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | same `Cargo.lock` test failure |
+| `ci-go-node / go-node` | **fail** | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | `runtime/ledger` `package-lock.json` out of sync with ESLint 9 deps — needs `npm install` |
+| `ci-rust / rust` | pending | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | in progress on run after `3d21f080` |
+| `CI required checks` | **fail** (blocked) | [28578168858](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28578168858) | awaits `ci-rust`, `ci-go-node`, `ci-extended` green |
 | `actionlint` | fail | [28577554950](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28577554950) | shellcheck SC2215 in `bench-swebench-stress-scheduled.yaml` (pre-existing; not PR-scoped) |
 
-**Merge state:** `BLOCKED` — do not merge until `CI required checks`, `integration`, and `deny` are green on a fresh push after CI-fix commit.
+**Merge state:** `BLOCKED` — do not merge until `CI required checks`, `integration`, `ci-go-node`, and `ci-extended` are green. Remaining fixes: commit `Cargo.lock`, regenerate `runtime/ledger/package-lock.json`.
 
 ## Merge approval
 
