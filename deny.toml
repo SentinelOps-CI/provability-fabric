@@ -151,6 +151,14 @@ reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately (#118)"
 id = "RUSTSEC-2026-0188"
 reason = "wasmtime 15.x wasm-sandbox stack; upgrade tracked separately (#118)"
 
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0190"
+reason = "anyhow transitive unsoundness; upgrade tracked with workspace deps"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0097"
+reason = "rand transitive unsoundness via wasmtime/kube chain; upgrade tracked separately"
+
 [licenses]
 version = 2
 confidence-threshold = 0.85

@@ -15,6 +15,15 @@ fi
 
 echo "=== docker-compose smoke (profile=${PROFILE}) ==="
 
+# Rust service Dockerfiles expect Cargo.lock in their build context (workspace root lockfile).
+if [[ -f Cargo.lock ]]; then
+  for ctx in runtime/sidecar-watcher runtime/egress-firewall runtime/attestor runtime/retrieval-gateway; do
+    if [[ -f "${ctx}/Dockerfile" ]]; then
+      cp Cargo.lock "${ctx}/Cargo.lock"
+    fi
+  done
+fi
+
 $COMPOSE config >/dev/null
 echo "compose config: OK"
 
