@@ -292,8 +292,8 @@ theorem read_requires_label_flow : ∀ (u : Principal) (doc : DocId) (path : Lis
         rcases hleft with h | h
         · exact hreader h
         · exact hadmin h
-      · rcases Bool.and_eq_true.mp hr with ⟨ho, heq⟩
-        exact howner ⟨ho, heq⟩)
+      · rw [Bool.and_eq_true] at hr
+        exact howner hr)
   simp only [permitD]
   exact hdeny
 
