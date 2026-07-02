@@ -8,10 +8,11 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Scope | Detail |
 |-------|--------|
-| **Code state** | Remediation on branch `audit-remediation-merge` — **not merged to `main`** until PR-M0 lands. |
+| **Code state** | Remediation on branch `audit-remediation-merge` — **not merged to `main`** until PR #144 CI green. |
 | **CI on `main`** | **13 / 68** gated workflows green (inventory 2026-07-03); unchanged until merge. |
+| **PR #144 CI** | Run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710) — **BLOCKED** (pre-fix failures: `deny`, `integration`, `Documentation Build`). Fixes pushed 2026-07-03; re-run pending. |
 | **Local gates** | All merge-gate commands below passed on working tree (2026-07-03). |
-| **67/67 sign-off** | **Not claimed.** Requires two consecutive `ci_workflow_inventory.sh` exit 0 on `main`. |
+| **68/68 sign-off** | **Not claimed.** Requires two consecutive `ci_workflow_inventory.sh` exit 0 on `main`. |
 
 ---
 
@@ -20,14 +21,15 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 | Metric | 2026-07-02 reassessment | 2026-07-03 v2 |
 |--------|-------------------------|---------------|
 | Findings DONE | 32 | **36** |
-| Findings PARTIAL | 6 | **3** (F23, F24, F33 Policy tree) |
+| Findings PARTIAL | 6 | **3** (F23, F24, F33 root Policy + MicroInterp) |
 | Findings OPEN | 1 (F38) | **0** |
 | Gated workflows green on `main` | 13 / 68 | **13 / 68** (pending merge) |
 | Sidecar production unwrap/expect | 40 | **0** (`--max 10`) |
 | Ledger `any` | 76 | **0** (`--max 20`) |
 | CI honesty unjustified | 59 | **0** (56 justified) |
 | Invariants.lean `sorry` | 7 | **0** |
-| Out-of-scope Lean sorry | 15 | **10** (Policy + MicroInterp) |
+| Out-of-scope Lean sorry | 15 | **6** (root Policy + MicroInterp) |
+| CI-enforced Lean targets | 5 paths | **6 paths** (+ `Invariants.lean`, 2026-07-03) |
 
 ---
 
@@ -62,7 +64,11 @@ F01–F22, F25–F32, F34–F39. Trust chain, ledger/MCP, sidecar burn-down, CI 
 |----|-------|-------------------|
 | **F23** | `bench-nightly-criterion.yaml` + `refresh_baseline` documented | Dispatch on `main`, commit baseline, two green runs |
 | **F24** | `integration_tests` 9/9 + rate-limit cluster; `PF_SHADOW_MODE=1` in workflows | Two green `paper-conformance.yaml` on `main` |
-| **F33** | `Invariants.lean` **0 sorry**; Policy.lean trees still have 8 sorry | Prove `proofs/Policy.lean` (P2); expand enforced set when ready |
+| **F33** | `Invariants.lean` **0 sorry** + **CI-enforced**; `proofs/Policy.lean` **0 sorry** | Consolidate root `Policy.lean` (4 sorry); prove MicroInterp (2) |
+
+#### F33 — Invariants enforced-set expansion (2026-07-03)
+
+`core/lean-libs/Invariants.lean` is now in the `lean-style.yaml` **ENFORCED** list alongside ActionDSL, Budget, and bundle specs. The workflow step **Check for 'sorry' or 'by admit' in CI-enforced Lean targets** will fail if any placeholder is reintroduced in Invariants. Existing enforced targets were not weakened. See [lean-sorry-burn-down.md](lean-sorry-burn-down.md).
 
 ### OPEN (0)
 
@@ -74,11 +80,26 @@ F38 ESLint 9 migration complete (root flat config + packages).
 
 | ID | Hardening | Wired in CI | Main proof |
 |----|-----------|-------------|------------|
-| F01 | `PF_ENFORCE_DSSE=1` | `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | Pending merge |
-| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | `env_config` unit test + compose | Pending merge |
-| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | Pending merge |
-| F05 | retrieval-gateway | `retrieval-gateway.yml` | No run on `main` yet |
+| F01 | `PF_ENFORCE_DSSE=1` | `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | Pending merge; local pass |
+| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | `env_config::enabled_tools_deny_by_default` in `sidecar-watcher --lib` tests (`reusable-ci-rust.yml`) + compose `PF_ENABLED_TOOLS=` | Pending merge |
+| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | Pending merge; submodule init fixed |
+| F05 | retrieval-gateway | `retrieval-gateway.yml` | PR pass [28576347539](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347539); no `main` run yet |
 | F21 | Compose smoke | `integration.yaml` → `docker-compose-smoke.sh` | Pending merge Linux CI |
+
+---
+
+## Wave 7 execution log (2026-07-03)
+
+| Todo | Status | Evidence |
+|------|--------|----------|
+| phase0-merge-pr144 | **BLOCKED** | PR #144 open; `mergeStateStatus: BLOCKED`; fixes for `deny.toml`, `integration.yaml`, docs links committed; merge deferred |
+| phase1-replay-security | **Pending merge** | Replay `replay-tests` green on PR; security `deny` fix pushed |
+| phase1-platform-lean | **Preemptive** | `Invariants.lean` in `lean-style.yaml` ENFORCED; `Lean Style Check` pass |
+| phase1-bench-docs | **Pending merge** | `make docs-strict` local pass; docs-build fix in branch |
+| phase1-remaining-workflows | **Not started** | Post-merge runbook commands documented |
+| phase2-f33-policy | **Partial** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry remain |
+| phase3-hardening-proof | **Wired** | F01/F03-F05/F21 in workflows; main proof awaits merge |
+| phase4-signoff | **Updated** | This document; 68/68 not claimed |
 
 ---
 
@@ -99,7 +120,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Code remediation is complete for merge.** The program bottleneck is **landing on `main` and proving CI clusters green twice** — not re-doing F16/F27/F38. Do not publish 67/67 or full evidence-program sign-off until inventory ceremony passes on `main`.
+**Code remediation is complete for merge.** Wave 7 Phase 0 is **blocked** on PR #144 CI (`deny`, `integration`, `Documentation Build` failures triaged and fixed in branch; fresh run required). The program bottleneck remains **landing on `main` and proving CI clusters green twice** — not re-doing F16/F27/F38. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main`.
 
 ---
 
