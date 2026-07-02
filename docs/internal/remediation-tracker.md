@@ -93,7 +93,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | F30 | P2 | Egress-firewall regex recompiled per call | 3 | **DONE** | — | — | `lazy_static!` cached regexes |
 | F31 | P2 | MD5 for approval token IDs | 3 | **DONE** | — | — | UUID in tool-broker |
 | F32 | P2 | Documentation drift | 5 | **DONE** | — | — | `make docs-strict` green (2026-07-02 local) |
-| F33 | P2 | Lean sorry debt | 6 | **PARTIAL** | LN-* | — | [lean-sorry-burn-down.md](lean-sorry-burn-down.md): Invariants.lean **14→7→0** sorry (7 proved 2026-07-03 Phase C); Policy/MicroInterp **10** remain; scoped CI enforcement unchanged |
+| F33 | P2 | Lean sorry debt | 6 | **PARTIAL** | LN-* | — | [lean-sorry-burn-down.md](lean-sorry-burn-down.md): Invariants.lean **0 sorry** + **CI-enforced** (2026-07-03 Wave 7); `proofs/Policy.lean` **4→0** sorry; root `Policy.lean` **4** + MicroInterp **2** remain |
 | F34 | P2 | Two parallel VS Code extensions | 5 | **DONE** | TD-013 | — | [documentation-map.md](../documentation-map.md) § VS Code |
 | F35 | P2 | Crate-wide `#![allow(dead_code)]` on sidecar | 3 | **DONE** | — | — | Module allows removed; lib `-D dead_code` in `reusable-ci-rust.yml` (lib + `integration_tests`); bin scaffold deferred |
 | F36 | P3 | No pre-commit hooks | 0 | **DONE** | — | Wave 0 | `.pre-commit-config.yaml` |
@@ -113,7 +113,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | 3 | Runtime hardening + sidecar CI | F13–F16, F30–F31, F35 | Sidecar in PR CI | **DONE** |
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
-| 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry; Policy/MicroInterp **10** remain); F38 done |
+| 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
 | 7 | CI green program | All CI clusters | 67/67 gated green twice on main | **IN PROGRESS** — Phase 0/1 local prep complete; merge + two consecutive green runs still required |
 
 ---
