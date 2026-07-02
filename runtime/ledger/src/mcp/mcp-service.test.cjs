@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 describe('McpService tenant resolution', () => {
-  function resolveTenantId(user: {
-    tid?: string;
-    tenantId?: string;
-    tenant_id?: string;
-  } | undefined): string | undefined {
+  function resolveTenantId(user) {
     if (!user) return undefined;
     return user.tid ?? user.tenantId ?? user.tenant_id;
   }
