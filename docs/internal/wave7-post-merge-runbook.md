@@ -8,21 +8,19 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-03 — Wave 7 execution, session 2)
+## Status (2026-07-03 — Wave 7 post-merge, session 3)
 
-**PR #144 not merged.** Head `518735c6` on `audit-remediation-merge`. Branch protection requires **CI required checks**, **smoke**, **evidence-schema-only**, **Documentation Build**, plus **1 approving review** (`reviewDecision: REVIEW_REQUIRED`).
+**Merged:** PR #136 + #144 at `95bcd563` on `main` (2026-07-03).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
-| 0 — Merge gate | **BLOCKED (CI + review)** | [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144); latest CI [28583017161](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583017161) (queued on `518735c6`) |
-| 0 — Branch checks (partial green) | **4/5 required pass on prior push** | `smoke` [28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952) job [84746594873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84746594873); `evidence-schema-only` [84744736821](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84744736821); `Documentation Build` [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843); `deny` [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163/job/84744734402); **`CI required checks` pending** on [28582134426](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134426) (`ci-honesty` fail pre-fix [84744735085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134426/job/84744735085); fixed in `518735c6`) |
-| 0 — CI fixes landed (2026-07-03) | **Committed** | `520205ac` Cargo.lock tracked; `3a935289` ledger lock; `3e3a934b`/`e7a1ae13` pf go.sum + typescript lock; `05d9cd6a` tool-broker/wasm-sandbox minimal workspace Dockerfiles; `518735c6` ci-honesty inline justifications |
-| 1.1 Replay cluster | **Pending merge** | `replay-tests` green on PR runs (e.g. [28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952)) |
-| 1.2 Security cluster | **Pending merge** | `deny` green [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163); CodeQL JS still red on PR |
-| 1.3 Platform cluster | **Pending merge** | `integration` red [28582134135](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134135) (compose smoke tool-broker; fix in `05d9cd6a`, re-run [28583016953](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583016953) queued) |
-| 1.4 Lean + paper | **Preemptive** | `Invariants.lean` ENFORCED in `lean-style.yaml`; Lean Style Check green on PR |
-| 1.5 Bench + docs | **Partial PR green** | `Documentation Build` [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843); Criterion smoke still running |
-| 1.6 Remaining ~30 | **Not started** | `main` still 13/68 green |
+| 0 — Merge gate | **DONE** | `95bcd563` on `main` |
+| 1.1 Replay cluster | **IN PROGRESS** | Post-merge runs queued (`28585705297` platform-replay, `28585705517` replay, `28585705516` morph-replay, `28585705691` platform-cert); cluster helper: all pending |
+| 1.2 Security cluster | **IN PROGRESS** | `codeql.yaml` [28585705418](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705418), `cargo-deny.yml` [28585705316](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705316), `scorecards.yml` [28585706992](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706992) queued |
+| 1.3 Platform cluster | **IN PROGRESS** | `integration.yaml` [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085), `demo-e2e.yml` [28585705589](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705589) queued |
+| 1.4 Lean + paper | **IN PROGRESS** | `lean-style.yaml` [28585706852](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706852), `paper-conformance.yaml` [28585705694](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705694) queued |
+| 1.5 Bench + docs | **IN PROGRESS** | `docs-build.yaml` [28585705338](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705338) queued |
+| 1.6 Remaining ~30 | **IN PROGRESS** | Inventory **5/68** (honest post-merge snapshot); 43 workflows queued |
 
 ### Post-merge commands (run immediately after PR #144 lands)
 
