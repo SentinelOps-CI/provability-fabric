@@ -1,0 +1,45 @@
+name: PF-Core Schema Check
+
+on:
+  push:
+    branches: [main, "phase7/**"]
+  pull_request:
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "vendor/pf-core/**"
+      - "scripts/init_pf_core_vendor.sh"
+      - ".github/workflows/pf-core-schema-check.yml"
+
+jobs:
+  schema-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch pinned PF-Core schemas
+        run: bash scripts/init_pf_core_vendor.sh
+
+      - name: Install PF-Core validator
+        run: |
+          git clone --depth 1 --branch pf-core-v0.6.0 \
+            https://github.com/SentinelOps-CI/provability-fabric-core.git pf-core-ref
+          pip install -e pf-core-ref/pf-core/validator jsonschema referencing
+
+      - name: schema-check pinned schemas
+        run: python -m pf_core.cli core schema-check --schemas vendor/pf-core/schemas
+
+      - name: compile-observation on golden MCP sidecar fixture
+        run: |
+          python -m pf_core.cli core compile-observation \
+            --schemas vendor/pf-core/schemas \
+            --file pf-core-ref/pf-core/examples/valid/mcp_sidecar_observation.json \
+            --output /tmp/event.json
+
+      - name: Sidecar runtime_observation unit tests
+        run: |
+          cd runtime/sidecar-watcher
+          cargo test --lib runtime_observation
