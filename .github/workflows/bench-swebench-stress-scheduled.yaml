@@ -28,9 +28,8 @@ jobs:
       - name: Install runner deps
         run: |
           pip install pyyaml
-          # ci-honesty: justified wave7-remediation
+          # ci-honesty: justified wave7-remediation — optional SWE-bench stack
           pip install datasets swebench 2>/dev/null || true
-          # ci-honesty: justified wave7-remediation
           pip install openhands 2>/dev/null || true
 
       - name: Fill manifest
@@ -45,14 +44,14 @@ jobs:
           mkdir -p "$EXP/baseline" "$EXP/pf"
           if command -v pf >/dev/null 2>&1; then RUN_CMD="pf bench swebench run"; else RUN_CMD="python bench/swebench/runner.py"; fi
           echo "Baseline run..."
+          # ci-honesty: justified wave7-remediation — baseline may fail without API keys
           $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
             --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --seed 42 \
-            # ci-honesty: justified wave7-remediation
             --out "$EXP/baseline/predictions.jsonl" --runs-dir "$EXP/baseline" 2>&1 | tee baseline.log || true
           echo "PF run..."
+          # ci-honesty: justified wave7-remediation — PF run may fail without API keys
           $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
             --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --mode pf_guarded \
-            # ci-honesty: justified wave7-remediation
             --seed 42 --policy swebench_safe_v1 --out "$EXP/pf/predictions.jsonl" --runs-dir "$EXP/pf" 2>&1 | tee pf.log || true
 
       - name: Harness and compare
@@ -61,12 +60,11 @@ jobs:
           BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           if [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
+            # ci-honesty: justified wave7-remediation — harness optional when runs incomplete
             python experiments/scripts/run_swebench_eval.py \
               --baseline-predictions "$EXP/baseline/predictions.jsonl" --pf-predictions "$EXP/pf/predictions.jsonl" \
-              # ci-honesty: justified wave7-remediation
               --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true
             python experiments/scripts/compare_runs.py --experiment-dir "$EXP" \
-              # ci-honesty: justified wave7-remediation
               --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" --pf-run-dir "$EXP/pf/$PF_RUN_ID" 2>/dev/null || true
           fi
 

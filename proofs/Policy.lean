@@ -154,13 +154,12 @@ def Permit (u : Principal) (a : Action) (γ : Ctx) : Prop :=
     | Tool.FileWrite => u.roles.contains "file_writer" ∨ u.roles.contains "admin"
     | Tool.Custom _ => u.roles.contains "admin"
   | Action.Read doc path =>
-    -- Document read access - will be refined by CanReadField
-    u.roles.contains "reader" ∨ u.roles.contains "admin" ∨
-    (u.roles.contains "owner" && u.org == "owner_org")
+    -- Parentheses match `permitD` (left-assoc `||` with grouped owner clause).
+    (u.roles.contains "reader" ∨ u.roles.contains "admin") ∨
+      (u.roles.contains "owner" ∧ u.org == "owner_org")
   | Action.Write doc path =>
-    -- Document write access - will be refined by CanWriteField
-    u.roles.contains "writer" ∨ u.roles.contains "admin" ∨
-    (u.roles.contains "owner" && u.org == "owner_org")
+    (u.roles.contains "writer" ∨ u.roles.contains "admin") ∨
+      (u.roles.contains "owner" ∧ u.org == "owner_org")
   | Action.Grant target action =>
     -- Grant permission (only admins can grant)
     u.roles.contains "admin"
@@ -178,13 +177,11 @@ def permitD (u : Principal) (a : Action) (γ : Ctx) : Bool :=
     | Tool.FileWrite => u.roles.contains "file_writer" || u.roles.contains "admin"
     | Tool.Custom _ => u.roles.contains "admin"
   | Action.Read doc path =>
-    -- Read permission
-    u.roles.contains "reader" || u.roles.contains "admin" ||
-    (u.roles.contains "owner" && u.org == "owner_org")
+    (u.roles.contains "reader" || u.roles.contains "admin") ||
+      (u.roles.contains "owner" && u.org == "owner_org")
   | Action.Write doc path =>
-    -- Write permission
-    u.roles.contains "writer" || u.roles.contains "admin" ||
-    (u.roles.contains "owner" && u.org == "owner_org")
+    (u.roles.contains "writer" || u.roles.contains "admin") ||
+      (u.roles.contains "owner" && u.org == "owner_org")
   | Action.Grant target action =>
     u.roles.contains "admin"
 
@@ -247,7 +244,7 @@ theorem soundness : ∀ (u : Principal) (a : Action) (γ : Ctx),
   intro u a γ h
   cases a with
   | Call tool =>
-    cases tool <;> intro h <;> simpa [Permit, permitD] using h
+    cases tool <;> simpa [Permit, permitD] using h
   | Read doc path =>
     simpa [Permit, permitD] using h
   | Write doc path =>
@@ -261,7 +258,7 @@ theorem completeness : ∀ (u : Principal) (a : Action) (γ : Ctx),
   intro u a γ h
   cases a with
   | Call tool =>
-    cases tool <;> intro h <;> simpa [Permit, permitD] using h
+    cases tool <;> simpa [Permit, permitD] using h
   | Read doc path =>
     simpa [Permit, permitD] using h
   | Write doc path =>
@@ -285,16 +282,20 @@ theorem read_requires_label_flow : ∀ (u : Principal) (doc : DocId) (path : Lis
   permitD u (Action.Read doc path) γ = false := by
   intro u doc path γ ⟨hadmin, hreader, howner, _⟩
   have hdeny :
-      (u.roles.contains "reader" || u.roles.contains "admin" ||
-          (u.roles.contains "owner" && u.org == "owner_org")) = false := by
-    rw [Bool.eq_false_iff]
-    intro htrue
-    rw [Bool.eq_true_iff] at htrue
-    rcases htrue with h | h | ⟨ho, heq⟩
-    · exact hreader h
-    · exact hadmin h
-    · exact howner ⟨ho, heq⟩
-  simp [permitD, hdeny]
+      ((u.roles.contains "reader" || u.roles.contains "admin") ||
+          (u.roles.contains "owner" && u.org == "owner_org")) = false :=
+    Bool.eq_false_iff.mpr (by
+      intro hperm
+      rw [Bool.or_eq_true] at hperm
+      rcases hperm with hleft | hr
+      · rw [Bool.or_eq_true] at hleft
+        rcases hleft with h | h
+        · exact hreader h
+        · exact hadmin h
+      · rcases Bool.and_eq_true.mp hr with ⟨ho, heq⟩
+        exact howner ⟨ho, heq⟩)
+  simp only [permitD]
+  exact hdeny
 
 /-- Monitor acceptance alone yields the first conjunct of global NI.
     Label-coherence across prefixes requires an explicit policy invariant (not yet
