@@ -8,11 +8,10 @@ on:
       - "runtime/labeler/**"
       - "core/lean-libs/**"
       - ".github/workflows/paper-conformance.yaml"
-  pull_request:
-    branches: [main, develop]
   schedule:
     # Run daily at 2 AM UTC
     - cron: "0 2 * * *"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always

@@ -14,6 +14,12 @@ VENDOR_DIR="vendor/mathlib"
 # Create vendor directory
 mkdir -p "$VENDOR_DIR"
 
+# Drop partial cache trees (e.g. restored .git without build artifacts)
+if [ -d "$VENDOR_DIR/.git" ] && [ ! -d "$VENDOR_DIR/.lake/build/lib" ]; then
+    echo "⚠️  Partial mathlib cache (no build artifacts); refreshing vendor tree..."
+    rm -rf "$VENDOR_DIR"
+fi
+
 # Clone mathlib to vendor directory (remove stale cache dirs missing .git)
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
 if [ ! -d "$VENDOR_DIR/.git" ] || [ ! -f "$VENDOR_DIR/lakefile.lean" ]; then
