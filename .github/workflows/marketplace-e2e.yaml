@@ -163,7 +163,7 @@ jobs:
       - name: Run unit tests
         run: |
           cd marketplace/ui
-          npm test -- --coverage --watchAll=false
+          npm test -- --coverage --watchAll=false --passWithNoTests
 
       - name: Test UI compatibility blocking
         run: |

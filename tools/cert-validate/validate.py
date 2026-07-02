@@ -31,11 +31,41 @@ def load_schema(schema_path):
         sys.exit(1)
 
 
+
+
+TRACE_REPLAY_REQUIRED = (
+    "cert_type",
+    "version",
+    "timestamp",
+    "replay_id",
+    "trace_metadata",
+    "environment",
+    "results",
+    "summary",
+    "signature",
+)
+
+
+def validate_trace_replay(file_path, data):
+    """Validate trace replay certificates (separate from emission CERT-V1)."""
+    if data.get("cert_type") != "trace_replay":
+        print(f"✗ {file_path}: expected cert_type trace_replay")
+        return False
+    missing = [key for key in TRACE_REPLAY_REQUIRED if key not in data]
+    if missing:
+        print(f"✗ {file_path}: missing required fields: {', '.join(missing)}")
+        return False
+    print(f"✓ {file_path} (trace_replay)")
+    return True
+
 def validate_file(file_path, schema):
     """Validate a single JSON file against the schema."""
     try:
         with open(file_path, "r") as f:
             data = json.load(f)
+
+        if data.get("cert_type") == "trace_replay":
+            return validate_trace_replay(file_path, data)
 
         validate(instance=data, schema=schema)
         print(f"✓ {file_path}")

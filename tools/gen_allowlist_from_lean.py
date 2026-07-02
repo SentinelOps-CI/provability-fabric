@@ -29,9 +29,16 @@ class ToolCapability:
 
 class AllowlistGenerator:
     def __init__(self, workspace_root: str):
-        self.workspace_root = Path(workspace_root)
+        self.workspace_root = Path(workspace_root).resolve()
         self.tools = set()
         self.capabilities = {}
+
+    def rel_path(self, file_path: Path) -> str:
+        """Return a stable repo-relative POSIX path for cross-platform CI sync."""
+        try:
+            return file_path.resolve().relative_to(self.workspace_root).as_posix()
+        except ValueError:
+            return Path(str(file_path)).as_posix()
 
     def find_lean_files(self) -> List[Path]:
         """Find all Lean files in the workspace."""
@@ -156,7 +163,7 @@ class AllowlistGenerator:
                             tool_name=tool_name,
                             can_use=can_use,
                             conditions=conditions,
-                            source_file=str(file_path),
+                            source_file=self.rel_path(file_path),
                         )
                     )
 
@@ -185,7 +192,7 @@ class AllowlistGenerator:
             "version": "3.0",
             "generated_from": "lean_proofs",
             "generation_timestamp": datetime.utcnow().isoformat(),
-            "source_files": [str(f) for f in lean_files],
+            "source_files": [self.rel_path(f) for f in lean_files],
             "sync_with_lean": True,
             "validation_status": "pending",
             "lean_environment": self.get_lean_environment_info(),
@@ -355,7 +362,7 @@ class AllowlistGenerator:
                     # Extract policy information
                     policy_name = file_path.stem
                     policies[policy_name] = {
-                        "file": str(file_path.relative_to(self.workspace_root)),
+                        "file": self.rel_path(file_path),
                         "theorems": self.extract_theorems(content),
                         "lemmas": self.extract_lemmas(content),
                         "axioms": self.extract_axioms(content),

@@ -2,7 +2,7 @@
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
-FROM rust:1.75-alpine AS builder
+FROM rust:1.88-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -21,13 +21,13 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl --no-default-features --features mimalloc
 
 # Copy source code
 COPY src/ ./src/
 
 # Build the application
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl --no-default-features --features mimalloc
 
 # Runtime stage
 FROM alpine:3.19

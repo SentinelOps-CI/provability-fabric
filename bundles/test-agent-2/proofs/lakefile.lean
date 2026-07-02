@@ -10,4 +10,6 @@ lean_lib Spec {
   -- add library configuration options here
 }
 
-require mathlib from git "https://github.com/leanprover-community/mathlib4.git" @ "v4.7.0"
+-- Use vendored mathlib instead of fetching from git
+require mathlib from "../../../vendor/mathlib"
+require Fabric from "../../../core/lean-libs"

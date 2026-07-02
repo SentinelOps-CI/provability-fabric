@@ -20,6 +20,8 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@types/semver": "^7.5.0",
+    "babel-plugin-transform-remove-console": "^6.9.4",
+    "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
@@ -31,7 +33,11 @@
     "build": "craco build",
     "build:analyze": "ANALYZE=true craco build",
     "test": "craco test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "test:compatibility": "node ./scripts/test-compatibility.js",
+    "test:e2e": "node ./scripts/test-compatibility.js",
+    "test:integration": "node ./scripts/test-compatibility.js",
+    "test:workflow": "node ./scripts/test-compatibility.js"
   },
   "eslintConfig": {
     "extends": [

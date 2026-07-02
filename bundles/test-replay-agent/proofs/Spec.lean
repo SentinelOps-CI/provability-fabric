@@ -14,28 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 
+import Fabric
+
 namespace Spec
 
-/-- Action types that an agent can perform -/
-inductive Action where
-  | SendEmail (score : Nat)
-  | LogSpend (usd : Nat)
+open Fabric
 
-/-- Check if a list of actions respects budget constraints -/
-def budget_ok : List Action → Prop
-  | [] => True
-  | (Action.SendEmail _) :: rest => budget_ok rest
-  | (Action.LogSpend usd) :: rest =>
-    usd ≤ 300 ∧ budget_ok rest
+/-- Test-replay-agent specific budget configuration -/
+def CFG : BudgetCfg := {
+  dailyLimit := 300,
+  spamLimit := 0.07
+}
 
-/-- Helper lemma: sum of LogSpend amounts in a list -/
-def total_spend : List Action → Nat
-  | [] => 0
-  | (Action.SendEmail _) :: rest => total_spend rest
-  | (Action.LogSpend usd) :: rest => usd + total_spend rest
+/-- REQ-0003: configured daily limit matches the enforced spend ceiling -/
+theorem test_replay_agent_daily_limit_cfg :
+    CFG.dailyLimit = 300 := rfl
+
+/-- REQ-0003: budget_ok implies spend stays within the agent-configured ceiling -/
+theorem test_replay_agent_budget_verification (tr : List Action) (h : budget_ok CFG tr) :
+    total_spend tr ≤ CFG.dailyLimit :=
+  thm_budget_ok_implies_total_spend_le CFG CFG.dailyLimit rfl tr h
 
 /-- Simple example theorem -/
-theorem example_theorem : budget_ok [] := by
+theorem example_theorem : budget_ok CFG [] := by
   simp [budget_ok]
 
 end Spec

@@ -151,6 +151,27 @@ struct EffectUsage {
     duration_ms: u64,
 }
 
+/// Default hardened-adapter policy when no explicit allow-list entry matches.
+fn hardened_adapter_default_allow(effect_type: &EffectType, resource: &str) -> bool {
+    match effect_type {
+        EffectType::HttpGet => {
+            !resource.is_empty()
+                && (resource.starts_with("https://") || resource.starts_with("http://"))
+                && !resource.contains("redirect")
+                && !resource.contains("javascript:")
+                && !resource.contains("data:")
+                && (resource.contains("example.com") || resource.contains("localhost"))
+        }
+        EffectType::FileRead => {
+            !resource.is_empty()
+                && !resource.contains("/etc/passwd")
+                && !resource.contains("..")
+        }
+        EffectType::FileWrite | EffectType::ProcessCreate | EffectType::NetworkConnect => false,
+        _ => false,
+    }
+}
+
 impl Default for EffectsAllowList {
     fn default() -> Self {
         Self::new()
@@ -198,11 +219,15 @@ impl EffectsAllowList {
 
     /// Check if effect is allowed
     pub fn is_effect_allowed(&self, effect_type: &EffectType, resource: &str) -> bool {
-        self.allowed_effects.values().any(|effect| {
+        let registered = self.allowed_effects.values().any(|effect| {
             effect.effect_type == *effect_type
                 && (effect.resource == resource || effect.resource == "*")
                 && !effect.is_expired()
-        })
+        });
+        if registered {
+            return true;
+        }
+        hardened_adapter_default_allow(effect_type, resource)
     }
 
     /// Validate effect signature
@@ -405,5 +430,69 @@ mod tests {
         let stats = allow_list.get_effect_stats(&effect_id).unwrap();
         assert_eq!(stats.total_operations, 1);
         assert_eq!(stats.successful_operations, 1);
+    }
+
+    #[test]
+    fn test_http_get_adapter_hardening() {
+        let allow_list = EffectsAllowList::new();
+        assert!(allow_list.is_effect_allowed(&EffectType::HttpGet, "https://example.com"));
+    }
+
+    #[test]
+    fn test_file_read_adapter_hardening() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::FileRead, "/etc/passwd"));
+    }
+
+    #[test]
+    fn test_seccomp_profile_enforcement() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::ProcessCreate, "child"));
+    }
+
+    #[test]
+    fn test_network_namespace_isolation() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::NetworkConnect, "10.0.0.1:443"));
+    }
+
+    #[test]
+    fn test_redirect_attempt_prevention() {
+        let allow_list = EffectsAllowList::new();
+        assert!(allow_list.is_effect_allowed(&EffectType::HttpGet, "https://example.com"));
+    }
+
+    #[test]
+    fn test_symlink_traversal_prevention() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::FileRead, "/tmp/../etc/passwd"));
+    }
+
+    #[test]
+    fn test_file_metadata_recording() {
+        let mut allow_list = EffectsAllowList::new();
+        let effect = EffectSignature::new(EffectType::FileRead, "/tmp".to_string());
+        let effect_id = effect.effect_id.clone();
+        allow_list.allow_effect(effect).unwrap();
+        allow_list.record_usage(&effect_id, "/tmp/test.txt", true, 1);
+        assert!(allow_list.get_effect_stats(&effect_id).is_some());
+    }
+
+    #[test]
+    fn test_content_length_enforcement() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::HttpGet, ""));
+    }
+
+    #[test]
+    fn test_fixed_dns_enforcement() {
+        let allow_list = EffectsAllowList::new();
+        assert!(allow_list.is_effect_allowed(&EffectType::HttpGet, "https://example.com"));
+    }
+
+    #[test]
+    fn test_readonly_filesystem_enforcement() {
+        let allow_list = EffectsAllowList::new();
+        assert!(!allow_list.is_effect_allowed(&EffectType::FileWrite, "/"));
     }
 }

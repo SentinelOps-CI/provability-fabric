@@ -1,8 +1,8 @@
-# SPDX-License-Identifier: Apache-2.0
+﻿# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
-FROM rust:1.75-alpine AS builder
+FROM rust:1.88-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -15,7 +15,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy dependency files
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -27,7 +27,7 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 COPY src/ ./src/
 
 # Build the application
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN touch src/main.rs && cargo build --release --target x86_64-unknown-linux-musl
 
 # Runtime stage
 FROM alpine:3.19

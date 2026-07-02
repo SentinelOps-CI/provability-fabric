@@ -134,23 +134,40 @@ def admission_controller(
 @pytest.fixture(scope="session")
 def ledger_service() -> Generator[str, None, None]:
     """Start ledger service and return URL."""
-    # Start ledger service
+    compose_files = [
+        "runtime/ledger/docker-compose.yml",
+        "runtime/ledger/docker-compose.ci.yml",
+    ]
+    # Start ledger service (CI overlay avoids dev bind mounts that break the image)
     subprocess.run(
-        ["docker", "compose", "-f", "runtime/ledger/docker-compose.yml", "up", "-d"],
+        ["docker", "compose", "-f", compose_files[0], "-f", compose_files[1], "up", "-d", "--build"],
         check=True,
     )
 
-    # Wait for service to be ready
+    # Wait for service to be ready (image build + DB migrate can exceed 2m on CI)
     ledger_url = "http://localhost:4000"
-    for _ in range(30):  # 30 second timeout
+    for _ in range(90):
         try:
-            response = requests.get(f"{ledger_url}/graphql", timeout=5)
+            response = requests.get(f"{ledger_url}/health", timeout=5)
             if response.status_code == 200:
                 break
         except requests.RequestException:
             pass
-        time.sleep(1)
+        time.sleep(2)
     else:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                compose_files[0],
+                "-f",
+                compose_files[1],
+                "logs",
+                "ledger",
+            ],
+            check=False,
+        )
         raise RuntimeError("Ledger service failed to start")
 
     try:
@@ -158,13 +175,22 @@ def ledger_service() -> Generator[str, None, None]:
     finally:
         # Cleanup
         subprocess.run(
-            ["docker", "compose", "-f", "runtime/ledger/docker-compose.yml", "down"],
+            [
+                "docker",
+                "compose",
+                "-f",
+                compose_files[0],
+                "-f",
+                compose_files[1],
+                "down",
+                "-v",
+            ],
             check=True,
         )
 
 
 @pytest.fixture(scope="session")
-def demo_agent_image() -> Generator[str, None, None]:
+def demo_agent_image(kind_cluster: str) -> Generator[str, None, None]:
     """Build demo agent container image."""
     # Create demo agent Dockerfile
     demo_dir = Path("demo/agent")
@@ -200,6 +226,18 @@ sleep 3600  # Keep container running
         check=True,
     )
 
+    subprocess.run(
+        [
+            "kind",
+            "load",
+            "docker-image",
+            "provability-fabric/demo-agent:latest",
+            "--name",
+            kind_cluster,
+        ],
+        check=True,
+    )
+
     yield "provability-fabric/demo-agent:latest"
 
     # Cleanup
@@ -209,7 +247,7 @@ sleep 3600  # Keep container running
 
 
 @pytest.fixture(scope="session")
-def violation_agent_image() -> Generator[str, None, None]:
+def violation_agent_image(kind_cluster: str) -> Generator[str, None, None]:
     """Build violation agent container image."""
     # Create violation agent Dockerfile
     demo_dir = Path("demo/violation-agent")
@@ -227,7 +265,7 @@ CMD ["/agent.sh"]
     (demo_dir / "agent.sh").write_text(
         """#!/bin/sh
 # Demo agent that emits over-budget actions
-echo '{"action": "LogSpend", "usd": 500.0, "payload": "violation"}' >&1
+echo '{"action": "LogSpend", "usd_amount": 500.0, "payload": "violation"}' >&1
 sleep 3600  # Keep container running
 """
     )
@@ -240,6 +278,18 @@ sleep 3600  # Keep container running
             "-t",
             "provability-fabric/violation-agent:latest",
             str(demo_dir),
+        ],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "kind",
+            "load",
+            "docker-image",
+            "provability-fabric/violation-agent:latest",
+            "--name",
+            kind_cluster,
         ],
         check=True,
     )

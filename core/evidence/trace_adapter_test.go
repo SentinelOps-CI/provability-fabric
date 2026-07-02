@@ -23,7 +23,7 @@ func TestImportKITSimpleTrace(t *testing.T) {
 	if len(trace.Events) != 2 {
 		t.Fatalf("expected 2 events, got %d", len(trace.Events))
 	}
-	if trace.Events[0].Kind != "call:Echo" {
+	if trace.Events[0].Kind != "function_call" {
 		t.Fatalf("first kind: %s", trace.Events[0].Kind)
 	}
 	expected, err := CanonicalJSONDigest(trace, "trace_digest")

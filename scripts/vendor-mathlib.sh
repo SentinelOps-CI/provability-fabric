@@ -16,10 +16,13 @@ mkdir -p "$VENDOR_DIR"
 
 # Clone mathlib to vendor directory (remove stale cache dirs missing .git)
 echo "📥 Cloning mathlib $MATHLIB_VERSION to $VENDOR_DIR..."
-if [ ! -d "$VENDOR_DIR/.git" ]; then
+if [ ! -d "$VENDOR_DIR/.git" ] || [ ! -f "$VENDOR_DIR/lakefile.lean" ]; then
     rm -rf "$VENDOR_DIR"
-    git clone --depth 1 --branch "$MATHLIB_VERSION" \
-        https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"
+    if ! timeout 600 git clone --depth 1 --branch "$MATHLIB_VERSION" \
+        https://github.com/leanprover-community/mathlib4.git "$VENDOR_DIR"; then
+        echo "git clone timed out after 10 minutes"
+        exit 1
+    fi
 else
     echo "✅ Mathlib already exists in vendor directory"
 fi
@@ -30,7 +33,10 @@ CURRENT_COMMIT=$(git rev-parse HEAD)
 if [ "$CURRENT_COMMIT" != "$MATHLIB_COMMIT" ]; then
     echo "⚠️  Warning: Expected commit $MATHLIB_COMMIT, got $CURRENT_COMMIT"
     echo "🔄 Checking out correct commit..."
-    git fetch origin "$MATHLIB_VERSION"
+    if ! timeout 300 git fetch --depth 1 origin "$MATHLIB_COMMIT"; then
+        echo "❌ git fetch timed out after 5 minutes"
+        exit 1
+    fi
     git checkout "$MATHLIB_COMMIT"
 fi
 
@@ -38,11 +44,12 @@ fi
 echo "🔨 Fetching mathlib build artifacts..."
 if [ -d .lake/build/lib ] && [ -n "$(ls -A .lake/build/lib 2>/dev/null)" ]; then
   echo "✅ Mathlib build artifacts already present, skipping fetch"
-elif lake exe cache get; then
+elif timeout 900 lake exe cache get; then
   echo "✅ Downloaded mathlib cache"
 else
-  echo "⚠️  Mathlib cache download failed; falling back to lake build"
-  lake build
+  echo "❌ Mathlib cache download failed or timed out after 15 minutes"
+  echo "   CI should restore vendor/mathlib/.lake from cache; avoid full lake build here."
+  exit 1
 fi
 
 echo "✅ Mathlib vendored successfully!"

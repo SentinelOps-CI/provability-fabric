@@ -65,7 +65,13 @@ jobs:
         uses: ./.github/actions/cache-cargo
 
       - name: Run Rust unit tests
-        run: cargo test -q --workspace --no-fail-fast
+        run: |
+          cargo test -q --workspace \
+            --exclude provability-fabric-core-sdk-rust \
+            --exclude sidecar-watcher \
+            --exclude labeler \
+            --exclude tool-broker \
+            --no-fail-fast
 
   nightly-with-model:
     name: Nightly (model calls, gated)

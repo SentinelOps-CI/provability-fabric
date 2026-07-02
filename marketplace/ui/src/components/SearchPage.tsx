@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { ChartBarIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import { marketplaceAPI } from '../services/api';
@@ -47,23 +47,7 @@ export const SearchPage: React.FC = () => {
     loadPackages();
   }, []);
 
-  // Handle URL search params
-  useEffect(() => {
-    const searchQuery = searchParams.get('q');
-    if (searchQuery && allPackages.length > 0) {
-      performAdvancedSearch({
-        query: searchQuery,
-        type: '',
-        author: '',
-        minRating: 0,
-        compatibility: '',
-        sortBy: 'relevance',
-        sortOrder: 'desc'
-      });
-    }
-  }, [searchParams, allPackages]);
-
-  const performAdvancedSearch = (filters: SearchFilters) => {
+  const performAdvancedSearch = useCallback((filters: SearchFilters) => {
     if (allPackages.length === 0) return;
 
     try {
@@ -82,7 +66,23 @@ export const SearchPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [allPackages]);
+
+  // Handle URL search params
+  useEffect(() => {
+    const searchQuery = searchParams.get('q');
+    if (searchQuery && allPackages.length > 0) {
+      performAdvancedSearch({
+        query: searchQuery,
+        type: '',
+        author: '',
+        minRating: 0,
+        compatibility: '',
+        sortBy: 'relevance',
+        sortOrder: 'desc'
+      });
+    }
+  }, [searchParams, allPackages, performAdvancedSearch]);
 
   const clearFilters = () => {
     setResults(allPackages);

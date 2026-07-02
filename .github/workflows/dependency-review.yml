@@ -14,13 +14,35 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check dependency graph availability
+        id: dep-graph
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Dependency graph is not enabled for ${GITHUB_REPOSITORY}. Skipping dependency review. Enable it under Settings > Code security and analysis > Dependency graph."
+          fi
+
       - name: Dependency review
+        if: steps.dep-graph.outputs.available == 'true'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
           comment-summary-in-pr: on-failure
+
+      - name: Record skipped dependency review
+        if: steps.dep-graph.outputs.available != 'true'
+        run: |
+          echo "Dependency review skipped because the repository dependency graph is unavailable."

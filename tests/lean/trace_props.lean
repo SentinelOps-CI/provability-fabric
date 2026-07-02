@@ -55,14 +55,14 @@ theorem test_budget_ok_prefix_single :
 
 -- Unit tests for budget_ok monotonicity
 theorem test_budget_ok_monotone_email :
-  budget_ok empty_trace → spend (Action.SendEmail 5) ≥ 0 → budget_ok (Action.SendEmail 5 :: empty_trace) := by
-  intro h_budget h_spend
-  exact thm_budget_ok_monotone empty_trace (Action.SendEmail 5) h_budget h_spend
+  budget_ok empty_trace → budget_ok (Action.SendEmail 5 :: empty_trace) := by
+  intro h_budget
+  exact thm_budget_ok_monotone empty_trace (Action.SendEmail 5) h_budget True.intro
 
 theorem test_budget_ok_monotone_spend :
-  budget_ok single_email_trace → spend (Action.LogSpend 100) ≥ 0 → budget_ok (Action.LogSpend 100 :: single_email_trace) := by
-  intro h_budget h_spend
-  exact thm_budget_ok_monotone single_email_trace (Action.LogSpend 100) h_budget h_spend
+  budget_ok single_email_trace → budget_ok (Action.LogSpend 100 :: single_email_trace) := by
+  intro h_budget
+  exact thm_budget_ok_monotone single_email_trace (Action.LogSpend 100) h_budget (by decide)
 
 -- Unit tests for spend function
 theorem test_spend_email : spend (Action.SendEmail 5) = 0 := by

@@ -21,10 +21,12 @@ jobs:
       - name: Install Syft
         run: |
           set -euo pipefail
-          curl -sSL -o /tmp/syft.tgz \
+          SYFT_DIR="$(mktemp -d)"
+          curl -sSL -o "$SYFT_DIR/syft.tgz" \
             "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
-          tar -xzf /tmp/syft.tgz -C /tmp
-          SYFT_BIN="$(find /tmp -maxdepth 3 -type f -name syft | head -1)"
+          tar -xzf "$SYFT_DIR/syft.tgz" -C "$SYFT_DIR"
+          SYFT_BIN="$(find "$SYFT_DIR" -type f -name syft | head -1)"
+          test -n "$SYFT_BIN"
           sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
           syft version
 

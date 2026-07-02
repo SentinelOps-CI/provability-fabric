@@ -1,5 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "hyperscan")]
 use hyperscan::{BlockDatabase, Pattern, PatternFlags};
 use aho_corasick::AhoCorasick;
 use lazy_static::lazy_static;
@@ -37,7 +38,7 @@ pub struct PiiDetectorConfig {
 impl Default for PiiDetectorConfig {
     fn default() -> Self {
         Self {
-            enable_hyperscan: true,
+            enable_hyperscan: cfg!(feature = "hyperscan"),
             enable_aho_corasick: true,
             enable_fallback: true,
             min_confidence: 0.8,
@@ -49,6 +50,7 @@ impl Default for PiiDetectorConfig {
 /// PII detector for emails, phones, SSNs, etc.
 pub struct PIIDetector {
     // Hyperscan database for complex regex patterns
+    #[cfg(feature = "hyperscan")]
     hyperscan_db: Arc<BlockDatabase>,
     
     // Aho-Corasick for exact token matches
@@ -122,13 +124,15 @@ impl PIIDetector {
     
     pub fn with_config(config: PiiDetectorConfig) -> Result<Self, Box<dyn std::error::Error>> {
         let mut detector = Self {
+            #[cfg(feature = "hyperscan")]
             hyperscan_db: Arc::new(BlockDatabase::new()?),
             exact_tokens: Arc::new(AhoCorasick::new(EXACT_TOKENS.iter())),
             fallback_patterns: Vec::new(),
             config,
         };
-        
+
         // Initialize Hyperscan database if enabled
+        #[cfg(feature = "hyperscan")]
         if config.enable_hyperscan {
             detector.init_hyperscan()?;
         }
@@ -142,6 +146,7 @@ impl PIIDetector {
     }
 
     /// Initialize Hyperscan database with PII patterns
+    #[cfg(feature = "hyperscan")]
     fn init_hyperscan(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut patterns = Vec::new();
         
@@ -175,6 +180,7 @@ impl PIIDetector {
         let mut detections = Vec::new();
         
         // Use Hyperscan for regex patterns if enabled
+        #[cfg(feature = "hyperscan")]
         if self.config.enable_hyperscan {
             if let Ok(matches) = self.hyperscan_db.find(text) {
                 for mat in matches {
@@ -395,10 +401,11 @@ mod tests {
         assert!(!detector.is_valid_credit_card("1234567890123456"));
     }
     
+    #[cfg(feature = "hyperscan")]
     #[test]
     fn test_hyperscan_integration() {
         let config = PiiDetectorConfig {
-            enable_hyperscan: true,
+            enable_hyperscan: cfg!(feature = "hyperscan"),
             enable_aho_corasick: true,
             enable_fallback: false,
             min_confidence: 0.8,

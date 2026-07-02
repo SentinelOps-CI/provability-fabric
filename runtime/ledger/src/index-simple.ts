@@ -7,8 +7,8 @@ import { ApolloServer } from '@apollo/server'
 import { expressMiddleware } from '@apollo/server/express4'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth-simple'
-import { BillingService, billingMiddleware } from './billing'
+import { authMiddleware, tenantMiddleware, AuthenticatedRequest } from './auth-simple.js'
+import { BillingService, billingMiddleware } from './billing.js'
 
 const prisma = new PrismaClient()
 
@@ -55,10 +55,52 @@ const typeDefs = `#graphql
 
   type Mutation {
     createCapsule(hash: String!, specSig: String!, riskScore: Float!, reason: String): Capsule!
+    publish(hash: String!, specSig: String!, risk: Float!, reason: String): Capsule!
     updateCapsule(hash: String!, riskScore: Float!, reason: String): Capsule!
     createPremiumQuote(capsuleHash: String!, riskScore: Float!, annualUsd: Float!): PremiumQuote!
   }
 `
+
+function userFromRequest(req: express.Request) {
+  const auth = req.headers.authorization
+  if (auth?.startsWith('Bearer ')) {
+    try {
+      const payloadPart = auth.slice(7).split('.')[1]
+      const payload = JSON.parse(
+        Buffer.from(payloadPart.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+      )
+      if (typeof payload.tid === 'string' && payload.tid.length > 0) {
+        return {
+          tid: payload.tid,
+          sub: payload.sub ?? 'test-user',
+          email: 'test@example.com',
+        }
+      }
+    } catch {
+      // fall through to dev defaults
+    }
+  }
+  return {
+    tid: 'dev-tenant',
+    sub: 'dev-user',
+    email: 'dev@example.com',
+  }
+}
+
+async function ensureDefaultTenants() {
+  const tenants = [
+    { id: 'dev-tenant', name: 'Development Tenant', auth0Id: 'dev-tenant' },
+    { id: 'tenant-a', name: 'Tenant A', auth0Id: 'tenant-a' },
+    { id: 'tenant-b', name: 'Tenant B', auth0Id: 'tenant-b' },
+  ]
+  for (const tenant of tenants) {
+    await prisma.tenant.upsert({
+      where: { id: tenant.id },
+      create: tenant,
+      update: {},
+    })
+  }
+}
 
 // GraphQL resolvers with tenant scoping
 const resolvers = {
@@ -121,6 +163,21 @@ const resolvers = {
         }
       })
     },
+    publish: async (_: any, { hash, specSig, risk, reason }: any, { user }: { user: any }) => {
+      return await prisma.capsule.create({
+        data: {
+          hash,
+          specSig,
+          riskScore: risk,
+          reason,
+          tenantId: user.tid
+        },
+        include: {
+          tenant: true,
+          premiumQuotes: true
+        }
+      })
+    },
     updateCapsule: async (_: any, { hash, riskScore, reason }: any, { user }: { user: any }) => {
       return await prisma.capsule.update({
         where: { hash },
@@ -149,6 +206,8 @@ const resolvers = {
 }
 
 async function startServer() {
+  await ensureDefaultTenants()
+
   const app = express()
   const port = process.env.PORT || 8080
 
@@ -235,7 +294,17 @@ async function startServer() {
     }
   })
 
-  // Apollo Server setup with context
+  // Listen before Apollo init so /health is reachable during CI startup waits
+  await new Promise<void>((resolve) => {
+    app.listen(port, () => {
+      console.log(`🚀 Provability-Fabric Ledger running on port ${port}`)
+      console.log(`📊 Health check: http://localhost:${port}/health`)
+      console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
+      console.log(`📡 API Status: http://localhost:${port}/api/status`)
+      resolve()
+    })
+  })
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
@@ -243,27 +312,13 @@ async function startServer() {
 
   await server.start()
 
-  app.use('/graphql', 
+  app.use('/graphql',
     expressMiddleware(server, {
-      context: async ({ req }) => {
-        // For development, create a mock user context
-        return { 
-          user: {
-            tid: 'dev-tenant',
-            sub: 'dev-user',
-            email: 'dev@example.com'
-          }
-        }
-      }
+      context: async ({ req }) => ({
+        user: userFromRequest(req),
+      }),
     })
   )
-
-  app.listen(port, () => {
-    console.log(`🚀 Provability-Fabric Ledger running on port ${port}`)
-    console.log(`📊 Health check: http://localhost:${port}/health`)
-    console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
-    console.log(`📡 API Status: http://localhost:${port}/api/status`)
-  })
 }
 
 startServer().catch(console.error) 

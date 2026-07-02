@@ -1,61 +1,1084 @@
 {
-  "version": "2.0",
+  "version": "3.0",
   "generated_from": "lean_proofs",
-  "generation_timestamp": "2025-01-15T10:30:00Z",
+  "generation_timestamp": "2026-06-19T04:27:59.049984",
   "source_files": [
     "core/lean-libs/ActionDSL.lean",
-    "core/lean-libs/Capability.lean"
+    "core/lean-libs/Budget.lean",
+    "core/lean-libs/Capability.lean",
+    "core/lean-libs/ExportDFA.lean",
+    "core/lean-libs/Fabric.lean",
+    "core/lean-libs/GenTrace.lean",
+    "core/lean-libs/Invariants.lean",
+    "core/lean-libs/lakefile.lean",
+    "core/lean-libs/Plan.lean",
+    "core/lean-libs/Privacy.lean",
+    "core/lean-libs/ProofBench.lean",
+    "core/lean-libs/Redaction.lean",
+    "core/lean-libs/Sandbox.lean",
+    "core/lean-tools/ExportDFA.lean",
+    "core/lean-tools/LabelerGen.lean",
+    "core/lean-libs/ActionDSL/Extended.lean",
+    "core/lean-libs/ActionDSL/Safety.lean",
+    "core/lean-libs/ActionDSL/Windows.lean",
+    "core/lean-libs/Delta/Typing.lean",
+    "core/lean-libs/Runtime/MicroInterp.lean",
+    "core/lean-libs/Runtime/Refinement.lean",
+    "core/lean-libs/Runtime/Schedule.lean",
+    "bundles/test-replay-agent/proofs/lakefile.lean",
+    "bundles/test-replay-agent/proofs/Spec.lean",
+    "bundles/test-new-user-agent/proofs/lakefile.lean",
+    "bundles/test-new-user-agent/proofs/Spec.lean",
+    "bundles/test-agent-2/proofs/lakefile.lean",
+    "bundles/test-agent-2/proofs/Spec.lean",
+    "bundles/my-agent/proofs/lakefile.lean",
+    "bundles/my-agent/proofs/Spec.lean",
+    "bundles/art/trace_monotonicity/proofs/lakefile.lean",
+    "bundles/art/trace_monotonicity/proofs/Spec.lean",
+    "bundles/art/spam_prevention/proofs/lakefile.lean",
+    "bundles/art/spam_prevention/proofs/Spec.lean",
+    "bundles/art/sandbox_isolation/proofs/lakefile.lean",
+    "bundles/art/sandbox_isolation/proofs/Spec.lean",
+    "bundles/art/privacy_compliance/proofs/lakefile.lean",
+    "bundles/art/privacy_compliance/proofs/Spec.lean",
+    "bundles/art/prefix_closure/proofs/lakefile.lean",
+    "bundles/art/prefix_closure/proofs/Spec.lean",
+    "bundles/art/invariant_preservation/proofs/lakefile.lean",
+    "bundles/art/invariant_preservation/proofs/Spec.lean",
+    "bundles/art/differential_privacy/proofs/lakefile.lean",
+    "bundles/art/differential_privacy/proofs/Spec.lean",
+    "bundles/art/composition_safety/proofs/lakefile.lean",
+    "bundles/art/composition_safety/proofs/Spec.lean",
+    "bundles/art/capability_enforcement/proofs/lakefile.lean",
+    "bundles/art/capability_enforcement/proofs/Spec.lean",
+    "bundles/art/budget_control/proofs/lakefile.lean",
+    "bundles/art/budget_control/proofs/Spec.lean"
   ],
   "sync_with_lean": true,
   "validation_status": "generated",
+  "lean_environment": {
+    "lean_version": "Lean (version 4.7.0, x86_64-w64-windows-gnu, commit 6fce8f7d5cd1, Release)",
+    "lake_version": "Lake version 5.0.0-6fce8f7 (Lean version 4.7.0)",
+    "workspace_hash": "c5353aabdcd0e52f534ac15adc23dab13e4bdd5949fe141544391cd964945394"
+  },
+  "workspace_hash": "c5353aabdcd0e52f534ac15adc23dab13e4bdd5949fe141544391cd964945394",
   "tools": {
-    "SendEmail": {
-      "can_use": true,
-      "conditions": ["budget_ok", "spam_ok"],
-      "source_file": "core/lean-libs/ActionDSL.lean",
-      "capability_type": "explicit",
-      "lean_definition": true
+    "CanUse": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
     },
-    "LogSpend": {
-      "can_use": true,
-      "conditions": ["budget_ok"],
-      "source_file": "core/lean-libs/ActionDSL.lean",
-      "capability_type": "explicit",
-      "lean_definition": true
+    "DatabaseQuery": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
     },
     "LogAction": {
-      "can_use": true,
-      "conditions": ["default"],
-      "source_file": "core/lean-libs/ActionDSL.lean",
-      "capability_type": "explicit",
-      "lean_definition": true
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "LogSpend": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
     },
     "NetworkCall": {
       "can_use": false,
-      "conditions": ["requires_explicit_lean_proof"],
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
       "source_file": "generated",
       "capability_type": "default_deny",
       "lean_definition": false
     },
-    "FileRead": {
+    "ReadFile": {
       "can_use": false,
-      "conditions": ["requires_explicit_lean_proof"],
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
       "source_file": "generated",
       "capability_type": "default_deny",
       "lean_definition": false
     },
-    "FileWrite": {
+    "SendEmail": {
       "can_use": false,
-      "conditions": ["requires_explicit_lean_proof"],
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "action_tool": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "forbidden_tool": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
       "source_file": "generated",
       "capability_type": "default_deny",
       "lean_definition": false
     }
   },
+  "capabilities": {},
+  "policies": {
+    "Policy": {
+      "file": "proofs/Policy.lean",
+      "theorems": [
+        "soundness",
+        "completeness",
+        "read_requires_label_flow",
+        "ni_bridge"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Spec": {
+      "file": "bundles/art/budget_control/proofs/Spec.lean",
+      "theorems": [
+        "thm_budget_ok",
+        "thm_privacy_ok",
+        "thm_capability_ok",
+        "thm_composition_ok"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "GammaSpecAdjunction": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/GammaSpecAdjunction.lean",
+      "theorems": [],
+      "lemmas": [
+        "locallyRingedSpaceAdjunction_unit",
+        "locallyRingedSpaceAdjunction_counit"
+      ],
+      "axioms": []
+    },
+    "Specialization": {
+      "file": "vendor/mathlib/Mathlib/Topology/Specialization.lean",
+      "theorems": [],
+      "lemmas": [
+        "toEquiv_symm",
+        "ofEquiv_symm",
+        "map_id"
+      ],
+      "axioms": []
+    },
+    "Hom": {
+      "file": "vendor/mathlib/Mathlib/Topology/Spectral/Hom.lean",
+      "theorems": [
+        "isSpectralMap_id",
+        "coe_id"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Arctan": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Arctan.lean",
+      "theorems": [
+        "continuousOn_tan",
+        "continuous_tan",
+        "continuousOn_tan_Ioo",
+        "surjOn_tan",
+        "tan_surjective",
+        "image_tan_Ioo",
+        "range_arctan",
+        "arctan_zero",
+        "arctan_strictMono",
+        "arctan_injective",
+        "tendsto_arctan_atTop",
+        "tendsto_arctan_atBot",
+        "arctan_one",
+        "arctan_inv_2_add_arctan_inv_3",
+        "two_mul_arctan_inv_2_sub_arctan_inv_7",
+        "two_mul_arctan_inv_3_add_arctan_inv_7",
+        "four_mul_arctan_inv_5_sub_arctan_inv_239",
+        "continuous_arctan",
+        "coe_tanPartialHomeomorph",
+        "coe_tanPartialHomeomorph_symm"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Basic": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Basic.lean",
+      "theorems": [
+        "gc",
+        "gc_set",
+        "zeroLocus_bot",
+        "zeroLocus_singleton_zero",
+        "zeroLocus_empty",
+        "vanishingIdeal_univ",
+        "zeroLocus_singleton_one",
+        "zeroLocus_univ",
+        "comap_id",
+        "basicOpen_one",
+        "basicOpen_zero",
+        "isTopologicalBasis_basic_opens",
+        "isBasis_basic_opens"
+      ],
+      "lemmas": [
+        "vanishingIdeal_isIrreducible",
+        "vanishingIdeal_isClosed_isIrreducible",
+        "vanishingIdeal_irreducibleComponents",
+        "zeroLocus_minimalPrimes"
+      ],
+      "axioms": []
+    },
+    "Inner": {
+      "file": "vendor/mathlib/Mathlib/MeasureTheory/Function/SpecialFunctions/Inner.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "RCLike": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/RCLike.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "ProjectiveSpecialLinearGroup": {
+      "file": "vendor/mathlib/Mathlib/LinearAlgebra/Matrix/ProjectiveSpecialLinearGroup.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "SpecialLinearGroup": {
+      "file": "vendor/mathlib/Mathlib/LinearAlgebra/Matrix/SpecialLinearGroup.lean",
+      "theorems": [
+        "coe_inv",
+        "coe_mul",
+        "coe_one",
+        "det_coe",
+        "coe_S",
+        "coe_T",
+        "coe_T_inv"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Spectrum": {
+      "file": "vendor/mathlib/Mathlib/Algebra/Algebra/Spectrum.lean",
+      "theorems": [
+        "algebraMap_image",
+        "image",
+        "subset_preimage"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Alternating": {
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Alternating.lean",
+      "theorems": [
+        "alternatingGroup_eq_sign_ker",
+        "closure_three_cycles_eq_alternating",
+        "normalClosure_finRotate_five",
+        "normalClosure_swap_mul_swap_five"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Cyclic": {
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Cyclic.lean",
+      "theorems": [
+        "isCyclic_of_card_pow_eq_one_le"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Dihedral": {
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Dihedral.lean",
+      "theorems": [
+        "one_def",
+        "nat_card",
+        "r_one_pow_n",
+        "orderOf_r_one",
+        "exponent"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "KleinFour": {
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/KleinFour.lean",
+      "theorems": [],
+      "lemmas": [
+        "not_isCyclic"
+      ],
+      "axioms": []
+    },
+    "Quaternion": {
+      "file": "vendor/mathlib/Mathlib/GroupTheory/SpecificGroups/Quaternion.lean",
+      "theorems": [
+        "one_def",
+        "a_one_pow_n",
+        "quaternionGroup_one_isCyclic",
+        "orderOf_a_one",
+        "exponent"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "SpecificFunctions": {
+      "file": "vendor/mathlib/Mathlib/Geometry/Manifold/MFDeriv/SpecificFunctions.lean",
+      "theorems": [
+        "hasMFDerivWithinAt",
+        "hasMFDerivAt",
+        "mdifferentiableWithinAt",
+        "mdifferentiableOn",
+        "mdifferentiableAt",
+        "mdifferentiable",
+        "mfderiv_eq",
+        "hasMFDerivWithinAt",
+        "hasMFDerivAt",
+        "mdifferentiableWithinAt",
+        "mdifferentiableOn",
+        "mdifferentiableAt",
+        "mdifferentiable",
+        "mfderiv_eq",
+        "mdifferentiableAt_id",
+        "mdifferentiableWithinAt_id",
+        "mdifferentiable_id",
+        "mdifferentiableOn_id",
+        "mfderiv_id",
+        "tangentMap_id",
+        "mdifferentiableAt_const",
+        "mdifferentiableWithinAt_const",
+        "mdifferentiable_const",
+        "mdifferentiableOn_const",
+        "mfderiv_const",
+        "mdifferentiable_fst",
+        "mdifferentiable_snd",
+        "hasMFDerivAt_neg",
+        "mdifferentiableAt_neg"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "SpecificDegree": {
+      "file": "vendor/mathlib/Mathlib/Data/Polynomial/SpecificDegree.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "SpecificAsymptotics": {
+      "file": "vendor/mathlib/Mathlib/Analysis/Asymptotics/SpecificAsymptotics.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Arsinh": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Arsinh.lean",
+      "theorems": [
+        "arsinh_zero",
+        "sinh_surjective",
+        "sinh_bijective",
+        "arsinh_bijective",
+        "arsinh_injective",
+        "arsinh_surjective",
+        "arsinh_strictMono",
+        "arsinh_inj",
+        "arsinh_le_arsinh",
+        "arsinh_lt_arsinh",
+        "arsinh_eq_zero_iff",
+        "arsinh_nonneg_iff",
+        "arsinh_nonpos_iff",
+        "arsinh_pos_iff",
+        "arsinh_neg_iff",
+        "differentiable_arsinh",
+        "continuous_arsinh"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Bernstein": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Bernstein.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "CompareExp": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/CompareExp.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Exp": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Exp.lean",
+      "theorems": [
+        "continuous_exp",
+        "continuous_exp",
+        "tendsto_exp_atTop",
+        "tendsto_exp_neg_atTop_nhds_zero",
+        "tendsto_exp_nhds_zero_nhds_one",
+        "tendsto_exp_atBot",
+        "tendsto_exp_atBot_nhdsWithin",
+        "coe_comp_expOrderIso",
+        "range_exp",
+        "map_exp_atTop",
+        "comap_exp_atTop",
+        "map_exp_atBot",
+        "comap_exp_nhdsWithin_Ioi_zero",
+        "comap_exp_nhds_zero",
+        "openEmbedding_exp",
+        "comap_exp_cobounded",
+        "comap_exp_nhds_zero",
+        "comap_exp_nhdsWithin_zero",
+        "tendsto_exp_comap_re_atTop",
+        "tendsto_exp_comap_re_atBot",
+        "tendsto_exp_comap_re_atBot_nhdsWithin"
+      ],
+      "lemmas": [
+        "summable_exp_neg_nat"
+      ],
+      "axioms": []
+    },
+    "ExpDeriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/ExpDeriv.lean",
+      "theorems": [
+        "differentiable_exp",
+        "deriv_exp",
+        "iter_deriv_exp",
+        "contDiff_exp",
+        "differentiable_exp",
+        "differentiableAt_exp",
+        "deriv_exp",
+        "iter_deriv_exp"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Exponential": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Exponential.lean",
+      "theorems": [
+        "hasStrictFDerivAt_exp_zero",
+        "hasFDerivAt_exp_zero",
+        "hasStrictDerivAt_exp_zero",
+        "hasDerivAt_exp_zero"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Gaussian": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gaussian.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "ImproperIntegrals": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/ImproperIntegrals.lean",
+      "theorems": [
+        "integral_exp_Iic_zero",
+        "integral_exp_neg_Ioi_zero",
+        "integrable_inv_one_add_sq",
+        "integral_univ_inv_one_add_sq"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Integrals": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Integrals.lean",
+      "theorems": [
+        "intervalIntegrable_pow",
+        "intervalIntegrable_id",
+        "intervalIntegrable_const",
+        "intervalIntegrable_exp",
+        "intervalIntegrable_sin",
+        "intervalIntegrable_cos",
+        "intervalIntegrable_one_div_one_add_sq",
+        "intervalIntegrable_inv_one_add_sq",
+        "mul_integral_comp_mul_right",
+        "mul_integral_comp_mul_left",
+        "inv_mul_integral_comp_div",
+        "mul_integral_comp_mul_add",
+        "mul_integral_comp_add_mul",
+        "inv_mul_integral_comp_div_add",
+        "inv_mul_integral_comp_add_div",
+        "mul_integral_comp_mul_sub",
+        "mul_integral_comp_sub_mul",
+        "inv_mul_integral_comp_div_sub",
+        "inv_mul_integral_comp_sub_div",
+        "integral_pow",
+        "integral_pow_abs_sub_uIoc",
+        "integral_id",
+        "integral_one",
+        "integral_const_on_unit_interval",
+        "integral_exp",
+        "integral_sin",
+        "integral_cos",
+        "integral_cos_sq_sub_sin_sq",
+        "integral_one_div_one_add_sq",
+        "integral_inv_one_add_sq",
+        "integral_sin_pow_aux",
+        "integral_sin_pow",
+        "integral_sin_sq",
+        "integral_sin_pow_odd",
+        "integral_sin_pow_even",
+        "integral_sin_pow_pos",
+        "integral_sin_pow_succ_le",
+        "integral_sin_pow_antitone",
+        "integral_cos_pow_aux",
+        "integral_cos_pow",
+        "integral_cos_sq",
+        "integral_sin_sq_mul_cos",
+        "integral_cos_pow_three",
+        "integral_sin_mul_cos_sq",
+        "integral_sin_pow_three",
+        "integral_sin_sq_mul_cos_sq",
+        "integral_sqrt_one_sub_sq"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "JapaneseBracket": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/JapaneseBracket.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "NonIntegrable": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/NonIntegrable.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "PolarCoord": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/PolarCoord.lean",
+      "theorems": [
+        "polarCoord_source_ae_eq_univ",
+        "polarCoord_source",
+        "polarCoord_target"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "PolynomialExp": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/PolynomialExp.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Polynomials": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Polynomials.lean",
+      "theorems": [
+        "isEquivalent_atTop_lead",
+        "tendsto_atTop_iff_leadingCoeff_nonneg",
+        "tendsto_atBot_iff_leadingCoeff_nonpos",
+        "abs_isBoundedUnder_iff",
+        "abs_tendsto_atTop_iff",
+        "isEquivalent_atTop_div"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "SmoothTransition": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/SmoothTransition.lean",
+      "theorems": [
+        "zero",
+        "zero_iff_nonpos",
+        "zero",
+        "one",
+        "projIcc",
+        "continuous",
+        "continuousAt"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Sqrt": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Sqrt.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Stirling": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Stirling.lean",
+      "theorems": [
+        "stirlingSeq_zero",
+        "stirlingSeq_one",
+        "log_stirlingSeq_bounded_aux",
+        "log_stirlingSeq_bounded_by_constant",
+        "stirlingSeq_has_pos_limit_a",
+        "tendsto_self_div_two_mul_self_add_one",
+        "tendsto_stirlingSeq_sqrt_pi"
+      ],
+      "lemmas": [
+        "factorial_isEquivalent_stirling"
+      ],
+      "axioms": []
+    },
+    "FloorPow": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/FloorPow.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Normed": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecificLimits/Normed.lean",
+      "theorems": [
+        "tendsto_norm_atTop_atTop",
+        "summable_geometric_iff_norm_lt_one"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Analytic": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Analytic.lean",
+      "theorems": [
+        "analyticOn_cexp",
+        "analyticAt_cexp"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Arg": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Arg.lean",
+      "theorems": [
+        "range_exp_mul_I",
+        "arg_zero",
+        "range_arg",
+        "arg_one",
+        "arg_neg_one",
+        "arg_I",
+        "arg_neg_I"
+      ],
+      "lemmas": [
+        "image_exp_Ioc_eq_sphere"
+      ],
+      "axioms": []
+    },
+    "Circle": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Circle.lean",
+      "theorems": [
+        "injective_arg",
+        "leftInverse_expMapCircle_arg",
+        "invOn_arg_expMapCircle",
+        "surjOn_expMapCircle_neg_pi_pi",
+        "periodic_expMapCircle",
+        "expMapCircle_two_pi"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Log": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/Log.lean",
+      "theorems": [
+        "range_exp",
+        "log_zero",
+        "log_one",
+        "log_neg_one",
+        "log_I",
+        "log_neg_I",
+        "two_pi_I_ne_zero",
+        "map_exp_comap_re_atBot",
+        "map_exp_comap_re_atTop"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "LogBounds": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/LogBounds.lean",
+      "theorems": [],
+      "lemmas": [
+        "logTaylor_zero"
+      ],
+      "axioms": []
+    },
+    "LogDeriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Complex/LogDeriv.lean",
+      "theorems": [
+        "isOpenMap_exp"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Beta": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/Beta.lean",
+      "theorems": [
+        "differentiable_one_div_Gamma"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "BohrMollerup": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/BohrMollerup.lean",
+      "theorems": [
+        "convexOn_log_Gamma",
+        "convexOn_Gamma",
+        "Gamma_two",
+        "Gamma_three_div_two_lt_one",
+        "Gamma_strictMonoOn_Ici",
+        "doublingGamma_one",
+        "log_doublingGamma_eq",
+        "doublingGamma_log_convex_Ioi"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Deligne": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Gamma/Deligne.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Base": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/Base.lean",
+      "theorems": [
+        "log_div_log",
+        "logb_zero",
+        "logb_one",
+        "log_b_ne_zero",
+        "logb_rpow",
+        "surjOn_logb",
+        "logb_surjective",
+        "range_logb",
+        "b_pos",
+        "strictMonoOn_logb",
+        "strictAntiOn_logb",
+        "logb_injOn_pos",
+        "tendsto_logb_atTop",
+        "b_ne_one",
+        "strictAntiOn_logb_of_base_lt_one",
+        "strictMonoOn_logb_of_base_lt_one",
+        "logb_injOn_pos_of_base_lt_one",
+        "tendsto_logb_atTop_of_base_lt_one",
+        "logb_eq_zero"
+      ],
+      "lemmas": [
+        "logb_self_eq_one_iff"
+      ],
+      "axioms": []
+    },
+    "Deriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/Convex/SpecificFunctions/Deriv.lean",
+      "theorems": [
+        "strictConcaveOn_sqrt_mul_log_Ioi",
+        "strictConcaveOn_sin_Icc",
+        "strictConcaveOn_cos_Icc"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Monotone": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/Monotone.lean",
+      "theorems": [
+        "log_mul_self_monotoneOn",
+        "log_div_self_antitoneOn",
+        "log_div_sqrt_antitoneOn"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "NegMulLog": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Log/NegMulLog.lean",
+      "theorems": [],
+      "lemmas": [
+        "continuous_mul_log",
+        "differentiableOn_mul_log",
+        "strictConvexOn_mul_log",
+        "convexOn_mul_log",
+        "negMulLog_def",
+        "negMulLog_eq_neg",
+        "negMulLog_zero",
+        "negMulLog_one",
+        "continuous_negMulLog",
+        "differentiableOn_negMulLog",
+        "strictConcaveOn_negMulLog",
+        "concaveOn_negMulLog"
+      ],
+      "axioms": []
+    },
+    "Asymptotics": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Asymptotics.lean",
+      "theorems": [
+        "tendsto_rpow_div",
+        "tendsto_rpow_neg_div"
+      ],
+      "lemmas": [
+        "tendsto_log_mul_self_nhds_zero_left"
+      ],
+      "axioms": []
+    },
+    "Complex": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Complex.lean",
+      "theorems": [
+        "continuousOn_tan",
+        "continuous_tan",
+        "cos_surjective",
+        "range_cos",
+        "sin_surjective",
+        "range_sin"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Continuity": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Continuity.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "NNReal": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/NNReal.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Real": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Pow/Real.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Angle": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Angle.lean",
+      "theorems": [
+        "continuous_coe",
+        "coe_coeHom",
+        "coe_zero",
+        "coe_two_pi",
+        "neg_coe_pi",
+        "two_nsmul_neg_pi_div_two",
+        "two_zsmul_neg_pi_div_two",
+        "two_nsmul_coe_pi",
+        "two_zsmul_coe_pi",
+        "coe_pi_add_coe_pi",
+        "continuous_sin",
+        "continuous_cos",
+        "sin_zero",
+        "sin_coe_pi",
+        "sin_antiperiodic",
+        "cos_zero",
+        "cos_coe_pi",
+        "cos_antiperiodic",
+        "toReal_injective",
+        "toReal_zero",
+        "toReal_pi",
+        "pi_ne_zero",
+        "toReal_pi_div_two",
+        "toReal_neg_pi_div_two",
+        "pi_div_two_ne_zero",
+        "neg_pi_div_two_ne_zero",
+        "tan_zero",
+        "tan_coe_pi",
+        "tan_periodic",
+        "sign_zero",
+        "sign_coe_pi",
+        "sign_antiperiodic",
+        "sign_coe_pi_div_two",
+        "sign_coe_neg_pi_div_two"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "ArctanDeriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/ArctanDeriv.lean",
+      "theorems": [
+        "differentiable_arctan",
+        "deriv_arctan"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Bounds": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Bounds.lean",
+      "theorems": [],
+      "lemmas": [
+        "one_sub_sq_div_two_le_cos"
+      ],
+      "axioms": []
+    },
+    "Chebyshev": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Chebyshev.lean",
+      "theorems": [
+        "complex_ofReal_eval_T",
+        "complex_ofReal_eval_U",
+        "T_complex_cos",
+        "T_real_cos",
+        "U_real_cos"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "ComplexDeriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/ComplexDeriv.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "EulerSineProd": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/EulerSineProd.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Inverse": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Inverse.lean",
+      "theorems": [
+        "range_arcsin",
+        "strictMonoOn_arcsin",
+        "monotone_arcsin",
+        "injOn_arcsin",
+        "continuous_arcsin",
+        "arcsin_zero",
+        "arcsin_one",
+        "arcsin_neg_one",
+        "mapsTo_sin_Ioo",
+        "strictAntiOn_arccos",
+        "arccos_injOn",
+        "arccos_zero",
+        "arccos_one",
+        "arccos_neg_one",
+        "continuous_arccos"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "InverseDeriv": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/InverseDeriv.lean",
+      "theorems": [
+        "deriv_arcsin",
+        "differentiableOn_arcsin",
+        "deriv_arccos",
+        "differentiableOn_arccos"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Series": {
+      "file": "vendor/mathlib/Mathlib/Analysis/SpecialFunctions/Trigonometric/Series.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Pow": {
+      "file": "vendor/mathlib/Mathlib/Analysis/Convex/SpecificFunctions/Pow.lean",
+      "theorems": [],
+      "lemmas": [
+        "strictConcaveOn_sqrt",
+        "strictConcaveOn_sqrt"
+      ],
+      "axioms": []
+    },
+    "IsOpenComapC": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/IsOpenComapC.lean",
+      "theorems": [
+        "isOpen_imageOfDf",
+        "imageOfDf_eq_comap_C_compl_zeroLocus",
+        "isOpenMap_comap_C"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Maximal": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Maximal.lean",
+      "theorems": [
+        "toPrimeSpectrum_injective",
+        "toPrimeSpectrum_range",
+        "toPrimeSpectrum_continuous",
+        "iInf_localization_eq_bot",
+        "iInf_localization_eq_bot"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Noetherian": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/PrimeSpectrum/Noetherian.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Scheme": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/Scheme.lean",
+      "theorems": [
+        "disjoint",
+        "carrier_ne_top"
+      ],
+      "lemmas": [
+        "carrier_eq_span"
+      ],
+      "axioms": []
+    },
+    "StructureSheaf": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/StructureSheaf.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Topology": {
+      "file": "vendor/mathlib/Mathlib/AlgebraicGeometry/ProjectiveSpectrum/Topology.lean",
+      "theorems": [
+        "gc_ideal",
+        "gc_set",
+        "gc_homogeneousIdeal",
+        "zeroLocus_bot",
+        "zeroLocus_singleton_zero",
+        "zeroLocus_empty",
+        "vanishingIdeal_univ",
+        "zeroLocus_singleton_one",
+        "zeroLocus_univ",
+        "basicOpen_one",
+        "basicOpen_zero",
+        "isTopologicalBasis_basic_opens"
+      ],
+      "lemmas": [],
+      "axioms": []
+    },
+    "Quasispectrum": {
+      "file": "vendor/mathlib/Mathlib/Algebra/Algebra/Quasispectrum.lean",
+      "theorems": [],
+      "lemmas": [
+        "val_one",
+        "isQuasiregular_zero"
+      ],
+      "axioms": []
+    },
+    "gentrace_spec": {
+      "file": "tests/lean/gentrace_spec.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "lakefile": {
+      "file": "spec-templates/v1/proofs/lakefile.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    },
+    "PolicyTrace": {
+      "file": "spec-templates/v1/proofs/PolicyTrace.lean",
+      "theorems": [],
+      "lemmas": [],
+      "axioms": []
+    }
+  },
   "metadata": {
-    "total_tools_found": 6,
-    "total_capabilities": 3,
-    "explicit_capabilities": 3,
-    "default_capabilities": 3
+    "total_tools_found": 9,
+    "total_capabilities": 0,
+    "explicit_capabilities": 0,
+    "default_capabilities": 9
   }
-} 
+}

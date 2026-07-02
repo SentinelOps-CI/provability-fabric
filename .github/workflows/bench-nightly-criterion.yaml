@@ -30,7 +30,7 @@ jobs:
   smoke-bench:
     name: Smoke (compile + run benches)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust
@@ -41,10 +41,8 @@ jobs:
         uses: ./.github/actions/cache-cargo
         with:
           key-suffix: "-criterion-deps"
-      - name: Install cargo-criterion
-        run: cargo install cargo-criterion
       - name: Run benches (small sample, no regression gate)
-        run: cargo criterion -p provability-fabric-bench -- --sample-size 5 --noplot
+        run: cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot --test
 
   save-baseline:
     name: Save baseline (main)

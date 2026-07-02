@@ -66,14 +66,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Lean toolchain and mathlib artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cache/lake
+            vendor/mathlib/.lake
+            vendor/mathlib/.git
+          key: lean-morph-${{ hashFiles('lean-toolchain', 'scripts/vendor-mathlib.sh') }}
+          restore-keys: |
+            lean-morph-
+
       - name: Set up Lean (elan)
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
-          elan toolchain install "$TOOLCHAIN"
+          if ! elan toolchain list | grep -Fq "$TOOLCHAIN"; then
+            elan toolchain install "$TOOLCHAIN" || true
+          fi
           elan override set "$TOOLCHAIN"
           lean --version
+
+      - name: Vendor mathlib
+        timeout-minutes: 20
+        run: |
+          chmod +x scripts/vendor-mathlib.sh
+          bash scripts/vendor-mathlib.sh
 
       - name: Prewarm caches (core libs & templates)
         run: |

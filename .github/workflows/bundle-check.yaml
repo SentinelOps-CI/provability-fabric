@@ -39,7 +39,11 @@ jobs:
 
       - name: Run trace checking
         run: |
-          go run core/cli/pf check-trace
+          cd core/cli/pf
+          go run . check-trace
+
+      - name: Install PyYAML for bundle spec parsing
+        run: pip install pyyaml
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -47,6 +51,7 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const { execSync } = require('child_process');
             
             let missingLinks = [];
             
@@ -58,7 +63,11 @@ jobs:
             for (const specDir of specFiles) {
               const specPath = path.join('bundles', specDir, 'spec.yaml');
               if (fs.existsSync(specPath)) {
-                const spec = require('js-yaml').load(fs.readFileSync(specPath, 'utf8'));
+                const specJson = execSync(
+                  `python3 -c "import yaml, json, sys; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))" "${specPath}"`,
+                  { encoding: 'utf8' }
+                );
+                const spec = JSON.parse(specJson);
                 
                 // Check REQ to AC mappings
                 if (spec.trace) {
@@ -81,6 +90,19 @@ jobs:
               }
             }
             
+            const postComment = async (body) => {
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body
+                });
+              } catch (error) {
+                core.warning(`Could not post PR comment: ${error.message}`);
+              }
+            };
+
             if (missingLinks.length > 0) {
               const comment = `## Bundle Verification Failed
               
@@ -90,19 +112,8 @@ jobs:
               
               Please ensure all requirements map to acceptance criteria and all acceptance criteria have corresponding test vectors.`;
               
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-              
+              await postComment(comment);
               core.setFailed('Bundle verification failed');
             } else {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: '✅ Bundle verification passed - all traceability links are present.'
-              });
+              await postComment('✅ Bundle verification passed - all traceability links are present.');
             } 

@@ -193,7 +193,7 @@ echo "Build successful"
             else:
                 logger.info("Using Unix shell script execution...")
                 result = subprocess.run(
-                    [str(build_script)],
+                    ["bash", build_script.name],
                     cwd=self.evil_adapter_path,
                     capture_output=True,
                     text=True,

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ExternalLink, Shield, Clock, User, Hash } from 'lucide-react';
+import { ExternalLink, Shield, User, Hash } from 'lucide-react';
 
 interface Plan {
   plan_id: string;
@@ -56,15 +56,6 @@ interface EgressCert {
   signer: string;
 }
 
-interface CapabilityToken {
-  token_id: string;
-  tenant: string;
-  subject: string;
-  scopes: string[];
-  expires_at: string;
-  signed: boolean;
-}
-
 interface CallsProps {
   callId?: string;
 }
@@ -74,7 +65,6 @@ export const Calls: React.FC<CallsProps> = ({ callId }) => {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [certificates, setCertificates] = useState<EgressCert[]>([]);
-  const [capabilities, setCapabilities] = useState<CapabilityToken[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,16 +120,6 @@ export const Calls: React.FC<CallsProps> = ({ callId }) => {
         text_hash: 'text_hash_001',
         timestamp: new Date().toISOString(),
         signer: 'egress_firewall'
-      }
-    ]);
-    setCapabilities([
-      {
-        token_id: 'token_001',
-        tenant: 'tenant_001',
-        subject: 'user_123',
-        scopes: ['read_data', 'send_email'],
-        expires_at: new Date(Date.now() + 86400000).toISOString(),
-        signed: true
       }
     ]);
     setLoading(false);

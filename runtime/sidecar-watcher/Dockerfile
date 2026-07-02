@@ -2,12 +2,12 @@
 # Copyright 2025 SentinelOps
 
 # ---------- builder stage ----------
-FROM rust:1.82-bookworm AS builder
+FROM rust:1.88-bookworm AS builder
 
 WORKDIR /app
 
 # Cache deps: copy manifests first
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 # If you have a workspace, also copy Cargo.toml files of members:
 # COPY crates/*/Cargo.toml crates/*/
 
@@ -19,7 +19,7 @@ RUN rm -rf src
 # Now copy real sources and build
 COPY src ./src
 # If workspace: COPY crates ./crates
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # ---------- runtime stage ----------
 FROM debian:bookworm-slim

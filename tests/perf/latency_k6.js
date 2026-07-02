@@ -78,15 +78,25 @@ const testPlans = [
   }
 ];
 
-// Helper function to extract timing headers
+// Helper function to extract timing headers (k6 normalizes header names)
+function headerValue(headers, name) {
+  const target = name.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === target) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 function extractTimings(response) {
   const headers = response.headers;
   return {
-    plan: parseInt(headers['X-PF-Plan-ms']) || 0,
-    retrieval: parseInt(headers['X-PF-Retrieval-ms']) || 0,
-    kernel: parseInt(headers['X-PF-Kernel-ms']) || 0,
-    egress: parseInt(headers['X-PF-Egress-ms']) || 0,
-    total: parseInt(headers['X-PF-Total-ms']) || 0
+    plan: parseInt(headerValue(headers, 'X-PF-Plan-ms')) || 0,
+    retrieval: parseInt(headerValue(headers, 'X-PF-Retrieval-ms')) || 0,
+    kernel: parseInt(headerValue(headers, 'X-PF-Kernel-ms')) || 0,
+    egress: parseInt(headerValue(headers, 'X-PF-Egress-ms')) || 0,
+    total: parseInt(headerValue(headers, 'X-PF-Total-ms')) || 0
   };
 }
 
@@ -118,7 +128,7 @@ export default function() {
   const success = check(planResponse, {
     'status is 200': (r) => r.status === 200,
     'response time < 2s': (r) => r.timings.duration < 2000,
-    'has timing headers': (r) => r.headers['X-PF-Total-ms'] !== undefined,
+    'has timing headers': (r) => headerValue(r.headers, 'X-PF-Total-ms') !== undefined,
     'plan budget respected': () => planTimings.plan <= 150,
     'retrieval budget respected': () => planTimings.retrieval <= 600,
     'kernel budget respected': () => planTimings.kernel <= 120,
@@ -149,7 +159,7 @@ export default function() {
     check(executeResponse, {
       'execution status is 200': (r) => r.status === 200,
       'execution time < 2s': (r) => r.timings.duration < 2000,
-      'execution has timing headers': (r) => r.headers['X-PF-Total-ms'] !== undefined,
+      'execution has timing headers': (r) => headerValue(r.headers, 'X-PF-Total-ms') !== undefined,
     });
   }
   

@@ -33,6 +33,9 @@ export interface DecisionEvent {
     decision?: any;
     outputSize?: number;
     processingTimeMs?: number;
+    requestId?: string;
+    sessionId?: string;
+    violatedConstraints?: string[];
   };
   metadata: {
     requestId: string;

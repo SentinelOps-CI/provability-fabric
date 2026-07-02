@@ -8,7 +8,14 @@ package Fabric {
 @[default_target]
 lean_lib ActionDSL {
   roots := #[`ActionDSL, `ActionDSL.Safety]
-  -- add library configuration options here
+}
+
+lean_lib Budget {
+  roots := #[`Budget]
+}
+
+lean_lib Fabric {
+  roots := #[`Fabric]
 }
 
 lean_lib Capability {
@@ -34,7 +41,6 @@ lean_lib GenTrace {
 -- ExportDFA executable
 lean_exe ExportDFA {
   root := `ExportDFA
-  supportInterpreter := true
 }
 
 -- Use vendored mathlib instead of fetching from git

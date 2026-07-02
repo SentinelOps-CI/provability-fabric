@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Grype policy: gate Critical CVEs with documented exceptions for
+# transitive dependencies awaiting upstream releases on this branch.
+
+ignore:
+  - vulnerability: GHSA-v778-237x-gjrc
+    reason: "golang.org/x/crypto CVE; tracked via Go module bumps in core/cli and services"
+  - vulnerability: GHSA-869c-j7wc-8jqv
+    reason: "Transitive Go stdlib advisory; no patched release in pinned toolchain yet"
+  - vulnerability: GHSA-fjxv-7rqg-78g4
+    reason: "form-data npm advisory in dev/build tooling; not in runtime attack surface"
+  - vulnerability: GHSA-pppg-cpfq-h7wr
+    reason: "Transitive container/base image finding; runtime images rebuilt on release"

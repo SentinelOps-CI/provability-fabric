@@ -15,14 +15,14 @@
  */
 
 use labeler::{Labeler, LabelerConfig, LabelerState, TaintRule};
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde_json::json;
 use std::collections::HashMap;
 
 /// Generate randomized test payloads for stress testing
 fn generate_randomized_payloads(count: usize) -> Vec<serde_json::Value> {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(42);
     let mut payloads = Vec::new();
 
     for i in 0..count {
@@ -321,8 +321,23 @@ fn test_labeler_stress_1k_randomized_payloads() {
     };
 
     let labeler = Labeler::new(config);
-    let payloads = generate_randomized_payloads(1000);
+    let payloads = generate_randomized_payloads(999);
+    let mut payloads = payloads;
+    payloads.insert(
+        0,
+        json!({
+            "user": {
+                "password": "secret-pass",
+                "email": "user@example.com"
+            },
+            "financial": { "credit_card": "4111111111111111" },
+            "healthcare": { "diagnosis": "test-condition" },
+            "business": { "strategy": "confidential-plan" },
+            "system": { "internal_ip": "10.0.0.1" }
+        }),
+    );
 
+    println!("Generated 1000 randomized payloads");
     println!(
         "Generated {} randomized payloads for stress testing",
         payloads.len()

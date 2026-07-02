@@ -45,11 +45,15 @@ spec:
               path: /healthz
               port: https
               scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz
               port: https
               scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 5
       volumes:
         - name: certs
           secret:

@@ -1,0 +1,6 @@
+{
+  "acceptanceCriterion": "AC-0001",
+  "description": "Traceability test vector for AC-0001",
+  "inputs": [],
+  "expectedOutcome": "pass"
+}

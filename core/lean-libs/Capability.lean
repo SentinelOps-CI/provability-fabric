@@ -17,6 +17,7 @@ limitations under the License.
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Set.Basic
 import Mathlib.Logic.Basic
+import ActionDSL
 
 namespace Fabric
 
@@ -56,7 +57,8 @@ def allowed_trace : List Action → Prop
   | [] => True
   | (a :: rest) => ¬ forbidden_tool_action a ∧ allowed_trace rest
 
-/-- Theorem: allowed traces contain no forbidden tools -/
+/-- Theorem: allowed traces contain no forbidden tools.
+    Mem.tail case uses `rest` suffix to avoid Lean 4.7 binder tokenization. -/
 theorem thm_allowed_implies_no_forbidden :
   ∀ (tr : List Action), allowed_trace tr → (¬ ∃ (a : Action), a ∈ tr ∧ forbidden_tool_action a) := by
   intro tr h_allowed
@@ -68,26 +70,19 @@ theorem thm_allowed_implies_no_forbidden :
     | intro a h_and =>
       have ⟨h_mem, h_forbidden⟩ := h_and
       simp at h_mem  -- Empty list has no elements
-  | cons head tail ih =>
+  | cons head rest ih =>
     simp [allowed_trace] at h_allowed
-    have ⟨h_not_forbidden, h_tail_allowed⟩ := h_allowed
-    have ih_result := ih h_tail_allowed
+    have ⟨h_not_forbidden, h_rest_allowed⟩ := h_allowed
+    have ih_result := ih h_rest_allowed
     intro h_exists
     cases h_exists with
     | intro a h_and =>
       have ⟨h_mem, h_forbidden⟩ := h_and
       cases h_mem with
       | head =>
-        -- a = head, but we know ¬ forbidden_tool_action head
-        contradiction
-      | tail h_tail_mem =>
-        -- a ∈ tail, apply induction hypothesis
-        have h_exists_tail : ∃ (a : Action), a ∈ tail ∧ forbidden_tool_action a := by
-          exists a
-          constructor
-          · exact h_tail_mem
-          · exact h_forbidden
-        contradiction
+        exact absurd h_forbidden h_not_forbidden
+      | tail _ h_mem =>
+        exact ih_result ⟨a, ⟨h_mem, h_forbidden⟩⟩
 
 /-- Check if a specific tool is allowed for a specific agent -/
 def agent_can_use_tool (agent_id : String) (tool : Tool) : Prop :=
@@ -143,13 +138,8 @@ theorem thm_test_agent_2_allowed :
       cases head with
       | SendEmail score =>
         simp [action_tool, agent_can_use_tool]
-        left
-        rfl
       | LogSpend usd =>
         simp [action_tool, agent_can_use_tool]
-        right
-        left
-        rfl
     · -- Prove agent_allowed_trace "test-agent-2" tail
       exact ih
 

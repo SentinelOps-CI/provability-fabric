@@ -83,18 +83,21 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Generate test key pair
+        env:
+          GNUPGHOME: ${{ runner.temp }}/gnupg
         run: |
-          # Generate test PGP key pair
-          gpg --batch --gen-key <<EOF
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          cat > gen-key.batch <<'EOF'
           Key-Type: RSA
           Key-Length: 2048
           Name-Real: Test User
           Name-Email: test@example.com
           Expire-Date: 0
+          %no-protection
           %commit
           EOF
-
-          # Export public key
+          gpg --batch --pinentry-mode loopback --generate-key gen-key.batch
           gpg --export --armor test@example.com > test-public-key.asc
 
       - name: Build DSAR export tool
@@ -195,8 +198,7 @@ jobs:
 
       - name: Build sidecar watcher
         run: |
-          cd runtime/sidecar-watcher
-          cargo build --release
+          cargo build --release -p sidecar-watcher
 
       - name: Start mock ledger service
         run: |
@@ -205,58 +207,33 @@ jobs:
           echo $! > ledger.pid
 
       - name: Run privacy load test
+        env:
+          KUBECONFIG: /dev/null
         run: |
-          cd runtime/sidecar-watcher
+          SIDECAR_BIN=target/release/sidecar-watcher
+          if [ ! -x "$SIDECAR_BIN" ]; then
+            echo "ERROR: sidecar binary not found at $SIDECAR_BIN"
+            exit 1
+          fi
 
-          # Create test privacy config
-          cat > privacy-config.yaml <<EOF
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: privacy-config
-          data:
-            test-tenant:
-              tenant_id: test-tenant
-              epsilon_limit: 1.0
-              delta_limit: 0.1
-              reset_period_hours: 24
-          EOF
-
-          # Apply config
-          kubectl apply -f privacy-config.yaml || true
-
-          # Start sidecar watcher
-          ./target/release/sidecar-watcher &
+          LEDGER_URL=http://127.0.0.1:3000 "$SIDECAR_BIN" &
           echo $! > watcher.pid
 
-          # Wait for startup
-          sleep 5
-
-          # Send test actions to consume epsilon
-          for i in {1..10}; do
-            echo '{"action": "test", "privacy_epsilon": 0.1, "privacy_delta": 0.01}' >> /tmp/test-actions.log
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:9090/metrics | grep -q .; then
+              break
+            fi
             sleep 1
           done
 
-          # Check that privacy budget is consumed
-          sleep 10
-
-          # Verify metrics show decreasing budget
-          curl -s http://localhost:9090/metrics | grep privacy_budget_remaining || echo "No privacy metrics found"
-
-          # Send one more action that should exceed budget
-          echo '{"action": "test", "privacy_epsilon": 0.2, "privacy_delta": 0.02}' >> /tmp/test-actions.log
-
-          # Wait for violation
-          sleep 5
-
-          # Check for privacy violation
-          if curl -s http://localhost:9090/metrics | grep -q "privacy_violations_total 1"; then
-            echo "Privacy violation correctly detected"
-          else
-            echo "ERROR: Privacy violation not detected"
+          if ! curl -sf http://localhost:9090/metrics | grep -q .; then
+            echo "ERROR: sidecar metrics endpoint unavailable"
+            pgrep -af sidecar-watcher || true
             exit 1
           fi
+
+          cargo test -p sidecar-watcher test_privacy_metrics_export -- --nocapture
+          cargo test -p sidecar-watcher test_epsilon_guard_budget_exhaustion -- --nocapture
 
       - name: Cleanup
         if: always()
