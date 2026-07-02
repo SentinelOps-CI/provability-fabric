@@ -36,6 +36,7 @@ jobs:
         run: python scripts/count_ledger_any.py --max 20
 
       - name: Build and test Rust workspace
+        timeout-minutes: 75
         run: |
           # sidecar-watcher and retrieval-gateway: curated targets only (env/RUSTFLAGS).
           # Do not include in workspace test — workspace would re-run them and pick up

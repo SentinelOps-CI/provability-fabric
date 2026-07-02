@@ -554,7 +554,8 @@ mod tests {
 
     #[test]
     fn test_performance_benchmark() {
-        let buffer = Arc::new(LockFreeRingBuffer::new(10000));
+        // Capacity must exceed push count: single-threaded push cannot drain while filling.
+        let buffer = Arc::new(LockFreeRingBuffer::new(100_000));
 
         // Benchmark push operations
         let start = Instant::now();
