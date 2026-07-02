@@ -4,8 +4,12 @@
 
 FROM rust:1.88-bookworm AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
 COPY runtime/wasm-sandbox ./runtime/wasm-sandbox
+RUN cat > Cargo.toml <<'EOF'
+[workspace]
+members = ["runtime/wasm-sandbox"]
+resolver = "2"
+EOF
 RUN cargo build --release -p wasm-sandbox
 
 FROM debian:bookworm-slim

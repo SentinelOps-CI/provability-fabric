@@ -4,9 +4,17 @@
 
 FROM rust:1.88-bookworm AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
 COPY core/crypto/dsse-rs ./core/crypto/dsse-rs
 COPY runtime/tool-broker ./runtime/tool-broker
+# Minimal workspace: root Cargo.toml lists members not copied into this context.
+RUN cat > Cargo.toml <<'EOF'
+[workspace]
+members = [
+    "core/crypto/dsse-rs",
+    "runtime/tool-broker",
+]
+resolver = "2"
+EOF
 RUN cargo build --release -p tool-broker
 
 FROM debian:bookworm-slim
