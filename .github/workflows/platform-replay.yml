@@ -41,6 +41,11 @@ jobs:
           STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
         run: make submodules
 
+      - name: Run replay docker contract test (F10)
+        run: |
+          chmod +x tests/replay/test_docker_invocation.sh
+          bash tests/replay/test_docker_invocation.sh
+
       - name: Run replay suites
         run: |
           chmod +x tests/replay/run_replays.sh

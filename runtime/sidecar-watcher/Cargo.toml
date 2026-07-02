@@ -7,6 +7,7 @@ description = "SentinelOps Platform Runtime Sidecar"
 autotests = false
 
 [dependencies]
+pf-dsse = { path = "../../core/crypto/dsse-rs" }
 anyhow = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1.0", features = ["full", "rt-multi-thread", "macros"] }
@@ -20,7 +21,6 @@ reqwest = { version = "0.11", features = ["json"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
 sha2 = "0.10"
-md5 = "0.7"
 axum = "0.7"
 jsonschema = "0.17"
 once_cell = "1.19"
@@ -61,5 +61,22 @@ path = "tests/dfa_equiv.rs"
 name = "emit_evidence_tests"
 path = "tests/emit_evidence_tests.rs"
 
-# ni_monitor_egress, safety_case_bundle, events_plan_dsl, and hardened_adapters
-# remain quarantined until updated for the current public API. CI gates use --lib tests.
+[[test]]
+name = "ni_monitor_egress"
+path = "tests/ni_monitor_egress.rs"
+
+[[test]]
+name = "safety_case_bundle"
+path = "tests/safety_case_bundle.rs"
+
+[[test]]
+name = "events_plan_dsl"
+path = "tests/events_plan_dsl.rs"
+
+[[test]]
+name = "hardened_adapters"
+path = "tests/hardened_adapters.rs"
+
+[[test]]
+name = "egress_evidence_enforcement"
+path = "tests/egress_evidence_enforcement.rs"

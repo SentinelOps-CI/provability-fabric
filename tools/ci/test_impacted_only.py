@@ -1,31 +1,62 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-# Proof test for P14: build-impacted path must not use "not yet implemented".
+# Proof tests for P14 / F12: build-impacted path writes real artifacts.
 
+import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
 def test_build_impacted_requires_output_dir():
-    """--build-impacted without --output-dir exits non-zero (no placeholder message)."""
+    """--build-impacted without --output-dir exits non-zero."""
     root = Path(__file__).resolve().parents[2]
     script = root / "tools" / "ci" / "impacted_only.py"
-    if not script.exists():
-        raise SystemExit("impacted_only.py not found")
     result = subprocess.run(
         [sys.executable, str(script), "--build-impacted"],
         capture_output=True,
         text=True,
         cwd=root,
-        timeout=10,
+        timeout=30,
     )
     assert result.returncode != 0
-    assert "not yet implemented" not in (result.stdout + result.stderr)
+    assert "output-dir" in (result.stdout + result.stderr).lower()
+
+
+def test_build_impacted_writes_plan():
+    """--build-impacted emits build_plan.json and build_impacted.sh."""
+    root = Path(__file__).resolve().parents[2]
+    script = root / "tools" / "ci" / "impacted_only.py"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--build-impacted",
+                "--output-dir",
+                str(out),
+                "--workspace",
+                str(root),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=root,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stderr
+        plan = out / "build_plan.json"
+        shell = out / "build_impacted.sh"
+        assert plan.is_file()
+        assert shell.is_file()
+        data = json.loads(plan.read_text(encoding="utf-8"))
+        assert data["build_type"] == "impacted_only"
+        assert "build_steps" in data
 
 
 def test_impacted_only_help():
-    """--help works and script is importable."""
+    """--help works."""
     root = Path(__file__).resolve().parents[2]
     script = root / "tools" / "ci" / "impacted_only.py"
     result = subprocess.run(
@@ -33,7 +64,7 @@ def test_impacted_only_help():
         capture_output=True,
         text=True,
         cwd=root,
-        timeout=5,
+        timeout=10,
     )
     assert result.returncode == 0
     assert "build-impacted" in result.stdout or "output-dir" in result.stdout

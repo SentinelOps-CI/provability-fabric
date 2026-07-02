@@ -38,6 +38,13 @@ jobs:
       - run: buf lint
         working-directory: api
 
+  ci-honesty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit workflow false-green patterns
+        run: python scripts/audit_ci_honesty.py
+
   prepare:
     needs: [changes]
     if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -75,6 +82,7 @@ jobs:
     needs:
       - changes
       - protobuf-lint
+      - ci-honesty
       - prepare
       - ci-lean
       - ci-rust
@@ -88,6 +96,10 @@ jobs:
           set -e
           if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
             echo "protobuf-lint did not succeed: ${{ needs.protobuf-lint.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.ci-honesty.result }}" != "success" ]; then
+            echo "ci-honesty did not succeed: ${{ needs.ci-honesty.result }}"
             exit 1
           fi
           if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.changes.outputs.code }}" != "true" ]; then

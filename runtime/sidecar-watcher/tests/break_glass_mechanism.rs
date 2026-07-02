@@ -209,7 +209,6 @@ fn test_break_glass_signature_validation() {
 }
 
 #[test]
-#[ignore = "requires generate_post_mortem_stub, export_post_mortem_stub, import_post_mortem_stub API"]
 fn test_break_glass_post_mortem_stub_emission() {
     let config = create_test_break_glass_config();
     let mut manager = BreakGlassManager::new(config);
@@ -242,7 +241,6 @@ fn test_break_glass_post_mortem_stub_emission() {
 }
 
 #[test]
-#[ignore = "requires get_request_info, get_required_signatures_for_urgency, max_urgency_level API"]
 fn test_break_glass_urgency_levels() {
     let config = create_test_break_glass_config();
     let mut manager = BreakGlassManager::new(config);
@@ -272,7 +270,6 @@ fn test_break_glass_urgency_levels() {
 }
 
 #[test]
-#[ignore = "requires handle_expired_requests, trigger_auto_paging, renew_expired_request API"]
 fn test_break_glass_expiry_and_auto_paging() {
     let config = create_test_break_glass_config();
     let mut manager = BreakGlassManager::new(config);
@@ -292,7 +289,6 @@ fn test_break_glass_expiry_and_auto_paging() {
 }
 
 #[test]
-#[ignore = "requires get_audit_log, export_audit_log, get_audit_log_filtered API"]
 fn test_break_glass_audit_logging() {
     let config = create_test_break_glass_config();
     let mut manager = BreakGlassManager::new(config);

@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+use crate::time_util;
 
 /// Input channel classification for injection hardening
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,10 +134,7 @@ impl PolicyKernel {
     /// Validate a plan against all policy rules
     pub async fn validate_plan(&self, plan: &Plan) -> KernelResult {
         // Check plan expiration
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
         
         if now > plan.expires_at {
             return KernelResult::Invalid {
@@ -405,28 +403,23 @@ impl PolicyKernel {
 
     /// Verify a signed access receipt
     fn verify_receipt(&self, receipt: &AccessReceipt) -> Result<(), String> {
-        // Basic validation
-        if receipt.receipt_id.is_empty() {
-            return Err("receipt ID is required".to_string());
-        }
-        if receipt.tenant.is_empty() {
-            return Err("receipt tenant is required".to_string());
-        }
-        if receipt.index_shard.is_empty() {
-            return Err("receipt index shard is required".to_string());
-        }
-        if receipt.sign_alg != "ed25519" {
-            return Err(format!("unsupported signature algorithm: {}", receipt.sign_alg));
-        }
-        if receipt.sig.is_empty() {
-            return Err("receipt signature is required".to_string());
-        }
-        
-        // Signature verification requires trust root; structural validation only until wired
-        // This would require access to the public keys for each shard
-        // For now, we'll do basic structural validation
-        
-        Ok(())
+        pf_dsse::verify_access_receipt(
+            &pf_dsse::AccessReceiptPayload {
+                receipt_id: receipt.receipt_id.clone(),
+                tenant: receipt.tenant.clone(),
+                subject_id: receipt.subject_id.clone(),
+                query_hash: receipt.query_hash.clone(),
+                index_shard: receipt.index_shard.clone(),
+                timestamp: receipt.timestamp,
+                result_hash: receipt.result_hash.clone(),
+                result_count: 0,
+                query_time_ms: 0,
+                signature: String::new(),
+            },
+            &receipt.sign_alg,
+            &receipt.sig,
+        )
+        .map_err(|e| e.to_string())
     }
 
     /// Cache a validated plan

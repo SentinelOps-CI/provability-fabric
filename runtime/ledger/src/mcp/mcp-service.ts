@@ -9,9 +9,13 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket, type RawData } from 'ws';
+import type { Server as HttpServer } from 'http';
+import type { IncomingMessage } from 'http';
 import ProvabilityFabricMcpServer from './mcp-server.js';
 import McpProxy from './mcp-proxy.js';
+import type { JsonRpcRequest, JsonRpcResponse, McpServiceMetrics, McpWebSocketMessage } from './types.js';
+import type { McpAuthenticatedRequest } from '../types/express-mcp.js';
 
 interface McpServiceConfig {
   name: string;
@@ -20,6 +24,16 @@ interface McpServiceConfig {
   enableWebSocket: boolean;
   sidecarUrl: string;
   enableMultiTenant: boolean;
+}
+
+/** Canonical tenant claim: `tid` preferred; legacy `tenantId` / `tenant_id` accepted. */
+function resolveTenantId(user: {
+  tid?: string;
+  tenantId?: string;
+  tenant_id?: string;
+} | undefined): string | undefined {
+  if (!user) return undefined;
+  return user.tid ?? user.tenantId ?? user.tenant_id;
 }
 
 export class McpService {
@@ -71,7 +85,8 @@ export class McpService {
     // MCP JSON-RPC endpoint
     this.router.post('/mcp/jsonrpc', async (req, res) => {
       try {
-        const mcpContext = (req as any).mcpContext;
+        const mcpReq = req as McpAuthenticatedRequest;
+        const mcpContext = mcpReq.mcpContext;
         const tenantId = mcpContext?.tenantId;
 
         // Get or create tenant-specific MCP server
@@ -103,8 +118,8 @@ export class McpService {
     // MCP server discovery endpoint
     this.router.get('/mcp/servers', async (req, res) => {
       try {
-        const tenantId = (req as any).user?.tenant_id;
-        
+        const tenantId = resolveTenantId((req as McpAuthenticatedRequest).user);
+
         const servers = Array.from(this.mcpServers.entries()).map(([id, server]) => ({
           id,
           name: this.config.name,
@@ -127,7 +142,7 @@ export class McpService {
     // MCP proxy statistics endpoint
     this.router.get('/mcp/stats', async (req, res) => {
       try {
-        const tenantId = (req as any).user?.tenant_id;
+        const tenantId = resolveTenantId((req as McpAuthenticatedRequest).user);
         const stats = await this.mcpProxy.getStats(tenantId);
         res.json(stats);
       } catch (error) {
@@ -233,41 +248,48 @@ export class McpService {
    */
   private async forwardToMcpServer(
     mcpServer: ProvabilityFabricMcpServer,
-    request: any
-  ): Promise<any> {
-    // This is a simplified implementation
-    // In production, you'd need proper JSON-RPC handling
-    
-    try {
-      // Mock response for demonstration
-      const response = {
-        jsonrpc: '2.0',
-        result: {
-          message: 'MCP request processed successfully',
-          method: request.method,
-          params: request.params,
-          timestamp: new Date().toISOString()
-        },
-        id: request.id
-      };
-
-      return response;
-    } catch (error) {
+    request: JsonRpcRequest
+  ): Promise<JsonRpcResponse> {
+    if (!request?.method) {
       return {
         jsonrpc: '2.0',
-        error: {
-          code: -32603,
-          message: error instanceof Error ? error.message : 'Unknown error'
-        },
-        id: request.id
+        error: { code: -32600, message: 'Invalid request: missing method' },
+        id: request?.id,
       };
     }
+
+    const handler = (mcpServer as ProvabilityFabricMcpServer & {
+      handleRequest?: (req: JsonRpcRequest) => Promise<JsonRpcResponse>;
+    }).handleRequest;
+    if (typeof handler === 'function') {
+      try {
+        return await handler.call(mcpServer, request);
+      } catch (error) {
+        return {
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: error instanceof Error ? error.message : 'Unknown error',
+          },
+          id: request.id,
+        };
+      }
+    }
+
+    return {
+      jsonrpc: '2.0',
+      error: {
+        code: 501,
+        message: 'MCP backend not configured for this method',
+      },
+      id: request.id,
+    };
   }
 
   /**
    * Setup WebSocket support for real-time MCP events
    */
-  setupWebSocket(server: any): void {
+  setupWebSocket(server: HttpServer): void {
     if (!this.config.enableWebSocket) {
       return;
     }
@@ -277,12 +299,12 @@ export class McpService {
       path: '/mcp/ws'
     });
 
-    this.wsServer.on('connection', (ws: any, req: any) => {
-      this.logger.info('MCP: WebSocket connection established');
+    this.wsServer.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      this.logger.info('MCP: WebSocket connection established', { path: req.url });
       
-      ws.on('message', async (data: any) => {
+      ws.on('message', async (data: RawData) => {
         try {
-          const message = JSON.parse(data.toString());
+          const message = JSON.parse(data.toString()) as McpWebSocketMessage;
           
           // Handle real-time MCP events
           switch (message.type) {
@@ -323,7 +345,7 @@ export class McpService {
   /**
    * Handle WebSocket subscription requests
    */
-  private async handleSubscription(ws: any, message: any): Promise<void> {
+  private async handleSubscription(ws: WebSocket, message: McpWebSocketMessage): Promise<void> {
     const { tenantId, eventTypes } = message;
     
     // Store subscription info (implement proper subscription management)
@@ -340,10 +362,13 @@ export class McpService {
   /**
    * Handle real-time MCP requests via WebSocket
    */
-  private async handleRealTimeMcpRequest(ws: any, message: any): Promise<void> {
+  private async handleRealTimeMcpRequest(ws: WebSocket, message: McpWebSocketMessage): Promise<void> {
     const { mcpRequest, tenantId } = message;
     
     try {
+      if (!mcpRequest) {
+        throw new Error('Missing mcpRequest in WebSocket message');
+      }
       const mcpServer = await this.getMcpServer(tenantId);
       const response = await this.forwardToMcpServer(mcpServer, mcpRequest);
       
@@ -368,7 +393,7 @@ export class McpService {
   broadcastEvent(event: {
     type: string;
     tenantId?: string;
-    data: any;
+    data: unknown;
   }): void {
     if (!this.wsServer) {
       return;
@@ -380,9 +405,10 @@ export class McpService {
       timestamp: new Date().toISOString()
     });
 
-    this.wsServer.clients.forEach((client: any) => {
-      if (client.readyState === client.OPEN) {
-        client.send(message);
+    this.wsServer.clients.forEach((client) => {
+      const wsClient = client as WebSocket;
+      if (wsClient.readyState === WebSocket.OPEN) {
+        wsClient.send(message);
       }
     });
   }
@@ -426,7 +452,7 @@ export class McpService {
   /**
    * Get service metrics for monitoring
    */
-  getMetrics(): any {
+  getMetrics(): McpServiceMetrics {
     return {
       servers: this.mcpServers.size,
       connections: this.wsServer?.clients?.size || 0,

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 SentinelOps Platform Contributors
-#![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

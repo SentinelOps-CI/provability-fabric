@@ -14,29 +14,18 @@ import { ToolSignatureManager } from './tool-signature-manager';
 import { CertificateManager } from './certificate-manager';
 import { EgressProfileManager } from './egress-profile-manager';
 import { JCSValidator } from './jcs-validator';
+import type {
+  JsonRpcRequest,
+  PolicyEnforcementResult,
+  McpProxyStats,
+} from './types.js';
+import type { McpAuthenticatedRequest } from '../types/express-mcp.js';
 
 interface McpRequest {
   method: string;
-  params: any;
+  params: Record<string, unknown>;
   id?: string | number;
   jsonrpc?: string;
-}
-
-interface McpResponse {
-  result?: any;
-  error?: {
-    code: number;
-    message: string;
-    data?: any;
-  };
-  id?: string | number;
-  jsonrpc?: string;
-}
-
-interface PolicyEnforcementResult {
-  allowed: boolean;
-  reason?: string;
-  violatedConstraints?: string[];
 }
 
 export class McpProxy {
@@ -68,10 +57,12 @@ export class McpProxy {
   middleware() {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
-        // Parse tenant from JWT (set by auth middleware)
-        const tenantId = (req as any).user?.tenant_id;
-        const userId = (req as any).user?.sub;
-        const rlsTokenHash = (req as any).user?.rls_token_hash;
+        const mcpReq = req as McpAuthenticatedRequest;
+        // Parse tenant from JWT (set by auth middleware) — canonical field is tid
+        const user = mcpReq.user;
+        const tenantId = user?.tid ?? user?.tenantId ?? user?.tenant_id;
+        const userId = user?.sub;
+        const rlsTokenHash = user?.rls_token_hash;
 
         // Validate MCP request format
         const mcpRequest = this.validateMcpRequest(req.body);
@@ -140,8 +131,8 @@ export class McpProxy {
         // Start timeline tracking for tool calls
         let decisionId: string | null = null;
         if (mcpRequest.method === 'tools/call') {
-          const sessionId = (req as any).sessionId || `session_${Date.now()}`;
-          const toolName = mcpRequest.params?.name || 'unknown';
+          const sessionId = mcpReq.sessionId || `session_${Date.now()}`;
+          const toolName = (mcpRequest.params?.name as string | undefined) || 'unknown';
           decisionId = this.egressProfileManager.startDecisionTimeline(
             mcpRequest.id?.toString() || 'unknown',
             sessionId,
@@ -160,7 +151,7 @@ export class McpProxy {
               policyResult: policyResult.reason,
               violatedConstraints: policyResult.violatedConstraints,
               requestId: mcpRequest.id?.toString(),
-              sessionId: (req as any).sessionId
+              sessionId: mcpReq.sessionId
             });
           }
 
@@ -201,12 +192,12 @@ export class McpProxy {
           this.egressProfileManager.addTimelineEvent(decisionId, 'validation_completed', {
             policyResult: 'passed',
             requestId: mcpRequest.id?.toString(),
-            sessionId: (req as any).sessionId
+            sessionId: mcpReq.sessionId
           });
         }
 
         // Attach validated context to request
-        (req as any).mcpContext = {
+        mcpReq.mcpContext = {
           tenantId,
           userId,
           validated: true,
@@ -238,24 +229,25 @@ export class McpProxy {
   /**
    * Validate MCP request format according to JSON-RPC 2.0 spec
    */
-  private validateMcpRequest(body: any): McpRequest {
+  private validateMcpRequest(body: unknown): McpRequest {
     if (!body || typeof body !== 'object') {
       throw new Error('Invalid MCP request: missing body');
     }
 
-    if (body.jsonrpc !== '2.0') {
+    const rpc = body as JsonRpcRequest;
+    if (rpc.jsonrpc !== '2.0') {
       throw new Error('Invalid MCP request: missing or invalid jsonrpc version');
     }
 
-    if (!body.method || typeof body.method !== 'string') {
+    if (!rpc.method || typeof rpc.method !== 'string') {
       throw new Error('Invalid MCP request: missing or invalid method');
     }
 
     return {
-      method: body.method,
-      params: body.params || {},
-      id: body.id,
-      jsonrpc: body.jsonrpc
+      method: rpc.method,
+      params: (rpc.params as Record<string, unknown>) || {},
+      id: rpc.id,
+      jsonrpc: rpc.jsonrpc
     };
   }
 
@@ -274,8 +266,10 @@ export class McpProxy {
           schemaName = 'tenant_context';
           break;
         default:
-          // For unknown methods, use basic validation
-          return { reject: false };
+          return {
+            reject: true,
+            reason: `Unknown MCP method: ${request.method}`,
+          };
       }
 
       const schema = this.jcsValidator.getSchema(schemaName);
@@ -465,16 +459,34 @@ export class McpProxy {
         return { allowed: true };
       
       default:
-        this.logger.warn('MCP: Unknown method, applying default policy', { method });
-        return { allowed: true };
+        // Deny unknown MCP methods by default
+        this.logger.warn('MCP: Unknown method denied', { method });
+        return {
+          allowed: false,
+          reason: `Unknown MCP method: ${method}`,
+          violatedConstraints: ['unknown_method'],
+        };
     }
   }
 
   /**
    * Enforce policies for tool calls with tool signature validation
    */
-  private async enforceToolCallPolicy(params: any, tenantId?: string): Promise<PolicyEnforcementResult> {
-    const { name: toolName, arguments: toolArgs } = params;
+  private async enforceToolCallPolicy(params: Record<string, unknown>, tenantId?: string): Promise<PolicyEnforcementResult> {
+    const toolName = params.name;
+    const toolArgs = params.arguments;
+    if (typeof toolName !== 'string') {
+      return {
+        allowed: false,
+        reason: 'Tool call missing name',
+        violatedConstraints: ['tool_name_required'],
+      };
+    }
+
+    const argsRecord =
+      toolArgs && typeof toolArgs === 'object' && !Array.isArray(toolArgs)
+        ? (toolArgs as Record<string, unknown>)
+        : {};
 
     // Get current epoch (simplified - in production, this would come from a time service)
     const epoch = Math.floor(Date.now() / (60 * 1000)); // 1-minute epochs
@@ -482,7 +494,7 @@ export class McpProxy {
     // Validate tool call using tool signature manager
     const validationResult = this.toolSignatureManager.validateToolCall(
       toolName,
-      toolArgs,
+      argsRecord,
       tenantId || 'anonymous',
       epoch
     );
@@ -525,8 +537,15 @@ export class McpProxy {
   /**
    * Enforce policies for resource reads
    */
-  private async enforceResourceReadPolicy(params: any): Promise<PolicyEnforcementResult> {
-    const { uri } = params;
+  private async enforceResourceReadPolicy(params: Record<string, unknown>): Promise<PolicyEnforcementResult> {
+    const uri = params.uri;
+    if (typeof uri !== 'string') {
+      return {
+        allowed: false,
+        reason: 'Resource read missing uri',
+        violatedConstraints: ['uri_required'],
+      };
+    }
 
     // Validate URI patterns
     const allowedUriPatterns = [
@@ -600,7 +619,7 @@ export class McpProxy {
     method: string;
     tenantId?: string;
     userId?: string;
-    params: any;
+    params: Record<string, unknown>;
     timestamp: Date;
     requestId?: string | number;
   }): Promise<void> {
@@ -625,7 +644,7 @@ export class McpProxy {
   /**
    * Get proxy statistics for monitoring
    */
-  async getStats(tenantId?: string): Promise<any> {
+  async getStats(tenantId?: string): Promise<McpProxyStats> {
     // Clean up expired entries
     this.toolSignatureManager.cleanupExpiredEntries();
     this.certificateManager.cleanupExpiredEntries();

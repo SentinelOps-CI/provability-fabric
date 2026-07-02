@@ -28,9 +28,9 @@ export interface DecisionEvent {
     tenantId?: string;
     userId?: string;
     toolSignature?: string;
-    validationResult?: any;
-    policyResult?: any;
-    decision?: any;
+    validationResult?: unknown;
+    policyResult?: unknown;
+    decision?: unknown;
     outputSize?: number;
     processingTimeMs?: number;
     requestId?: string;
@@ -295,8 +295,8 @@ export class EgressProfileManager {
       bottlenecks: string[];
     };
     visualization: {
-      chart: any; // Chart.js compatible data
-      timeline: any; // Timeline.js compatible data
+      chart: Record<string, unknown>;
+      timeline: Record<string, unknown>[];
     };
   } {
     const explanation = this.explanations.get(decisionId);

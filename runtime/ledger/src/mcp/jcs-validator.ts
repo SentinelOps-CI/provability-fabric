@@ -19,7 +19,7 @@ export interface ValidationResult {
 
 export interface SchemaDefinition {
   type: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, SchemaDefinition>;
   required?: string[];
   additionalProperties?: boolean;
   pattern?: string;
@@ -27,12 +27,18 @@ export interface SchemaDefinition {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  enum?: any[];
-  items?: any;
-  oneOf?: any[];
-  anyOf?: any[];
-  allOf?: any[];
-  not?: any;
+  enum?: unknown[];
+  items?: SchemaDefinition;
+  oneOf?: SchemaDefinition[];
+  anyOf?: SchemaDefinition[];
+  allOf?: SchemaDefinition[];
+  not?: SchemaDefinition;
+}
+
+export interface ValidationOptions {
+  strictMode?: boolean;
+  allowAdditionalProperties?: boolean;
+  customRules?: ValidationRule[];
 }
 
 export interface ValidationRule {
@@ -44,8 +50,8 @@ export interface ValidationRule {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  enum?: any[];
-  customValidator?: (value: any) => { valid: boolean; error?: string };
+  enum?: unknown[];
+  customValidator?: (value: unknown) => { valid: boolean; error?: string };
 }
 
 export class JCSValidator {
@@ -62,13 +68,9 @@ export class JCSValidator {
    * Validate input using JCS canonicalization and schema validation
    */
   public validateInput(
-    input: any,
+    input: unknown,
     schema: SchemaDefinition,
-    options: {
-      strictMode?: boolean;
-      allowAdditionalProperties?: boolean;
-      customRules?: ValidationRule[];
-    } = {}
+    options: ValidationOptions = {}
   ): ValidationResult {
     try {
       const errors: string[] = [];
@@ -79,7 +81,7 @@ export class JCSValidator {
       const schemaDigest = this.computeSchemaDigest(schema);
 
       // Step 2: Parse canonicalized input
-      let parsedInput: any;
+      let parsedInput: unknown;
       try {
         parsedInput = JSON.parse(canonicalized);
       } catch (error) {
@@ -98,8 +100,8 @@ export class JCSValidator {
       }
 
       // Step 4: Object property validation
-      if (schema.type === 'object' && typeof parsedInput === 'object' && !Array.isArray(parsedInput)) {
-        this.validateObjectProperties(parsedInput, schema, errors, warnings, options);
+      if (schema.type === 'object' && typeof parsedInput === 'object' && parsedInput !== null && !Array.isArray(parsedInput)) {
+        this.validateObjectProperties(parsedInput as Record<string, unknown>, schema, errors, warnings, options);
       }
 
       // Step 5: Array validation
@@ -118,8 +120,8 @@ export class JCSValidator {
       }
 
       // Step 8: Custom validation rules
-      if (options.customRules) {
-        this.applyCustomRules(parsedInput, options.customRules, errors, warnings);
+      if (options.customRules && typeof parsedInput === 'object' && parsedInput !== null && !Array.isArray(parsedInput)) {
+        this.applyCustomRules(parsedInput as Record<string, unknown>, options.customRules, errors, warnings);
       }
 
       // Step 9: Pattern validation
@@ -176,7 +178,7 @@ export class JCSValidator {
   /**
    * Early rejection for malformed inputs before expensive operations
    */
-  public earlyReject(input: any, schema: SchemaDefinition): { reject: boolean; reason?: string } {
+  public earlyReject(input: unknown, schema: SchemaDefinition): { reject: boolean; reason?: string } {
     try {
       // Quick type check
       if (schema.type && typeof input !== schema.type) {
@@ -187,7 +189,7 @@ export class JCSValidator {
       }
 
       // Quick required field check
-      if (schema.required && Array.isArray(schema.required)) {
+      if (schema.required && Array.isArray(schema.required) && typeof input === 'object' && input !== null) {
         for (const field of schema.required) {
           if (!(field in input)) {
             return {
@@ -242,8 +244,8 @@ export class JCSValidator {
   /**
    * JSON Canonicalization Scheme (JCS) implementation
    */
-  private canonicalizeJson(obj: any): string {
-    const canonicalize = (value: any): any => {
+  private canonicalizeJson(obj: unknown): string {
+    const canonicalize = (value: unknown): unknown => {
       if (value === null || typeof value !== 'object') {
         return value;
       }
@@ -253,10 +255,10 @@ export class JCSValidator {
       }
       
       // Sort object keys recursively
-      const sortedKeys = Object.keys(value).sort();
-      const result: any = {};
+      const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
+      const result: Record<string, unknown> = {};
       for (const key of sortedKeys) {
-        result[key] = canonicalize(value[key]);
+        result[key] = canonicalize((value as Record<string, unknown>)[key]);
       }
       return result;
     };
@@ -277,11 +279,11 @@ export class JCSValidator {
    * Validate object properties
    */
   private validateObjectProperties(
-    obj: any,
+    obj: Record<string, unknown>,
     schema: SchemaDefinition,
     errors: string[],
     warnings: string[],
-    options: any
+    options: ValidationOptions
   ): void {
     if (!schema.properties) return;
 
@@ -315,7 +317,7 @@ export class JCSValidator {
 
         // Recursive validation for nested objects
         if (propType === 'object' && typeof propValue === 'object' && !Array.isArray(propValue)) {
-          this.validateObjectProperties(propValue, propSchema, errors, warnings, options);
+          this.validateObjectProperties(propValue as Record<string, unknown>, propSchema, errors, warnings, options);
         }
       }
     }
@@ -335,11 +337,11 @@ export class JCSValidator {
    * Validate array items
    */
   private validateArrayItems(
-    arr: any[],
+    arr: unknown[],
     schema: SchemaDefinition,
     errors: string[],
     warnings: string[],
-    options: any
+    options: ValidationOptions
   ): void {
     if (schema.items) {
       for (let i = 0; i < arr.length; i++) {
@@ -395,7 +397,7 @@ export class JCSValidator {
    * Apply custom validation rules
    */
   private applyCustomRules(
-    input: any,
+    input: Record<string, unknown>,
     rules: ValidationRule[],
     errors: string[],
     warnings: string[]
@@ -427,7 +429,7 @@ export class JCSValidator {
    * Validate composition schemas (oneOf, anyOf, allOf)
    */
   private validateCompositionSchemas(
-    input: any,
+    input: unknown,
     schema: SchemaDefinition,
     errors: string[],
     warnings: string[]
@@ -470,7 +472,7 @@ export class JCSValidator {
   /**
    * Generate cache key for validation results
    */
-  private generateCacheKey(input: any, schema: SchemaDefinition): string {
+  private generateCacheKey(input: unknown, schema: SchemaDefinition): string {
     const inputHash = crypto.createHash('sha256').update(JSON.stringify(input)).digest('hex');
     const schemaHash = this.computeSchemaDigest(schema);
     return `${inputHash}:${schemaHash}`;

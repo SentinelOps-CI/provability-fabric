@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
-// Many types are used by tests or reserved for future use.
-#![allow(dead_code, unused_variables)]
 
 pub mod assumption;
 pub mod break_glass;
@@ -17,6 +15,7 @@ pub mod declassify;
 pub mod dfa;
 pub mod effects;
 pub mod egress_cert;
+pub mod env_config;
 pub mod evidence_v01;
 pub mod events;
 pub mod ifc_labels;
@@ -31,6 +30,7 @@ pub mod revocation;
 pub mod safety_case;
 pub mod scheduler;
 pub mod snapshot_storage;
+pub mod time_util;
 pub mod witness;
 
 use anyhow::Result;

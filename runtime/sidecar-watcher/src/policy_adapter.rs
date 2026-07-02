@@ -369,7 +369,11 @@ impl PolicyAdapter {
                         principal.id, action
                     );
                 }
-                true // Always allow in shadow mode
+                if crate::env_config::shadow_mode_allowed() {
+                    true
+                } else {
+                    permit_allowed && path_witness_ok && label_derivation_ok
+                }
             }
             EnforcementMode::Monitor => {
                 if !permit_allowed || !path_witness_ok || !label_derivation_ok {

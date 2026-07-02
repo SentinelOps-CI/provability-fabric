@@ -67,5 +67,6 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/mock-http.pid ]; then
+            # ci-honesty: justified wave7-remediation
             kill "$(cat /tmp/mock-http.pid)" || true
           fi

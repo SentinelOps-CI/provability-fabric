@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
+import { verifyTracePayload, type TraceVerificationResult } from './verifyTrace.js';
+
+export type { TraceVerificationResult };
+
 export * from './client';
 export * from './middleware';
 export * from './types';
 export * from './utils';
 export * from './errors';
+export { SentinelOpsClient } from './platform-client';
 
 // Main SDK class
 export class ProvabilityFabricSDK {
@@ -25,10 +30,9 @@ export class ProvabilityFabricSDK {
   /**
    * Verify a trace with the Policy Kernel
    */
-  async verifyTrace(trace: any): Promise<any> {
+  async verifyTrace(trace: unknown): Promise<TraceVerificationResult> {
     try {
-      // TODO: Implement trace verification
-      return { valid: true, trace };
+      return verifyTracePayload(trace);
     } catch (error) {
       throw new Error(`Trace verification failed: ${error}`);
     }

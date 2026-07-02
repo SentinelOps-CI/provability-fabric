@@ -29,6 +29,7 @@ jobs:
       - name: cargo deny
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          command: check
+          command: check advisories bans licenses sources
+          arguments: --all-features
           # Match CI Rust (Embark default was historically old); empty = runner toolchain only.
           rust-version: stable

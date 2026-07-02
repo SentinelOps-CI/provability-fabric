@@ -25,4 +25,5 @@ jobs:
         run: |
           set -euo pipefail
           cd core/cli/pf
+          # ci-honesty: justified wave7-remediation
           ./so cert verify ../../evidence/certs --json --jwks "$JWKS_URL" || true

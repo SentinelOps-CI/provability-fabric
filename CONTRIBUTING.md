@@ -39,6 +39,17 @@ Optional: build the specdoc CLI if present:
 [ -f cmd/specdoc/main.go ] && cd cmd/specdoc && go build -o specdoc . && cd ../..
 ```
 
+#### Go workspace (local dev)
+
+The repo has many `go.mod` files. For local multi-module work, copy the workspace template:
+
+```bash
+cp go.work.example go.work   # go.work is gitignored for local overrides
+go work sync                 # optional: align sums after module changes
+```
+
+Primary CLI entrypoint remains `core/cli/pf`; `go.work` wires replace paths across modules without manual `replace` edits in each module.
+
 ### Standard (CLI + Rust workspace)
 
 Build the CLI as above, then build the Rust workspace (requires [Rust](https://rustup.rs/) and `rust-toolchain.toml`):
@@ -59,6 +70,36 @@ Run the installation script for your platform:
 See [Reuse and extend](docs/guides/reuse-and-extend.md) for install modes (minimal, standard, full) and tiered setup.
 
 ## Running tests
+
+### Windows development (WSL required)
+
+Native Windows (PowerShell/cmd) supports a **subset** of the dev workflow. Linux CI remains authoritative.
+
+| Task | Windows native | WSL / Linux |
+|------|----------------|-------------|
+| Go CLI (`core/cli/pf`) | Pass — `go test ./...` | Pass |
+| Rust workspace (non-excluded crates) | Pass | Pass |
+| Evidence validate/pack (`pf evidence`) | Pass (static paths) | Pass |
+| Evidence replay execute, bash testbeds | **Skip** — needs bash + submodules | Pass |
+| `make evidence-verify`, `make test` | **Use WSL or Git Bash** | Pass |
+| SWE-bench real engine | **Skip** | Pass with OpenHands |
+| Lean / Lake builds | **Use WSL** | Pass |
+| Full platform docker compose | Partial | Pass |
+
+**Recommendation:** Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu, clone the repo inside the Linux filesystem (`~/provability-fabric`), and run bash/Makefile targets from WSL. Git Bash works for light gates (`make evidence-verify` subset) but not for Lean/Lake or full integration tests.
+
+Quick Windows smoke (no WSL):
+
+```powershell
+cd core\cli\pf; go test ./...
+cargo test --workspace --exclude sidecar-watcher --exclude labeler --exclude tool-broker
+```
+
+Full parity subset via Makefile:
+
+```bash
+make test-windows   # CLI + Rust smoke; skips Linux-only paths
+```
 
 ### Minimal checks
 
@@ -130,7 +171,19 @@ Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-
 
 - **No admin merge on red:** merge only when all required status checks for the PR scope are green. Document any exception in the PR body and update the health matrix. Branch protection on `main` enforces **CI required checks**, **smoke**, **evidence-schema-only**, and **Documentation Build** (applied 2026-06-16).
 - **Local gates before CI PRs:** `make dev-standards`, `make evidence-verify` (evidence paths), `make docs-strict` (docs), `make proto-lint proto-validate` (protobuf).
-- **Inventory:** run `scripts/ci_workflow_inventory.sh` on `main` after large workflow changes; see [CI health matrix](docs/internal/ci-health-matrix.md).
+- **Inventory:** run `scripts/ci_workflow_inventory.sh` (Linux/macOS/WSL) or `scripts/ci_workflow_inventory.ps1` (Windows) on `main` after large workflow changes; see [CI health matrix](docs/internal/ci-health-matrix.md).
+
+### Local pre-commit gates (Wave 0 / F36)
+
+Install [pre-commit](https://pre-commit.com/) and enable hooks once per clone:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files   # optional full sweep
+```
+
+Hooks mirror critical CI checks: `actionlint` on workflow files, placeholder scan (`scripts/check_no_placeholder.py`), trailing-whitespace/YAML hygiene, `gofmt`, and `cargo fmt`. See [.pre-commit-config.yaml](.pre-commit-config.yaml). On Windows without bash, run `pwsh scripts/ci_workflow_inventory.ps1` and targeted pytest/jest commands before opening a PR.
 
 ## Reuse and forking
 

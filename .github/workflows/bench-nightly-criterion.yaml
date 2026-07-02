@@ -25,6 +25,12 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      refresh_baseline:
+        description: "Save a fresh Criterion baseline (main) and update bench/BASELINE.md"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   smoke-bench:
@@ -47,7 +53,9 @@ jobs:
   save-baseline:
     name: Save baseline (main)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: >
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+      || (github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true)
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -67,7 +75,7 @@ jobs:
         run: cargo install cargo-criterion
 
       - name: Save Criterion baseline
-        run: cargo bench -p provability-fabric-bench -- --save-baseline main
+        run: make bench-save-baseline
 
       - name: Cache Criterion baseline
         uses: actions/cache@v4
@@ -98,6 +106,7 @@ jobs:
 
       - name: Restore Criterion baseline (from last main)
         uses: actions/cache@v4
+        id: criterion-cache
         with:
           path: target/criterion
           key: criterion-main-${{ github.sha }}
@@ -107,8 +116,24 @@ jobs:
       - name: Install cargo-criterion
         run: cargo install cargo-criterion
 
+      - name: Detect baseline presence
+        id: baseline
+        run: |
+          if [ -d target/criterion ] && find target/criterion -type d -name main 2>/dev/null | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compare against baseline (fail on regression)
+        if: steps.baseline.outputs.present == 'true'
         run: |
           cargo bench -p provability-fabric-bench -- --baseline main || (echo "::error::Criterion regression detected (see bench/README.md thresholds)." && exit 1)
         env:
           CRITERION_NO_FAIL_FAST: "0"
+
+      - name: Seed baseline when cache miss (first nightly)
+        if: steps.baseline.outputs.present != 'true'
+        run: |
+          echo "::warning::No Criterion baseline in cache (restore key: ${{ steps.criterion-cache.outputs.cache-hit }}). Saving current run as baseline."
+          cargo bench -p provability-fabric-bench -- --save-baseline main

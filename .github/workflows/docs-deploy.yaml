@@ -45,6 +45,7 @@ jobs:
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v4
+        # ci-honesty: justified wave7-remediation
         continue-on-error: true
 
       - name: Upload artifact

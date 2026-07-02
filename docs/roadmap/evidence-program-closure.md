@@ -18,9 +18,30 @@ Every workflow under `.github/workflows/` that triggers on **`push` to `main`** 
 
 ```bash
 scripts/ci_workflow_inventory.sh
+scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-latest.md
+# Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-06-17):** The Evidence lane is **green** on `main` with documented smoke baselines (see inventory table below). The repository is **not** fully green repo-wide — latest inventory on `main` reports **12/67** gated workflows green (`scripts/ci_workflow_inventory.sh` exit **1**). Do not claim full CI green in release communications until inventory exits 0.
+**Current posture (2026-07-03, Wave 7):** Local audit remediation program complete for code gates (unwrap **0**, ledger `any` **0**, CI honesty **0** unjustified, Invariants.lean **0 sorry**). Evidence lane remains **green** on `main`. Repo-wide CI is **not** fully green — inventory reports **13/68** gated workflows green until Phase 0 merge + Linux validation; see [merge-readiness-checklist.md](../internal/merge-readiness-checklist.md) and [full-repo-audit-reassessment-2026-07-03.md](../internal/full-repo-audit-reassessment-2026-07-03.md).
+
+**Do not claim 67/67** until `scripts/ci_workflow_inventory.sh` exits 0 twice consecutively on `main`.
+
+### Path to 67/67 (Wave 7 — updated 2026-07-02)
+
+| Milestone | Target green | Clusters | Depends on |
+|-----------|-------------:|----------|------------|
+| M1 (post-Phase 0–1 merge) | ~20/67 | Replay + Security | Linux replay contract test on `main`; submodule bump |
+| M2 | ~25/68 | + Lean (paper-conformance) partial | F24 rate-limit + integration_tests in CI with `PF_SHADOW_MODE=1`; Invariants.lean sorry-free; lean-style mathlib cache; merge to main |
+| M3 | ~35/67 | + Platform | `integration.yaml` F06 smokes; operational-excellence real paths |
+| M4 | ~50/67 | + Bench + Docs | Criterion baseline on main; `docs-build.yaml` green |
+| M5 | 67/67 | Remaining ~30 | Weekly inventory diff; one workflow per PR |
+
+1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows after Linux validation.
+2. **Security cluster** — CodeQL artifact chain (F20 done locally); cargo-deny all-features; wasm-scan empty-registry skip.
+3. **Lean cluster** — vendor mathlib cache without stale `.git`; Invariants.lean **sorry-free** (2026-07-03); Policy tree sorry burn-down continues per [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md); paper-conformance rate-limits + `integration_tests` with `PF_SHADOW_MODE=1`.
+4. **Platform cluster** — SLO lockfiles (F19 done); `integration.yaml` F06 smoke scope; billing/operational-excellence.
+5. **Bench cluster** — Criterion baseline refresh (F23 workflow ready); performance-gate thresholds.
+6. **Remaining ~30** — triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
 Reusable-only workflows (`workflow_call`) are tracked but not gating until invoked.
 
@@ -72,6 +93,21 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 |------|------:|------:|----:|--------:|
 | Post-#132 (`0d802f6e`) | 67 | 12 | 52 | 21 |
 | Post-#134 (`f55a98bd`) | 67 | 12 | 52 | 21 |
+| Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
+| Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
+
+### Path to 67/67 (Wave 7)
+
+1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows.
+2. **Security cluster** — CodeQL artifact chain (F20); cargo-deny all-features; wasm-scan empty-registry skip.
+3. **Lean cluster** — vendor mathlib cache; scoped sorry aligned with [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md).
+4. **Platform cluster** — SLO lockfiles (F19 done); operational-excellence ghost tests (F06 done); billing/integration smoke.
+5. **Bench cluster** — Criterion baseline refresh (F23); performance-gate thresholds.
+6. **Remaining ~30** — triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-health-matrix.md](../internal/ci-health-matrix.md).
+
+_Superseded by milestone table above (2026-07-02 refresh)._
+
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off updates this page only when inventory exits **0**.
 
 Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 

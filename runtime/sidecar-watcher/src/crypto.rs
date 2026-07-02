@@ -95,9 +95,23 @@ impl AsyncSigningPipeline {
         let metrics = Arc::new(SigningMetrics::default());
         let running = Arc::new(RwLock::new(true));
 
-        // Spawn worker tasks (skipped: mpsc::Receiver cannot be cloned; handle differently in production)
-        for _ in 0..config.worker_count {
-            // no workers spawned yet
+        let metrics_for_worker = metrics.clone();
+        let running_for_worker = running.clone();
+        let config_for_worker = config.clone();
+        if let Ok(rt) = tokio::runtime::Runtime::new() {
+            std::thread::spawn(move || {
+                rt.block_on(async move {
+                    Self::worker_loop(
+                        0,
+                        request_rx,
+                        result_tx,
+                        metrics_for_worker,
+                        running_for_worker,
+                        config_for_worker,
+                    )
+                    .await;
+                });
+            });
         }
 
         Self {
@@ -415,6 +429,8 @@ impl BatchVerifier {
             public_key,
             request_id,
         };
+        let _ = self.batch_timeout;
+        let _ = self.batch_size;
 
         self.tx.send(request).await
     }

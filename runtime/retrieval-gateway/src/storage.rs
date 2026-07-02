@@ -1,8 +1,16 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
+
+fn content_hash_for(content: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    hex::encode(hasher.finalize())
+}
 
 /// Storage adapter trait for vector index backends
 #[async_trait]
@@ -103,7 +111,7 @@ impl VectorIndex {
     }
 
     /// Generate query embedding (simplified)
-    fn generate_query_embedding(&self, query: &str) -> Vec<f32> {
+    pub fn generate_query_embedding(query: &str) -> Vec<f32> {
         // Simplified embedding generation based on query hash
         let hash = {
             use sha2::{Digest, Sha256};
@@ -133,7 +141,7 @@ impl StorageAdapter for VectorIndex {
         let embeddings = self.embeddings.read().await;
 
         // Generate query embedding
-        let query_embedding = self.generate_query_embedding(query);
+        let query_embedding = Self::generate_query_embedding(query);
 
         // Filter documents by tenant and labels
         let mut candidates: Vec<_> = docs
@@ -189,7 +197,8 @@ impl StorageAdapter for VectorIndex {
                 crate::SearchResult {
                     document_id: doc.id.clone(),
                     content: doc.content.clone(),
-                    score,
+                    content_hash: content_hash_for(&doc.content),
+                    score: score as f64,
                     metadata: doc.metadata.clone(),
                     labels: doc.labels.clone(),
                 }
@@ -324,7 +333,7 @@ impl StorageAdapter for PostgresVectorAdapter {
             .context("Failed to set tenant context")?;
 
         // Generate query embedding (simplified)
-        let query_embedding = VectorIndex::new().await?.generate_query_embedding(query);
+        let query_embedding = VectorIndex::generate_query_embedding(query);
 
         // Build SQL query with label filtering
         let labels_condition = if labels_filter.is_empty() {
@@ -366,7 +375,8 @@ impl StorageAdapter for PostgresVectorAdapter {
                 crate::SearchResult {
                     document_id: row.get("id"),
                     content: row.get("content"),
-                    score,
+                    content_hash: content_hash_for(row.get::<String, _>("content").as_str()),
+                    score: score as f64,
                     metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
                     labels: row.get("labels"),
                 }
@@ -401,8 +411,8 @@ impl StorageAdapter for PostgresVectorAdapter {
                     labels: row.get("labels"),
                     metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
                     embedding: vec![], // Would decode from vector type
-                    created_at: row.get("created_at"),
-                    updated_at: row.get("updated_at"),
+                    created_at: row.get::<i64, _>("created_at") as u64,
+                    updated_at: row.get::<i64, _>("updated_at") as u64,
                 };
                 Ok(Some(doc))
             }
@@ -483,7 +493,7 @@ mod tests {
 
         // Search should only return documents for the specified tenant
         let results = index
-            .search_with_tenant_isolation("test query", "tenant1", &["public"], 10)
+            .search_with_tenant_isolation("test query", "tenant1", &["public".to_string()], 10)
             .await
             .unwrap();
 
@@ -522,7 +532,7 @@ mod tests {
 
         // Search with label filter should only return matching documents
         let results = index
-            .search_with_tenant_isolation("test query", "tenant1", &["public"], 10)
+            .search_with_tenant_isolation("test query", "tenant1", &["public".to_string()], 10)
             .await
             .unwrap();
 

@@ -16,8 +16,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::time_util;
 use super::cert_v1_core::CertV1Core;
 
 /// CERT-V1 Extended Certificate (Async)
@@ -277,10 +277,7 @@ pub struct ExtendedMetadata {
 impl CertV1Extended {
     /// Create a new extended certificate from a core certificate
     pub fn from_core(core: CertV1Core) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         Self {
             core,

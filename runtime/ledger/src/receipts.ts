@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
+import { verifyReceiptSignature as verifyReceiptDsse } from './crypto/dsse.js';
 
 const prisma = new PrismaClient();
 
@@ -118,7 +119,7 @@ export async function getReceiptsByTenant(tenant: string, limit: number = 100): 
       take: limit,
     });
 
-    return receipts.map(receipt => ({
+    return receipts.map((receipt: (typeof receipts)[number]) => ({
       receipt_id: receipt.receiptId,
       tenant: receipt.tenant,
       subject_id: receipt.subjectId,
@@ -154,7 +155,7 @@ export async function getReceiptsBySubject(subjectId: string, limit: number = 10
       take: limit,
     });
 
-    return receipts.map(receipt => ({
+    return receipts.map((receipt: (typeof receipts)[number]) => ({
       receipt_id: receipt.receiptId,
       tenant: receipt.tenant,
       subject_id: receipt.subjectId,
@@ -244,25 +245,21 @@ export async function getReceiptsBySubjectHandler(req: Request, res: Response): 
 // Verify receipt signature
 export function verifyReceiptSignature(receipt: AccessReceipt): boolean {
   try {
-    // Create receipt data for verification
-    const receiptData = {
-      receipt_id: receipt.receipt_id,
-      tenant: receipt.tenant,
-      subject_id: receipt.subject_id,
-      query_hash: receipt.query_hash,
-      index_shard: receipt.index_shard,
-      timestamp: receipt.timestamp,
-      result_hash: receipt.result_hash,
-    };
-
-    const receiptBytes = JSON.stringify(receiptData);
-    const receiptHash = crypto.createHash('sha256').update(receiptBytes).digest();
-    
-    // TODO: Implement actual Ed25519 signature verification
-    // This would require the public key for the specific shard
-    // For now, we'll do basic structural validation
-    
-    return receipt.sign_alg === 'ed25519' && receipt.sig.length > 0;
+    return verifyReceiptDsse(
+      {
+        receipt_id: receipt.receipt_id,
+        tenant: receipt.tenant,
+        subject_id: receipt.subject_id,
+        query_hash: receipt.query_hash,
+        index_shard: receipt.index_shard,
+        timestamp: receipt.timestamp,
+        result_hash: receipt.result_hash,
+        result_count: receipt.result_count,
+        query_time_ms: receipt.query_time_ms,
+      },
+      receipt.sign_alg,
+      receipt.sig,
+    );
   } catch (error) {
     console.error('Error verifying receipt signature:', error);
     return false;

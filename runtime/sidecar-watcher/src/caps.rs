@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+use crate::time_util;
 
 /// Capability token verification result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,10 +65,7 @@ impl CapabilityVerifier {
 
         // Check cache first
         if let Some(cached) = self.get_cached_token(&token.token_id).await {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = time_util::unix_secs();
 
             if now > cached.expires_at {
                 return TokenValidationResult::Expired {
@@ -90,10 +88,7 @@ impl CapabilityVerifier {
         }
 
         // Check expiration
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         if now > token.expires_at {
             return TokenValidationResult::Expired {
@@ -193,10 +188,7 @@ impl CapabilityVerifier {
 
     /// Clean expired tokens from cache
     pub async fn clean_expired_tokens(&self) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         let mut cache = self.cache.write().await;
         cache.retain(|_, entry| {
@@ -207,10 +199,7 @@ impl CapabilityVerifier {
     /// Get cache statistics
     pub async fn get_cache_stats(&self) -> CacheStats {
         let cache = self.cache.read().await;
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = time_util::unix_secs();
 
         let total_tokens = cache.len();
         let expired_tokens = cache

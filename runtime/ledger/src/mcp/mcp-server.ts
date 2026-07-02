@@ -19,6 +19,13 @@ import {
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
 
+interface CapsuleQueryFilter {
+  tenantId?: string;
+  id?: string;
+  status?: string;
+  behaviorHash?: string;
+}
+
 interface McpServerConfig {
   name: string;
   version: string;
@@ -123,13 +130,24 @@ export class ProvabilityFabricMcpServer {
       try {
         switch (name) {
           case 'query_capsules':
-            return await this.handleQueryCapsules(args);
+            return await this.handleQueryCapsules(
+              (args ?? {}) as { filter?: { status?: string; behaviorHash?: string }; limit?: number }
+            );
           
           case 'verify_behavior_guarantee':
-            return await this.handleVerifyBehaviorGuarantee(args);
+            return await this.handleVerifyBehaviorGuarantee(
+              (args ?? {}) as { capsuleId: string; behaviorSpec: string; proofType?: string }
+            );
             
           case 'log_audit_event':
-            return await this.handleLogAuditEvent(args);
+            return await this.handleLogAuditEvent(
+              (args ?? {}) as {
+                eventType: string;
+                agentId?: string;
+                details?: unknown;
+                severity?: string;
+              }
+            );
             
           default:
             throw new McpError(
@@ -229,11 +247,11 @@ export class ProvabilityFabricMcpServer {
     });
   }
 
-  private async handleQueryCapsules(args: any) {
+  private async handleQueryCapsules(args: { filter?: { status?: string; behaviorHash?: string }; limit?: number }) {
     const { filter = {}, limit = 10 } = args;
     
     // Apply tenant isolation if configured
-    const whereClause: any = {};
+    const whereClause: CapsuleQueryFilter = {};
     if (this.tenantId) {
       whereClause.tenantId = this.tenantId;
     }
@@ -266,7 +284,7 @@ export class ProvabilityFabricMcpServer {
         {
           type: 'text',
           text: JSON.stringify({
-            capsules: capsules.map(capsule => ({
+            capsules: capsules.map((capsule: (typeof capsules)[number]) => ({
               id: capsule.id,
               hash: capsule.hash,
               specSig: capsule.specSig,
@@ -283,11 +301,15 @@ export class ProvabilityFabricMcpServer {
     };
   }
 
-  private async handleVerifyBehaviorGuarantee(args: any) {
+  private async handleVerifyBehaviorGuarantee(args: {
+    capsuleId: string;
+    behaviorSpec: string;
+    proofType?: string;
+  }) {
     const { capsuleId, behaviorSpec, proofType = 'lean' } = args;
     
     // Verify capsule exists and tenant access
-    const whereClause: any = { id: capsuleId };
+    const whereClause: CapsuleQueryFilter = { id: capsuleId };
     if (this.tenantId) {
       whereClause.tenantId = this.tenantId;
     }
@@ -328,7 +350,12 @@ export class ProvabilityFabricMcpServer {
     };
   }
 
-  private async handleLogAuditEvent(args: any) {
+  private async handleLogAuditEvent(args: {
+    eventType: string;
+    agentId?: string;
+    details?: unknown;
+    severity?: string;
+  }) {
     const { eventType, agentId, details, severity = 'info' } = args;
     
     const auditEvent = {
@@ -359,7 +386,7 @@ export class ProvabilityFabricMcpServer {
   }
 
   private async readActiveCapsules() {
-    const whereClause: any = {};
+    const whereClause: CapsuleQueryFilter = {};
     if (this.tenantId) {
       whereClause.tenantId = this.tenantId;
     }

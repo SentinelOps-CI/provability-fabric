@@ -69,26 +69,29 @@ def get_impacted_targets(workspace_root: str, changed_files: List[str]) -> Set[s
 
 
 def get_impacted_tests(workspace_root: str, changed_files: List[str]) -> Set[str]:
-    """Get impacted tests from changed files."""
-    impacted_tests = set()
-
-    # Map file patterns to test types
-    test_patterns = {
-        r"tests/.*\.py$": "python_test",
-        r"tests/.*\.js$": "javascript_test",
-        r"tests/.*\.go$": "go_test",
-        r"tests/.*\.rs$": "rust_test",
-        r"bundles/.*/proofs/.*\.lean$": "lean_proof",
-        r"core/.*\.lean$": "lean_spec",
-    }
+    """Get impacted test file paths from changed files (pytest-compatible)."""
+    impacted_tests: Set[str] = set()
+    test_file_patterns = (
+        r"tests/.*\.py$",
+        r"tests/.*\.js$",
+        r"tests/perf/.*\.js$",
+        r"tests/.*\.go$",
+        r"tests/.*\.rs$",
+        r"bench/.*\.py$",
+    )
 
     for file_path in changed_files:
-        for pattern, test_type in test_patterns.items():
-            if re.match(pattern, file_path):
-                # Extract test name from path
-                test_name = Path(file_path).stem
-                impacted_tests.add(f"{test_type}:{test_name}")
-                break
+        if any(re.match(pattern, file_path) for pattern in test_file_patterns):
+            impacted_tests.add(file_path)
+            continue
+
+        # Lean proof changes map to nearest pytest gate when present
+        if re.match(r"bundles/.*/proofs/.*\.lean$", file_path) or re.match(
+            r"core/.*\.lean$", file_path
+        ):
+            lean_gate = Path(workspace_root) / "tools" / "ci" / "test_impacted_only.py"
+            if lean_gate.is_file():
+                impacted_tests.add(str(lean_gate.relative_to(workspace_root)).replace("\\", "/"))
 
     return impacted_tests
 

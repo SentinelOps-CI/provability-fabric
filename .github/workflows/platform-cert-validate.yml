@@ -50,6 +50,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install jsonschema pyyaml
 
+      - name: Run replay docker contract test (F10)
+        run: |
+          chmod +x tests/replay/test_docker_invocation.sh
+          bash tests/replay/test_docker_invocation.sh
+
       - name: Generate replay CERTs
         run: |
           chmod +x tests/replay/run_replays.sh

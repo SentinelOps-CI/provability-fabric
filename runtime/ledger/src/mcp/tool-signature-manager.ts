@@ -18,9 +18,18 @@ export interface ToolSignature {
   expiresAt?: Date;
 }
 
+export interface ToolSchemaProperty {
+  type: string;
+  properties?: Record<string, ToolSchemaProperty>;
+  items?: ToolSchemaProperty;
+  enum?: string[];
+  minimum?: number;
+  maximum?: number;
+}
+
 export interface ToolSchema {
   type: string;
-  properties: Record<string, any>;
+  properties: Record<string, ToolSchemaProperty>;
   required?: string[];
   additionalProperties?: boolean;
 }
@@ -46,7 +55,15 @@ export class ToolSignatureManager {
   }
 
   /**
-   * Pre-hash tool signatures (name + schema digest)
+   * Compute tool signature hash without mutating the allow-list (for validation).
+   */
+  private computeSignatureHash(name: string, schema: ToolSchema): string {
+    const schemaDigest = this.computeSchemaDigest(schema);
+    return this.computeToolSignature(name, schemaDigest);
+  }
+
+  /**
+   * Pre-hash tool signatures (name + schema digest) and register in allow-list.
    */
   public generateToolSignature(name: string, schema: ToolSchema): ToolSignature {
     const schemaDigest = this.computeSchemaDigest(schema);
@@ -94,9 +111,9 @@ export class ToolSignatureManager {
    * JSON Canonicalization Scheme (JCS) implementation
    * Ensures consistent JSON serialization for hashing
    */
-  private canonicalizeJson(obj: any): string {
+  private canonicalizeJson(obj: unknown): string {
     // Sort object keys recursively
-    const canonicalize = (value: any): any => {
+    const canonicalize = (value: unknown): unknown => {
       if (value === null || typeof value !== 'object') {
         return value;
       }
@@ -106,10 +123,10 @@ export class ToolSignatureManager {
       }
       
       // Sort object keys
-      const sortedKeys = Object.keys(value).sort();
-      const result: any = {};
+      const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
+      const result: Record<string, unknown> = {};
       for (const key of sortedKeys) {
-        result[key] = canonicalize(value[key]);
+        result[key] = canonicalize((value as Record<string, unknown>)[key]);
       }
       return result;
     };
@@ -123,7 +140,7 @@ export class ToolSignatureManager {
    */
   public validateToolCall(
     toolName: string, 
-    toolArgs: any, 
+    toolArgs: Record<string, unknown>, 
     tenantId: string, 
     epoch: number
   ): { allowed: boolean; reason?: string; toolSignature?: string } {
@@ -137,25 +154,25 @@ export class ToolSignatureManager {
         };
       }
 
-      const toolSignature = this.generateToolSignature(toolName, schema);
+      const toolSignature = this.computeSignatureHash(toolName, schema);
       
-      // Check if tool signature is in allow-list
-      if (!this.allowedTools.has(toolSignature.signature)) {
+      // Check if tool signature is in allow-list (must be pre-registered at init)
+      if (!this.allowedTools.has(toolSignature)) {
         return {
           allowed: false,
-          reason: `Tool signature not in allow-list: ${toolSignature.signature}`
+          reason: `Tool signature not in allow-list: ${toolSignature}`
         };
       }
 
       // Check permission matrix for tenant/epoch combination
-      const permissionKey = `${toolSignature.signature}:${tenantId}:${epoch}`;
+      const permissionKey = `${toolSignature}:${tenantId}:${epoch}`;
       const permission = this.permissionMatrix.get(permissionKey);
       
       if (permission && !permission.allowed) {
         return {
           allowed: false,
           reason: `Permission denied for tenant ${tenantId} at epoch ${epoch}`,
-          toolSignature: toolSignature.signature
+          toolSignature
         };
       }
 
@@ -165,20 +182,20 @@ export class ToolSignatureManager {
         return {
           allowed: false,
           reason: `Input validation failed: ${validationResult.errors.join(', ')}`,
-          toolSignature: toolSignature.signature
+          toolSignature
         };
       }
 
       this.logger.info('MCP: Tool call validated', {
         toolName,
-        toolSignature: toolSignature.signature,
+        toolSignature,
         tenantId,
         epoch
       });
 
       return {
         allowed: true,
-        toolSignature: toolSignature.signature
+        toolSignature
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -267,7 +284,7 @@ export class ToolSignatureManager {
   /**
    * Validate inputs against schema using JCS
    */
-  private validateInputs(inputs: any, schema: ToolSchema): { valid: boolean; errors: string[] } {
+  private validateInputs(inputs: Record<string, unknown>, schema: ToolSchema): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
     
     try {

@@ -1,0 +1,36 @@
+[package]
+name = "retrieval-gateway"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Retrieval gateway with ABAC, semantic cache, and DSSE access receipts"
+
+[[bin]]
+name = "retrieval-gateway"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+axum = { version = "0.7", features = ["macros"] }
+base64 = "0.22"
+ed25519-dalek = { version = "2.0", features = ["pkcs8", "rand_core"] }
+hex = "0.4"
+lazy_static = "1.4"
+pem = "3"
+pf-dsse = { path = "../../core/crypto/dsse-rs" }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres"] }
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

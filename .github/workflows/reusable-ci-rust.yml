@@ -10,6 +10,7 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_TERM_COLOR: always
+      PF_SHADOW_MODE: "1"
 
     steps:
       - name: Checkout repository
@@ -36,17 +37,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Sidecar unwrap regression gate (F16)
+        run: python scripts/count_sidecar_unwraps.py --max 10
+
+      - name: Ledger any regression gate (F27)
+        run: python scripts/count_ledger_any.py --max 20
+
       - name: Build and test Rust workspace
         run: |
-          # core/sdk/rust is optional; build separately when proto bindings are ready
           cargo build --workspace --exclude provability-fabric-core-sdk-rust
-          # labeler stress and tool-broker bin tests are extended/nightly coverage
+          RUSTFLAGS="-D dead_code" cargo test -p sidecar-watcher --lib -- --nocapture
+          PF_SHADOW_MODE=1 RUSTFLAGS="-D dead_code" cargo test -p sidecar-watcher --test integration_tests -- --nocapture
+          cargo test -p sidecar-watcher --test ni_monitor_egress --test safety_case_bundle --test events_plan_dsl --test hardened_adapters -- --nocapture
+          cargo test -p retrieval-gateway -- --nocapture
           cargo test --workspace \
             --exclude provability-fabric-core-sdk-rust \
-            --exclude sidecar-watcher \
             --exclude labeler \
             --exclude tool-broker \
             --no-fail-fast
 
       - name: Clippy (workspace)
-        run: cargo clippy --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher -- -D warnings
+        run: cargo clippy --workspace --exclude provability-fabric-core-sdk-rust -- -D warnings

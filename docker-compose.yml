@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 #
-# Profiles: default (no profile) = platform only (postgres, redis, api-gateway, spec, proof, build, evidence, replay, runtime-sidecar).
+# Profiles: default (no profile) = platform + sidecar
 #   docker compose up
-# Full stack (adds console, demos, monitoring):
+# Ledger stack (postgres, redis, ledger GraphQL/MCP):
+#   docker compose --profile ledger up
+# Runtime enforcement (egress-firewall):
+#   docker compose --profile enforcement up
+# Full stack (adds console, demos, monitoring, ledger, enforcement):
 #   docker compose --profile full up
 
 services:
@@ -169,8 +173,11 @@ services:
       - METRICS_PORT=9090
       - REDIS_URL=redis://redis:6379
       - ENFORCEMENT_MODE=enforce
+      - PF_PROFILE=production
+      - PF_ENFORCE_DSSE=1
+      - PF_ENABLED_TOOLS=
       - TENANT_ID=demo-tenant
-      - LEDGER_URL=
+      - LEDGER_URL=http://ledger:4000
     depends_on:
       redis:
         condition: service_healthy
@@ -179,6 +186,92 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Ledger GraphQL + MCP (ledger / full profiles)
+  ledger:
+    profiles: ["ledger", "full"]
+    build:
+      context: ./runtime/ledger
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - PROFILE=production
+      - PORT=4000
+      - PF_ENFORCE_DSSE=1
+      - PF_ENABLED_TOOLS=
+      - DATABASE_URL=postgresql://sentinelops:sentinelops_password@postgres:5432/sentinelops?schema=public
+      - SIDECAR_URL=http://runtime-sidecar:8006
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Egress firewall (enforcement / full profiles)
+  egress-firewall:
+    profiles: ["enforcement", "full"]
+    build:
+      context: ./runtime/egress-firewall
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Retrieval gateway (full profile)
+  retrieval-gateway:
+    profiles: ["full"]
+    build:
+      context: ./runtime/retrieval-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RECEIPT_SIGNING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      - LEDGER_ENDPOINT=http://ledger:4000
+      - RUST_LOG=info
+    depends_on:
+      ledger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Tool broker demo (full profile; batch-style binary)
+  tool-broker:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: runtime/tool-broker/Dockerfile
+    environment:
+      - KERNEL_URL=http://runtime-sidecar:8006
+      - RUST_LOG=info
+    depends_on:
+      runtime-sidecar:
+        condition: service_healthy
+    restart: "no"
+
+  # WASM adapter sandbox CLI (full profile; invoke with module args via compose run)
+  wasm-sandbox:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: runtime/wasm-sandbox/Dockerfile
+    entrypoint: ["wasm-sandbox", "--help"]
+    restart: "no"
 
   # Console Web UI (full stack only)
   console:

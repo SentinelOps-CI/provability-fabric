@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/server/**/*",
+    "src/mcp/**/*",
+    "src/types/**/*",
+    "src/receipts.ts",
+    "src/egress.ts"
+  ]
+}

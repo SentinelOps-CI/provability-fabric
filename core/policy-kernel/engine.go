@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/provability-fabric/core/crypto/dsse"
 )
 
 // InputChannels represents the classification of input channels
@@ -546,25 +548,19 @@ func (k *Kernel) validateStep(subject Subject, step Step, stepIndex int) []strin
 
 // verifyReceipt verifies a signed access receipt
 func (k *Kernel) verifyReceipt(receipt AccessReceipt) error {
-	// Basic validation
-	if receipt.ReceiptID == "" {
-		return fmt.Errorf("receipt ID is required")
-	}
-	if receipt.Tenant == "" {
-		return fmt.Errorf("receipt tenant is required")
-	}
-	if receipt.IndexShard == "" {
-		return fmt.Errorf("receipt index shard is required")
-	}
-	if receipt.SignAlg != "ed25519" {
-		return fmt.Errorf("unsupported signature algorithm: %s", receipt.SignAlg)
-	}
-	if receipt.Sig == "" {
-		return fmt.Errorf("receipt signature is required")
-	}
-
-	// Signature verification requires trust root (PEM/JWKS); structural validation only until wired
-	return nil
+	return dsse.VerifyAccessReceipt(
+		dsse.AccessReceiptPayload{
+			ReceiptID:  receipt.ReceiptID,
+			Tenant:     receipt.Tenant,
+			SubjectID:  receipt.SubjectID,
+			QueryHash:  receipt.QueryHash,
+			IndexShard: receipt.IndexShard,
+			Timestamp:  receipt.Timestamp,
+			ResultHash: receipt.ResultHash,
+		},
+		receipt.SignAlg,
+		receipt.Sig,
+	)
 }
 
 // validateLabelFlow validates that label flow is consistent

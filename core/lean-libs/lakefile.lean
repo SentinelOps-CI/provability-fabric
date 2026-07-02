@@ -38,6 +38,10 @@ lean_lib GenTrace {
   -- add library configuration options here
 }
 
+lean_lib Invariants {
+  roots := #[`Invariants]
+}
+
 -- ExportDFA executable
 lean_exe ExportDFA {
   root := `ExportDFA

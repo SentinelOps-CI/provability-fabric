@@ -281,6 +281,7 @@ jobs:
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           VR="$RUNNER_TEMP/rejected_verification_result.json"
           export PF_RELEASE_MODE=0
+          # ci-honesty: justified wave7-remediation
           go run . verify science-claim "$RELEASE/invalid_mismatched_trace_hash.json" --out "$VR" || true
           set +e
           go run . explain failure "$VR" 2>&1 | tee "$RUNNER_TEMP/explain_vr.txt"

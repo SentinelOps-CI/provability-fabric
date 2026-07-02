@@ -84,8 +84,10 @@ pub struct QueryLogging {
 pub struct QueryContext {
     pub tenant: String,
     pub subject_id: String,
+    pub query: String,
     pub labels_filter: Vec<String>,
     pub query_hash: String,
+    pub index_shard: String,
 }
 
 /// ABAC authorization decision
@@ -116,12 +118,17 @@ impl AbacPolicy {
         Ok(decision.allowed)
     }
 
+    /// Evaluate ABAC policy; returns false on internal errors (fail closed).
+    pub async fn evaluate(&self, context: &QueryContext) -> bool {
+        self.authorize_query(context).await.unwrap_or(false)
+    }
+
     /// Evaluate query and return detailed decision
     pub async fn evaluate_query(&self, context: &QueryContext) -> Result<AuthorizationDecision> {
         let mut decision = AuthorizationDecision {
             allowed: self.default_policy == "allow",
             reason: None,
-            rules_applied: Vec::new(),
+            rules_applied: vec![format!("policy:{}:{}", self.version, self.description)],
             audit_required: false,
         };
 
@@ -133,11 +140,45 @@ impl AbacPolicy {
                 return Ok(decision);
             }
             decision.rules_applied.push("tenant_isolation".to_string());
+            if self.tenant_isolation.cross_tenant_queries && context.index_shard != format!("shard_{}", context.tenant) {
+                decision.allowed = false;
+                decision.reason = Some("Cross-tenant query blocked".to_string());
+                return Ok(decision);
+            }
         }
 
         // Check subject rules
         if let Some(subject_rule) = self.find_matching_subject_rule(&context.subject_id) {
             decision.rules_applied.push(format!("subject_rule:{}", subject_rule.subject_pattern));
+            if let Some(privileges) = &subject_rule.privileges {
+                if privileges.is_empty() {
+                    decision.allowed = false;
+                    decision.reason = Some("Subject lacks required privileges".to_string());
+                    return Ok(decision);
+                }
+            }
+            if let Some(capabilities) = &subject_rule.capabilities {
+                for cap in capabilities {
+                    if let Some(cap_cfg) = self.capabilities.get(cap) {
+                        if cap_cfg.dp_budget_required.unwrap_or(false) && context.tenant.is_empty() {
+                            decision.allowed = false;
+                            decision.reason = Some(format!(
+                                "Capability '{}' ({}) requires tenant context",
+                                cap, cap_cfg.description
+                            ));
+                            return Ok(decision);
+                        }
+                        if !cap_cfg.required_for.is_empty() && context.labels_filter.is_empty() {
+                            decision.allowed = false;
+                            decision.reason = Some(format!(
+                                "Capability '{}' requires labels {:?}",
+                                cap, cap_cfg.required_for
+                            ));
+                            return Ok(decision);
+                        }
+                    }
+                }
+            }
         }
 
         // Check label policies
@@ -150,6 +191,7 @@ impl AbacPolicy {
                     return Ok(decision);
                 }
                 decision.rules_applied.push(format!("label_policy:{}", label));
+                decision.rules_applied.push(format!("label_desc:{}", label_policy.description));
 
                 // Check if audit required
                 if self.audit.always_audit.contains(label) || 
@@ -157,6 +199,38 @@ impl AbacPolicy {
                     decision.audit_required = true;
                 }
             }
+        }
+
+        if !self.get_rate_limits(context).is_empty() {
+            decision
+                .rules_applied
+                .push("rate_limits_configured".to_string());
+        }
+
+        let limits = &self.query_context.complexity_limits;
+        if context.query.len() > limits.max_query_length {
+            decision.allowed = false;
+            decision.reason = Some(format!(
+                "Query length {} exceeds limit {}",
+                context.query.len(),
+                limits.max_query_length
+            ));
+            return Ok(decision);
+        }
+        decision.rules_applied.push(format!(
+            "complexity:max_results={},max_concurrent={}",
+            limits.max_results_per_query, limits.max_concurrent_queries
+        ));
+
+        if decision.audit_required && self.audit.query_logging.enabled {
+            decision.rules_applied.push(format!(
+                "audit_log:text={},hash={},count={},timing={}",
+                self.audit.query_logging.log_query_text,
+                self.audit.query_logging.log_query_hash,
+                self.audit.query_logging.log_result_count,
+                self.audit.query_logging.log_timing
+            ));
+            let _ = &context.query;
         }
 
         // If we get here and default is deny, check if any allow rules matched
@@ -224,15 +298,16 @@ impl AbacPolicy {
         // Check if any labels require auditing
         context.labels_filter.iter().any(|label| {
             self.audit.always_audit.contains(label) || 
-            self.audit.always_audit.iter().any(|pattern| 
-                pattern.starts_with("label:") && label == &pattern[6:]
-            )
+            self.audit.always_audit.iter().any(|pattern| {
+                pattern.starts_with("label:") && label == &pattern[6..]
+            })
         })
     }
 
     /// Get rate limits for context
     pub fn get_rate_limits(&self, context: &QueryContext) -> Vec<&RateLimit> {
         self.query_context.rate_limits.iter().filter(|limit| {
+            let _ = limit.requests_per_minute;
             match limit.scope.as_str() {
                 "tenant" => true,
                 "subject" => true,
@@ -256,8 +331,10 @@ mod tests {
         let context = QueryContext {
             tenant: "tenant1".to_string(),
             subject_id: "user1".to_string(),
+            query: "test".to_string(),
             labels_filter: vec!["public".to_string()],
             query_hash: "test_hash".to_string(),
+            index_shard: "shard_tenant1".to_string(),
         };
 
         let result = policy.check_tenant_isolation(&context).await.unwrap();
@@ -283,8 +360,10 @@ mod tests {
         let context = QueryContext {
             tenant: "tenant1".to_string(),
             subject_id: "user1".to_string(),
+            query: "test".to_string(),
             labels_filter: vec!["confidential".to_string()],
             query_hash: "test_hash".to_string(),
+            index_shard: "shard_tenant1".to_string(),
         };
 
         assert!(policy.should_audit(&context));

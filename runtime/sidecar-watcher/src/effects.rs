@@ -20,6 +20,8 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+use crate::time_util;
+
 /// Effect type enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EffectType {
@@ -266,10 +268,7 @@ impl EffectsAllowList {
         duration_ms: u64,
     ) {
         let usage = EffectUsage {
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: time_util::unix_secs(),
             resource: resource.to_string(),
             success,
             duration_ms,
@@ -291,11 +290,7 @@ impl EffectsAllowList {
             return; // Only cleanup every hour
         }
 
-        let cutoff_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            - 86400; // Keep last 24 hours
+        let cutoff_time = time_util::unix_secs().saturating_sub(86400); // Keep last 24 hours
 
         for usage_list in self.effect_usage.values_mut() {
             usage_list.retain(|usage| usage.timestamp >= cutoff_time);
@@ -327,6 +322,7 @@ impl EffectsAllowList {
             failed_operations,
             avg_duration_ms: avg_duration,
             last_used: usage_list.last().map(|u| u.timestamp),
+            last_resource: usage_list.last().map(|u| u.resource.clone()),
         })
     }
 
@@ -347,10 +343,7 @@ impl EffectSignature {
     /// Check if effect is expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = time_util::unix_secs();
             now > expires_at
         } else {
             false
@@ -371,10 +364,7 @@ impl EffectSignature {
                 process_restrictions: None,
             },
             metadata: HashMap::new(),
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            created_at: time_util::unix_secs(),
             expires_at: None,
         }
     }
@@ -390,6 +380,7 @@ pub struct EffectStats {
     pub failed_operations: u32,
     pub avg_duration_ms: u64,
     pub last_used: Option<u64>,
+    pub last_resource: Option<String>,
 }
 
 #[cfg(test)]

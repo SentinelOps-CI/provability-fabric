@@ -257,6 +257,9 @@ mod integration_tests {
     /// Test shadow mode allows actions but logs violations
     #[test]
     fn test_shadow_mode_behavior() {
+        std::env::set_var("PF_SHADOW_MODE", "1");
+        std::env::remove_var("PF_PROFILE");
+
         let config = PolicyConfig {
             enforcement_mode: EnforcementMode::Shadow,
             shadow_mode: true,
@@ -290,6 +293,8 @@ mod integration_tests {
         assert!(result.allowed, "Shadow mode should allow all actions");
         assert_eq!(result.permit_decision, "reject"); // But permitD still rejects
         assert_eq!(result.reason, "Action permitted"); // Final result is permitted
+
+        std::env::remove_var("PF_SHADOW_MODE");
     }
 
     /// Test monitor mode tracks violations without blocking

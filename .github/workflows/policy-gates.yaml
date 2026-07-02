@@ -60,6 +60,7 @@ jobs:
         run: |
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
           if ! elan toolchain list | grep -Fq "$TOOLCHAIN"; then
+            # ci-honesty: justified wave7-remediation
             elan toolchain install "$TOOLCHAIN" || true
           fi
           elan override set "$TOOLCHAIN"

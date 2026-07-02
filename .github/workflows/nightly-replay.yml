@@ -35,6 +35,11 @@ jobs:
             pip install -r external/TRACE-REPLAY-KIT/requirements.txt
           fi
 
+      - name: Run replay docker contract test (F10)
+        run: |
+          chmod +x tests/replay/test_docker_invocation.sh
+          bash tests/replay/test_docker_invocation.sh
+
       - name: Run replay suites
         run: bash tests/replay/run_replays.sh
 

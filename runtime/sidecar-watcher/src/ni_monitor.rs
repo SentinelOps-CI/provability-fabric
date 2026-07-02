@@ -13,13 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+fn unix_timestamp_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 
 /// Non-interference monitor configuration
 ///
@@ -98,7 +104,9 @@ impl SecurityLabel {
             "confidential" => Ok(SecurityLabel::Confidential),
             "secret" => Ok(SecurityLabel::Secret),
             s if s.starts_with("custom:") => {
-                let name = s.strip_prefix("custom:").unwrap();
+                let name = s
+                    .strip_prefix("custom:")
+                    .ok_or_else(|| format!("Invalid custom label prefix: {}", s))?;
                 Ok(SecurityLabel::Custom(name.to_string()))
             }
             _ => Err(format!("Unknown security label: {}", s)),
@@ -164,10 +172,7 @@ pub struct NIPrefix {
 impl NIPrefix {
     /// Create new NI prefix
     pub fn new(prefix_id: String, input_label: SecurityLabel, output_label: SecurityLabel) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         Self {
             prefix_id,
@@ -182,10 +187,7 @@ impl NIPrefix {
     /// Add event to prefix
     pub fn add_event(&mut self, event: NIEvent) {
         self.events.push(event);
-        self.last_updated = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.last_updated = unix_timestamp_secs();
     }
 
     /// Check if prefix violates non-interference
@@ -258,10 +260,7 @@ impl Default for ProofHashes {
 impl ProofHashes {
     /// Create new proof hashes
     pub fn new() -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         Self {
             policy_proof_hash: String::new(),
@@ -297,10 +296,7 @@ impl ProofHashes {
         hasher.update(ni_bridge_content.as_bytes());
         self.ni_bridge_hash = format!("{:x}", hasher.finalize());
 
-        self.computed_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.computed_at = unix_timestamp_secs();
     }
 
     /// Verify that proof hashes match expected values
@@ -333,10 +329,7 @@ impl NIMonitorState {
             prefixes: HashMap::new(),
             active_sessions: HashSet::new(),
             violation_count: 0,
-            last_audit: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            last_audit: unix_timestamp_secs(),
             config,
             proof_hashes: ProofHashes::new(),
         }
@@ -360,8 +353,8 @@ impl NIMonitorState {
         // Generate prefix ID based on event characteristics
         let prefix_id = self.generate_prefix_id(&event);
 
-        // Get or create prefix
-        {
+        // Get or create prefix, add event, and evaluate violations in one pass.
+        let (violates, audit_prefix) = {
             let prefix = self.prefixes.entry(prefix_id.clone()).or_insert_with(|| {
                 NIPrefix::new(
                     prefix_id.clone(),
@@ -378,15 +371,18 @@ impl NIMonitorState {
                 )
             });
 
-            // Add event to prefix
             prefix.add_event(event.clone());
-        }
-
-        // Get prefix reference for violation checking and logging
-        let prefix = self.prefixes.get(&prefix_id).unwrap();
+            let violates = prefix.violates_ni();
+            let audit_prefix = if self.config.enable_audit_logging {
+                Some(prefix.clone())
+            } else {
+                None
+            };
+            (violates, audit_prefix)
+        };
 
         // Check for non-interference violations
-        if prefix.violates_ni() {
+        if violates {
             self.violation_count += 1;
 
             if self.config.strict_mode {
@@ -398,9 +394,7 @@ impl NIMonitorState {
         self.active_sessions.insert(event.session_id.clone());
 
         // Audit logging
-        if self.config.enable_audit_logging {
-            // Clone prefix data to avoid borrowing conflict
-            let prefix_clone = prefix.clone();
+        if let Some(prefix_clone) = audit_prefix {
             self.log_audit_event(&event, &prefix_clone);
         }
 
@@ -427,10 +421,7 @@ impl NIMonitorState {
 
     /// Log audit event
     fn log_audit_event(&mut self, event: &NIEvent, prefix: &NIPrefix) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         // Log to audit trail (in a real implementation, this would go to a secure log)
         println!(
@@ -554,10 +545,7 @@ impl NIMonitorState {
 
     /// Clean up old prefixes
     pub fn cleanup_old_prefixes(&mut self, max_age_seconds: u64) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = unix_timestamp_secs();
 
         let mut to_remove = Vec::new();
 
