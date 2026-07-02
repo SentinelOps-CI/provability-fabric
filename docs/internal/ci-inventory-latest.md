@@ -1,6 +1,6 @@
 ﻿# CI workflow inventory (auto-generated)
 
-Generated: 2026-07-02T08:20:38Z UTC
+Generated: 2026-07-02T08:32:45Z UTC
 Repository: `SentinelOps-CI/provability-fabric` branch `main`
 
 ## Summary
@@ -9,8 +9,8 @@ Repository: `SentinelOps-CI/provability-fabric` branch `main`
 |--------|------:|
 | Total workflow files | 86 |
 | Gated (push/schedule on main) | 68 |
-| Green (last run success) | 13 |
-| Red (failure/cancelled/in progress) | 53 |
+| Green (last run success) | 12 |
+| Red (failure/cancelled/in progress) | 54 |
 | No run / unknown | 20 |
 
 ## Workflows
@@ -31,7 +31,7 @@ Repository: `SentinelOps-CI/provability-fabric` branch `main`
 | `cert-validate.yml` | push, pull_request, workflow_dispatch | success | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516758 |
 | `chaos-nightly.yaml` | schedule, workflow_dispatch | success | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28568878282 |
 | `ci.yml` | push, pull_request, workflow_dispatch | success | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27677074379 |
-| `ci-nightly-pytest.yml` | schedule, workflow_dispatch | success | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28505615641 |
+| `ci-nightly-pytest.yml` | schedule, workflow_dispatch | **in_progress** | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576040030 |
 | `ci-weekly-full.yml` | schedule, workflow_dispatch | success | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28367886347 |
 | `cla-bot.yaml` | pull_request, workflow_dispatch | failure | no | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27528984318 |
 | `codeql.yaml` | push, pull_request, schedule | **failure** | yes | https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28429083030 |
@@ -114,6 +114,7 @@ Repository: `SentinelOps-CI/provability-fabric` branch `main`
 - `bench-swebench-unit.yaml (failure)`
 - `billing-test.yaml (failure)`
 - `cargo-deny.yml (failure)`
+- `ci-nightly-pytest.yml (in_progress)`
 - `codeql.yaml (failure)`
 - `demo-e2e.yml (failure)`
 - `dfa.yaml (failure)`

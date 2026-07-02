@@ -37,7 +37,7 @@ Windows: Docker replay + compose smoke steps skip without Docker; PR Ubuntu CI i
 ## Post-merge (do not skip)
 
 1. `bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-latest.md`
-2. Wave 7 clusters per [wave7-post-merge-runbook.md](docs/internal/wave7-post-merge-runbook.md)
+2. Wave 7 clusters per [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md)
 3. Target M1: ~20/67 green (replay + security)
 
 ## Findings status after merge
@@ -62,14 +62,14 @@ Windows: Docker replay + compose smoke steps skip without Docker; PR Ubuntu CI i
 
 ## Docs added/updated
 
-- [merge-readiness-checklist.md](docs/internal/merge-readiness-checklist.md)
-- [wave7-post-merge-runbook.md](docs/internal/wave7-post-merge-runbook.md)
-- [full-repo-audit-reassessment-2026-07-03.md](docs/internal/full-repo-audit-reassessment-2026-07-03.md)
-- [ci-inventory-latest.md](docs/internal/ci-inventory-latest.md)
-- [remediation-tracker.md](docs/internal/remediation-tracker.md)
-- [ci-health-matrix.md](docs/internal/ci-health-matrix.md)
-- [lean-sorry-burn-down.md](docs/internal/lean-sorry-burn-down.md)
-- [evidence-program-closure.md](docs/roadmap/evidence-program-closure.md)
+- [merge-readiness-checklist.md](merge-readiness-checklist.md)
+- [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md)
+- [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
+- [ci-inventory-latest.md](ci-inventory-latest.md)
+- [remediation-tracker.md](remediation-tracker.md)
+- [ci-health-matrix.md](ci-health-matrix.md)
+- [lean-sorry-burn-down.md](lean-sorry-burn-down.md)
+- [evidence-program-closure.md](../roadmap/evidence-program-closure.md)
 
 ## Risk / split guidance
 

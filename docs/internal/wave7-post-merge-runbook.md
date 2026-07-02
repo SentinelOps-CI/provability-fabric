@@ -95,7 +95,7 @@ bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-la
 
 | Workflow | Action |
 |----------|--------|
-| `bench-nightly-criterion.yaml` | `workflow_dispatch` with `refresh_baseline: true` per [bench/BASELINE.md](../../bench/BASELINE.md) |
+| `bench-nightly-criterion.yaml` | `workflow_dispatch` with `refresh_baseline: true` per repo `bench/BASELINE.md` |
 | `performance-gate.yaml` | Align thresholds post-baseline |
 | `docs-build.yaml`, `docs-deploy.yaml` | `make docs-strict` on Linux CI |
 

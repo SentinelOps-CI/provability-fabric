@@ -42,6 +42,7 @@ run_step python scripts/count_sidecar_unwraps.py --max 10
 run_step python scripts/count_ledger_any.py --max 20
 run_step python scripts/audit_ci_honesty.py
 run_step python tests/crypto/test_cross_lang_dsse.py
+run_step make no-runtime-placeholders
 run_step make docs-strict
 
 echo "=== All merge-gate commands passed ==="
