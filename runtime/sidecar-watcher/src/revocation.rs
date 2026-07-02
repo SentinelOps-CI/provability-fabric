@@ -217,7 +217,7 @@ impl RevocationManager {
     }
 
     /// Create approval token for revocation
-    fn create_approval_token(&self, request: &RevocationRequest) -> Result<String> {
+    fn create_approval_token(&self, _request: &RevocationRequest) -> Result<String> {
         // In a real implementation, this would create a secure approval token
         // For now, we'll create a simple hash-based token
         let token = format!("approval_{}", uuid::Uuid::new_v4());

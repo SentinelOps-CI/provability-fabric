@@ -276,7 +276,7 @@ impl EgressCertificate {
     }
 
     /// Sign the certificate
-    pub fn sign(&mut self, private_key: &str) -> Result<(), Box<dyn Error>> {
+    pub fn sign(&mut self, _private_key: &str) -> Result<(), Box<dyn Error>> {
         let content_json = serde_json::to_string(&self.content)?;
         let mut hasher = Sha256::new();
         hasher.update(content_json.as_bytes());

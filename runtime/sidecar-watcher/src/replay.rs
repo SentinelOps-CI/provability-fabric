@@ -146,7 +146,7 @@ impl ReplaySession {
         let chunk_hash = self.compute_chunk_hash();
 
         // Record chunk information
-        let chunk_info = ChunkInfo {
+        let _chunk_info = ChunkInfo {
             sequence_number: self.sequence_number,
             size_bytes: self.chunk_buffer.len(),
             hash: chunk_hash,

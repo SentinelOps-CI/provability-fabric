@@ -163,7 +163,7 @@ impl AsyncSigningPipeline {
 
     /// Worker loop for processing signing requests
     async fn worker_loop(
-        worker_id: usize,
+        _worker_id: usize,
         mut request_rx: mpsc::Receiver<SigningRequest>,
         result_tx: mpsc::Sender<SigningResult>,
         metrics: Arc<SigningMetrics>,
@@ -365,7 +365,6 @@ impl BatchVerifier {
         let (result_tx, result_rx) = mpsc::channel::<VerificationResult>(1000);
 
         let running = Arc::new(RwLock::new(true));
-        let running_clone = running.clone();
 
         // Spawn the batch processing worker
         tokio::spawn(async move {

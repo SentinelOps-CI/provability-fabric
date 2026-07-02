@@ -215,7 +215,7 @@ impl SemanticCache {
         let mut cache = self.cache.write().await;
         let removed = cache.remove(tenant);
         
-        if let Some(_) = removed {
+        if removed.is_some() {
             info!("Invalidated all cache entries for tenant: {}", tenant);
             
             // Update statistics

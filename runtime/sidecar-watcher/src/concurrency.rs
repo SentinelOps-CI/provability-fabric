@@ -200,7 +200,7 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
 
             // Process events from ring buffer
             let mut batch_count = 0;
-            while let Some(event) = ring_buffer.pop() {
+            while let Some(_event) = ring_buffer.pop() {
                 // Process the event here
                 // For now, just count it
                 batch_count += 1;
