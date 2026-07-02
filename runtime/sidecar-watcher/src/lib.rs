@@ -27,6 +27,7 @@ pub mod queue_manager;
 pub mod ratelimit;
 pub mod replay;
 pub mod revocation;
+pub mod runtime_observation;
 pub mod safety_case;
 pub mod scheduler;
 pub mod snapshot_storage;

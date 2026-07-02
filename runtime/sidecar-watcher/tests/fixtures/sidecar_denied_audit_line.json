@@ -1,0 +1,17 @@
+{
+  "request_id": "obs-mcp-sidecar-denied",
+  "trace_id": "trace-mcp-denied",
+  "event_id": "ev-mcp-denied",
+  "agent_id": "agent-1",
+  "tenant": "tenant-a",
+  "tool_effect": "mcp.invoke",
+  "resource": "mcp:network/fetch",
+  "policy_decision": "denied",
+  "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "policy_bundle": "policy/default.v0",
+  "audit_bundle": "evidence/mcp-audit.v0",
+  "capability_hint": "cap:mcp-invoke",
+  "runtime_ref": "provability-fabric/sidecar-watcher",
+  "timestamp": "2026-06-18T12:00:00Z",
+  "reason": "mcp tool invoke denied by policy"
+}
