@@ -37,11 +37,10 @@ fn validate_against_schema(obs: &Value) {
     match compiled.validate(obs) {
         Ok(()) => {}
         Err(errors) => {
-            for err in errors {
-                panic!("schema validation failed: {err}");
-            }
+            let msgs: Vec<String> = errors.map(|e| e.to_string()).collect();
+            panic!("schema validation failed: {}", msgs.join("; "));
         }
-    }
+    };
 }
 
 #[test]
