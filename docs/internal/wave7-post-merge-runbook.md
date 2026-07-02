@@ -8,18 +8,20 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-03 — Wave 7 execution)
+## Status (2026-07-03 — Wave 7 execution, session 2)
 
-**PR #144 not merged.** `audit-remediation-merge` is blocked on CI (`mergeStateStatus: BLOCKED`). Phase 0 fixes pushed; awaiting fresh Ubuntu CI run.
+**PR #144 not merged.** Head `518735c6` on `audit-remediation-merge`. Branch protection requires **CI required checks**, **smoke**, **evidence-schema-only**, **Documentation Build**, plus **1 approving review** (`reviewDecision: REVIEW_REQUIRED`).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
-| 0 — Merge gate | **BLOCKED** | [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144); CI run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710) |
-| 1.1 Replay cluster | **Pending merge** | `replay-tests` pass on PR [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480) |
-| 1.2 Security cluster | **Pending merge** | `deny` fail pre-fix [28576347505](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347505); `deny.toml` updated |
-| 1.3 Platform cluster | **Pending merge** | `integration` fail pre-fix [28576347398](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347398); submodule init fixed |
-| 1.4 Lean + paper | **Preemptive** | `Invariants.lean` added to `lean-style.yaml` ENFORCED; `Lean Style Check` pass [28576347346](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347346) |
-| 1.5 Bench + docs | **Pending merge** | `Documentation Build` fail pre-fix [28576347536](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347536); `make docs-strict` pass locally |
+| 0 — Merge gate | **BLOCKED (CI + review)** | [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144); latest CI [28583017161](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583017161) (queued on `518735c6`) |
+| 0 — Branch checks (partial green) | **4/5 required pass on prior push** | `smoke` [28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952) job [84746594873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84746594873); `evidence-schema-only` [84744736821](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84744736821); `Documentation Build` [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843); `deny` [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163/job/84744734402); **`CI required checks` pending** on [28582134426](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134426) (`ci-honesty` fail pre-fix [84744735085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134426/job/84744735085); fixed in `518735c6`) |
+| 0 — CI fixes landed (2026-07-03) | **Committed** | `520205ac` Cargo.lock tracked; `3a935289` ledger lock; `3e3a934b`/`e7a1ae13` pf go.sum + typescript lock; `05d9cd6a` tool-broker/wasm-sandbox minimal workspace Dockerfiles; `518735c6` ci-honesty inline justifications |
+| 1.1 Replay cluster | **Pending merge** | `replay-tests` green on PR runs (e.g. [28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952)) |
+| 1.2 Security cluster | **Pending merge** | `deny` green [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163); CodeQL JS still red on PR |
+| 1.3 Platform cluster | **Pending merge** | `integration` red [28582134135](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134135) (compose smoke tool-broker; fix in `05d9cd6a`, re-run [28583016953](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583016953) queued) |
+| 1.4 Lean + paper | **Preemptive** | `Invariants.lean` ENFORCED in `lean-style.yaml`; Lean Style Check green on PR |
+| 1.5 Bench + docs | **Partial PR green** | `Documentation Build` [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843); Criterion smoke still running |
 | 1.6 Remaining ~30 | **Not started** | `main` still 13/68 green |
 
 ### Post-merge commands (run immediately after PR #144 lands)

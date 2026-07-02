@@ -2,7 +2,7 @@
 
 Triage snapshot for `main`. Automated inventory: `scripts/ci_workflow_inventory.sh --markdown` (bash/WSL) or `scripts/ci_workflow_inventory.ps1 -Markdown` (Windows). Latest report: [ci-inventory-latest.md](ci-inventory-latest.md) when generated locally.
 
-**Baseline (2026-07-03 audit):** 13/68 gated workflows green on `main`; inventory exit code 1. Target: **67/67** with honest gates (Wave 7). **Local remediation not merged** — clusters below marked **pending main merge** until PR-M0 lands and two consecutive green runs are recorded.
+**Baseline (2026-07-03 audit, session 2):** 13/68 gated workflows green on `main`; inventory exit code 1. Target: **68/68** with honest gates (Wave 7). **PR #144 not merged** — head `518735c6`; branch checks partially green on PR ([smoke 28582133952](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952), [Documentation Build 28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001), [deny 28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163)); **`CI required checks`** and GitHub review still pending.
 
 **Phase 0–1 local prep (2026-07-03):** Placeholder gate, CI honesty gate (`ci.yml`), replay contract test in `integration.yaml`, compose smoke in `integration.yaml`, sidecar `integration_tests` in reusable Rust CI, DSSE cross-lang test in extended CI, `retrieval-gateway.yml` wired. Local gate commands pass; **main CI proof pending merge**.
 

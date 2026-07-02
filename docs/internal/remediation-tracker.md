@@ -26,7 +26,7 @@ Captured on Windows via `powershell -File scripts/ci_workflow_inventory.ps1 -Lis
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** Local remediation is **not yet merged to `main`**; inventory on `main` remains 13/68 until merge + Linux CI validation. Merge PR prep: [merge-readiness-checklist.md](merge-readiness-checklist.md), [merge-pr-body.md](merge-pr-body.md).
+**Note:** Local remediation is **not yet merged to `main`**; inventory on `main` remains 13/68 until merge + Linux CI validation. **PR #144** head `518735c6` — CI gate fixes landed 2026-07-03; merge blocked on **`CI required checks`** + GitHub review. Merge PR prep: [merge-readiness-checklist.md](merge-readiness-checklist.md), [merge-pr-body.md](merge-pr-body.md).
 
 ---
 

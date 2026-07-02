@@ -10,7 +10,7 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 |-------|--------|
 | **Code state** | Remediation on branch `audit-remediation-merge` — **not merged to `main`** until PR #144 CI green. |
 | **CI on `main`** | **13 / 68** gated workflows green (inventory 2026-07-03); unchanged until merge. |
-| **PR #144 CI** | Run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710) — **BLOCKED** (pre-fix failures: `deny`, `integration`, `Documentation Build`). Fixes pushed 2026-07-03; re-run pending. |
+| **PR #144 CI** | Head `518735c6`; latest CI [28583017161](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583017161) queued. Prior push: branch checks **smoke** [84746594873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84746594873), **evidence-schema-only** [84744736821](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84744736821), **Documentation Build** [84744733843](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843), **deny** [84744734402](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163/job/84744734402) green; **CI required checks** awaiting green on `518735c6`. **Review:** `REVIEW_REQUIRED`. |
 | **Local gates** | All merge-gate commands below passed on working tree (2026-07-03). |
 | **68/68 sign-off** | **Not claimed.** Requires two consecutive `ci_workflow_inventory.sh` exit 0 on `main`. |
 
@@ -88,18 +88,18 @@ F38 ESLint 9 migration complete (root flat config + packages).
 
 ---
 
-## Wave 7 execution log (2026-07-03)
+## Wave 7 execution log (2026-07-03, session 2)
 
 | Todo | Status | Evidence |
 |------|--------|----------|
-| phase0-merge-pr144 | **BLOCKED** | PR #144 open; `mergeStateStatus: BLOCKED`; fixes for `deny.toml`, `integration.yaml`, docs links committed; merge deferred |
-| phase1-replay-security | **Pending merge** | Replay `replay-tests` green on PR; security `deny` fix pushed |
-| phase1-platform-lean | **Preemptive** | `Invariants.lean` in `lean-style.yaml` ENFORCED; `Lean Style Check` pass |
-| phase1-bench-docs | **Pending merge** | `make docs-strict` local pass; docs-build fix in branch |
-| phase1-remaining-workflows | **Not started** | Post-merge runbook commands documented |
-| phase2-f33-policy | **Partial** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry remain |
-| phase3-hardening-proof | **Wired** | F01/F03-F05/F21 in workflows; main proof awaits merge |
-| phase4-signoff | **Updated** | This document; 68/68 not claimed |
+| phase0-merge-pr144 | **BLOCKED** | PR #144 open; head `518735c6`; 4/5 branch-protection checks green on prior push; `CI required checks` + GitHub review pending; merge **not executed** |
+| phase1-replay-security | **NOT STARTED (main)** | PR-only green: `replay-tests`, `deny` [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163); post-merge cluster proof blocked on merge |
+| phase1-platform-lean | **NOT STARTED (main)** | `Invariants.lean` ENFORCED; `integration` compose smoke fix `05d9cd6a`; re-run [28583016953](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583016953) queued |
+| phase1-bench-docs | **NOT STARTED (main)** | `Documentation Build` PR green [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001); Criterion baseline refresh not dispatched on `main` |
+| phase1-remaining-workflows | **NOT STARTED** | `main` 13/68; inventory refresh deferred until merge |
+| phase2-f33-policy | **PARTIAL** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry; `MicroInterp.lean` 2 sorry |
+| phase3-hardening-proof | **WIRED ONLY** | F01/F03-F05/F21 in workflows; no `main` CI run IDs |
+| phase4-signoff | **IN PROGRESS** | Docs updated with PR run IDs; 68/68 **not claimed** |
 
 ---
 
@@ -120,7 +120,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Code remediation is complete for merge.** Wave 7 Phase 0 is **blocked** on PR #144 CI (`deny`, `integration`, `Documentation Build` failures triaged and fixed in branch; fresh run required). The program bottleneck remains **landing on `main` and proving CI clusters green twice** — not re-doing F16/F27/F38. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main`.
+**Code remediation is complete for merge.** Wave 7 Phase 0 is **blocked** on PR #144: **`CI required checks`** must go green on head `518735c6`, **`integration`** compose smoke must pass with tool-broker Docker fix (`05d9cd6a`), and a **GitHub approving review** is required (`REVIEW_REQUIRED`). Four branch-protection checks (`smoke`, `evidence-schema-only`, `Documentation Build`, `deny`) already passed on the prior push. The program bottleneck remains **landing on `main` and proving CI clusters green twice** — not re-doing F16/F27/F38. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main`.
 
 ---
 
