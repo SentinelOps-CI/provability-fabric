@@ -33,7 +33,7 @@ pub struct SidecarAuditLine {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct CapabilityCatalog {
+pub(crate) struct CapabilityCatalog {
     capabilities: Vec<CapabilityEntry>,
     principal_roles_by_capability: HashMap<String, Vec<String>>,
 }
@@ -84,6 +84,15 @@ fn resolve_capability_id(
     Err(anyhow!("no catalog capability for effect {effect_kind}"))
 }
 
+fn resource_pattern_for(catalog: &CapabilityCatalog, capability_id: &str) -> String {
+    catalog
+        .capabilities
+        .iter()
+        .find(|c| c.id == capability_id)
+        .map(|c| c.resource_pattern.clone())
+        .unwrap_or_else(|| "mcp:*".to_string())
+}
+
 fn roles_for_capability(catalog: &CapabilityCatalog, capability_id: &str) -> Vec<String> {
     catalog
         .principal_roles_by_capability
@@ -119,7 +128,7 @@ fn principal_object(
 }
 
 /// Map a sidecar audit line to `pf-core.runtime_observation.v1`.
-pub fn emit_runtime_observation(
+pub(crate) fn emit_runtime_observation(
     line: &SidecarAuditLine,
     catalog: &CapabilityCatalog,
 ) -> Result<Value> {
@@ -175,7 +184,7 @@ pub fn emit_runtime_observation(
     string_field(&mut capability, "schema_version", "pf-core.capability.v0".to_string());
     string_field(&mut capability, "id", capability_id.clone());
     string_field(&mut capability, "effect_kind", effect_kind.clone());
-    string_field(&mut capability, "resource_pattern", "mcp:*".to_string());
+    string_field(&mut capability, "resource_pattern", resource_pattern_for(catalog, &capability_id));
 
     let mut effect = Map::new();
     string_field(&mut effect, "schema_version", "pf-core.effect.v0".to_string());
