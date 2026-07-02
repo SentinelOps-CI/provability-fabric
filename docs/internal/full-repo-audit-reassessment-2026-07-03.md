@@ -8,9 +8,9 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Scope | Detail |
 |-------|--------|
-| **Code state** | Remediation on branch `audit-remediation-merge` — **not merged to `main`** until PR #144 CI green. |
-| **CI on `main`** | **13 / 68** gated workflows green (inventory 2026-07-03); unchanged until merge. |
-| **PR #144 CI** | Head `518735c6`; latest CI [28583017161](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583017161) queued. Prior push: branch checks **smoke** [84746594873](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84746594873), **evidence-schema-only** [84744736821](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582133952/job/84744736821), **Documentation Build** [84744733843](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001/job/84744733843), **deny** [84744734402](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163/job/84744734402) green; **CI required checks** awaiting green on `518735c6`. **Review:** `REVIEW_REQUIRED`. |
+| **Code state** | **Merged to `main`** at `95bcd563` (PR #136 + #144, 2026-07-03). |
+| **CI on `main`** | Post-merge inventory **5 / 68** gated workflows green (2026-07-03); **43 push workflows queued** on first merge wave (runs `28585705xxx`). Pre-merge baseline was 13/68. |
+| **Main CI** | [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) queued on `95bcd563`. |
 | **Local gates** | All merge-gate commands below passed on working tree (2026-07-03). |
 | **68/68 sign-off** | **Not claimed.** Requires two consecutive `ci_workflow_inventory.sh` exit 0 on `main`. |
 
@@ -23,7 +23,7 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 | Findings DONE | 32 | **36** |
 | Findings PARTIAL | 6 | **3** (F23, F24, F33 root Policy + MicroInterp) |
 | Findings OPEN | 1 (F38) | **0** |
-| Gated workflows green on `main` | 13 / 68 | **13 / 68** (pending merge) |
+| Gated workflows green on `main` | 13 / 68 | **5 / 68** post-merge snapshot (43 queued); refresh after wave completes |
 | Sidecar production unwrap/expect | 40 | **0** (`--max 10`) |
 | Ledger `any` | 76 | **0** (`--max 20`) |
 | CI honesty unjustified | 59 | **0** (56 justified) |
@@ -48,7 +48,7 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 | `make docs-strict` | **0** | mkdocs strict |
 | `tests/replay/test_docker_invocation.sh` | skip/win | Docker required; wired in CI |
 | `bash scripts/linux_validation_checklist.sh` | partial/win | All non-Docker steps pass on Windows |
-| `scripts/ci_workflow_inventory.ps1 -Markdown` | **1** | 13/68 green on `main` |
+| `scripts/ci_workflow_inventory.ps1 -Markdown` | **1** | 5/68 green on `main` post-merge (`95bcd563`); 43 workflows queued |
 
 ---
 
@@ -80,19 +80,32 @@ F38 ESLint 9 migration complete (root flat config + packages).
 
 | ID | Hardening | Wired in CI | Main proof |
 |----|-----------|-------------|------------|
-| F01 | `PF_ENFORCE_DSSE=1` | `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | Pending merge; local pass |
-| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | `env_config::enabled_tools_deny_by_default` in `sidecar-watcher --lib` tests (`reusable-ci-rust.yml`) + compose `PF_ENABLED_TOOLS=` | Pending merge |
-| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | Pending merge; submodule init fixed |
-| F05 | retrieval-gateway | `retrieval-gateway.yml` | PR pass [28576347539](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347539); no `main` run yet |
-| F21 | Compose smoke | `integration.yaml` → `docker-compose-smoke.sh` | Pending merge Linux CI |
+| F01 | `PF_ENFORCE_DSSE=1` | `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | Main run pending [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) queued |
+| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | `env_config::enabled_tools_deny_by_default` in `sidecar-watcher --lib` tests (`reusable-ci-rust.yml`) + compose `PF_ENABLED_TOOLS=` | Main CI queued |
+| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085) queued |
+| F05 | retrieval-gateway | `retrieval-gateway.yml` | [28585706166](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706166) queued |
+| F21 | Compose smoke | `integration.yaml` → `docker-compose-smoke.sh` | [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085) queued |
 
 ---
 
-## Wave 7 execution log (2026-07-03, session 2)
+## Wave 7 execution log (2026-07-03, session 3 — post-merge)
 
 | Todo | Status | Evidence |
 |------|--------|----------|
-| phase0-merge-pr144 | **BLOCKED** | PR #144 open; head `518735c6`; 4/5 branch-protection checks green on prior push; `CI required checks` + GitHub review pending; merge **not executed** |
+| phase0-merge-pr144 | **DONE** | Merged `95bcd563` (PR #136 + #144) to `main` |
+| phase1-replay-security | **IN PROGRESS** | 43 post-merge runs queued (`28585705xxx`); cluster helper all `no_run`/pending |
+| phase1-platform-lean | **IN PROGRESS** | `integration.yaml` [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085), `paper-conformance.yaml` [28585705694](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705694) queued |
+| phase1-bench-docs | **IN PROGRESS** | `docs-build.yaml` [28585705338](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705338) queued; Criterion [28585900934](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585900934) queued |
+| phase1-remaining-workflows | **IN PROGRESS** | Inventory **5/68** honest snapshot; refresh after queue drains |
+| phase2-f33-policy | **PARTIAL** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry; `MicroInterp.lean` 2 sorry |
+| phase3-hardening-proof | **IN PROGRESS** | F01/F03-F05/F21 runs queued on `95bcd563`; no conclusions yet |
+| phase4-signoff | **IN PROGRESS** | Docs + inventory refreshed; 68/68 **not claimed** |
+
+### Wave 7 execution log (2026-07-03, session 2 — superseded)
+
+| Todo | Status | Evidence |
+|------|--------|----------|
+| phase0-merge-pr144 | **DONE** | Superseded by session 3 merge |
 | phase1-replay-security | **NOT STARTED (main)** | PR-only green: `replay-tests`, `deny` [28582134163](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134163); post-merge cluster proof blocked on merge |
 | phase1-platform-lean | **NOT STARTED (main)** | `Invariants.lean` ENFORCED; `integration` compose smoke fix `05d9cd6a`; re-run [28583016953](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583016953) queued |
 | phase1-bench-docs | **NOT STARTED (main)** | `Documentation Build` PR green [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001); Criterion baseline refresh not dispatched on `main` |
@@ -120,7 +133,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Code remediation is complete for merge.** Wave 7 Phase 0 is **blocked** on PR #144: **`CI required checks`** must go green on head `518735c6`, **`integration`** compose smoke must pass with tool-broker Docker fix (`05d9cd6a`), and a **GitHub approving review** is required (`REVIEW_REQUIRED`). Four branch-protection checks (`smoke`, `evidence-schema-only`, `Documentation Build`, `deny`) already passed on the prior push. The program bottleneck remains **landing on `main` and proving CI clusters green twice** — not re-doing F16/F27/F38. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main`.
+**Code remediation merged to `main` (`95bcd563`).** Wave 7 Phase 1 is **in progress**: post-merge inventory reports **5/68** green with **43 workflows queued** on the first push wave. Cluster proof (replay, security, platform, lean, bench) awaits run conclusions — main CI [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) still queued. **PR #143** (dependabot docs) rebased; CI [28586333806](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28586333806) pending — merge blocked until **CI required checks**, **smoke**, **evidence-schema-only**, **Documentation Build** green. **PR #138** remains **CONFLICTING** with `main`. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main` twice.
 
 ---
 
