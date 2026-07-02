@@ -5,7 +5,7 @@ Land local audit remediation (36/39 findings DONE, 3 PARTIAL) onto `main` to unb
 - **Trust chain (F01–F02, F17, F25):** Cross-language DSSE verify (Go/Rust/TS); fail-closed when `PF_ENFORCE_DSSE=1`; deny-by-default `PF_ENABLED_TOOLS`; evidence hash enforcement.
 - **Runtime / ledger (F03–F04, F11, F16, F22, F26–F28):** MCP tenant integration test; 0 production unwrap/expect; 0 ledger `any`; Docker CMD → `dist/index.js`; 23+ Jest tests.
 - **CI honesty + Wave 7 prep (F06, F10, F13–F14, F19–F20):** `audit_ci_honesty.py` gate in `ci.yml`; replay Docker contract test; sidecar `integration_tests` with `PF_SHADOW_MODE=1`; `PF_SHADOW_MODE` on paper-conformance; compose smoke in integration workflow.
-- **Lean F33:** `Invariants.lean` sorry-free (0 remaining); `generateCertificate` + egress cert lemmas proved.
+- **Lean F33:** `Invariants.lean` sorry-free (0 remaining) + CI-enforced; `proofs/Policy.lean` sorry-free (4 proved).
 - **New workflow:** `retrieval-gateway.yml` (F05).
 
 ## Pre-merge gates (Linux required)
@@ -45,7 +45,7 @@ Windows: Docker replay + compose smoke steps skip without Docker; PR Ubuntu CI i
 | Status | Count | IDs |
 |--------|------:|-----|
 | DONE (local + awaiting main CI proof) | 36 | F01–F22, F25–F32, F34–F39 |
-| PARTIAL | 3 | F23 (Criterion baseline on main), F24 (paper-conformance ×2), F33 (Policy.lean sorries remain) |
+| PARTIAL | 3 | F23 (Criterion baseline on main), F24 (paper-conformance ×2), F33 (root `Policy.lean` 4 sorry + MicroInterp 2) |
 | OPEN | 0 | — |
 
 **Not claiming 67/67** until inventory exits 0 twice on `main`.
