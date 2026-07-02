@@ -516,3 +516,5 @@ quick-start: build demo-up
 	@$(ECHOOK) ""
 	@$(ECHOOK) "⚙️  For SRE/Platform:"
 	@$(ECHOOK) "  Monitor SLOs → check cert validation → roll back epochs → fetch artifacts"
+
+# ci: path-filter trigger for evidence smoke merge gate (docs-only PR #143)
