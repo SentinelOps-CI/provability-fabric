@@ -195,7 +195,7 @@ impl LeanInterface {
                 }
             }
             Action::Grant {
-                principal: target,
+                principal: _target,
                 action: _,
             } => principal.roles.contains(&"admin".to_string()),
         }
@@ -335,7 +335,7 @@ impl PolicyAdapter {
         // Validate witness and label derivation for high assurance mode
         let (path_witness_ok, label_derivation_ok) = if self.config.witness_validation {
             match action {
-                Action::Read { doc, path } => {
+                Action::Read { doc: _, path } => {
                     let witness_ok = self
                         .witness_validator
                         .validate_merkle_path(path, &ctx.session);
@@ -344,7 +344,7 @@ impl PolicyAdapter {
                         .validate_label_derivation("", "", &[]);
                     (witness_ok, label_ok)
                 }
-                Action::Write { doc, path } => {
+                Action::Write { doc: _, path } => {
                     let witness_ok = self
                         .witness_validator
                         .validate_merkle_path(path, &ctx.session);
@@ -541,7 +541,7 @@ impl WorldState {
         }
     }
 
-    pub fn has_path_witness(&self, doc: &DocId, path: &[String]) -> bool {
+    pub fn has_path_witness(&self, doc: &DocId, _path: &[String]) -> bool {
         // In a real implementation, this would check Merkle path witnesses
         // For now, we'll simulate this
         self.documents.contains_key(doc)

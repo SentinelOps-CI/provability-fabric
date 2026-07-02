@@ -54,7 +54,7 @@ jobs:
       - name: Build and deploy full stack
         run: |
           # Build images
-          docker build -t provability-fabric/sidecar-watcher:test runtime/sidecar-watcher/
+          docker build -f runtime/sidecar-watcher/Dockerfile -t provability-fabric/sidecar-watcher:test .
           docker build -t provability-fabric/admission-controller:test runtime/admission-controller/
           docker build -t provability-fabric/ledger:test runtime/ledger/
           docker build -t provability-fabric/attestor:test runtime/attestor/

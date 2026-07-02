@@ -200,7 +200,7 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
 
             // Process events from ring buffer
             let mut batch_count = 0;
-            while let Some(event) = ring_buffer.pop() {
+            while let Some(_event) = ring_buffer.pop() {
                 // Process the event here
                 // For now, just count it
                 batch_count += 1;
@@ -554,7 +554,8 @@ mod tests {
 
     #[test]
     fn test_performance_benchmark() {
-        let buffer = Arc::new(LockFreeRingBuffer::new(10000));
+        // Capacity must exceed push count: single-threaded push cannot drain while filling.
+        let buffer = Arc::new(LockFreeRingBuffer::new(100_000));
 
         // Benchmark push operations
         let start = Instant::now();

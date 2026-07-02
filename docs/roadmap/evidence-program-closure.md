@@ -22,7 +22,7 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-03, Wave 7 session 2):** Local audit remediation program complete for code gates. Evidence lane remains **green** on `main`. Repo-wide CI is **not** fully green — inventory reports **13/68** gated workflows green. **PR #144 not merged** — head `518735c6`; CI fixes landed (`Cargo.lock`, ledger/typescript locks, pf `go.sum`, tool-broker Docker workspace, ci-honesty justifications); branch checks **smoke**/**evidence-schema-only**/**Documentation Build**/**deny** green on prior push; **`CI required checks`** + approving review pending. See [merge-readiness-checklist.md](../internal/merge-readiness-checklist.md), [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md), and [full-repo-audit-reassessment-2026-07-03.md](../internal/full-repo-audit-reassessment-2026-07-03.md).
+**Current posture (2026-07-03, Wave 7 session 4 — merge poll):** PR #136 + #144 **merged** to `main` at `95bcd563`. Post-merge inventory: **24/68** gated workflows green (2026-07-03T13:35Z snapshot; 44 red, 18 unknown). **No merges** of #145 (closed → #146), #143, or #138 — none had all four branch-protection checks green. **PR #146** (`ci/wave7-post-merge-fixes`) is the canonical cluster-fix PR; `171ed295` adds admission-controller `go.sum` fix for `ci-go-node`. **PR #138** blocked: `CI required checks` fail, `smoke` cancelled. **68/68 not claimed.** See [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
 
 **Do not claim 68/68** until `scripts/ci_workflow_inventory.sh` exits 0 twice consecutively on `main`.
 
@@ -95,9 +95,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Post-#134 (`f55a98bd`) | 67 | 12 | 52 | 21 |
 | Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
-| Wave 7 execution (2026-07-03) | 68 | 13 | 55 | — |
-
-**PR #144:** not merged. CI snapshot run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710). Key PR passes: `ci-honesty` [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710), `replay-tests` [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480), `retrieval-gateway` [28576347539](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347539), `Lean Style Check` [28576347346](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347346).
+| Wave 7 post-merge (2026-07-03, `95bcd563`) | 68 | 5 | 63 | 18 queued |
 
 ### Path to 67/67 (Wave 7)
 

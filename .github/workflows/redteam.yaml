@@ -79,9 +79,8 @@ jobs:
           docker build -t provability-fabric/admission-controller:test .
           kind load docker-image provability-fabric/admission-controller:test --name redteam-test
 
-          # Build sidecar watcher
-          cd ../sidecar-watcher
-          docker build -t provability-fabric/sidecar-watcher:test .
+          # Build sidecar watcher (repo-root context for pf-dsse path dep)
+          docker build -f runtime/sidecar-watcher/Dockerfile -t provability-fabric/sidecar-watcher:test .
           kind load docker-image provability-fabric/sidecar-watcher:test --name redteam-test
 
       - name: Deploy admission controller

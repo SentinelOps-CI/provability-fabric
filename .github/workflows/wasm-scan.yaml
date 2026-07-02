@@ -31,9 +31,11 @@ jobs:
 
       - name: Install wasm-objdump
         run: |
-          # Install wasm-objdump from wabt
-          curl -L https://github.com/WebAssembly/wabt/releases/download/1.0.33/wabt-1.0.33-linux.tar.gz | tar xz
-          sudo cp wabt-1.0.33/bin/wasm-objdump /usr/local/bin/
+          # Install wasm-objdump from wabt (1.0.33 tarball removed upstream)
+          curl -fsSL -o wabt.tar.gz \
+            https://github.com/WebAssembly/wabt/releases/download/1.0.41/wabt-1.0.41-linux-x64.tar.gz
+          tar xzf wabt.tar.gz
+          sudo cp wabt-1.0.41/bin/wasm-objdump /usr/local/bin/
 
       - name: Build WASM sandbox
         run: |

@@ -36,7 +36,7 @@ jobs:
         include:
           - service: sidecar-watcher
             dockerfile: runtime/sidecar-watcher/Dockerfile
-            context: runtime/sidecar-watcher
+            context: .
           - service: egress-firewall
             dockerfile: runtime/egress-firewall/Dockerfile
             context: runtime/egress-firewall
@@ -54,7 +54,9 @@ jobs:
       - name: Stage workspace Cargo.lock for Docker build
         run: |
           cargo generate-lockfile
-          cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
+          if [ "${{ matrix.context }}" != "." ]; then
+            cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

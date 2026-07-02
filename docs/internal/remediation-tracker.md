@@ -10,23 +10,23 @@ Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit
 
 ## CI baseline (Wave 0 inventory)
 
-Captured on Windows via `powershell -File scripts/ci_workflow_inventory.ps1 -ListOnly` (2026-07-01; requires `gh` CLI authenticated to repo).
+Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-03 post-merge; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
 
 | Metric | Count |
 |--------|------:|
-| Total workflow files | 85 |
+| Total workflow files | 86 |
 | Gated (push/schedule on `main`) | 68 |
-| Latest run **success** | 13 |
-| Latest run **failure / in_progress / cancelled** | 53 |
-| No run / unknown | 19 |
+| Latest run **success** | 5 |
+| Latest run **failure / in_progress / cancelled** | 63 |
+| No run / unknown (queued) | 18 |
 
-**Green (13):** `actionlint.yml`, `bench-swebench-smoke.yaml`, `cert-validate.yml`, `chaos-nightly.yaml`, `ci.yml`, `ci-nightly-pytest.yml`, `ci-weekly-full.yml`, `evidence.yaml`, `evidence-v01-smoke.yml`, `proof-bot.yaml`, `proto-compat.yaml`, `scorecards.yml`, `standards-pin.yml`.
+**Green (5, post-merge snapshot):** `chaos-nightly.yaml`, `ci-nightly-pytest.yml`, `ci-weekly-full.yml`, `evidence.yaml`, `proof-bot.yaml` — prior scheduled runs; **43 push workflows queued** on merge commit `95bcd563` (runs `28585705xxx`).
 
-**No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml`.
+**No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml` (first post-merge run queued for policy-build).
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** Local remediation is **not yet merged to `main`**; inventory on `main` remains 13/68 until merge + Linux CI validation. **PR #144** head `518735c6` — CI gate fixes landed 2026-07-03; merge blocked on **`CI required checks`** + GitHub review. Merge PR prep: [merge-readiness-checklist.md](merge-readiness-checklist.md), [merge-pr-body.md](merge-pr-body.md).
+**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). Post-merge honest inventory **24/68** green (2026-07-03T13:35Z); pre-merge baseline was **13/68**. Session 4 merge poll: **0 merges** (#145 closed in favor of #146; #143/#138 blocked on required checks). PR [#146](https://github.com/SentinelOps-CI/provability-fabric/pull/146) pushed `171ed295` (admission-controller `go.sum`); still blocked on `ci-go-node` re-run + `REVIEW_REQUIRED` + path-filtered `smoke`/`evidence-schema-only`. Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
@@ -114,7 +114,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
 | 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
-| 7 | CI green program | All CI clusters | 67/67 gated green twice on main | **IN PROGRESS** — Phase 0/1 local prep complete; merge + two consecutive green runs still required |
+| 7 | CI green program | All CI clusters | 67/67 gated green twice on main | **IN PROGRESS** — merged `95bcd563`; post-merge inventory **24/68**; PR #146 fixes wasm-scan/policy-gates/CodeQL pending merge |
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DOCUMENTED** | `bench/BASELINE.md` + `bench-nightly-criterion.yaml` `workflow_dispatch` input |
 
-**Still pending merge / main CI:** replay cluster green twice, platform/security clusters, 67/67 inventory. See [merge-readiness-checklist.md](merge-readiness-checklist.md).
+**Still pending main CI proof:** replay cluster green twice, platform/security clusters, 67/68 inventory. Merge landed `95bcd563`; see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 

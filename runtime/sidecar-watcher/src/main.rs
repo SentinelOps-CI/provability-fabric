@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use hyper::{
     service::{make_service_fn, service_fn},

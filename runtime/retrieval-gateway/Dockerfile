@@ -5,12 +5,17 @@
 
 FROM rust:1.88-bookworm AS builder
 WORKDIR /app
-
-COPY Cargo.toml Cargo.lock ./
-COPY runtime/retrieval-gateway/Cargo.toml runtime/retrieval-gateway/
-COPY core/crypto/dsse-rs/Cargo.toml core/crypto/dsse-rs/
-COPY core/crypto/dsse-rs/src core/crypto/dsse-rs/src
-COPY runtime/retrieval-gateway/src runtime/retrieval-gateway/src
+COPY core/crypto/dsse-rs ./core/crypto/dsse-rs
+COPY runtime/retrieval-gateway ./runtime/retrieval-gateway
+# Minimal workspace: root Cargo.toml lists members not copied into this context.
+RUN cat > Cargo.toml <<'EOF'
+[workspace]
+members = [
+    "core/crypto/dsse-rs",
+    "runtime/retrieval-gateway",
+]
+resolver = "2"
+EOF
 RUN cargo build --release -p retrieval-gateway
 
 FROM debian:bookworm-slim

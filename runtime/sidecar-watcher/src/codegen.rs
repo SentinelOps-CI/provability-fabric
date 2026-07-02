@@ -277,18 +277,16 @@ impl HotRuleCodegen {
             branch_predictions += 1;
 
             match pattern.event_kind {
-                EventKind::Call => {
-                    if pattern.call_tag.is_some() {
-                        estimated_cycles += 1; // Compare call_tag
-                        branch_predictions += 1;
-                    }
+                EventKind::Call if pattern.call_tag.is_some() => {
+                    estimated_cycles += 1; // Compare call_tag
+                    branch_predictions += 1;
                 }
-                EventKind::Emit => {
-                    if pattern.emit_bucket.is_some() {
-                        estimated_cycles += 1; // Compare emit_bucket
-                        branch_predictions += 1;
-                    }
+                EventKind::Call => {}
+                EventKind::Emit if pattern.emit_bucket.is_some() => {
+                    estimated_cycles += 1; // Compare emit_bucket
+                    branch_predictions += 1;
                 }
+                EventKind::Emit => {}
                 _ => {}
             }
 

@@ -161,8 +161,8 @@ services:
 
   runtime-sidecar:
     build:
-      context: ./runtime/sidecar-watcher
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: runtime/sidecar-watcher/Dockerfile
     ports:
       - "8006:8006"
       # - "9090:9090"
