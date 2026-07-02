@@ -245,7 +245,7 @@ def GlobalNonInterference (monitor : NIMonitor) (prefixes : List NIPrefix) : Pro
 theorem soundness : ∀ (u : Principal) (a : Action) (γ : Ctx),
   permitD u a γ = true → Permit u a γ := by
   intro u a γ h
-  rcases a with
+  cases a with
   | Call tool =>
     cases tool <;> intro h <;> simpa [Permit, permitD] using h
   | Read doc path =>
@@ -259,7 +259,7 @@ theorem soundness : ∀ (u : Principal) (a : Action) (γ : Ctx),
 theorem completeness : ∀ (u : Principal) (a : Action) (γ : Ctx),
   Permit u a γ → permitD u a γ = true := by
   intro u a γ h
-  rcases a with
+  cases a with
   | Call tool =>
     cases tool <;> intro h <;> simpa [Permit, permitD] using h
   | Read doc path =>
@@ -285,17 +285,16 @@ theorem read_requires_label_flow : ∀ (u : Principal) (doc : DocId) (path : Lis
   permitD u (Action.Read doc path) γ = false := by
   intro u doc path γ ⟨hadmin, hreader, howner, _⟩
   have hdeny :
-      ¬(u.roles.contains "reader" || u.roles.contains "admin" ||
-          (u.roles.contains "owner" && u.org == "owner_org")) := by
-    intro hperm
-    simp only [Bool.or_eq_true, Bool.and_eq_true] at hperm
-    rcases hperm with h | h | ⟨ho, heq⟩
-    · exact hreader (by simpa [h])
-    · exact hadmin (by simpa [h])
+      (u.roles.contains "reader" || u.roles.contains "admin" ||
+          (u.roles.contains "owner" && u.org == "owner_org")) = false := by
+    rw [Bool.eq_false_iff]
+    intro htrue
+    rw [Bool.eq_true_iff] at htrue
+    rcases htrue with h | h | ⟨ho, heq⟩
+    · exact hreader h
+    · exact hadmin h
     · exact howner ⟨ho, heq⟩
-  simp only [permitD, Bool.eq_false_iff]
-  intro hperm
-  exact hdeny (by simpa [Bool.eq_false_iff] using hperm)
+  simp [permitD, hdeny]
 
 /-- Monitor acceptance alone yields the first conjunct of global NI.
     Label-coherence across prefixes requires an explicit policy invariant (not yet
