@@ -8,6 +8,54 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
+## Status (2026-07-03 — Wave 7 execution)
+
+**PR #144 not merged.** `audit-remediation-merge` is blocked on CI (`mergeStateStatus: BLOCKED`). Phase 0 fixes pushed; awaiting fresh Ubuntu CI run.
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| 0 — Merge gate | **BLOCKED** | [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144); CI run [28576347710](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347710) |
+| 1.1 Replay cluster | **Pending merge** | `replay-tests` pass on PR [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480) |
+| 1.2 Security cluster | **Pending merge** | `deny` fail pre-fix [28576347505](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347505); `deny.toml` updated |
+| 1.3 Platform cluster | **Pending merge** | `integration` fail pre-fix [28576347398](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347398); submodule init fixed |
+| 1.4 Lean + paper | **Preemptive** | `Invariants.lean` added to `lean-style.yaml` ENFORCED; `Lean Style Check` pass [28576347346](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347346) |
+| 1.5 Bench + docs | **Pending merge** | `Documentation Build` fail pre-fix [28576347536](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347536); `make docs-strict` pass locally |
+| 1.6 Remaining ~30 | **Not started** | `main` still 13/68 green |
+
+### Post-merge commands (run immediately after PR #144 lands)
+
+```bash
+# 1. Refresh inventory baseline
+bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-latest.md
+
+# 2. Cluster status helper
+bash scripts/wave7_cluster_status.sh
+
+# 3. Replay cluster (M1) — watch first main runs
+gh run list --workflow platform-replay.yml --branch main --limit 5
+gh run list --workflow replay.yml --branch main --limit 5
+
+# 4. Security cluster
+gh run list --workflow codeql.yaml --branch main --limit 5
+gh run list --workflow cargo-deny.yml --branch main --limit 5
+
+# 5. Platform cluster
+gh run list --workflow integration.yaml --branch main --limit 5
+gh run list --workflow slo-gates.yaml --branch main --limit 5
+
+# 6. Lean + paper (M2)
+gh run list --workflow paper-conformance.yaml --branch main --limit 5
+gh run list --workflow lean-style.yaml --branch main --limit 5
+
+# 7. Bench baseline refresh (M4)
+gh workflow run bench-nightly-criterion.yaml --ref main -f refresh_baseline=true
+
+# 8. Triage failures
+gh run view <run-id> --log-failed
+```
+
+---
+
 ## Prerequisites (Phase A complete)
 
 1. Merge PR **audit-remediation-merge** to `main` (no force-push).
