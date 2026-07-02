@@ -1,4 +1,5 @@
 name: Evidence v0.1 smoke
+# Path-filter trigger: required for branch-protection smoke + evidence-schema-only on CI-only PRs.
 
 on:
   pull_request:
