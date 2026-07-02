@@ -260,7 +260,7 @@ impl SnapshotStorage {
             .collect();
 
         // Sort by creation time (newest first)
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         // Apply limit
         if let Some(limit) = criteria.limit {
@@ -372,7 +372,7 @@ impl SnapshotStorage {
 
         // Sort by creation time (oldest first)
         let mut sorted_snapshots = snapshots;
-        sorted_snapshots.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        sorted_snapshots.sort_by_key(|a| a.created_at);
 
         // Delete oldest snapshots
         let to_delete = sorted_snapshots.len() - self.max_snapshots_per_decision;
