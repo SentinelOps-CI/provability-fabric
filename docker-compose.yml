@@ -233,8 +233,8 @@ services:
   retrieval-gateway:
     profiles: ["full"]
     build:
-      context: ./runtime/retrieval-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: runtime/retrieval-gateway/Dockerfile
     ports:
       - "8080:8080"
     environment:
