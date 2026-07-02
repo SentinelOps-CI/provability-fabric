@@ -26,8 +26,7 @@ jobs:
           if [ ! -f package.json ]; then npm init -y >/dev/null 2>&1; fi
           npm i -D typescript @types/node
           if [ ! -f tsconfig.json ]; then npx tsc --init >/dev/null 2>&1; fi
-          echo "import './index';" > check.ts
-          npx tsc --noEmit check.ts
+          npx tsc --noEmit
       - name: Validate emitted CERT shape (sample)
         run: |
           node -e "const {createCertMiddleware}=require('./adapters/express-cert-middleware/index.js'); const mw=createCertMiddleware({}); const req={method:'GET',originalUrl:'/health',headers:{}}; const res={ statusCode:200, on:(e,f)=>f() }; const next=()=>{}; console.log('OK');"
