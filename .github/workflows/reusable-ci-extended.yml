@@ -92,6 +92,21 @@ jobs:
               --ignore=tests/integration/test_violation_path.py
           fi
 
+      - name: Set up Node.js (DSSE TypeScript toolchain)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install DSSE TypeScript dependencies
+        run: |
+          set -euo pipefail
+          cd core/crypto/dsse-ts
+          if [ -f package-lock.json ]; then
+            npm ci --no-fund --no-audit
+          else
+            npm install --no-fund --no-audit
+          fi
+
       - name: Run cross-language DSSE tests (F01)
         run: python tests/crypto/test_cross_lang_dsse.py
 

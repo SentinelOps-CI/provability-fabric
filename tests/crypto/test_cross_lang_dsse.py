@@ -66,17 +66,13 @@ def test_rust_dsse_verify() -> None:
 
 
 def _find_tsc_cmd() -> list[str]:
-    tsc_js = (
-        REPO_ROOT
-        / "runtime"
-        / "ledger"
-        / "node_modules"
-        / "typescript"
-        / "bin"
-        / "tsc"
-    )
-    if tsc_js.exists():
-        return ["node", str(tsc_js)]
+    for rel in (
+        "core/crypto/dsse-ts/node_modules/typescript/bin/tsc",
+        "runtime/ledger/node_modules/typescript/bin/tsc",
+    ):
+        tsc_js = REPO_ROOT / rel
+        if tsc_js.exists():
+            return ["node", str(tsc_js)]
     return ["tsc"]
 
 
