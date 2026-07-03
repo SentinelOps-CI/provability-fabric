@@ -15,16 +15,8 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
+# Copy dependency files and source
 COPY Cargo.toml Cargo.lock ./
-
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release --target x86_64-unknown-linux-musl --no-default-features --features mimalloc
-
-# Copy source code
 COPY src/ ./src/
 
 # Build the application
@@ -63,7 +55,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
 
 # Run the application
 CMD ["./egress-firewall"]
