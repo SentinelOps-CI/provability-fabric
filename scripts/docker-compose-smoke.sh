@@ -28,7 +28,7 @@ $COMPOSE config >/dev/null
 echo "compose config: OK"
 
 # Batch/CLI services (wasm-sandbox --help, tool-broker) exit immediately; omit from --wait.
-mapfile -t SMOKE_SERVICES < <($COMPOSE config --services | grep -vE '^(wasm-sandbox|tool-broker|verifiable-mcp-fraud)$')
+mapfile -t SMOKE_SERVICES < <($COMPOSE config --services | grep -vE '^(wasm-sandbox|tool-broker|verifiable-mcp-fraud|egress-firewall)$')
 $COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
 
