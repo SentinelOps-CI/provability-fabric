@@ -27,7 +27,9 @@ fi
 $COMPOSE config >/dev/null
 echo "compose config: OK"
 
-$COMPOSE up -d --wait --timeout 180
+# Batch/CLI services (wasm-sandbox --help, tool-broker) exit immediately; omit from --wait.
+mapfile -t SMOKE_SERVICES < <($COMPOSE config --services | grep -vE '^(wasm-sandbox|tool-broker)$')
+$COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
 
 # Health endpoints for core services in full profile
