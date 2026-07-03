@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "provability-fabric-pf-core-wrapper"
+version = "0.6.0"
+description = "Thin wrapper delegating to pf-core-validator (Phase 7 PR-3)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "jsonschema>=4.0",
+  "referencing>=0.30",
+  "pf-core-validator @ git+https://github.com/SentinelOps-CI/provability-fabric-core.git@pf-core-v0.6.0#subdirectory=pf-core/validator",
+]
+
+[project.scripts]
+pf-core-validator = "pf_core_wrapper.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pf_core_wrapper*"]

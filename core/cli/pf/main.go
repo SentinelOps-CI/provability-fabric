@@ -59,6 +59,7 @@ func init() {
 	rootCmd.AddCommand(sign)
 	pfcmd.RegisterScienceClaimSign(sign)
 	pfcmd.RegisterPCSCommands(rootCmd)
+	rootCmd.AddCommand(pfCoreCmd())
 	rootCmd.AddCommand(checkTraceCmd())
 	rootCmd.AddCommand(watchCmd())
 	rootCmd.AddCommand(riskscoreCmd())
