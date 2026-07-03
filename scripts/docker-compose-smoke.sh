@@ -31,7 +31,6 @@ echo "compose config: OK"
 # demo apps, and platform microservices not required for compose/DB validation.
 SMOKE_SERVICES=(
   postgres redis runtime-sidecar ledger retrieval-gateway
-  prometheus grafana console
 )
 $COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
