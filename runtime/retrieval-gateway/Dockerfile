@@ -21,6 +21,8 @@ RUN cargo build --release -p retrieval-gateway
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget \
     && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY runtime/retrieval-gateway/abac.yaml ./abac.yaml
 COPY --from=builder /app/target/release/retrieval-gateway /usr/local/bin/
 EXPOSE 8080
 ENV PORT=8080
