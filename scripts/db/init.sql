@@ -37,7 +37,7 @@ ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy for tenant isolation
 CREATE POLICY tenant_isolation ON certificates
-    FOR ALL TO ALL
+    FOR ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Create audit_logs table for hash chain
@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_hash ON audit_logs(hash);
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY audit_tenant_isolation ON audit_logs
-    FOR ALL TO ALL
+    FOR ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Create policy_versions table
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_policy_versions_status ON policy_versions(status)
 ALTER TABLE policy_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY policy_tenant_isolation ON policy_versions
-    FOR ALL TO ALL
+    FOR ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Create epochs table
@@ -117,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_epochs_created_at ON epochs(created_at);
 ALTER TABLE epochs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY epoch_tenant_isolation ON epochs
-    FOR ALL TO ALL
+    FOR ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Create replay_jobs table
@@ -147,7 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_replay_jobs_started_at ON replay_jobs(started_at)
 ALTER TABLE replay_jobs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY replay_tenant_isolation ON replay_jobs
-    FOR ALL TO ALL
+    FOR ALL
     USING (tenant_id = current_setting('app.current_tenant', true));
 
 -- Insert sample data for demo

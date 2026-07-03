@@ -27,7 +27,12 @@ fi
 $COMPOSE config >/dev/null
 echo "compose config: OK"
 
-$COMPOSE up -d --wait --timeout 180
+# Long-running services exercised by this smoke (health curls below). Omit batch CLIs,
+# demo apps, and platform microservices not required for compose/DB validation.
+SMOKE_SERVICES=(
+  postgres redis runtime-sidecar ledger retrieval-gateway
+)
+$COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
 
 # Health endpoints for core services in full profile

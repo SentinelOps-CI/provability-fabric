@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client'
 import express from 'express'
 import { ApolloServer } from '@apollo/server'
 import { expressMiddleware } from '@apollo/server/express4'
-import { json } from 'body-parser'
+import bodyParser from 'body-parser'
 import cors from 'cors'
 import winston from 'winston'
 import {
@@ -52,7 +52,7 @@ export async function startProductionProfile(): Promise<void> {
   await mcpService.initialize()
 
   app.use(cors())
-  app.use(json())
+  app.use(bodyParser.json())
 
   registerRestRoutes(app, {
     prisma,
