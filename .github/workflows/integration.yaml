@@ -10,11 +10,17 @@ on:
       - "runtime/**"
       - "tests/integration/**"
       - ".github/workflows/integration.yaml"
+      - "docker-compose.yml"
+      - "scripts/db/**"
+      - "scripts/docker-compose-smoke.sh"
   pull_request:
     paths:
       - "runtime/**"
       - "tests/integration/**"
       - ".github/workflows/integration.yaml"
+      - "docker-compose.yml"
+      - "scripts/db/**"
+      - "scripts/docker-compose-smoke.sh"
 
 jobs:
   integration:
