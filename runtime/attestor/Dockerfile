@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     musl-dev \
     openssl-dev \
     pkgconfig \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+    && rustup target add x86_64-unknown-linux-musl
 
 # Set working directory
 WORKDIR /app
