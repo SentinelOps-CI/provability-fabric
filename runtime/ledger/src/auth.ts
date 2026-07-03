@@ -6,6 +6,8 @@ import { expressjwt as jwt } from 'express-jwt'
 import jwksRsa from 'jwks-rsa'
 import { PrismaClient } from '@prisma/client'
 import type { PeerCertificate } from 'tls'
+import https from 'node:https'
+import crypto from 'node:crypto'
 
 const prisma = new PrismaClient()
 
@@ -28,11 +30,11 @@ export const authMiddleware = jwt({
     jwksRequestsPerMinute: 5,
     jwksUri: process.env.JWKS_URI || `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
     // Add certificate chain pinning
-    requestAgent: new (require('https').Agent)({
+    requestAgent: new https.Agent({
       checkServerIdentity: (host: string, cert: PeerCertificate) => {
         // Certificate chain pinning validation
         const expectedPins = process.env.CERTIFICATE_PINS?.split(',') || [];
-        const certFingerprint = require('crypto')
+        const certFingerprint = crypto
           .createHash('sha256')
           .update(cert.raw)
           .digest('base64');

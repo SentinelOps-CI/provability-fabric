@@ -21,6 +21,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/db/init-ledger-db.sh:/docker-entrypoint-initdb.d/init-ledger-db.sh
     ports:
       - "5432:5432"
     healthcheck:
@@ -200,7 +201,7 @@ services:
       - PORT=4000
       - PF_ENFORCE_DSSE=1
       - PF_ENABLED_TOOLS=
-      - DATABASE_URL=postgresql://sentinelops:sentinelops_password@postgres:5432/sentinelops?schema=public
+      - DATABASE_URL=postgresql://sentinelops:sentinelops_password@postgres:5432/ledger?schema=public
       - SIDECAR_URL=http://runtime-sidecar:8006
     depends_on:
       postgres:

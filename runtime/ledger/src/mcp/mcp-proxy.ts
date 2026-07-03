@@ -10,10 +10,10 @@ import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
 import axios from 'axios';
-import { ToolSignatureManager } from './tool-signature-manager';
-import { CertificateManager } from './certificate-manager';
-import { EgressProfileManager } from './egress-profile-manager';
-import { JCSValidator } from './jcs-validator';
+import { ToolSignatureManager } from './tool-signature-manager.js';
+import { CertificateManager } from './certificate-manager.js';
+import { EgressProfileManager } from './egress-profile-manager.js';
+import { JCSValidator } from './jcs-validator.js';
 import type {
   JsonRpcRequest,
   PolicyEnforcementResult,
