@@ -5,7 +5,7 @@
 type Request = any;
 type Response = any;
 type NextFunction = any;
-import { ProvabilityFabricSDK } from '../index';
+import { ProvabilityFabricSDK, type TraceVerificationResult } from '../index';
 
 export interface PFMiddlewareOptions {
   sdk: ProvabilityFabricSDK;
@@ -33,11 +33,11 @@ export function pfMiddleware(options: PFMiddlewareOptions) {
 
       // Verify trace if requested
       if (verifyTrace && req.body?.trace) {
-        const traceVerification = await Promise.race([
+        const traceVerification: TraceVerificationResult = await Promise.race([
           sdk.verifyTrace(req.body.trace),
-          new Promise((_, reject) => 
+          new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Trace verification timeout')), timeout)
-          )
+          ),
         ]);
 
         if (!traceVerification.valid) {
