@@ -27,8 +27,12 @@ fi
 $COMPOSE config >/dev/null
 echo "compose config: OK"
 
-# Batch/CLI services (wasm-sandbox --help, tool-broker) exit immediately; omit from --wait.
-mapfile -t SMOKE_SERVICES < <($COMPOSE config --services | grep -vE '^(wasm-sandbox|tool-broker|verifiable-mcp-fraud|egress-firewall)$')
+# Long-running services exercised by this smoke (health curls below). Omit batch CLIs,
+# demo apps, and platform microservices not required for compose/DB validation.
+SMOKE_SERVICES=(
+  postgres redis runtime-sidecar ledger retrieval-gateway
+  prometheus grafana console
+)
 $COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
 
