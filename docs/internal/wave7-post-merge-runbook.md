@@ -8,23 +8,21 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-03 — Wave 7 post-merge, session 4)
+## Status (2026-07-15 — Wave 7 post-merge, session 5)
 
-**Merged:** PR #136 + #144 at `95bcd563` on `main`. **Canonical fix PR:** [#146](https://github.com/SentinelOps-CI/provability-fabric/pull/146) (duplicate [#145](https://github.com/SentinelOps-CI/provability-fabric/pull/145) closed 2026-07-03).
+**Merged:** PR #136 + #144 at `95bcd563`; **PR #146** merged 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL); **PR #151** at `ee68659c` (F21 compose postgres init, 2026-07-03). **Main head:** `ee68659c` (no push since 2026-07-03).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
-| 0 — Merge gate | **DONE** | `95bcd563` on `main` |
-| 0 — Fix PR #146 | **BLOCKED (queue + review)** | All PR checks **QUEUED** since 2026-07-02T11:51Z ([28587840412](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28587840412)); no approving review |
-| 1.1 Replay cluster | **PARTIAL (×1 green)** | `platform-replay` [28585705297](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705297), `replay` [28585705517](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705517), `morph-replay` [28585705516](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705516), `platform-cert` [28585705691](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705691) success; `nightly-replay` red (stale schedule [28568693881](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28568693881)) |
-| 1.2 Security cluster | **PARTIAL** | `scorecards` [28585706992](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706992), `cargo-deny` [28585705316](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705316) green; **red:** `wasm-scan` [28585705335](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705335), `codeql` [28585705418](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705418), `policy-gates` [28585707156](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585707156) — fixes in PR #146 |
-| 1.3 Platform cluster | **PARTIAL** | `retrieval-gateway` [28585706166](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706166) green; **red:** `integration` [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085), `multiarch-build` [28585705304](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705304), `demo-e2e` [28585705589](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705589) |
-| 1.4 Lean + paper | **IN PROGRESS** | `lean-style` [28585706852](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706852) green; `lean-offline` [28585705320](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705320) in_progress; `paper-conformance` [28585705694](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705694) queued |
-| 1.5 Bench + docs | **PARTIAL** | `docs-build` [28585705338](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705338) green; `bench-nightly-criterion` [28585900934](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585900934) in_progress |
-| 1.6 Remaining | **IN PROGRESS** | Honest inventory **24/68** green (2026-07-03T12:35Z snapshot); Actions queue still saturated |
-| **PR #146** | **OPEN (merge blocked)** | [ci/wave7-post-merge-fixes](https://github.com/SentinelOps-CI/provability-fabric/pull/146): wabt 1.0.41, retrieval-gateway Docker workspace, Policy.lean, CodeQL npm install |
-
-**PR #136 merge greens (pre-#144 re-queue):** platform-replay [28585643503](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585643503), integration [28585647206](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585647206), lean-style [28585643316](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585643316), scorecards [28585647213](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585647213). **Confirmed red on #144 wave:** wasm-scan [28585705335](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705335) (wabt 1.0.33 tarball; fixed in PR #146).
+| 0 — Merge gate | **DONE** | `ee68659c` on `main` |
+| 0 — PR #146 | **DONE** | Merged 2026-07-02; wasm-scan + CodeQL + retrieval-gateway Docker fixes |
+| 1.1 Replay cluster | **GREEN (×1+)** | `platform-replay` [28585705297](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705297), `replay` [28585705517](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705517), `morph-replay` [28585705516](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705516), `platform-cert` [28585705691](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705691) |
+| 1.2 Security cluster | **GREEN (×1+)** | `scorecards`, `cargo-deny`, `wasm-scan`, `codeql` green on `main` post-#146 |
+| 1.3 Platform cluster | **PARTIAL** | `integration` **green** [28639549743](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549743) (F10+F21); **red:** `multiarch-build` [28639549827](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549827) — fix in [PR #164](https://github.com/SentinelOps-CI/provability-fabric/pull/164); `demo-e2e` still red |
+| 1.4 Lean + paper | **IN PROGRESS** | `lean-style` green; `paper-conformance` red [29389589027](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29389589027) (scheduler heap ordering) — fix in [PR #163](https://github.com/SentinelOps-CI/provability-fabric/pull/163) |
+| 1.5 Bench + docs | **PARTIAL** | `docs-build` green; `bench-nightly-criterion` needs `refresh_baseline=true` dispatch (F23) |
+| 1.6 Remaining | **IN PROGRESS** | Honest inventory **38/69** green (2026-07-15); target 69/69 ×2 |
+| **Active PRs** | **#163, #164** | Scheduler priority fix (F24); native musl multiarch Docker build |
 
 ### Post-merge commands (run immediately after PR #144 lands)
 

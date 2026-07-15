@@ -1,32 +1,32 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-03** (local test pass).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-15** (main @ `ee68659c`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
-**North-star:** 67/67 gated workflows green with honest gates; trust chain fail-closed; burn-down reflects code reality.
+**North-star:** 69/69 gated workflows green with honest gates; trust chain fail-closed; burn-down reflects code reality.
 
 ---
 
 ## CI baseline (Wave 0 inventory)
 
-Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-03 post-merge; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
+Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-15; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
 
 | Metric | Count |
 |--------|------:|
-| Total workflow files | 86 |
-| Gated (push/schedule on `main`) | 68 |
-| Latest run **success** | 5 |
-| Latest run **failure / in_progress / cancelled** | 63 |
+| Total workflow files | 87 |
+| Gated (push/schedule on `main`) | 69 |
+| Latest run **success** | 38 |
+| Latest run **failure / in_progress / cancelled** | 31 |
 | No run / unknown (queued) | 18 |
 
-**Green (5, post-merge snapshot):** `chaos-nightly.yaml`, `ci-nightly-pytest.yml`, `ci-weekly-full.yml`, `evidence.yaml`, `proof-bot.yaml` — prior scheduled runs; **43 push workflows queued** on merge commit `95bcd563` (runs `28585705xxx`).
+**Green snapshot (38/69, 2026-07-15):** replay cluster, security baseline (`cargo-deny`, `scorecards`, `wasm-scan`), `integration.yaml` ([28639549743](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549743)), `retrieval-gateway.yml`, `proto-compat.yaml`, `privacy-test.yaml`, `proof-bot.yaml`, and related scheduled/nightly lanes — see inventory for full list.
 
-**No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml` (first post-merge run queued for policy-build).
+**No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml` (awaiting trigger).
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). Post-merge honest inventory **24/68** green (2026-07-03T13:35Z); pre-merge baseline was **13/68**. Session 4 merge poll: **0 merges** (#145 closed in favor of #146; #143/#138 blocked on required checks). PR [#146](https://github.com/SentinelOps-CI/provability-fabric/pull/146) pushed `171ed295` (admission-controller `go.sum`); still blocked on `ci-go-node` re-run + `REVIEW_REQUIRED` + path-filtered `smoke`/`evidence-schema-only`. Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). **PR #146 merged** 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL). **PR #151 merged** at `ee68659c` (2026-07-03, F21 compose postgres init). Post-merge honest inventory **38/69** green (2026-07-15); integration F10+F21 green on `main`. Active cluster fixes: paper-conformance scheduler ([PR #163](https://github.com/SentinelOps-CI/provability-fabric/pull/163)), multiarch native musl ([PR #164](https://github.com/SentinelOps-CI/provability-fabric/pull/164)). Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
@@ -114,7 +114,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
 | 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
-| 7 | CI green program | All CI clusters | 67/67 gated green twice on main | **IN PROGRESS** — merged `95bcd563`; post-merge inventory **24/68**; PR #146 fixes wasm-scan/policy-gates/CodeQL pending merge |
+| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `ee68659c` on `main`; inventory **38/69** green (2026-07-15); PR #146 merged; integration F10+F21 green; paper-conformance + multiarch fixes in flight (#163, #164) |
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DOCUMENTED** | `bench/BASELINE.md` + `bench-nightly-criterion.yaml` `workflow_dispatch` input |
 
-**Still pending main CI proof:** replay cluster green twice, platform/security clusters, 67/68 inventory. Merge landed `95bcd563`; see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Still pending main CI proof:** paper-conformance + multiarch clusters (PRs #163/#164), bench baseline refresh (F23), 69/69 inventory ×2. Main @ `ee68659c`; integration green — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
