@@ -36,6 +36,8 @@ jobs:
     name: Build Multi-Arch Images
     runs-on: ubuntu-latest
     strategy:
+      # Let other matrix images finish push even if one job fails (e.g. cache backend).
+      fail-fast: false
       matrix:
         include:
           - service: sidecar-watcher
@@ -105,7 +107,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || 'type=gha,mode=max' }}
+          # ignore-error: GHA cache export 400s must not fail the job after a successful
+          # GHCR push (build+push is the gate; cache is best-effort).
+          cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || 'type=gha,mode=max,ignore-error=true' }}
 
       - name: Image size report
         if: github.event_name != 'pull_request'
