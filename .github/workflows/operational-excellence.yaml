@@ -360,13 +360,13 @@ jobs:
 
       - name: Run performance benchmarks
         run: |
-          cd scripts
-          python bench.py --count 10000 --output perf-results.json
+          # Run from repo root so bench.py can find runtime/sidecar-watcher.
+          python scripts/bench.py --count 10000 --output scripts/perf-results.json
 
           # Analyze results
           python -c "
           import json
-          with open('perf-results.json') as f:
+          with open('scripts/perf-results.json') as f:
               data = json.load(f)
           print(f'Average latency: {data[\"avg_latency\"]:.2f}ms')
           print(f'P95 latency: {data[\"p95_latency\"]:.2f}ms')
