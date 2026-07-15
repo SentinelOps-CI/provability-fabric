@@ -300,7 +300,7 @@ impl SemanticCache {
 
         let mut best_match: Option<(&CacheEntry, f64)> = None;
 
-        for (_, entry) in tenant_cache.iter() {
+        for entry in tenant_cache.values() {
             if self.is_expired(entry) {
                 continue;
             }
