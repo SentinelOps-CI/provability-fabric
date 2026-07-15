@@ -224,7 +224,7 @@ impl InstancePool {
         loop {
             interval.tick().await;
             let mut instances = self.instances.write().await;
-            for (_adapter_hash, adapter_instances) in instances.iter_mut() {
+            for adapter_instances in instances.values_mut() {
                 let mut to_remove = Vec::new();
                 for (index, instance) in adapter_instances.iter_mut().enumerate() {
                     if instance.last_used.elapsed() > Duration::from_secs(600) {
