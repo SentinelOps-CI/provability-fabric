@@ -25,6 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql://pf_user:pf_password@postgres:5432/provability_fabric
       PORT: 4000
+      PROFILE: dev
     ports:
       - "4000:4000"
     depends_on:

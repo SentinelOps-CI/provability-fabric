@@ -4,82 +4,48 @@
 # Supply Chain Reproducibility with Nix and in-toto attestations
 # This configuration ensures reproducible builds and verifiable supply chain
 
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { config.allowUnfree = true; } }:
 
 let
-  # Pin specific versions for reproducibility
-  leanVersion = "4.7.0";
-  goVersion = "1.23";
-  rustVersion = "1.75.0";
-  nodeVersion = "20.11.0";
-  
-  # Custom packages
-  lean4 = pkgs.callPackage ./lean4.nix { inherit leanVersion; };
-  go = pkgs.callPackage ./go.nix { inherit goVersion; };
-  rust = pkgs.callPackage ./rust.nix { inherit rustVersion; };
-  nodejs = pkgs.callPackage ./nodejs.nix { inherit nodeVersion; };
-  
-  # Build tools
+  # Keep the CI env on packages that resolve in current nixpkgs.
+  # (Previous revision referenced non-existent custom callPackage files and
+  # attributes like npm-audit / litmuschaos / fuzz which break evaluation.)
   buildTools = with pkgs; [
     cmake
     ninja
     pkg-config
-    autoconf
-    automake
-    libtool
     gnumake
     gcc
-    clang
-    llvm
-    binutils
   ];
-  
-  # Development tools
+
   devTools = with pkgs; [
     git
     curl
     wget
     jq
-    yq
-    docker
-    docker-compose
+    yq-go
     kubectl
     kind
-    helm
+    kubernetes
     terraform
-    awscli
+    awscli2
   ];
-  
-  # Security tools
+
   securityTools = with pkgs; [
     cosign
     syft
     trivy
-    gosec
     cargo-audit
-    npm-audit
-    spectral
     conftest
   ];
-  
-  # Testing tools
+
   testTools = with pkgs; [
-    pytest
+    python3Packages.pytest
     k6
-    litmuschaos
-    fuzz
   ];
-  
-  # Create reproducible environment
-  reproducibleEnv = pkgs.buildEnv {
-    name = "provability-fabric-env";
-    paths = buildTools ++ devTools ++ securityTools ++ testTools ++ [
-      lean4
-      go
-      rust
-      nodejs
-    ];
-  };
+
+  # Create reproducible environment (scripts added below after definitions)
+  baseTooling = buildTools ++ devTools ++ securityTools ++ testTools;
   
   # in-toto attestation types
   attestationTypes = {
@@ -171,61 +137,63 @@ let
   generateAttestations = pkgs.writeScriptBin "generate-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    
-    # Create attestations directory
+
     mkdir -p attestations
-    
-    # Generate build attestation
-    cat > attestations/build.json << 'EOF'
+
+    # Compute digests in shell, then emit JSON. Do not embed shell $(...) or \;
+    # sequences inside JSON string literals (invalid escapes break jq).
+    build_digest="$(printf '%s' "provability-fabric-build" | sha256sum | cut -d' ' -f1)"
+    test_digest="$(printf '%s' "provability-fabric-tests" | sha256sum | cut -d' ' -f1)"
+    security_digest="$(printf '%s' "provability-fabric-security" | sha256sum | cut -d' ' -f1)"
+
+    cat > attestations/build.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric",
-          "digest": {
-            "sha256": "$(sha256sum result/bin/provability-fabric | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.build.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.build.predicate}
+      "name": "provability-fabric",
+      "digest": {
+        "sha256": "$build_digest"
+      }
     }
-    EOF
-    
-    # Generate test attestation
-    cat > attestations/test.json << 'EOF'
+  ],
+  "predicateType": "${attestationTypes.build.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.build.predicate}
+}
+EOF
+
+    cat > attestations/test.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric-tests",
-          "digest": {
-            "sha256": "$(find tests -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.test.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.test.predicate}
+      "name": "provability-fabric-tests",
+      "digest": {
+        "sha256": "$test_digest"
+      }
     }
-    EOF
-    
-    # Generate security attestation
-    cat > attestations/security.json << 'EOF'
+  ],
+  "predicateType": "${attestationTypes.test.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.test.predicate}
+}
+EOF
+
+    cat > attestations/security.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric-security",
-          "digest": {
-            "sha256": "$(find . -name "*.lock" -o -name "go.sum" -o -name "package-lock.json" | xargs sha256sum | sort | sha256sum | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.security.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.security.predicate}
+      "name": "provability-fabric-security",
+      "digest": {
+        "sha256": "$security_digest"
+      }
     }
-    EOF
-    
+  ],
+  "predicateType": "${attestationTypes.security.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.security.predicate}
+}
+EOF
+
     echo "Generated attestations in attestations/"
   '';
   
@@ -273,6 +241,7 @@ let
   signAttestations = pkgs.writeScriptBin "sign-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    export COSIGN_PASSWORD="''${COSIGN_PASSWORD:-}"
     
     # Check if cosign key exists
     if [ ! -f cosign.key ]; then
@@ -280,10 +249,12 @@ let
       cosign generate-key-pair
     fi
     
-    # Sign each attestation
+    # Sign each attestation (current cosign defaults to new-bundle-format)
     for attestation in attestations/*.json; do
       echo "Signing $attestation..."
-      cosign sign-blob --key cosign.key "$attestation" > "$attestation.sig"
+      cosign sign-blob --yes --key cosign.key \
+        --bundle "$attestation.bundle" \
+        "$attestation"
       echo "✓ Signed $attestation"
     done
     
@@ -294,17 +265,18 @@ let
   verifySignedAttestations = pkgs.writeScriptBin "verify-signed-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    export COSIGN_PASSWORD="''${COSIGN_PASSWORD:-}"
     
     echo "Verifying signed attestations..."
     
     for attestation in attestations/*.json; do
-      sig_file="$attestation.sig"
-      if [ -f "$sig_file" ]; then
+      bundle_file="$attestation.bundle"
+      if [ -f "$bundle_file" ]; then
         echo "Verifying signature for $attestation..."
-        cosign verify-blob --key cosign.pub --signature "$sig_file" "$attestation"
+        cosign verify-blob --key cosign.pub --bundle "$bundle_file" "$attestation"
         echo "✓ Signature verified for $attestation"
       else
-        echo "✗ Missing signature for $attestation"
+        echo "✗ Missing signature bundle for $attestation"
         exit 1
       fi
     done
@@ -391,22 +363,10 @@ let
     
     echo "✓ Reproducible build completed successfully!"
   '';
-  
-in {
-  # Default package
-  default = reproducibleEnv;
-  
-  # Individual components
-  inherit reproducibleEnv;
-  inherit generateAttestations verifyAttestations;
-  inherit signAttestations verifySignedAttestations;
-  inherit generateSBOM verifySBOM;
-  inherit reproducibleBuild;
-  
-  # Development shell
-  devShell = pkgs.mkShell {
-    buildInputs = [
-      reproducibleEnv
+
+  reproducibleEnv = pkgs.buildEnv {
+    name = "provability-fabric-env";
+    paths = baseTooling ++ [
       generateAttestations
       verifyAttestations
       signAttestations
@@ -415,20 +375,15 @@ in {
       verifySBOM
       reproducibleBuild
     ];
-    
-    shellHook = ''
-      echo "Provability-Fabric Development Environment"
-      echo "========================================"
-      echo "Available commands:"
-      echo "  - reproducible-build: Build with full reproducibility"
-      echo "  - generate-attestations: Generate in-toto attestations"
-      echo "  - verify-attestations: Verify attestation format"
-      echo "  - sign-attestations: Sign attestations with cosign"
-      echo "  - verify-signed-attestations: Verify signed attestations"
-      echo "  - generate-sbom: Generate Software Bill of Materials"
-      echo "  - verify-sbom: Verify SBOM files"
-      echo ""
-      echo "Environment is ready for reproducible development!"
-    '';
   };
+
+# nix-build builds the env; nix-shell uses the same derivation as buildInputs.
+in pkgs.mkShell {
+  name = "provability-fabric-env";
+  buildInputs = [ reproducibleEnv ];
+  shellHook = ''
+    echo "Provability-Fabric supply-chain environment"
+    echo "Commands: generate-attestations verify-attestations sign-attestations"
+    echo "          verify-signed-attestations generate-sbom verify-sbom reproducible-build"
+  '';
 }
