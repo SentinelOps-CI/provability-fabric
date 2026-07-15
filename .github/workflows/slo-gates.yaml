@@ -90,13 +90,12 @@ jobs:
 
     - name: Run nightly k6 latency gate
       run: |
+        # Thresholds live in tests/perf/latency_k6.js options; k6 has no --threshold CLI flag.
         k6 run tests/perf/latency_k6.js \
           --env BASE_URL=http://127.0.0.1:8080 \
           --stage 30s:20 \
           --stage 2m:50 \
-          --stage 30s:0 \
-          --threshold 'p(95)<2000' \
-          --threshold 'errors<0.01'
+          --stage 30s:0
 
     - name: Upload k6 results
       uses: actions/upload-artifact@v4
