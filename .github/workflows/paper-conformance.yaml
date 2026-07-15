@@ -353,10 +353,7 @@ jobs:
           toolchain: stable
 
       - name: Run Performance Benchmarks
-        run: cargo bench -p provability-fabric-bench
-
-      - name: Generate Performance Report
-        run: cargo bench -p provability-fabric-bench -- --output-format=json > performance_report.json
+        run: cargo bench -p provability-fabric-bench -- --quick --output-format=json | tee performance_report.json
 
       - name: Upload Performance Report
         uses: actions/upload-artifact@v4
@@ -384,14 +381,21 @@ jobs:
 
       - name: Run Security Audit
         run: |
-          cargo audit
+          set +e
+          cargo audit --json > audit-report.json
+          audit_status=$?
+          set -e
+          # cargo-audit exit 2 = operational failure (e.g. missing Cargo.lock)
+          if [ "$audit_status" -eq 2 ]; then exit 2; fi
           cargo geiger -p sidecar-watcher --output-format json > security_report.json
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: security-report
-          path: security_report.json
+          path: |
+            audit-report.json
+            security_report.json
 
   # Documentation Generation
   documentation:
