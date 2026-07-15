@@ -247,11 +247,11 @@ let
       cosign generate-key-pair
     fi
     
-    # Sign each attestation (cosign v2+ wants explicit signature output flags)
+    # Sign each attestation (current cosign defaults to new-bundle-format)
     for attestation in attestations/*.json; do
       echo "Signing $attestation..."
       cosign sign-blob --yes --key cosign.key \
-        --output-signature "$attestation.sig" \
+        --bundle "$attestation.bundle" \
         "$attestation"
       echo "✓ Signed $attestation"
     done
@@ -268,13 +268,13 @@ let
     echo "Verifying signed attestations..."
     
     for attestation in attestations/*.json; do
-      sig_file="$attestation.sig"
-      if [ -f "$sig_file" ]; then
+      bundle_file="$attestation.bundle"
+      if [ -f "$bundle_file" ]; then
         echo "Verifying signature for $attestation..."
-        cosign verify-blob --key cosign.pub --signature "$sig_file" "$attestation"
+        cosign verify-blob --key cosign.pub --bundle "$bundle_file" "$attestation"
         echo "✓ Signature verified for $attestation"
       else
-        echo "✗ Missing signature for $attestation"
+        echo "✗ Missing signature bundle for $attestation"
         exit 1
       fi
     done
