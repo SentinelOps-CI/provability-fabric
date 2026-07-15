@@ -21,9 +21,9 @@ env:
   NODE_VERSION: '18'
 
 jobs:
-  # PR Smoke Test - Quick performance validation
+  # PR / main push smoke test - quick performance validation
   pr-smoke-test:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
