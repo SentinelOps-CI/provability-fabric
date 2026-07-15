@@ -387,7 +387,7 @@ jobs:
           set -e
           # cargo-audit exit 2 = operational failure (e.g. missing Cargo.lock)
           if [ "$audit_status" -eq 2 ]; then exit 2; fi
-          cargo geiger -p sidecar-watcher --output-format json > security_report.json
+          cargo geiger -p sidecar-watcher --output-format Json > security_report.json
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
