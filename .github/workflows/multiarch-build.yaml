@@ -176,10 +176,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Resolve GHCR image ref
+        id: image
+        run: |
+          set -euo pipefail
+          # GHCR paths are lowercase; build job tags sha-<7> via docker/metadata-action.
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          repo="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
+          short="$(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "ref=${{ env.REGISTRY }}/${owner}/${repo}/sidecar-watcher:sha-${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/sidecar-watcher:${{ needs.build.outputs.version }}
+          image-ref: ${{ steps.image.outputs.ref }}
           format: "sarif"
           output: "trivy-results.sarif"
 
