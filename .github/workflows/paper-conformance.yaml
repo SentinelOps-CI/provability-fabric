@@ -353,20 +353,16 @@ jobs:
           toolchain: stable
 
       - name: Run Performance Benchmarks
-        run: |
-          cd runtime/sidecar-watcher
-          cargo bench --all
+        run: cargo bench -p provability-fabric-bench
 
       - name: Generate Performance Report
-        run: |
-          cd runtime/sidecar-watcher
-          cargo bench --all -- --output-format=json > performance_report.json
+        run: cargo bench -p provability-fabric-bench -- --output-format=json > performance_report.json
 
       - name: Upload Performance Report
         uses: actions/upload-artifact@v4
         with:
           name: performance-report
-          path: runtime/sidecar-watcher/performance_report.json
+          path: performance_report.json
 
   # Security Audit
   security-audit:
@@ -388,7 +384,7 @@ jobs:
 
       - name: Run Security Audit
         run: |
-          cargo audit -p sidecar-watcher
+          cargo audit
           cargo geiger -p sidecar-watcher --output-format json > security_report.json
 
       - name: Upload Security Report
