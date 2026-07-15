@@ -1,6 +1,6 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-15** (main @ `ee68659c`).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-15** (main @ `f4b0859e`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
@@ -16,17 +16,17 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 |--------|------:|
 | Total workflow files | 87 |
 | Gated (push/schedule on `main`) | 69 |
-| Latest run **success** | 38 |
-| Latest run **failure / in_progress / cancelled** | 31 |
+| Latest run **success** | 39 |
+| Latest run **failure / in_progress / cancelled** | 30 |
 | No run / unknown (queued) | 18 |
 
-**Green snapshot (38/69, 2026-07-15):** replay cluster, security baseline (`cargo-deny`, `scorecards`, `wasm-scan`), `integration.yaml` ([28639549743](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549743)), `retrieval-gateway.yml`, `proto-compat.yaml`, `privacy-test.yaml`, `proof-bot.yaml`, and related scheduled/nightly lanes — see inventory for full list.
+**Green snapshot (39/69, 2026-07-15 @ `f4b0859e`):** includes `paper-conformance.yaml` ([29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127)); replay cluster; security baseline; `integration.yaml`; related nightly lanes — see inventory for full list.
 
 **No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml` (awaiting trigger).
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). **PR #146 merged** 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL). **PR #151 merged** at `ee68659c` (2026-07-03, F21 compose postgres init). Post-merge honest inventory **38/69** green (2026-07-15); integration F10+F21 green on `main`. Active cluster fixes: paper-conformance scheduler ([PR #163](https://github.com/SentinelOps-CI/provability-fabric/pull/163)), multiarch native musl ([PR #164](https://github.com/SentinelOps-CI/provability-fabric/pull/164)). Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). **PR #146 merged** 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL). **PR #151 merged** at `ee68659c` (2026-07-03, F21 compose postgres init). **PR #176 merged** at `f4b0859e` (2026-07-15, F24 paper-conformance). Integration F10+F21 green on `main`; F24 closed (paper-conformance ×2 green). Next: multiarch GHCR/cache retry (PR #164 merged; last run red on Actions cache export). Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
@@ -84,7 +84,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | F21 | P1 | Runtime components absent from compose | 5 | **DONE** | — | — | `docker-compose.yml` profiles + `scripts/docker-compose-smoke.sh` |
 | F22 | P1 | `ws` missing from ledger | 4 | **DONE** | — | — | `package.json`; `mcp-websocket.test.cjs` smoke stub |
 | F23 | P1 | Bench Nightly Criterion regression | 1 | **PARTIAL** | — | — | `bench-nightly-criterion.yaml` `refresh_baseline` input; `bench/BASELINE.md`; needs main CI refresh |
-| F24 | P1 | Paper Conformance sidecar integration failures | 1, 3 | **PARTIAL** | — | — | Local: `integration_tests` (9/9) + rate-limit cluster (`test_rate_limiter_basic`, `test_optimized_rate_limiter`, `test_99th_percentile_performance`, `test_clock_wraparound_safety`, `test_monotonicity_guarantee`) in `paper-conformance.yaml`; `Instant` overflow + ε-tolerance fixed in `ratelimit.rs`; `PF_SHADOW_MODE=1` on integration + rate-limits jobs and `reusable-ci-rust.yml`; needs **two** green `paper-conformance.yaml` on `main` |
+| F24 | P1 | Paper Conformance sidecar integration failures | 1, 3 | **DONE** | — | [#176](https://github.com/SentinelOps-CI/provability-fabric/pull/176) | `paper-conformance.yaml` green ×2 on `main` @ `f4b0859e`: [29441338434](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338434) (push), [29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127) (dispatch); integration gates unchanged |
 | F25 | P1 | Egress cert evidence hardcoded accept | 2 | **DONE** | PH-005 | — | `env_config::resolve_evidence_hash`; `egress_evidence_enforcement.rs` |
 | F26 | P2 | Duplicate ledger entrypoints | 4 | **DONE** | — | — | `index-simple.ts` / `index-production.ts` removed; single `index.ts` + PROFILE env |
 | F27 | P2 | 152 `any` in ledger src | 4 | **DONE** | — | — | `scripts/count_ledger_any.py --max 20` (0 `any`); `tsconfig.server.json` strict on server/mcp/receipts/egress |
@@ -108,13 +108,13 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Wave | Focus | Findings | Exit gate | Status (2026-07-02) |
 |------|-------|----------|-----------|---------------------|
 | 0 | Foundation / truth baseline | F36 | Tracker + burn-down reconciled | **DONE** |
-| 1 | CI unblock and honesty | F06, F10–F12, F19–F24 | Replay green; ≥25/67 workflows green | **IN PROGRESS** — Phase 0 local prep done; Phase 1 cluster prep landed (honesty gate in `ci.yml`, `integration_tests` in reusable Rust CI, `PF_SHADOW_MODE` in paper-conformance); main CI proof pending merge |
+| 1 | CI unblock and honesty | F06, F10–F12, F19–F24 | Replay green; ≥25/67 workflows green | **MOSTLY DONE** — F24 closed on `main` @ `f4b0859e` (paper-conformance ×2); F23 Criterion baseline refresh still pending |
 | 2 | Trust chain core | F01–F02, F17, F25 | Cross-lang DSSE; fail-closed when enforced | **DONE** |
 | 3 | Runtime hardening + sidecar CI | F13–F16, F30–F31, F35 | Sidecar in PR CI | **DONE** |
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
 | 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
-| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `ee68659c` on `main`; inventory **38/69** green (2026-07-15); PR #146 merged; integration F10+F21 green; paper-conformance + multiarch fixes in flight (#163, #164) |
+| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `f4b0859e` on `main`; F24 DONE; next multiarch GHCR/cache retry (#164 merged, last run red on GHA cache export); F23 + demo-e2e / ops-excellence / billing still red |
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DOCUMENTED** | `bench/BASELINE.md` + `bench-nightly-criterion.yaml` `workflow_dispatch` input |
 
-**Still pending main CI proof:** paper-conformance + multiarch clusters (PRs #163/#164), bench baseline refresh (F23), 69/69 inventory ×2. Main @ `ee68659c`; integration green — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Still pending main CI proof:** multiarch (GHCR/Actions cache retry; #164 merged), bench baseline refresh (F23), confirmed-red triage (demo-e2e, operational-excellence DR/AWS, billing), 69/69 inventory ×2. Main @ `f4b0859e`; F24 DONE — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 

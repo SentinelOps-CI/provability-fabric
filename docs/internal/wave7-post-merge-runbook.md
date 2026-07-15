@@ -8,21 +8,21 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-15 — Wave 7 post-merge, session 5)
+## Status (2026-07-15 — Wave 7 post-merge, session 6)
 
-**Merged:** PR #136 + #144 at `95bcd563`; **PR #146** merged 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL); **PR #151** at `ee68659c` (F21 compose postgres init, 2026-07-03). **Main head:** `ee68659c` (no push since 2026-07-03).
+**Merged:** PR #136 + #144 at `95bcd563`; **PR #146** merged 2026-07-02; **PR #151** at `ee68659c`; **PR #163** (F24 scheduler); **PR #164** (multiarch musl); **PR #176** at `f4b0859e` (paper-conformance geiger drop / F24 closeout). **Main head:** `f4b0859e`.
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
-| 0 — Merge gate | **DONE** | `ee68659c` on `main` |
+| 0 — Merge gate | **DONE** | `f4b0859e` on `main` |
 | 0 — PR #146 | **DONE** | Merged 2026-07-02; wasm-scan + CodeQL + retrieval-gateway Docker fixes |
 | 1.1 Replay cluster | **GREEN (×1+)** | `platform-replay` [28585705297](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705297), `replay` [28585705517](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705517), `morph-replay` [28585705516](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705516), `platform-cert` [28585705691](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705691) |
 | 1.2 Security cluster | **GREEN (×1+)** | `scorecards`, `cargo-deny`, `wasm-scan`, `codeql` green on `main` post-#146 |
-| 1.3 Platform cluster | **PARTIAL** | `integration` **green** [28639549743](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549743) (F10+F21); **red:** `multiarch-build` [28639549827](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549827) — fix in [PR #164](https://github.com/SentinelOps-CI/provability-fabric/pull/164); `demo-e2e` still red |
-| 1.4 Lean + paper | **IN PROGRESS** | `lean-style` green; `paper-conformance` red [29389589027](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29389589027) (scheduler heap ordering) — fix in [PR #163](https://github.com/SentinelOps-CI/provability-fabric/pull/163) |
-| 1.5 Bench + docs | **PARTIAL** | `docs-build` green; `bench-nightly-criterion` needs `refresh_baseline=true` dispatch (F23) |
-| 1.6 Remaining | **IN PROGRESS** | Honest inventory **38/69** green (2026-07-15); target 69/69 ×2 |
-| **Active PRs** | **#163, #164** | Scheduler priority fix (F24); native musl multiarch Docker build |
+| 1.3 Platform cluster | **PARTIAL** | `integration` **green** [28639549743](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549743) (F10+F21); **red:** `multiarch-build` [29441338384](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338384) — images pushed to GHCR then failed on GHA cache export (transient 400); retry next; `demo-e2e` still red |
+| 1.4 Lean + paper | **DONE (F24)** | `lean-style` green; `paper-conformance` green ×2 @ `f4b0859e`: [29441338434](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338434), [29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127); F24 **CLOSED**; integration gates unchanged |
+| 1.5 Bench + docs | **PARTIAL** | `docs-build` green; `bench-nightly-criterion` cancelled / needs `refresh_baseline=true` dispatch (F23) |
+| 1.6 Remaining | **IN PROGRESS** | Target 69/69 ×2; next multiarch retry, then demo-e2e / ops-excellence / billing |
+| **Next action** | **Retry multiarch** | `gh workflow run multiarch-build.yaml --ref main` (no code PR until retry confirms non-transient failure) |
 
 ### Post-merge commands (run immediately after PR #144 lands)
 
@@ -128,16 +128,12 @@ bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-la
 
 | Workflow | Notes |
 |----------|-------|
-| `paper-conformance.yaml` | `PF_SHADOW_MODE=1` on integration + rate-limits jobs |
+| `paper-conformance.yaml` | **GREEN ×2** — F24 CLOSED; runs [29441338434](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338434), [29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127) on `f4b0859e` (PR #176); `PF_SHADOW_MODE=1` on integration + rate-limits |
 | `lean-offline.yaml` | Mathlib cache paths aligned with `lean-style.yaml` |
-| `lean-style.yaml` | Enforced sorry-free targets only |
+| `lean-style.yaml` | Enforced sorry-free targets only — green |
 | `lean-morph.yml` | Optional `MORPH_API_KEY` |
 
-**Steps:**
-
-1. Watch first `paper-conformance.yaml` run post-merge.
-2. Triage mathlib vendor/cache if `lean-offline.yaml` fails.
-3. **Exit:** `paper-conformance.yaml` green twice; `lean-style.yaml` green on enforced targets.
+**Exit (met):** `paper-conformance.yaml` green twice on `main`; `lean-style.yaml` green on enforced targets. Integration gates unchanged.
 
 ---
 
