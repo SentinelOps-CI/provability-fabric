@@ -342,6 +342,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -383,15 +388,14 @@ jobs:
 
       - name: Run Security Audit
         run: |
-          cd runtime/sidecar-watcher
-          cargo audit
-          cargo geiger --output-format json > security_report.json
+          cargo audit -p sidecar-watcher
+          cargo geiger -p sidecar-watcher --output-format json > security_report.json
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: security-report
-          path: runtime/sidecar-watcher/security_report.json
+          path: security_report.json
 
   # Documentation Generation
   documentation:
