@@ -355,6 +355,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install benchmark dependencies
+        run: pip install psutil
+
       - name: Run performance benchmarks
         run: |
           cd scripts
