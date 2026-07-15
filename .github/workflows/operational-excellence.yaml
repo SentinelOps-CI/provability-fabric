@@ -36,6 +36,8 @@ jobs:
   cross-region-dr:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      aws_available: ${{ steps.aws.outputs.available }}
 
     steps:
       - name: Checkout repository
@@ -44,7 +46,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      # Guard: empty secrets make configure-aws-credentials fail hard.
+      # Skip DR deploy only when secrets are absent; do not continue-on-error
+      # on required in-repo jobs (usage-metering, supply-chain, marketplace).
+      - name: Check AWS credentials availability
+        id: aws
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AWS secrets not configured; skipping cross-region DR deploy (DR not validated)"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure AWS credentials
+        if: steps.aws.outputs.available == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -52,11 +71,13 @@ jobs:
           aws-region: us-west-2
 
       - name: Set up Terraform
+        if: steps.aws.outputs.available == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.6.0"
 
       - name: Deploy cross-region infrastructure
+        if: steps.aws.outputs.available == 'true'
         run: |
           cd ops/terraform/regions
           terraform init
@@ -64,6 +85,7 @@ jobs:
           terraform apply -var="db_password=${{ secrets.DB_PASSWORD }}" -var="route53_zone_id=${{ secrets.ROUTE53_ZONE_ID }}" -auto-approve
 
       - name: Test failover functionality
+        if: steps.aws.outputs.available == 'true'
         run: |
           # Test primary region health
           aws route53 get-health-check-status --health-check-id ${{ steps.health-check.outputs.primary_id }}
@@ -73,6 +95,7 @@ jobs:
           # This would trigger a controlled failover test
 
       - name: Verify zero-downtime upgrade capability
+        if: steps.aws.outputs.available == 'true'
         run: |
           chmod +x scripts/zero-downtime-upgrade.sh
           export ROUTE53_ZONE_ID="${{ secrets.ROUTE53_ZONE_ID }}"
@@ -82,6 +105,12 @@ jobs:
 
           # Test upgrade script (dry run)
           ./scripts/zero-downtime-upgrade.sh v1.0.1 v1.0.0 --dry-run
+
+      - name: Record DR skip (secrets absent)
+        if: steps.aws.outputs.available != 'true'
+        run: |
+          echo "cross-region-dr: infrastructure steps skipped (AWS secrets absent)."
+          echo "This job did not validate disaster recovery."
 
   # Per-Tenant Usage Metering & Bill-Ready Cost Reports
   usage-metering:
@@ -106,7 +135,7 @@ jobs:
       - name: Start ledger service
         run: |
           cd runtime/ledger
-          docker-compose up -d
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build
 
           # Wait for ledger to be ready
           timeout 120 bash -c 'until curl -f http://localhost:4000/health; do sleep 2; done'
@@ -224,25 +253,35 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@main
 
       - name: Build with Nix
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
           nix-build releaser/supply-chain-reproducibility.nix --no-out-link
 
       - name: Generate in-toto attestations
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
           cd releaser
           nix-shell supply-chain-reproducibility.nix --run "generate-attestations"
 
       - name: Generate SBOM
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
           cd releaser
           nix-shell supply-chain-reproducibility.nix --run "generate-sbom"
 
       - name: Sign attestations
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
           cd releaser
           nix-shell supply-chain-reproducibility.nix --run "sign-attestations"
 
       - name: Verify reproducibility
+        env:
+          NIXPKGS_ALLOW_UNFREE: "1"
         run: |
           cd releaser
           nix-shell supply-chain-reproducibility.nix --run "verify-attestations"
@@ -389,23 +428,8 @@ jobs:
       - name: Validate all components
         run: |
           echo "Validating operational excellence components..."
-
-          # Check cross-region DR
-          echo "✓ Cross-region DR infrastructure deployed"
-
-          # Check metering
-          echo "✓ Usage metering system operational"
-
-          # Check marketplace
-          echo "✓ Marketplace with semantic versioning active"
-
-          # Check reproducibility
-          echo "✓ Supply chain reproducibility verified"
-
-          # Check security
-          echo "✓ Security scanning completed"
-
-          echo "🎉 All operational excellence components validated!"
+          echo "Upstream required jobs (metering, marketplace, supply-chain, security) completed."
+          echo "Note: cross-region DR only validates when AWS secrets are configured; otherwise those steps are skipped without claiming a DR pass."
 
       - name: Generate summary report
         run: |

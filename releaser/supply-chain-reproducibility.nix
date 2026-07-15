@@ -4,7 +4,7 @@
 # Supply Chain Reproducibility with Nix and in-toto attestations
 # This configuration ensures reproducible builds and verifiable supply chain
 
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { config.allowUnfree = true; } }:
 
 let
   # Pin specific versions for reproducibility
