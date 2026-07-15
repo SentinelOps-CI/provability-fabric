@@ -9,8 +9,7 @@ RUN apk add --no-cache \
     musl-dev \
     openssl-dev \
     pkgconfig \
-    && rm -rf /var/cache/apk/* \
-    && rustup target add x86_64-unknown-linux-musl
+    && rm -rf /var/cache/apk/*
 
 # Set working directory
 WORKDIR /app
@@ -22,13 +21,13 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release --target x86_64-unknown-linux-musl --no-default-features --features mimalloc
+RUN cargo build --release --no-default-features --features mimalloc
 
 # Copy source code
 COPY src/ ./src/
 
 # Build the application
-RUN cargo build --release --target x86_64-unknown-linux-musl --no-default-features --features mimalloc
+RUN cargo build --release --no-default-features --features mimalloc
 
 # Runtime stage
 FROM alpine:3.19
@@ -47,7 +46,7 @@ RUN addgroup -g 1001 -S appgroup && \
 WORKDIR /app
 
 # Copy binary from builder stage
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/egress-firewall ./
+COPY --from=builder /app/target/release/egress-firewall ./
 
 # Copy policy files
 COPY policies/ ./policies/
