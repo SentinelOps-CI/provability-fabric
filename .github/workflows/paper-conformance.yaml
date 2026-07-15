@@ -387,7 +387,7 @@ jobs:
           set -e
           # cargo-audit exit 2 = operational failure (e.g. missing Cargo.lock)
           if [ "$audit_status" -eq 2 ]; then exit 2; fi
-          cargo geiger --manifest-path runtime/sidecar-watcher/Cargo.toml --output-format Json > security_report.json
+          cargo geiger --manifest-path "${GITHUB_WORKSPACE}/runtime/sidecar-watcher/Cargo.toml" --output-format Json > security_report.json
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
