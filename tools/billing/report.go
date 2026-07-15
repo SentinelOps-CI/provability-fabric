@@ -106,17 +106,14 @@ func downloadInvoice(cmd *cobra.Command, args []string) error {
 	}
 
 	var url string
-	var contentType string
 	var filename string
 
 	switch format {
 	case "csv":
 		url = fmt.Sprintf("%s/tenant/%s/invoice/csv?period=%s", ledgerURL, tenantID, period)
-		contentType = "text/csv"
 		filename = fmt.Sprintf("invoice-%s-%s.csv", tenantID, period)
 	case "pdf":
 		url = fmt.Sprintf("%s/tenant/%s/invoice/pdf?period=%s", ledgerURL, tenantID, period)
-		contentType = "application/pdf"
 		filename = fmt.Sprintf("invoice-%s-%s.pdf", tenantID, period)
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
