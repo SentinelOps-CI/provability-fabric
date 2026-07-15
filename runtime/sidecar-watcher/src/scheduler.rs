@@ -91,12 +91,11 @@ impl PartialOrd for ScheduledEvent {
 
 impl Ord for ScheduledEvent {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Higher priority first, then FIFO within same priority
-        other
-            .priority
-            .cmp(&self.priority)
-            .then(self.timestamp.cmp(&other.timestamp))
-            .then(self.sequence_number.cmp(&other.sequence_number))
+        // Max-heap: higher priority first, then FIFO within same priority
+        self.priority
+            .cmp(&other.priority)
+            .then_with(|| other.timestamp.cmp(&self.timestamp))
+            .then_with(|| other.sequence_number.cmp(&self.sequence_number))
     }
 }
 
@@ -280,17 +279,10 @@ impl TwoQueueScheduler {
 
     /// Get next event to process
     pub fn next_event(&mut self) -> Option<ScheduledEvent> {
-        // If merge is triggered, process FIFO queue first
-        if self.merge_triggered && !self.fifo_queue.is_empty() {
-            return self.fifo_queue.pop_front();
-        }
-
-        // Otherwise, process priority queue first
         if !self.priority_queue.is_empty() {
             return self.priority_queue.pop();
         }
 
-        // Fall back to FIFO queue
         self.fifo_queue.pop_front()
     }
 
