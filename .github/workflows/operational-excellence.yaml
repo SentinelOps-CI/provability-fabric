@@ -159,9 +159,14 @@ jobs:
 
       - name: Test billing integration
         run: |
-          # Test billing API endpoints
-          curl -f http://localhost:4000/tenant/tenant-001/invoice/csv
-          curl -f http://localhost:4000/tenant/tenant-001/invoice/pdf
+          set -euo pipefail
+          period=$(date -u +%Y-%m)
+          # Ledger CI overlay runs PROFILE=dev (auth-simple); seed tenant is dev-tenant.
+          curl -sf "http://localhost:4000/tenant/dev-tenant/invoice/csv?period=${period}" -o /tmp/invoice.csv
+          curl -sf "http://localhost:4000/tenant/dev-tenant/invoice/pdf?period=${period}" -o /tmp/invoice.pdf
+          test -s /tmp/invoice.csv
+          test -s /tmp/invoice.pdf
+          echo "Invoice CSV/PDF endpoints responded for period ${period}"
 
   # Adapter & Spec Marketplace with Semantic Versioning
   marketplace-e2e:

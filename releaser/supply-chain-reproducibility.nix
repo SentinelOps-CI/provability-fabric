@@ -7,79 +7,45 @@
 { pkgs ? import <nixpkgs> { config.allowUnfree = true; } }:
 
 let
-  # Pin specific versions for reproducibility
-  leanVersion = "4.7.0";
-  goVersion = "1.23";
-  rustVersion = "1.75.0";
-  nodeVersion = "20.11.0";
-  
-  # Custom packages
-  lean4 = pkgs.callPackage ./lean4.nix { inherit leanVersion; };
-  go = pkgs.callPackage ./go.nix { inherit goVersion; };
-  rust = pkgs.callPackage ./rust.nix { inherit rustVersion; };
-  nodejs = pkgs.callPackage ./nodejs.nix { inherit nodeVersion; };
-  
-  # Build tools
+  # Keep the CI env on packages that resolve in current nixpkgs.
+  # (Previous revision referenced non-existent custom callPackage files and
+  # attributes like npm-audit / litmuschaos / fuzz which break evaluation.)
   buildTools = with pkgs; [
     cmake
     ninja
     pkg-config
-    autoconf
-    automake
-    libtool
     gnumake
     gcc
-    clang
-    llvm
-    binutils
   ];
-  
-  # Development tools
+
   devTools = with pkgs; [
     git
     curl
     wget
     jq
-    yq
-    docker
-    docker-compose
+    yq-go
     kubectl
     kind
-    helm
+    kubernetes
     terraform
-    awscli
+    awscli2
   ];
-  
-  # Security tools
+
   securityTools = with pkgs; [
     cosign
     syft
     trivy
-    gosec
     cargo-audit
-    npm-audit
-    spectral
     conftest
   ];
-  
-  # Testing tools
+
   testTools = with pkgs; [
-    pytest
+    python3Packages.pytest
     k6
-    litmuschaos
-    fuzz
   ];
-  
-  # Create reproducible environment
-  reproducibleEnv = pkgs.buildEnv {
-    name = "provability-fabric-env";
-    paths = buildTools ++ devTools ++ securityTools ++ testTools ++ [
-      lean4
-      go
-      rust
-      nodejs
-    ];
-  };
+
+  # Create reproducible environment (scripts added below after definitions)
+  baseTooling = buildTools ++ devTools ++ securityTools ++ testTools;
   
   # in-toto attestation types
   attestationTypes = {
@@ -391,22 +357,10 @@ let
     
     echo "✓ Reproducible build completed successfully!"
   '';
-  
-in {
-  # Default package
-  default = reproducibleEnv;
-  
-  # Individual components
-  inherit reproducibleEnv;
-  inherit generateAttestations verifyAttestations;
-  inherit signAttestations verifySignedAttestations;
-  inherit generateSBOM verifySBOM;
-  inherit reproducibleBuild;
-  
-  # Development shell
-  devShell = pkgs.mkShell {
-    buildInputs = [
-      reproducibleEnv
+
+  reproducibleEnv = pkgs.buildEnv {
+    name = "provability-fabric-env";
+    paths = baseTooling ++ [
       generateAttestations
       verifyAttestations
       signAttestations
@@ -415,20 +369,15 @@ in {
       verifySBOM
       reproducibleBuild
     ];
-    
-    shellHook = ''
-      echo "Provability-Fabric Development Environment"
-      echo "========================================"
-      echo "Available commands:"
-      echo "  - reproducible-build: Build with full reproducibility"
-      echo "  - generate-attestations: Generate in-toto attestations"
-      echo "  - verify-attestations: Verify attestation format"
-      echo "  - sign-attestations: Sign attestations with cosign"
-      echo "  - verify-signed-attestations: Verify signed attestations"
-      echo "  - generate-sbom: Generate Software Bill of Materials"
-      echo "  - verify-sbom: Verify SBOM files"
-      echo ""
-      echo "Environment is ready for reproducible development!"
-    '';
   };
+
+# nix-build builds the env; nix-shell uses the same derivation as buildInputs.
+in pkgs.mkShell {
+  name = "provability-fabric-env";
+  buildInputs = [ reproducibleEnv ];
+  shellHook = ''
+    echo "Provability-Fabric supply-chain environment"
+    echo "Commands: generate-attestations verify-attestations sign-attestations"
+    echo "          verify-signed-attestations generate-sbom verify-sbom reproducible-build"
+  '';
 }
