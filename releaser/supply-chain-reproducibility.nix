@@ -239,6 +239,7 @@ let
   signAttestations = pkgs.writeScriptBin "sign-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    export COSIGN_PASSWORD="''${COSIGN_PASSWORD:-}"
     
     # Check if cosign key exists
     if [ ! -f cosign.key ]; then
@@ -246,10 +247,12 @@ let
       cosign generate-key-pair
     fi
     
-    # Sign each attestation
+    # Sign each attestation (cosign v2+ wants explicit signature output flags)
     for attestation in attestations/*.json; do
       echo "Signing $attestation..."
-      cosign sign-blob --key cosign.key "$attestation" > "$attestation.sig"
+      cosign sign-blob --yes --key cosign.key \
+        --output-signature "$attestation.sig" \
+        "$attestation"
       echo "✓ Signed $attestation"
     done
     
@@ -260,6 +263,7 @@ let
   verifySignedAttestations = pkgs.writeScriptBin "verify-signed-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
+    export COSIGN_PASSWORD="''${COSIGN_PASSWORD:-}"
     
     echo "Verifying signed attestations..."
     
