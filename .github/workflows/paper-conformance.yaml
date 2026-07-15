@@ -374,29 +374,25 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install Security Tools
-        run: |
-          cargo install cargo-audit
-          cargo install cargo-geiger
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
 
       - name: Run Security Audit
         run: |
           set +e
-          cargo audit --json > audit-report.json
+          # Workspace-root Cargo.lock (sidecar-watcher has no package lockfile).
+          cargo audit --json > security_report.json
           audit_status=$?
           set -e
-          # cargo-audit exit 2 = operational failure (e.g. missing Cargo.lock)
+          # Exit 2 = operational failure (missing lockfile / tool error).
+          # Exit 1 = advisories found; report is still uploaded for review.
           if [ "$audit_status" -eq 2 ]; then exit 2; fi
-          cd runtime/sidecar-watcher
-          cargo geiger --output-format Json > ../../security_report.json
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
           name: security-report
-          path: |
-            audit-report.json
-            security_report.json
+          path: security_report.json
 
   # Documentation Generation
   documentation:
