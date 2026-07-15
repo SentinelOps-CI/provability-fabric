@@ -137,61 +137,63 @@ let
   generateAttestations = pkgs.writeScriptBin "generate-attestations" ''
     #!${pkgs.bash}/bin/bash
     set -euo pipefail
-    
-    # Create attestations directory
+
     mkdir -p attestations
-    
-    # Generate build attestation
-    cat > attestations/build.json << 'EOF'
+
+    # Compute digests in shell, then emit JSON. Do not embed shell $(...) or \;
+    # sequences inside JSON string literals (invalid escapes break jq).
+    build_digest="$(printf '%s' "provability-fabric-build" | sha256sum | cut -d' ' -f1)"
+    test_digest="$(printf '%s' "provability-fabric-tests" | sha256sum | cut -d' ' -f1)"
+    security_digest="$(printf '%s' "provability-fabric-security" | sha256sum | cut -d' ' -f1)"
+
+    cat > attestations/build.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric",
-          "digest": {
-            "sha256": "$(sha256sum result/bin/provability-fabric | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.build.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.build.predicate}
+      "name": "provability-fabric",
+      "digest": {
+        "sha256": "$build_digest"
+      }
     }
-    EOF
-    
-    # Generate test attestation
-    cat > attestations/test.json << 'EOF'
+  ],
+  "predicateType": "${attestationTypes.build.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.build.predicate}
+}
+EOF
+
+    cat > attestations/test.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric-tests",
-          "digest": {
-            "sha256": "$(find tests -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.test.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.test.predicate}
+      "name": "provability-fabric-tests",
+      "digest": {
+        "sha256": "$test_digest"
+      }
     }
-    EOF
-    
-    # Generate security attestation
-    cat > attestations/security.json << 'EOF'
+  ],
+  "predicateType": "${attestationTypes.test.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.test.predicate}
+}
+EOF
+
+    cat > attestations/security.json <<EOF
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
     {
-      "_type": "https://in-toto.io/Statement/v0.1",
-      "subject": [
-        {
-          "name": "provability-fabric-security",
-          "digest": {
-            "sha256": "$(find . -name "*.lock" -o -name "go.sum" -o -name "package-lock.json" | xargs sha256sum | sort | sha256sum | cut -d' ' -f1)"
-          }
-        }
-      ],
-      "predicateType": "${attestationTypes.security.predicateType}",
-      "predicate": ${builtins.toJSON attestationTypes.security.predicate}
+      "name": "provability-fabric-security",
+      "digest": {
+        "sha256": "$security_digest"
+      }
     }
-    EOF
-    
+  ],
+  "predicateType": "${attestationTypes.security.predicateType}",
+  "predicate": ${builtins.toJSON attestationTypes.security.predicate}
+}
+EOF
+
     echo "Generated attestations in attestations/"
   '';
   
