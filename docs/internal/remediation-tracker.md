@@ -10,23 +10,23 @@ Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit
 
 ## CI baseline (Wave 0 inventory)
 
-Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-15; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
+Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-16; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
 
 | Metric | Count |
 |--------|------:|
 | Total workflow files | 87 |
-| Gated (push/schedule on `main`) | 69 |
-| Latest run **success** | 39 |
-| Latest run **failure / in_progress / cancelled** | 30 |
-| No run / unknown (queued) | 18 |
+| Gated (push/schedule on `main`) | 67 |
+| Latest run **success** | 60 |
+| Latest run **failure / in_progress / cancelled** | 7 |
+| No run / unknown | 16 |
 
-**Green snapshot (39/69, 2026-07-15 @ `f4b0859e`):** includes `paper-conformance.yaml` ([29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127)); replay cluster; security baseline; `integration.yaml`; related nightly lanes — see inventory for full list.
+**Green snapshot (60/67, 2026-07-16 @ `a844d8b0`):** includes `release.yaml`, `verify-publish-bundle.yaml`, `codeql.yaml`, multiarch, ops-excellence — see inventory for full list.
 
-**No run on main (gated):** `policy-build.yml`, `release.yaml`, `verify-publish-bundle.yaml` (awaiting trigger).
+**No run on main (gated):** none material — `release.yaml` and `verify-publish-bundle.yaml` greened via #204 + dispatch (2026-07-16).
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** **PR #136 + #144 merged** to `main` at `95bcd563` (2026-07-03). **PR #146 merged** 2026-07-02 (wasm-scan, retrieval-gateway Docker, CodeQL). **PR #151 merged** at `ee68659c` (2026-07-03, F21 compose postgres init). **PR #176 merged** at `f4b0859e` (2026-07-15, F24 paper-conformance). Integration F10+F21 green on `main`; F24 closed (paper-conformance ×2 green). Next: multiarch GHCR/cache retry (PR #164 merged; last run red on Actions cache export). Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Note:** **PR #204 merged** at `a844d8b0` (2026-07-16): release dry-run, verify-publish fixture, CodeQL JS disk. Inventory **60/67**. Prior: **PR #203** trust-fire + swebench stress; **PR #176** F24 paper-conformance. Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DONE** | Green ×3 @ `1ab0d2d5`; `bench/BASELINE.md` recorded; #197/#198 |
 
-**Still pending main CI proof:** multiarch (GHCR/Actions cache), `perf.yaml` / DR-AWS / stress / weekly-full cluster, 67/67 inventory ×2. Main @ `1ab0d2d5`; F23+F24 DONE — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Still pending main CI proof:** 67/67 inventory ×2. Remaining gated reds (2026-07-16 @ `a844d8b0`, **60/67**): `dr-cross` (AWS); `disabled_inactivity` cluster (`edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer`). See [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 

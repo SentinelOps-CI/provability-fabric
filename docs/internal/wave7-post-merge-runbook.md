@@ -8,7 +8,31 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-16 — Wave 7 / F23 closeout)
+## Status (2026-07-16 — Wave 7 / release + verify-publish + CodeQL)
+
+**Merged:** **PR #204** (release dry-run / missing-`CI_PAT` skip; verify-publish fixture `logs/`; CodeQL JS disk reclaim). **Main head:** `a844d8b0`. Inventory **60/67**.
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| 0 — Merge gate | **DONE** | `a844d8b0` on `main` |
+| 1.4 Lean + paper | **DONE (F24)** | `paper-conformance` green ×2 @ `f4b0859e` |
+| 1.5 Bench + docs | **DONE (F23)** | `bench-nightly-criterion` green ×3 @ `1ab0d2d5` lineage |
+| 1.6 Remaining | **IN PROGRESS** | `release.yaml` dry-run green ×3 ([29525076387](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29525076387)+); `verify-publish-bundle` green ×2 ([29525017061](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29525017061), [29525078691](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29525078691)); `codeql.yaml` green @ tip ([29525017343](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29525017343)); multiarch + ops-excellence green @ tip |
+| **Next action** | **7 honest leftovers** | `dr-cross` (AWS creds); skip `disabled_inactivity`: `edge-load` / `loadtest` / `perf-proofmeter` / `publish-updates` / `revocation-sync` / `pf-cross-repo-consumer` unless re-enabled honestly |
+
+### Prior status (2026-07-16 — Wave 7 / trust-fire + swebench stress)
+
+**Merged:** **PR #203** (`trust-fire-ga-test` orchestrator smoke; `bench-swebench-stress-scheduled` mock fallback). **Main head:** `00b5257f`. Inventory **54/67**.
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| 0 — Merge gate | **DONE** | `00b5257f` on `main` |
+| 1.4 Lean + paper | **DONE (F24)** | `paper-conformance` green ×2 @ `f4b0859e` |
+| 1.5 Bench + docs | **DONE (F23)** | `bench-nightly-criterion` green ×3 @ `1ab0d2d5` lineage |
+| 1.6 Remaining | **IN PROGRESS** | `trust-fire-ga-test` green [29522471801](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29522471801); `bench-swebench-stress-scheduled` green [29522474048](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29522474048); prior: `perf.yaml` / `redteam` green via #200–#202 |
+| **Next action** | **Next clear gated red** | Prefer `release.yaml` / `verify-publish-bundle.yaml` (`no_run`) or `dr-cross` (needs AWS creds); skip `disabled_inactivity` (`edge-load`/`loadtest`/`perf-proofmeter`/`publish-updates`/`revocation-sync`/`pf-cross-repo-consumer`) unless re-enabled honestly |
+
+### Prior status (2026-07-16 — Wave 7 / F23 closeout)
 
 **Merged:** **PR #197** (Criterion CI timeouts/overrides); **PR #198** (ring-buffer MPMC hang). **Main head:** `1ab0d2d5`. Inventory **51/67**.
 
