@@ -17,7 +17,9 @@ on:
 jobs:
   lean-offline:
     runs-on: ubuntu-latest
-    timeout-minutes: 44
+    # Cold cache must finish vendor+build once so actions/cache can persist;
+    # prior 44m job limit cancelled nightly runs mid-vendor (no cache ever saved).
+    timeout-minutes: 90
     name: "Lean Offline Build"
 
     steps:
@@ -26,8 +28,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache Lean toolchain and mathlib artifacts
-        uses: actions/cache@v4
+      - name: Restore Lean toolchain and mathlib cache
+        id: cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.elan
@@ -38,8 +41,9 @@ jobs:
             spec-templates/v1/proofs/.lake
             bundles/my-agent/proofs/.lake
             bundles/test-new-user-agent/proofs/.lake
-          key: lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637
+          key: lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-v2
           restore-keys: |
+            lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-
             lean-offline-
 
       - name: Set up Lean (elan)
@@ -56,7 +60,8 @@ jobs:
           lean --version
 
       - name: Vendor mathlib
-        timeout-minutes: 20
+        id: vendor
+        timeout-minutes: 40
         run: |
           MATHLIB_COMMIT="a45ae63747140c1b2cbad9d46f518015c047047a"
           if [ -f vendor/mathlib/lakefile.lean ] && [ -d vendor/mathlib/.git ] \
@@ -65,12 +70,29 @@ jobs:
             ACTUAL=$(git -C vendor/mathlib rev-parse HEAD)
             if [ "$ACTUAL" = "$MATHLIB_COMMIT" ]; then
               echo "Cached vendored mathlib ready, skipping vendor script"
+              echo "vendor_ready=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "Cached mathlib commit mismatch (expected $MATHLIB_COMMIT, got $ACTUAL)"
           fi
           chmod +x scripts/vendor-mathlib.sh
           bash scripts/vendor-mathlib.sh
+          echo "vendor_ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Save Lean toolchain and mathlib cache
+        if: steps.vendor.outputs.vendor_ready == 'true' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cache/lake
+            vendor/mathlib/.lake
+            vendor/mathlib/.git
+            core/lean-libs/.lake
+            spec-templates/v1/proofs/.lake
+            bundles/my-agent/proofs/.lake
+            bundles/test-new-user-agent/proofs/.lake
+          key: lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-v2
 
       - name: Verify vendor/mathlib exists
         run: |
