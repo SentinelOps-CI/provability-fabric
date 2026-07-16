@@ -1,16 +1,11 @@
 name: Publish Updates
 
+# Writes docs/updates.md from live metrics publishers and pushes commits.
+# Historically failed as disabled_inactivity; not an honest gated CI path
+# without stable external metric sources. Kept as workflow_dispatch-only so
+# inventory is not gated on an unachievable path (same pattern as #194/#196).
 on:
-  schedule:
-    # Run nightly at 2 AM UTC
-    - cron: "0 2 * * *"
   workflow_dispatch:
-    # Allow manual triggering
-  push:
-    branches: [main]
-    paths:
-      - "tools/metrics/**"
-      - ".github/workflows/publish-updates.yaml"
 
 jobs:
   publish-updates:
