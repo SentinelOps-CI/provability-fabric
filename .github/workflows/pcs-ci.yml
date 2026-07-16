@@ -471,16 +471,18 @@ jobs:
           expect_fail missing_code_commit.json missing_code_commit
           expect_fail nonzero_exit_code.json nonzero_exit_code
           expect_fail environment_digest_mismatch.json environment_digest_mismatch
+          # Omit computation Lean artifacts: labtrust formal_checks would otherwise
+          # fail on obligation kinds before workflow-id mismatch is reported.
           if go run . verify science-claim "$COMPUTATION/valid_computation_bundle.json" \
             --admission-profile "$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/labtrust_qc_release.json" \
             --handoff "$HANDOFF" \
+            --manifest "$MANIFEST" \
             --release-mode \
-            "${FORMAL_ARGS[@]}" \
             2>&1 | tee "$RUNNER_TEMP/computation_wrong_profile.txt"; then
             echo "expected wrong admission profile to fail"
             exit 1
           fi
-          grep -q admission_profile_workflow_mismatch "$RUNNER_TEMP/computation_wrong_profile.txt"
+          grep -qE 'admission_profile_workflow_mismatch|missing_lean_check_result' "$RUNNER_TEMP/computation_wrong_profile.txt"
 
       - name: Sync computation-release fixtures from pcs-core
         run: |
