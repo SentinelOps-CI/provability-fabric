@@ -8,6 +8,7 @@ on:
       - "experiments/**"
       - "tests/test_*.py"
       - "tests/fixtures/**"
+      - ".github/workflows/bench-swebench-unit.yaml"
   pull_request:
     branches: [main]
     paths:
@@ -15,6 +16,8 @@ on:
       - "experiments/**"
       - "tests/test_*.py"
       - "tests/fixtures/**"
+      - ".github/workflows/bench-swebench-unit.yaml"
+  workflow_dispatch:
 
 jobs:
   pytest:
@@ -31,8 +34,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install pytest
-        run: pip install pytest
+      - name: Install pytest and deps
+        run: python -m pip install --upgrade pip pytest pyyaml requests
 
       - name: Run bench/swebench and experiments unit tests
         if: matrix.os == 'ubuntu-latest'

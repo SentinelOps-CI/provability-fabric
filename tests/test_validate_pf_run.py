@@ -35,9 +35,9 @@ def test_validate_pf_run_fails_when_compliance_missing():
     root = make_fake_runpair(instance_ids=["a"])
     try:
         pf_run_dir = root / "pf" / "fake-run-001"
-        inst_dir = next(pf_run_dir.iterdir()) if pf_run_dir.is_dir() else None
-        if inst_dir and inst_dir.is_dir():
-            (inst_dir / "policy_compliance_summary.json").unlink(missing_ok=True)
+        inst_dirs = sorted(d for d in pf_run_dir.iterdir() if d.is_dir())
+        assert inst_dirs, "expected at least one instance directory"
+        (inst_dirs[0] / "policy_compliance_summary.json").unlink(missing_ok=True)
         ok, messages = validate_run(pf_run_dir)
         assert ok is False
         assert any("policy_compliance_summary" in m or "compliance" in m.lower() for m in messages)
