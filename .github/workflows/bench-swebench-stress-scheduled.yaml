@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 #
-# Scheduled run of exp-step2-lite-stress-large-repos (not gated in CI).
-# Stores empty_patch_reasons, timeout rate, patch_apply failure rate, wall-clock for trend analysis.
+# Scheduled run of exp-step2-lite-stress-large-repos.
+# Uses OpenHands when an LLM API key and a working OpenHands CLI/library are
+# available; otherwise falls back to --engine mock so the stress pipeline,
+# compare, and alert plumbing stay green without empty-patch engine_error noise.
 
 name: Bench SWE-bench stress (scheduled)
 
@@ -32,6 +34,27 @@ jobs:
           pip install datasets swebench 2>/dev/null || true
           pip install openhands 2>/dev/null || true
 
+      - name: Select engine
+        id: engine
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          ENGINE=mock
+          if [ -n "${OPENAI_API_KEY}" ] || [ -n "${ANTHROPIC_API_KEY}" ]; then
+            if command -v openhands >/dev/null 2>&1; then
+              ENGINE=openhands
+            elif python -c "import openhands.core" 2>/dev/null; then
+              ENGINE=openhands
+            else
+              echo "LLM API key present but OpenHands runtime unavailable; using mock."
+            fi
+          else
+            echo "No LLM API key; using mock engine for pipeline integrity."
+          fi
+          echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
+          echo "Selected engine: $ENGINE"
+
       - name: Fill manifest
         run: python experiments/scripts/fill_manifest_from_run.py experiments/exp-step2-lite-stress-large-repos/manifest.json
 
@@ -39,18 +62,25 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ENGINE: ${{ steps.engine.outputs.engine }}
         run: |
           EXP=runs/exp-step2-lite-stress-large-repos
           mkdir -p "$EXP/baseline" "$EXP/pf"
           if command -v pf >/dev/null 2>&1; then RUN_CMD="pf bench swebench run"; else RUN_CMD="python bench/swebench/runner.py"; fi
-          echo "Baseline run..."
-          $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
-            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --seed 42 \
-            --out "$EXP/baseline/predictions.jsonl" --runs-dir "$EXP/baseline" 2>&1 | tee baseline.log || true  # ci-honesty: justified wave7-remediation
-          echo "PF run..."
-          $RUN_CMD --dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt \
-            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine openhands --mode pf_guarded \
-            --seed 42 --policy swebench_safe_v1 --out "$EXP/pf/predictions.jsonl" --runs-dir "$EXP/pf" 2>&1 | tee pf.log || true  # ci-honesty: justified wave7-remediation
+          if [ "$ENGINE" = "mock" ]; then
+            # Pipeline integrity only: fixtures + no clone (large-repo stress needs OpenHands).
+            INSTANCE_ARGS=(--instances-file bench/swebench/fixtures/instances_smoke.jsonl --max_instances 3 --no-workspace)
+          else
+            INSTANCE_ARGS=(--dataset Lite --instance-ids-file experiments/exp-step2-lite-stress-large-repos/instance_ids.txt)
+          fi
+          echo "Baseline run (engine=$ENGINE)..."
+          $RUN_CMD "${INSTANCE_ARGS[@]}" \
+            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine "$ENGINE" --seed 42 \
+            --out "$EXP/baseline/predictions.jsonl" --runs-dir "$EXP/baseline" 2>&1 | tee baseline.log
+          echo "PF run (engine=$ENGINE)..."
+          $RUN_CMD "${INSTANCE_ARGS[@]}" \
+            --experiment-dir experiments/exp-step2-lite-stress-large-repos --engine "$ENGINE" --mode pf_guarded \
+            --seed 42 --policy swebench_safe_v1 --out "$EXP/pf/predictions.jsonl" --runs-dir "$EXP/pf" 2>&1 | tee pf.log
 
       - name: Harness and compare
         run: |
@@ -58,11 +88,15 @@ jobs:
           BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           if [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
+            # ci-honesty: justified wave7-remediation — harness needs Docker images; compare is the gate
             python experiments/scripts/run_swebench_eval.py \
               --baseline-predictions "$EXP/baseline/predictions.jsonl" --pf-predictions "$EXP/pf/predictions.jsonl" \
-              --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true  # ci-honesty: justified wave7-remediation
+              --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true
             python experiments/scripts/compare_runs.py --experiment-dir "$EXP" \
-              --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" --pf-run-dir "$EXP/pf/$PF_RUN_ID" 2>/dev/null || true  # ci-honesty: justified wave7-remediation
+              --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" --pf-run-dir "$EXP/pf/$PF_RUN_ID"
+          else
+            echo "Missing baseline or PF run dir; cannot compare."
+            exit 1
           fi
 
       - name: Write stress summary
@@ -83,10 +117,17 @@ jobs:
           fi
 
       - name: Stress regression alerts
+        env:
+          ENGINE: ${{ steps.engine.outputs.engine }}
         run: |
           EXP=runs/exp-step2-lite-stress-large-repos
           if [ ! -f "$EXP/stress_summary.json" ] || [ ! -f "$EXP/compare.json" ]; then
             echo "Stress summary or compare.json missing; skipping alerts."
+            exit 0
+          fi
+          if [ "$ENGINE" = "mock" ]; then
+            # Mock proves pipeline integrity; empty-patch/parity thresholds apply to OpenHands runs.
+            echo "Engine=mock: skipping OpenHands regression thresholds (pipeline integrity only)."
             exit 0
           fi
           python experiments/scripts/check_stress_alerts.py \
