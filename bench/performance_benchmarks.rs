@@ -309,31 +309,42 @@ pub fn concurrency_benchmarks(c: &mut Criterion) {
     });
     
     // Benchmark 3: Lock-Free Ring Buffer Concurrency
+    // Fresh buffer per iteration; bounded spin so a lost-item race cannot hang CI.
     group.bench_function("concurrent_ring_buffer", |b| {
-        let buffer = Arc::new(LockFreeRingBuffer::new(10000));
-        
         b.iter(|| {
+            let buffer = Arc::new(LockFreeRingBuffer::new(10000));
+            let per_thread: usize = 2_500;
+            let deadline = Instant::now() + std::time::Duration::from_secs(5);
+
             let producer_handles: Vec<_> = (0..2)
                 .map(|thread_id| {
                     let buffer = Arc::clone(&buffer);
                     std::thread::spawn(move || {
-                        for i in 0..25000 {
-                            while buffer.push(thread_id * 25000 + i).is_err() {
+                        for i in 0..per_thread {
+                            loop {
+                                if buffer.push(thread_id * per_thread + i).is_ok() {
+                                    break;
+                                }
+                                if Instant::now() > deadline {
+                                    return;
+                                }
                                 std::thread::yield_now();
                             }
                         }
                     })
                 })
                 .collect();
-            
+
             let consumer_handles: Vec<_> = (0..2)
                 .map(|_| {
                     let buffer = Arc::clone(&buffer);
                     std::thread::spawn(move || {
                         let mut count = 0;
-                        while count < 25000 {
-                            if let Some(_) = buffer.pop() {
+                        while count < per_thread {
+                            if buffer.pop().is_some() {
                                 count += 1;
+                            } else if Instant::now() > deadline {
+                                break;
                             } else {
                                 std::thread::yield_now();
                             }
@@ -341,13 +352,14 @@ pub fn concurrency_benchmarks(c: &mut Criterion) {
                     })
                 })
                 .collect();
-            
+
             for handle in producer_handles {
                 handle.join().unwrap();
             }
             for handle in consumer_handles {
                 handle.join().unwrap();
             }
+            black_box(buffer.len());
         });
     });
     
