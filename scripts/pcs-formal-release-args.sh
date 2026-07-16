@@ -19,3 +19,4 @@ if [[ -f "${LC}" ]]; then
   ARGS+=(--lean-check-result "${LC}")
 fi
 printf '%q ' "${ARGS[@]}"
+printf '\n'
