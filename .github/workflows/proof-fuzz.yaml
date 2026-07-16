@@ -235,7 +235,7 @@ jobs:
           dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
           success_rates = [0.95 + (i * 0.001) for i in range(30)]
 
-          dates = dates.append(pd.Series([datetime.now()]))
+          dates = pd.DatetimeIndex(list(dates) + [datetime.now()])
           success_rates.append(summary['success_rate'])
 
           plt.figure(figsize=(12, 6))
