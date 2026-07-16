@@ -2024,24 +2024,52 @@ func traceCompareLowViewCmd() *cobra.Command {
 				interp = "python"
 			}
 			oracle := "external/TRACE-REPLAY-KIT/oracles/lowview_equal.py"
-			if _, err := os.Stat(oracle); err == nil {
-				args := []string{oracle, "--input", inputDir, "--threshold", fmt.Sprintf("%f", threshold)}
-				cmdExec := exec.Command(interp, args...)
-				cmdExec.Stdout = os.Stdout
-				cmdExec.Stderr = os.Stderr
-				if err := cmdExec.Run(); err != nil {
-					return fmt.Errorf("low-view compare failed: %w", err)
-				}
-				fmt.Println("✅ Low-view comparison passed")
+			if _, err := os.Stat(oracle); err != nil {
+				fmt.Println("ℹ️  Oracle not found; skipping")
 				return nil
 			}
-			fmt.Println("ℹ️  Oracle not found; skipping")
+			certs, err := collectReplayCerts(inputDir)
+			if err != nil {
+				return err
+			}
+			if len(certs) < 2 {
+				return fmt.Errorf("need >=2 CERT files under %s for low-view compare (found %d)", inputDir, len(certs))
+			}
+			// Oracle expects positional cert paths and --min-determinism as a percent
+			minDeterminism := threshold * 100.0
+			args := append([]string{oracle}, certs...)
+			args = append(args, "--min-determinism", fmt.Sprintf("%f", minDeterminism))
+			cmdExec := exec.Command(interp, args...)
+			cmdExec.Stdout = os.Stdout
+			cmdExec.Stderr = os.Stderr
+			if err := cmdExec.Run(); err != nil {
+				return fmt.Errorf("low-view compare failed: %w", err)
+			}
+			fmt.Println("✅ Low-view comparison passed")
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&inputDir, "in", "", "Input directory of replay outputs")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.999999, "Low-view equality threshold")
 	return cmd
+}
+
+// collectReplayCerts finds *.cert.json under dir or dir/certs.
+func collectReplayCerts(dir string) ([]string, error) {
+	candidates := []string{
+		filepath.Join(dir, "*.cert.json"),
+		filepath.Join(dir, "certs", "*.cert.json"),
+	}
+	var out []string
+	for _, pattern := range candidates {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, matches...)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 // computeJSONDiff renders a simple line-by-line diff of two JSON strings
