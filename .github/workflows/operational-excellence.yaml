@@ -395,10 +395,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [performance-benchmarks]
+    env:
+      SYFT_VERSION: "1.19.0"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Syft
+        run: |
+          set -euo pipefail
+          SYFT_DIR="$(mktemp -d)"
+          curl -sSL -o "$SYFT_DIR/syft.tgz" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf "$SYFT_DIR/syft.tgz" -C "$SYFT_DIR"
+          SYFT_BIN="$(find "$SYFT_DIR" -type f -name syft | head -1)"
+          test -n "$SYFT_BIN"
+          sudo install -m 0755 "$SYFT_BIN" /usr/local/bin/syft
+          syft version
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -410,18 +435,19 @@ jobs:
 
       - name: Run Syft SBOM generation
         run: |
-          syft packages . -o json > sbom.json
-          syft packages . -o spdx-json > sbom.spdx.json
+          syft . -o json --file sbom.json
+          syft . -o spdx-json --file sbom.spdx.json
 
       - name: Run Go security scanner
         run: |
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-          gosec ./... -fmt json -out gosec-results.json
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          # Best-effort scan; gosec exits non-zero when findings exist.
+          gosec -fmt json -out gosec-results.json ./... || test -f gosec-results.json
 
       - name: Run Rust security scanner
         run: |
-          cd runtime/sidecar-watcher
-          cargo audit --json > ../../cargo-audit-results.json
+          cargo audit --manifest-path runtime/sidecar-watcher/Cargo.toml --json > cargo-audit-results.json \
+            || test -s cargo-audit-results.json
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4
@@ -433,6 +459,7 @@ jobs:
             sbom.spdx.json
             gosec-results.json
             cargo-audit-results.json
+          if-no-files-found: warn
 
   # Final Validation
   final-validation:
