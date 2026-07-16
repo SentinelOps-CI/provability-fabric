@@ -88,7 +88,7 @@ concurrency:
 jobs:
   pcs:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash -eo pipefail {0}
