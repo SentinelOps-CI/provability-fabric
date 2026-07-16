@@ -10,7 +10,7 @@
   "input_artifacts": {
     "computation_witness.json": {
       "artifact_type": "ComputationWitness.v0",
-      "sha256": "sha256:a86081703ca5bc521445cc5a38826adfc1ca55f87f52f35b3c429a2bbdaf13f9"
+      "sha256": "sha256:fc8aa214f4e08a205734ed1d11efe04979430001c966b7b9b66a4ec36f809532"
     }
   },
   "expected_outputs": {
@@ -23,5 +23,5 @@
     "run_receipt_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828"
   },
   "status": "Validated",
-  "signature_or_digest": "sha256:e2170d91b655ae0d9ae9b8f6a18fa78f9801d76213bd8e5bfba577ac7599f501"
+  "signature_or_digest": "sha256:0a077781bb8006f3355e041c62d19d51537f57aaba34edca98cc9c3ad9416ce7"
 }

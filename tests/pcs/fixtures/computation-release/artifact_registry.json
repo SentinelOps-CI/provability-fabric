@@ -1772,7 +1772,527 @@
       ],
       "canonical_hash_required": true,
       "release_mode_required": false
+    },
+    "PFCorePrincipal.v0": {
+      "artifact_type": "PFCorePrincipal.v0",
+      "schema": "schemas/PFCorePrincipal.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreCapability.v0": {
+      "artifact_type": "PFCoreCapability.v0",
+      "schema": "schemas/PFCoreCapability.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreResource.v0": {
+      "artifact_type": "PFCoreResource.v0",
+      "schema": "schemas/PFCoreResource.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreAction.v0": {
+      "artifact_type": "PFCoreAction.v0",
+      "schema": "schemas/PFCoreAction.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreEvent.v0": {
+      "artifact_type": "PFCoreEvent.v0",
+      "schema": "schemas/PFCoreEvent.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "AgentRuntime",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "AgentRuntime",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreContract.v0": {
+      "artifact_type": "PFCoreContract.v0",
+      "schema": "schemas/PFCoreContract.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreHandoff.v0": {
+      "artifact_type": "PFCoreHandoff.v0",
+      "schema": "schemas/PFCoreHandoff.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "Validated",
+        "Deprecated"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "signature_or_digest"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": false
+    },
+    "PFCoreTrace.v0": {
+      "artifact_type": "PFCoreTrace.v0",
+      "schema": "schemas/PFCoreTrace.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeChecked",
+        "CertificateChecked",
+        "LeanKernelChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "trace_id",
+        "claim_class",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest",
+        "trace_hash",
+        "events"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "claim_class_matches_assurance",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_kernel_proof",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_library_build",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "PFCoreCertificate.v0": {
+      "artifact_type": "PFCoreCertificate.v0",
+      "schema": "schemas/PFCoreCertificate.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "pcs-core",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "pcs-core",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeChecked",
+        "CertificateChecked",
+        "LeanKernelChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "certificate_id",
+        "claim_class",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest",
+        "trace_hash",
+        "claim_class"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "claim_class_matches_assurance",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_kernel_proof",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_library_build",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
+    },
+    "PFCoreRuntimeObservation.v0": {
+      "artifact_type": "PFCoreRuntimeObservation.v0",
+      "schema": "schemas/PFCoreRuntimeObservation.v0.schema.json",
+      "schema_owner": "pcs-core",
+      "runtime_producer": "AgentRuntime",
+      "allowed_runtime_producers": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "producer": "AgentRuntime",
+      "allowed_statuses": [
+        "Draft",
+        "RuntimeChecked",
+        "CertificateChecked",
+        "LeanKernelChecked",
+        "Rejected",
+        "Stale"
+      ],
+      "required_release_fields": [
+        "schema_version",
+        "artifact_type",
+        "observation_id",
+        "claim_class",
+        "source_repo",
+        "source_commit",
+        "signature_or_digest",
+        "observed_at",
+        "payload_hash"
+      ],
+      "semantic_checks": [
+        {
+          "check_id": "explicit_artifact_type",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "schema_valid",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "claim_class_matches_assurance",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_kernel_proof",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        },
+        {
+          "check_id": "lean_library_build",
+          "severity": "release_blocking",
+          "responsible_component": "pcs-core",
+          "execution_required_in_release_mode": true,
+          "allowed_to_skip": false
+        }
+      ],
+      "consumer_repos": [
+        "pcs-core",
+        "AgentRuntime"
+      ],
+      "canonical_hash_required": true,
+      "release_mode_required": true
     }
   },
-  "signature_or_digest": "sha256:52f85a49adb004c158a20fce0fa52ca2f684715fa9c24f5cf0dcfb07b697dadb"
+  "signature_or_digest": "sha256:ef001e3f1bd7265a09f561cae6bd74163768d727c9ecfe421157a1db25a60c06"
 }

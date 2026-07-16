@@ -13,6 +13,32 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
+func pcsBenchIngestSchemaAliases(name string) []string {
+	switch name {
+	case "PcsBenchIngest.v0.schema.json":
+		return []string{"PcsBenchIngest.v0.schema.json", "PCSBenchIngest.v0.schema.json"}
+	case "PCSBenchIngest.v0.schema.json":
+		return []string{"PCSBenchIngest.v0.schema.json", "PcsBenchIngest.v0.schema.json"}
+	default:
+		return []string{name}
+	}
+}
+
+func readSchemaBody(repoRoot, name string) (string, bool) {
+	if body, ok := readEmbeddedSchema(name); ok {
+		return body, true
+	}
+	if repoRoot == "" {
+		return "", false
+	}
+	for _, alias := range pcsBenchIngestSchemaAliases(name) {
+		if b, err := os.ReadFile(ResolveSchemaPath(repoRoot, alias)); err == nil {
+			return string(b), true
+		}
+	}
+	return "", false
+}
+
 func loadCompiledSchema(repoRoot, schemaFile string) (*jsonschema.Schema, error) {
 	compiler := jsonschema.NewCompiler()
 	names, err := listEmbeddedSchemaNames()
@@ -22,26 +48,23 @@ func loadCompiledSchema(repoRoot, schemaFile string) (*jsonschema.Schema, error)
 	if err != nil {
 		return nil, err
 	}
+	registeredID := map[string]struct{}{}
 	for _, name := range names {
-		body, ok := readEmbeddedSchema(name)
-		if !ok && repoRoot != "" {
-			p := ResolveSchemaPath(repoRoot, name)
-			if b, err := os.ReadFile(p); err == nil {
-				body = string(b)
-				ok = true
-			}
-		}
+		body, ok := readSchemaBody(repoRoot, name)
 		if !ok {
 			continue
 		}
-		if err := registerSchemaResource(compiler, name, body); err != nil {
+		for _, alias := range pcsBenchIngestSchemaAliases(name) {
+			if err := compiler.AddResource(alias, strings.NewReader(body)); err != nil {
+				return nil, fmt.Errorf("register schema %s: %w", alias, err)
+			}
+		}
+		if err := registerSchemaID(compiler, body, registeredID); err != nil {
 			return nil, fmt.Errorf("register schema %s: %w", name, err)
 		}
 	}
-	if _, ok := readEmbeddedSchema(schemaFile); !ok && repoRoot != "" {
-		if _, err := os.Stat(ResolveSchemaPath(repoRoot, schemaFile)); err != nil {
-			return nil, fmt.Errorf("schema not found: %s", schemaFile)
-		}
+	if _, ok := readSchemaBody(repoRoot, schemaFile); !ok {
+		return nil, fmt.Errorf("schema not found: %s", schemaFile)
 	}
 	return compiler.Compile(schemaFile)
 }
@@ -50,15 +73,23 @@ func registerSchemaResource(compiler *jsonschema.Compiler, name, body string) er
 	if err := compiler.AddResource(name, strings.NewReader(body)); err != nil {
 		return err
 	}
+	return registerSchemaID(compiler, body, nil)
+}
+
+func registerSchemaID(compiler *jsonschema.Compiler, body string, seen map[string]struct{}) error {
 	var meta struct {
 		ID string `json:"$id"`
 	}
-	if err := json.Unmarshal([]byte(body), &meta); err == nil && meta.ID != "" {
-		if err := compiler.AddResource(meta.ID, strings.NewReader(body)); err != nil {
-			return err
-		}
+	if err := json.Unmarshal([]byte(body), &meta); err != nil || meta.ID == "" {
+		return nil
 	}
-	return nil
+	if seen != nil {
+		if _, ok := seen[meta.ID]; ok {
+			return nil
+		}
+		seen[meta.ID] = struct{}{}
+	}
+	return compiler.AddResource(meta.ID, strings.NewReader(body))
 }
 
 func listConfigSchemaNames(repoRoot string) ([]string, error) {

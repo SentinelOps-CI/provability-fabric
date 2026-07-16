@@ -9,14 +9,14 @@
   "provability_fabric_commit": "c333333333333333333333333333333333333333",
   "scientific_memory_commit": "d444444444444444444444444444444444444444",
   "artifacts": {
-    "dataset_receipt.json": "sha256:d54994e19c32caeb7508edbb73a14efc94341ffd93013873af527e180385dfec",
-    "environment_receipt.json": "sha256:6335e612b739e925d74ca94a39690380f8be7c9db836fcad4c8ff0ba8b6c98ae",
-    "computation_run_receipt.json": "sha256:c14b4fed421343459ad081e74f7b613b39b6bca803eca27ffde0fdda1a8dd12a",
-    "result_artifact.json": "sha256:a38eeaab2b0cd104ac461b6a061bfa09e4f797253c27173107452a5acd9c42ed",
-    "computation_witness.json": "sha256:a86081703ca5bc521445cc5a38826adfc1ca55f87f52f35b3c429a2bbdaf13f9",
-    "science_claim_bundle.certified.json": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d",
-    "verification_result.json": "sha256:59c45c6e24cbca96489cfdefc0b156c39bec252b53b09e8f1d8b7b48fa88676f",
-    "signed_science_claim_bundle.json": "sha256:6995cdbdcb788d7e570093db3fd204072d69bd07c03390dce2f5a3a1490bf2ea",
-    "scientific_memory_import_report.json": "sha256:21fa9d915b7f313a3e9d1b1fdf4bdd2815bbd06404ae9699518bd5e367bca41e"
+    "dataset_receipt.json": "sha256:f94a4a839cea893cd0abeea758326e0e28f01a293b6ac87f8436ca5cca753e79",
+    "environment_receipt.json": "sha256:c01a8f055da8965e01c1172eb7ff9f58e702619261a6d6159e24ee861e134598",
+    "computation_run_receipt.json": "sha256:567e0adeec5bc61786efa529dcb777f5ac2ddda1f8cb1160d67e5638405cbd4a",
+    "result_artifact.json": "sha256:a2b8d26f9d0e056e7fd963156021a88b43c764c84357e2ff8ae70cd2c2d99acc",
+    "computation_witness.json": "sha256:fc8aa214f4e08a205734ed1d11efe04979430001c966b7b9b66a4ec36f809532",
+    "science_claim_bundle.certified.json": "sha256:5a6a675d23354d219e85daec27a89443d8648d158249e86c48b99528b4412643",
+    "verification_result.json": "sha256:f78c35d74928bb139e2d507424a022f2dfa78fcc2e1a67ccd4adeb0f51e0b43c",
+    "signed_science_claim_bundle.json": "sha256:e6419afb62cf88f2ae12f5f8bf58fc7ebde8cf7f2f28b61c9aea1a2aba889c4a",
+    "scientific_memory_import_report.json": "sha256:2e0eb651afa576796cab671320b7d8dea52dac0dd7864ba55501fdebfe9a06ca"
   }
 }

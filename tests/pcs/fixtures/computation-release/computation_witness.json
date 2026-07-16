@@ -6,7 +6,8 @@
   "environment_hash": "sha256:3739a2ed0a132d5c55dc6e7f53dabca2c7e57cbb188962a0ce670762850f4e01",
   "run_receipt_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828",
   "result_hashes": [
-    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   ],
   "code_repo": "https://github.com/example/scientific-computation-runner",
   "code_commit": "e555555555555555555555555555555555555555",
@@ -16,5 +17,5 @@
   "violations": [],
   "source_repo": "https://github.com/fraware/CertifyEdge",
   "source_commit": "b222222222222222222222222222222222222222",
-  "signature_or_digest": "sha256:68930f59c18ca213df059cec7b3097c5bdfc177bfbadb00ff0e14697f7fe8da8"
+  "signature_or_digest": "sha256:9745610472b75b2ec5d7c63ec37cc4ed35ed18968ba11fd941d9a4ea338d9259"
 }

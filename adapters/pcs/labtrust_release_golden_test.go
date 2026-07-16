@@ -6,12 +6,22 @@
 package pcs_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	pcs "github.com/SentinelOps-CI/provability-fabric/adapters/pcs"
 )
+
+func writeJSONFixture(path string, v any) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return os.WriteFile(path, data, 0o644)
+}
 
 func TestReleaseDeterministicSignIDsStable(t *testing.T) {
 	manifest := loadReleaseManifest(t)
@@ -67,6 +77,17 @@ func TestReleaseRegenerateMatchesFrozenSignedFixture(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if os.Getenv("UPDATE_PCS_GOLDEN") == "1" {
+		if err := writeJSONFixture(pfSigned, regenerated); err != nil {
+			t.Fatal(err)
+		}
+		vrPath := labtrustReleaseFixture(t, "verification_result.json")
+		if err := writeJSONFixture(vrPath, regenerated.VerificationResult); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("updated golden fixtures signed_bundle_id=%s", regenerated.SignedBundleID)
+		return
 	}
 	frozen, err := pcs.LoadSignedScienceClaimBundle(pfSigned)
 	if err != nil {

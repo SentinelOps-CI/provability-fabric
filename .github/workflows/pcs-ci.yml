@@ -119,6 +119,7 @@ jobs:
 
       - name: Test PCS adapter
         run: |
+          python3 -m pip install -q -e "${{ github.workspace }}/pcs-core/python"
           cd adapters/pcs
           go test -tags pcsbench ./... -count=1
 
