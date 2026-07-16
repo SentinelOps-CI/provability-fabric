@@ -59,8 +59,16 @@ class StochasticHarness:
         self.config = self._load_config(config_path)
         self.results: List[PerturbationResult] = []
         self.repo = git.Repo(search_parent_directories=True)
+        self.repo_root = Path(self.repo.working_tree_dir)
         self.random_seed = self.config.get("random_seed", 42)
         random.seed(self.random_seed)
+
+    def _resolve_path(self, path: str) -> Path:
+        """Resolve repo-relative paths even when cwd is tests/proof-fuzz."""
+        candidate = Path(path)
+        if candidate.is_absolute():
+            return candidate
+        return self.repo_root / candidate
 
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from YAML file"""
@@ -100,19 +108,26 @@ class StochasticHarness:
     def find_spec_files(self) -> List[str]:
         """Find all specification files in the project"""
         spec_files = []
-        spec_path = self.config.get("spec_templates_path", "spec-templates")
+        spec_path = self._resolve_path(
+            self.config.get("spec_templates_path", "spec-templates")
+        )
 
         for pattern in ["**/spec.yaml", "**/spec.yml", "**/*.spec.yaml"]:
-            spec_files.extend(Path(spec_path).glob(pattern))
+            spec_files.extend(spec_path.glob(pattern))
         return [str(f) for f in spec_files]
 
     def find_proof_files(self) -> List[str]:
         """Find all proof files in the project"""
         proof_files = []
-        lean_path = self.config.get("lean_libs_path", "core/lean-libs")
+        lean_path = self._resolve_path(
+            self.config.get("lean_libs_path", "core/lean-libs")
+        )
 
         for pattern in ["**/*.lean", "**/proofs/**/*.lean"]:
-            proof_files.extend(Path(lean_path).glob(pattern))
+            proof_files.extend(lean_path.glob(pattern))
+        proof_files.extend(
+            self._resolve_path("spec-templates").glob("**/proofs/**/*.lean")
+        )
         return [str(f) for f in proof_files]
 
     def load_spec(self, spec_path: str) -> Dict[str, Any]:
