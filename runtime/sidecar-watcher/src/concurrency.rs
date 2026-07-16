@@ -51,48 +51,41 @@ impl<T: Default + Clone> LockFreeRingBuffer<T> {
         self.capacity
     }
 
-    /// Push item to ring buffer (using interior mutability)
+    /// Push item to ring buffer.
+    ///
+    /// Head/tail updates must run under the same mutex as the slot write. A prior
+    /// lock-free-looking path raced concurrent producers (lost items), which made
+    /// multi-consumer benches spin forever waiting for pops that never arrived.
     #[inline(always)]
     pub fn push(&self, item: T) -> Result<(), T> {
+        let mut buffer = self.buffer.lock();
         let current_tail = self.tail.load(Ordering::Relaxed);
         let next_tail = (current_tail + 1) & self.mask;
 
-        // Check if buffer is full
-        if next_tail == self.head.load(Ordering::Acquire) {
+        // Check if buffer is full (one slot left unused to distinguish empty/full).
+        if next_tail == self.head.load(Ordering::Relaxed) {
             return Err(item);
         }
 
-        // Store item with interior mutability
-        {
-            let mut buffer = self.buffer.lock();
-            buffer[current_tail] = item;
-        }
-
-        // Update tail
-        self.tail.store(next_tail, Ordering::Release);
+        buffer[current_tail] = item;
+        self.tail.store(next_tail, Ordering::Relaxed);
         Ok(())
     }
 
-    /// Pop item from ring buffer (using interior mutability)
+    /// Pop item from ring buffer (mutex covers empty-check + slot read + head update).
     #[inline(always)]
     pub fn pop(&self) -> Option<T> {
+        let buffer = self.buffer.lock();
         let current_head = self.head.load(Ordering::Relaxed);
 
         // Check if buffer is empty
-        if current_head == self.tail.load(Ordering::Acquire) {
+        if current_head == self.tail.load(Ordering::Relaxed) {
             return None;
         }
 
-        // Load item with interior mutability
-        let item = {
-            let buffer = self.buffer.lock();
-            buffer[current_head].clone()
-        };
-
-        // Update head
+        let item = buffer[current_head].clone();
         let next_head = (current_head + 1) & self.mask;
-        self.head.store(next_head, Ordering::Release);
-
+        self.head.store(next_head, Ordering::Relaxed);
         Some(item)
     }
 
@@ -451,43 +444,53 @@ mod tests {
 
     #[test]
     fn test_concurrent_ring_buffer() {
-        let buffer = Arc::new(LockFreeRingBuffer::new(1024));
-        let mut handles = Vec::new();
+        use std::sync::mpsc;
 
-        // Spawn producer threads
-        for thread_id in 0..4 {
-            let buffer = Arc::clone(&buffer);
-            let handle = thread::spawn(move || {
-                for i in 0..1000 {
-                    let value = thread_id * 1000 + i;
-                    while buffer.push(value).is_err() {
+        let buffer = Arc::new(LockFreeRingBuffer::new(1024));
+        let (done_tx, done_rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            let mut handles = Vec::new();
+
+            // Spawn producer threads
+            for thread_id in 0..4 {
+                let buffer = Arc::clone(&buffer);
+                let handle = thread::spawn(move || {
+                    for i in 0..1000 {
+                        let value = thread_id * 1000 + i;
+                        while buffer.push(value).is_err() {
+                            thread::yield_now();
+                        }
+                    }
+                });
+                handles.push(handle);
+            }
+
+            // Spawn consumer thread
+            let buffer_clone = Arc::clone(&buffer);
+            let consumer_handle = thread::spawn(move || {
+                let mut count = 0;
+                while count < 4000 {
+                    if buffer_clone.pop().is_some() {
+                        count += 1;
+                    } else {
                         thread::yield_now();
                     }
                 }
+                count
             });
-            handles.push(handle);
-        }
 
-        // Spawn consumer thread
-        let buffer_clone = Arc::clone(&buffer);
-        let consumer_handle = thread::spawn(move || {
-            let mut count = 0;
-            while count < 4000 {
-                if let Some(_) = buffer_clone.pop() {
-                    count += 1;
-                } else {
-                    thread::yield_now();
-                }
+            for handle in handles {
+                handle.join().unwrap();
             }
-            count
+
+            let consumed = consumer_handle.join().unwrap();
+            let _ = done_tx.send(consumed);
         });
 
-        // Wait for all threads
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        let consumed = consumer_handle.join().unwrap();
+        let consumed = done_rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("concurrent ring buffer hung (likely lost items under MPMC race)");
         assert_eq!(consumed, 4000);
     }
 
