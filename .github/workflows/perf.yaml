@@ -9,6 +9,9 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch: # Allow manual triggering
 
+permissions:
+  contents: write
+
 jobs:
   performance:
     runs-on: ubuntu-latest
@@ -48,17 +51,20 @@ jobs:
           name: perf-results-${{ github.run_number }}
           path: perf-results.json
 
-      - name: Deploy to gh-pages
-        if: github.event_name == 'schedule'
+      # Global `gh-pages` CLI fails on GHA with:
+      # TypeError: The "path" argument must be of type string. Received undefined
+      # (find-cache-dir returns undefined under global npm install). Use the
+      # in-repo peaceiris action instead (same pattern as compliance.yaml).
+      - name: Prepare perf publish directory
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
-          # Install gh-pages
-          npm install -g gh-pages
-
-          # Create perf directory
           mkdir -p perf
+          cp perf-results.json "perf/$(date +%Y-%m-%d).json"
 
-          # Copy results with timestamp
-          cp perf-results.json perf/$(date +%Y-%m-%d).json
-
-          # Deploy to gh-pages branch
-          gh-pages --dist perf --add
+      - name: Deploy to gh-pages
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./perf
+          keep_files: true
