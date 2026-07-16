@@ -22,11 +22,11 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-03, Wave 7 session 4 — merge poll):** PR #136 + #144 **merged** to `main` at `95bcd563`. Post-merge inventory: **24/68** gated workflows green (2026-07-03T13:35Z snapshot; 44 red, 18 unknown). **No merges** of #145 (closed → #146), #143, or #138 — none had all four branch-protection checks green. **PR #146** (`ci/wave7-post-merge-fixes`) is the canonical cluster-fix PR; `171ed295` adds admission-controller `go.sum` fix for `ci-go-node`. **PR #138** blocked: `CI required checks` fail, `smoke` cancelled. **68/68 not claimed.** See [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
+**Current posture (2026-07-16 — Wave 7 inventory gate closed):** **PR #206** merged at `7d48b3d4`. Inventory on `main`: **60/60** gated workflows green, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC). Seven SaaS/AWS leftovers were honestly moved to `workflow_dispatch` only (not gated; DR/load/SaaS paths not proven in CI). Historical “67/67” target is satisfied as inventory exit 0 after the gated set shrank by those honest ungates. See [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md) and [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Do not claim 68/68** until `scripts/ci_workflow_inventory.sh` exits 0 twice consecutively on `main`.
+**Inventory exit 0 ×2 claimed** at tip `7d48b3d4` (not the legacy 67 gated count — gated count is now 60).
 
-### Path to 67/67 (Wave 7 — updated 2026-07-02)
+### Path to 67/67 (Wave 7 — closed 2026-07-16)
 
 | Milestone | Target green | Clusters | Depends on |
 |-----------|-------------:|----------|------------|
@@ -34,7 +34,7 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 | M2 | ~25/68 | + Lean (paper-conformance) partial | F24 rate-limit + integration_tests in CI with `PF_SHADOW_MODE=1`; Invariants.lean sorry-free; lean-style mathlib cache; merge to main |
 | M3 | ~35/67 | + Platform | `integration.yaml` F06 smokes; operational-excellence real paths |
 | M4 | ~50/67 | + Bench + Docs | Criterion baseline on main; `docs-build.yaml` green |
-| M5 | 67/67 | Remaining ~30 | Weekly inventory diff; one workflow per PR |
+| M5 | 60/60 (exit 0) | Honest ungates + tip green | **DONE** 2026-07-16 @ `7d48b3d4` (PR #206); historical label was 67/67 |
 
 1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows after Linux validation.
 2. **Security cluster** — CodeQL artifact chain (F20 done locally); cargo-deny all-features; wasm-scan empty-registry skip.
@@ -96,6 +96,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
 | Wave 7 post-merge (2026-07-03, `95bcd563`) | 68 | 5 | 63 | 18 queued |
+| Wave 7 inventory gate (2026-07-16, `7d48b3d4`) | **60** | **60** | 11 (ungated) | 16 |
 
 ### Path to 67/67 (Wave 7)
 
@@ -108,7 +109,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 _Superseded by milestone table above (2026-07-02 refresh)._
 
-Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off updates this page only when inventory exits **0**.
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` @ `7d48b3d4` (**60/60** gated).
 
 Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 

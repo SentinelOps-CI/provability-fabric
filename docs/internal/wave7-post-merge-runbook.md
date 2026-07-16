@@ -8,7 +8,21 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-16 — Wave 7 / release + verify-publish + CodeQL)
+## Status (2026-07-16 — Wave 7 / inventory gate closed)
+
+**Merged:** **PR #206** (honest ungate of seven SaaS/AWS leftovers to `workflow_dispatch` only; `dr-cross` AWS secret-presence skip). **Main head:** `7d48b3d4`. Inventory **60/60 gated green**, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC).
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| 0 — Merge gate | **DONE** | `7d48b3d4` on `main` |
+| 1.4 Lean + paper | **DONE (F24)** | `paper-conformance` green ×2 @ `f4b0859e` |
+| 1.5 Bench + docs | **DONE (F23)** | `bench-nightly-criterion` green ×3 @ `1ab0d2d5` lineage |
+| 1.6 Remaining | **DONE** | Inventory exit 0 ×2; tip CI/CodeQL/multiarch/ops-excellence green @ `7d48b3d4` ([29529736631](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736631), [29529735993](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529735993), [29529736127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736127), [29529736174](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736174)) |
+| **Next action** | **Phase E sign-off** | Optional: revive ungated workflows only with real SaaS/AWS smoke; otherwise ceremony complete |
+
+**Honest ungated (not in gate; not proven in CI):** `dr-cross`, `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer` (+ prior #194/#196: `lean-offline`, `art-benchmark`).
+
+### Prior status (2026-07-16 — Wave 7 / release + verify-publish + CodeQL)
 
 **Merged:** **PR #204** (release dry-run / missing-`CI_PAT` skip; verify-publish fixture `logs/`; CodeQL JS disk reclaim). **Main head:** `a844d8b0`. Inventory **60/67**.
 
@@ -208,7 +222,7 @@ bash scripts/ci_workflow_inventory.sh   # exit 0
 bash scripts/ci_workflow_inventory.sh   # second consecutive exit 0
 ```
 
-**Exit:** 67/67 gated workflows green twice.
+**Exit:** inventory exits 0 twice (all remaining push/schedule workflows green). Achieved 2026-07-16 @ `7d48b3d4` as **60/60** after honest ungating of seven SaaS/AWS leftovers (historical target label was 67/67).
 
 ---
 
@@ -226,7 +240,7 @@ bash scripts/ci_workflow_inventory.sh   # second consecutive exit 0
 
 ## Phase E — Sign-off ceremony
 
-When 67/67 achieved:
+When inventory exit 0 ×2 achieved (2026-07-16 @ `7d48b3d4`, **60/60** gated):
 
 ```bash
 bash scripts/ci_workflow_inventory.sh

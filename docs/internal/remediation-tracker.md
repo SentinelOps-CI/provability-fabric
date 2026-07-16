@@ -4,7 +4,7 @@ Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
-**North-star:** 69/69 gated workflows green with honest gates; trust chain fail-closed; burn-down reflects code reality.
+**North-star:** inventory exit 0 on all push/schedule workflows (achieved **60/60** @ `7d48b3d4`, 2026-07-16); trust chain fail-closed; burn-down reflects code reality.
 
 ---
 
@@ -15,18 +15,18 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Metric | Count |
 |--------|------:|
 | Total workflow files | 87 |
-| Gated (push/schedule on `main`) | 67 |
+| Gated (push/schedule on `main`) | 60 |
 | Latest run **success** | 60 |
-| Latest run **failure / in_progress / cancelled** | 7 |
+| Latest run **failure / cancelled** (ungated / PR-only) | 11 |
 | No run / unknown | 16 |
 
-**Green snapshot (60/67, 2026-07-16 @ `a844d8b0`):** includes `release.yaml`, `verify-publish-bundle.yaml`, `codeql.yaml`, multiarch, ops-excellence — see inventory for full list.
+**Green snapshot (60/60 gated, inventory exit 0 ×2, 2026-07-16 @ `7d48b3d4`):** all push/schedule workflows green after **PR #206** honest ungating of seven SaaS/AWS leftovers. See [ci-inventory-latest.md](ci-inventory-latest.md).
 
-**No run on main (gated):** none material — `release.yaml` and `verify-publish-bundle.yaml` greened via #204 + dispatch (2026-07-16).
+**No run on main (gated):** none — full gated set green.
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** **PR #204 merged** at `a844d8b0` (2026-07-16): release dry-run, verify-publish fixture, CodeQL JS disk. Inventory **60/67**. Prior: **PR #203** trust-fire + swebench stress; **PR #176** F24 paper-conformance. Wave 7 cluster triage: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Note:** **PR #206 merged** at `7d48b3d4` (2026-07-16): ungate `dr-cross` + six `disabled_inactivity` workflows to `workflow_dispatch` only (same honesty pattern as #194/#196). Inventory **60/60** exit 0 ×2. Prior: **PR #204** release/verify-publish/CodeQL (**60/67**); **PR #203** trust-fire + swebench stress. Wave 7: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DONE** | Green ×3 @ `1ab0d2d5`; `bench/BASELINE.md` recorded; #197/#198 |
 
-**Still pending main CI proof:** 67/67 inventory ×2. Remaining gated reds (2026-07-16 @ `a844d8b0`, **60/67**): `dr-cross` (AWS); `disabled_inactivity` cluster (`edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer`). See [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green). Seven leftovers remain `workflow_dispatch`-only (not gated; not proven in CI): `dr-cross` (AWS secret-presence skip), `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer`. See [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
