@@ -2037,9 +2037,9 @@ func traceCompareLowViewCmd() *cobra.Command {
 			}
 			// Oracle expects positional cert paths and --min-determinism as a percent
 			minDeterminism := threshold * 100.0
-			args := append([]string{oracle}, certs...)
-			args = append(args, "--min-determinism", fmt.Sprintf("%f", minDeterminism))
-			cmdExec := exec.Command(interp, args...)
+			pyArgs := append([]string{oracle}, certs...)
+			pyArgs = append(pyArgs, "--min-determinism", fmt.Sprintf("%f", minDeterminism))
+			cmdExec := exec.Command(interp, pyArgs...)
 			cmdExec.Stdout = os.Stdout
 			cmdExec.Stderr = os.Stderr
 			if err := cmdExec.Run(); err != nil {
