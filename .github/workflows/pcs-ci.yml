@@ -89,6 +89,9 @@ jobs:
   pcs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash -eo pipefail {0}
     env:
       PCS_CORE_PATH: ${{ github.workspace }}/pcs-core
     steps:
