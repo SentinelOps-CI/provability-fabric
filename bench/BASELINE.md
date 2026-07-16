@@ -8,6 +8,10 @@ The nightly `Bench Nightly Criterion` workflow compares against a Criterion base
 under `target/criterion/`. Until a baseline is saved from a green main run, scheduled compare jobs
 seed a baseline on first cache miss (see `compare-baseline` job).
 
+CI passes Criterion CLI overrides (`--sample-size 50 --measurement-time 5 --noplot`) so jobs stay
+inside the Actions timeout budget; local `make bench-save-baseline` still uses the full group
+settings in `bench/performance_benchmarks.rs`.
+
 ## Refresh locally (Linux/WSL)
 
 ```bash
