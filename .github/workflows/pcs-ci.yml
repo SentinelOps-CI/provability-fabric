@@ -421,22 +421,30 @@ jobs:
         run: |
           cd core/cli/pf
           COMPUTATION="$GITHUB_WORKSPACE/tests/pcs/fixtures/computation"
+          FORMAL="$GITHUB_WORKSPACE/tests/pcs/fixtures/formal/computation"
           PROFILE="$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/scientific_computation_reproducibility.json"
           HANDOFF="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json"
           PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
+          FORMAL_ARGS=(
+            --proof-obligations "$FORMAL/proof_obligation.v0.json"
+            --lean-check-result "$FORMAL/lean_check_result.v0.json"
+          )
           go run . verify science-claim "$COMPUTATION/valid_computation_bundle.json" \
             --handoff "$HANDOFF" \
             --admission-profile "$PROFILE" \
-            --release-mode
+            --release-mode \
+            "${FORMAL_ARGS[@]}"
           expect_fail() {
             local fixture="$1"
             local code="$2"
             if go run . verify science-claim "$COMPUTATION/$fixture" \
               --handoff "$HANDOFF" \
               --admission-profile "$PROFILE" \
-              --release-mode 2>&1 | tee "$RUNNER_TEMP/computation_${fixture}.txt"; then
+              --release-mode \
+              "${FORMAL_ARGS[@]}" \
+              2>&1 | tee "$RUNNER_TEMP/computation_${fixture}.txt"; then
               echo "expected $fixture to fail"
               exit 1
             fi
@@ -454,7 +462,9 @@ jobs:
           if go run . verify science-claim "$COMPUTATION/valid_computation_bundle.json" \
             --admission-profile "$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/labtrust_qc_release.json" \
             --handoff "$HANDOFF" \
-            --release-mode 2>&1 | tee "$RUNNER_TEMP/computation_wrong_profile.txt"; then
+            --release-mode \
+            "${FORMAL_ARGS[@]}" \
+            2>&1 | tee "$RUNNER_TEMP/computation_wrong_profile.txt"; then
             echo "expected wrong admission profile to fail"
             exit 1
           fi
