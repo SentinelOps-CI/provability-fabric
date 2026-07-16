@@ -24,8 +24,13 @@ jobs:
         run: pip install pyyaml requests
       - name: Run offline red-team scripts
         run: |
-          python tests/redteam/injection_runner.py --corpus tests/redteam/injection_corpus.jsonl --kernel-url http://127.0.0.1:8080 --output injection-results.json
-          python tests/redteam/abac_fuzz.py
+          # Job is offline-only: no kernel/gateway is started. Without --offline,
+          # connection failures look like universal BLOCKED and false-fail ALLOWED cases.
+          python tests/redteam/injection_runner.py \
+            --corpus tests/redteam/injection_corpus.jsonl \
+            --offline \
+            --output injection-results.json
+          python tests/redteam/abac_fuzz.py --offline
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
