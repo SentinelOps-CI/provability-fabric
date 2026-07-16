@@ -4,6 +4,10 @@
 # Nightly Criterion benchmarks (aligned with bench/README.md):
 # - On push to main: save baseline so next run can compare.
 # - On schedule: compare against saved baseline; fail if regression exceeds threshold.
+#
+# Bench groups in bench/performance_benchmarks.rs hard-code large sample sizes and
+# measurement windows (up to 10k samples / 60s). CI always passes CLI overrides so
+# jobs finish within the timeout budget (prior schedule runs cancelled at 30m/45m).
 
 name: Bench Nightly Criterion
 
@@ -22,6 +26,7 @@ on:
       - "runtime/sidecar-watcher/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - ".github/workflows/bench-nightly-criterion.yaml"
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
@@ -32,11 +37,15 @@ on:
         default: false
         type: boolean
 
+env:
+  # CLI overrides win over group.sample_size / group.measurement_time in Criterion.
+  CRITERION_CI_ARGS: "--sample-size 50 --measurement-time 5 --noplot"
+
 jobs:
   smoke-bench:
     name: Smoke (compile + run benches)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust
@@ -48,7 +57,7 @@ jobs:
         with:
           key-suffix: "-criterion-deps"
       - name: Run benches (small sample, no regression gate)
-        run: cargo bench -p provability-fabric-bench -- --sample-size 10 --noplot --test
+        run: cargo bench -p provability-fabric-bench -- --sample-size 10 --measurement-time 1 --noplot --test
 
   save-baseline:
     name: Save baseline (main)
@@ -56,7 +65,7 @@ jobs:
     if: >
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
       || (github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true)
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,11 +80,67 @@ jobs:
         with:
           key-suffix: "-criterion-deps"
 
-      - name: Install cargo-criterion
-        run: cargo install cargo-criterion
-
       - name: Save Criterion baseline
-        run: make bench-save-baseline
+        run: |
+          # Use cargo bench (not cargo-criterion) so --save-baseline works.
+          # shellcheck disable=SC2086
+          cargo bench -p provability-fabric-bench -- --save-baseline main ${{ env.CRITERION_CI_ARGS }}
+
+      - name: Record baseline metadata in bench/BASELINE.md
+        run: |
+          python3 <<'PY'
+          import datetime
+          import pathlib
+          import platform
+          import re
+          import subprocess
+
+          path = pathlib.Path("bench/BASELINE.md")
+          text = path.read_text(encoding="utf-8")
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          machine = " ".join(
+              [
+                  platform.uname().system,
+                  platform.uname().release,
+                  platform.uname().machine,
+                  "(GitHub Actions ubuntu-latest)",
+              ]
+          )
+          replacements = {
+              r"(\| Last refresh SHA \| )[^|]+(\|)": rf"\g<1>`{sha}`\g<2>",
+              r"(\| Last refresh date \(UTC\) \| )[^|]+(\|)": rf"\g<1>{date}\g<2>",
+          }
+          for pattern, repl in replacements.items():
+              text, n = re.subn(pattern, repl, text, count=1)
+              if n != 1:
+                  raise SystemExit(f"failed to update BASELINE.md field matching {pattern!r}")
+          # Keep a machine line for operators without rewriting the whole doc.
+          if "| Last refresh machine |" in text:
+              text, n = re.subn(
+                  r"(\| Last refresh machine \| )[^|]+(\|)",
+                  rf"\g<1>{machine}\g<2>",
+                  text,
+                  count=1,
+              )
+              if n != 1:
+                  raise SystemExit("failed to update Last refresh machine")
+          else:
+              needle = "| Workflow | `bench-nightly-criterion.yaml` (`refresh_baseline: true`) |"
+              insert = f"| Last refresh machine | {machine} |\n{needle}"
+              if needle not in text:
+                  raise SystemExit("BASELINE.md missing Workflow row for machine insert")
+              text = text.replace(needle, insert, 1)
+          path.write_text(text, encoding="utf-8")
+          print(f"Updated {path} for {sha} @ {date}")
+          PY
+
+      - name: Upload updated BASELINE.md
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-baseline-md-${{ github.sha }}
+          path: bench/BASELINE.md
+          if-no-files-found: error
 
       - name: Cache Criterion baseline
         uses: actions/cache@v4
@@ -88,8 +153,12 @@ jobs:
   compare-baseline:
     name: Compare to baseline (nightly)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 45
+    # Skip on refresh_baseline dispatch: save-baseline owns that path; a parallel
+    # compare with a cold/missing cache only re-seeds and historically timed out.
+    if: >
+      github.event_name == 'schedule'
+      || (github.event_name == 'workflow_dispatch' && inputs.refresh_baseline != true)
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -113,9 +182,6 @@ jobs:
           restore-keys: |
             criterion-main-
 
-      - name: Install cargo-criterion
-        run: cargo install cargo-criterion
-
       - name: Detect baseline presence
         id: baseline
         run: |
@@ -128,7 +194,9 @@ jobs:
       - name: Compare against baseline (fail on regression)
         if: steps.baseline.outputs.present == 'true'
         run: |
-          cargo bench -p provability-fabric-bench -- --baseline main || (echo "::error::Criterion regression detected (see bench/README.md thresholds)." && exit 1)
+          # shellcheck disable=SC2086
+          cargo bench -p provability-fabric-bench -- --baseline main ${{ env.CRITERION_CI_ARGS }} \
+            || (echo "::error::Criterion regression detected (see bench/README.md thresholds)." && exit 1)
         env:
           CRITERION_NO_FAIL_FAST: "0"
 
@@ -136,4 +204,5 @@ jobs:
         if: steps.baseline.outputs.present != 'true'
         run: |
           echo "::warning::No Criterion baseline in cache (restore key: ${{ steps.criterion-cache.outputs.cache-hit }}). Saving current run as baseline."
-          cargo bench -p provability-fabric-bench -- --save-baseline main
+          # shellcheck disable=SC2086
+          cargo bench -p provability-fabric-bench -- --save-baseline main ${{ env.CRITERION_CI_ARGS }}
