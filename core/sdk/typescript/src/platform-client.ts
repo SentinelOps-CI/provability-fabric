@@ -97,7 +97,8 @@ export class SentinelOpsClient {
   }
 
   async getHealth(): Promise<{ status: string; services: Record<string, unknown> }> {
-    return this.request('GET', '/api/v1/health');
+    // API gateway aggregates backend health at /health (not /api/v1/health).
+    return this.request('GET', '/health');
   }
 
   async getSLO(): Promise<{

@@ -269,9 +269,19 @@ clean:
 demo-up:
 	@$(ECHOOK) "🎬 Starting SentinelOps Platform Demo..."
 	@$(ECHOOK) "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
-	$(DC) up --build -d
-	@$(ECHOOK) "⏳ Waiting for services to be ready ($(WAIT)s)..."
-	@$(SLEEP) $(WAIT)
+	# Fraud demo / console / monitoring live under the compose "full" profile.
+	$(DC) --profile full up --build -d
+	@$(ECHOOK) "⏳ Waiting for API gateway health (up to $(WAIT)s)..."
+	@ok=0; i=0; \
+	while [ $$i -lt $(WAIT) ]; do \
+	  if curl -sf http://localhost:8000/health >/dev/null 2>&1; then ok=1; break; fi; \
+	  i=$$((i+1)); sleep 1; \
+	done; \
+	if [ $$ok -ne 1 ]; then \
+	  echo "API gateway /health not ready after $(WAIT)s"; \
+	  $(DC) --profile full ps || true; \
+	  exit 1; \
+	fi
 	@$(ECHOOK) "🎯 Setting up demo data..."
 	$(MAKE) demo-setup
 	@$(ECHOOK) ""
@@ -293,19 +303,19 @@ demo-up:
 
 demo-down:
 	@$(ECHOOK) "🛑 Stopping demo environment..."
-	$(DC) down
+	$(DC) --profile full down
 	@$(ECHOOK) "✅ Demo environment stopped"
 
 # Run setup **inside** the verifiable-mcp-fraud container using compiled JS
 demo-setup:
 	@$(ECHOOK) "🎯 Setting up demo data and policies..."
-	$(DC) run --rm verifiable-mcp-fraud node dist/scripts/setup-demo.js
+	$(DC) --profile full run --rm verifiable-mcp-fraud node dist/scripts/setup-demo.js
 	@$(ECHOOK) "✅ Demo setup completed"
 
 # Optional convenience: run the demo script inside the container
 demo-run:
 	@$(ECHOOK) "▶️ Running demo script..."
-	$(DC) run --rm verifiable-mcp-fraud node dist/scripts/run-demo.js
+	$(DC) --profile full run --rm verifiable-mcp-fraud node dist/scripts/run-demo.js
 
 # ---------- Platform ----------
 install: install-full

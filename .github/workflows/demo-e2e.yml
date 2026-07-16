@@ -37,9 +37,11 @@ jobs:
     - name: Start platform
       run: |
         echo "🚀 Starting complete platform for E2E testing..."
-        make demo-up
-        echo "⏳ Waiting for platform to be fully ready..."
-        sleep 90
+        # demo-up uses compose --profile full and waits on /health; give builds more headroom.
+        make demo-up WAIT=180
+        echo "⏳ Confirming API gateway still healthy..."
+        curl -sf http://localhost:8000/health | tee /tmp/gateway-health.json
+        test "$(jq -r '.status' /tmp/gateway-health.json)" = "healthy" -o "$(jq -r '.status' /tmp/gateway-health.json)" = "degraded"
     
     - name: Run demo setup
       run: |
