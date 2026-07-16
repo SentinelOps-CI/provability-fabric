@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 SentinelOps Platform Contributors
 
-import { SentinelOpsClient } from '@sentinelops/platform-sdk';
+import { SentinelOpsClient } from '@provability-fabric/core-sdk-typescript';
 
 const FRAUD_POLICY_ENGLISH = `
 Only FraudService may call the score endpoint.

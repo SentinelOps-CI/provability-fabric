@@ -46,31 +46,59 @@ export class SentinelOpsClient {
     }
   }
 
-  async compilePolicy(request: { english: string; policy_id: string; version?: string }) {
-    const data = await this.request<Record<string, unknown>>('POST', '/api/v1/policy/compile', {
+  async compilePolicy(request: {
+    english: string;
+    policy_id: string;
+    version?: string;
+  }): Promise<{ policy_hash: string; actionDsl: unknown }> {
+    const data = await this.request<{
+      policy_hash?: string;
+      action_dsl?: unknown;
+      actionDsl?: unknown;
+    }>('POST', '/api/v1/policy/compile', {
       version: '1.0.0',
       ...request,
     });
+    const policyHash = data.policy_hash;
+    if (!policyHash) {
+      throw new Error('policy/compile response missing policy_hash');
+    }
     return {
-      ...data,
-      actionDsl: (data as { action_dsl?: unknown }).action_dsl ?? (data as { actionDsl?: unknown }).actionDsl,
+      policy_hash: policyHash,
+      actionDsl: data.action_dsl ?? data.actionDsl,
     };
   }
 
-  async runProofs(request: { policy_hash: string; action_dsl: unknown }) {
-    return this.request('POST', '/api/v1/proofs/run', request);
+  async runProofs(request: {
+    policy_hash: string;
+    action_dsl: unknown;
+  }): Promise<{ proof_hash: string }> {
+    const data = await this.request<{ proof_hash?: string }>('POST', '/api/v1/proofs/run', request);
+    if (!data.proof_hash) {
+      throw new Error('proofs/run response missing proof_hash');
+    }
+    return { proof_hash: data.proof_hash };
   }
 
   async buildPolicy(request: {
     policy_hash: string;
     action_dsl: unknown;
     proof_hash: string;
-  }) {
-    return this.request('POST', '/api/v1/policy/build', request);
+  }): Promise<{ automata_hash: string }> {
+    const data = await this.request<{ automata_hash?: string }>(
+      'POST',
+      '/api/v1/policy/build',
+      request
+    );
+    if (!data.automata_hash) {
+      throw new Error('policy/build response missing automata_hash');
+    }
+    return { automata_hash: data.automata_hash };
   }
 
   async getHealth(): Promise<{ status: string; services: Record<string, unknown> }> {
-    return this.request('GET', '/api/v1/health');
+    // API gateway aggregates backend health at /health (not /api/v1/health).
+    return this.request('GET', '/health');
   }
 
   async getSLO(): Promise<{

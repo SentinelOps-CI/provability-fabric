@@ -3,8 +3,8 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { SentinelOpsClient } from '@sentinelops/platform-sdk';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { SentinelOpsClient } from '@provability-fabric/core-sdk-typescript';
 
 interface AgentConfig {
   tenant_id: string;
@@ -74,7 +74,7 @@ export class MCPClientAgent {
               },
             },
           },
-          CallToolRequestSchema
+          CallToolResultSchema
         );
 
         // 2. Score fraud (this should be restricted by platform policy)
@@ -89,10 +89,16 @@ export class MCPClientAgent {
               },
             },
           },
-          CallToolRequestSchema
+          CallToolResultSchema
         );
 
-        const scoreData = JSON.parse(scoreResult.params.content[0].text);
+        const scoreText = scoreResult.content.find(
+          (block): block is { type: 'text'; text: string } => block.type === 'text'
+        )?.text;
+        if (!scoreText) {
+          throw new Error('score_fraud returned no text content');
+        }
+        const scoreData = JSON.parse(scoreText);
         console.log(`Fraud score for ${txn.id}: ${scoreData.fraud_score} (${scoreData.risk_level})`);
 
         // 3. Handle high-risk transactions
@@ -130,7 +136,7 @@ export class MCPClientAgent {
             },
           },
         },
-        CallToolRequestSchema
+        CallToolResultSchema
       );
       console.log('✅ Fraud scoring allowed (expected)');
     } catch (error) {
@@ -152,7 +158,7 @@ export class MCPClientAgent {
               },
             },
           },
-          CallToolRequestSchema
+          CallToolResultSchema
         );
         console.log(`Rate limit test ${i + 1}/7: Success`);
       } catch (error) {
@@ -187,7 +193,7 @@ export class MCPClientAgent {
             },
           },
         },
-        CallToolRequestSchema
+        CallToolResultSchema
       );
       
       console.log('✅ Policy enforcement with new epoch successful');

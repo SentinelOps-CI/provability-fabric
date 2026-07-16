@@ -34,17 +34,35 @@ def generate_test_actions(count: int) -> List[str]:
     return actions
 
 
-def _wait_for_sidecar_health(timeout_s: float = 30) -> None:
+def _wait_for_sidecar_health(
+    process: subprocess.Popen,
+    log_path: str,
+    timeout_s: float = 60,
+) -> None:
     """Wait until the sidecar HTTP health endpoint responds."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
+        if process.poll() is not None:
+            stderr = ""
+            if process.stderr is not None:
+                stderr = process.stderr.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"Sidecar watcher exited early (code={process.returncode}). "
+                f"stderr:\n{stderr[-4000:]}"
+            )
         try:
             with urllib.request.urlopen("http://127.0.0.1:8006/health", timeout=1) as resp:
                 if resp.status == 200:
                     return
         except (urllib.error.URLError, TimeoutError, OSError):
             time.sleep(0.2)
-    raise RuntimeError("Sidecar watcher failed to start")
+    stderr = ""
+    if process.stderr is not None:
+        stderr = process.stderr.read().decode("utf-8", errors="replace")
+    raise RuntimeError(
+        f"Sidecar watcher failed to start within {timeout_s:.0f}s "
+        f"(log={log_path}). stderr:\n{stderr[-4000:]}"
+    )
 
 
 def _stop_sidecar(process: subprocess.Popen) -> None:
@@ -65,6 +83,10 @@ def measure_processing_time(actions: List[str]) -> List[float]:
 
     bin_path = os.environ.get("SIDECAR_BIN")
     if bin_path:
+        if not os.path.isfile(bin_path):
+            raise RuntimeError(f"SIDECAR_BIN not found: {bin_path}")
+        if not os.access(bin_path, os.X_OK):
+            raise RuntimeError(f"SIDECAR_BIN not executable: {bin_path}")
         cmd = [bin_path]
         cwd = None
     else:
@@ -74,8 +96,8 @@ def measure_processing_time(actions: List[str]) -> List[float]:
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         env={
             **os.environ,
             "LOG_FILE": log_path,
@@ -83,11 +105,12 @@ def measure_processing_time(actions: List[str]) -> List[float]:
             "LIMIT_BUDGET": "1000.0",
             "LIMIT_SPAMSCORE": "0.07",
             "ENABLE_HEARTBEAT": "0",
+            "PORT": "8006",
         },
     )
 
     try:
-        _wait_for_sidecar_health()
+        _wait_for_sidecar_health(process, log_path)
 
         with open(log_path, "a", encoding="utf-8") as log:
             for action in actions:
