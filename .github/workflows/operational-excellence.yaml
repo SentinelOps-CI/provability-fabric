@@ -445,9 +445,12 @@ jobs:
           gosec -fmt json -out gosec-results.json ./... || test -f gosec-results.json
 
       - name: Run Rust security scanner
+        working-directory: runtime/sidecar-watcher
         run: |
-          cargo audit --manifest-path runtime/sidecar-watcher/Cargo.toml --json > cargo-audit-results.json \
-            || test -s cargo-audit-results.json
+          # cargo-audit has no --manifest-path; run from the crate directory.
+          # Exit non-zero on advisories is OK if JSON output was produced.
+          cargo audit --json > ../../cargo-audit-results.json \
+            || test -s ../../cargo-audit-results.json
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4
