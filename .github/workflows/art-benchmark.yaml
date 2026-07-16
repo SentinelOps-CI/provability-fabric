@@ -1,31 +1,31 @@
 name: ART Benchmark
 
+# Incomplete ART CI scaffold — not maintainable as a gated workflow:
+# - Matrix include used `shard: [1..8]`, which expands to job name
+#   "Shard Array/8" (failure run 19399502401, Nov 2025).
+# - Job depends on `make lean-offline`, which is workflow_dispatch-only
+#   after #194 (unachievable cold-cache path on GitHub-hosted runners).
+# - Workflow references missing tools: art_aggregate.py, art_dashboard.py,
+#   art_gates.py; art_runner.py does not implement the --shard/--output CLI.
+# Kept as workflow_dispatch-only so it can be revived without gating the
+# main inventory. Push-gated bench Lean remains lean-morph / swebench smoke.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-  schedule:
-    # Run weekly on Sundays at 2 AM UTC
-    - cron: "0 2 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: art-benchmark-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   art-benchmark:
     name: ART Benchmark (Shard ${{ matrix.shard }}/${{ matrix.total-shards }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
+      # Honest single-axis shard matrix (no bogus include arrays).
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
         total-shards: [8]
-        include:
-          # PR jobs run only shard 1 for quick feedback
-          - shard: 1
-            total-shards: 1
-            is-pr: true
-          # Weekly jobs run all 8 shards
-          - shard: [1, 2, 3, 4, 5, 6, 7, 8]
-            total-shards: 8
-            is-pr: false
 
     steps:
       - name: Checkout code
@@ -94,7 +94,7 @@ jobs:
     name: Aggregate Results
     runs-on: ubuntu-latest
     needs: art-benchmark
-    if: github.event_name == 'schedule' || github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
@@ -130,40 +130,11 @@ jobs:
           name: art-dashboard
           path: dashboard.html
 
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('aggregate_results.json', 'utf8'));
-
-            const comment = `## ART Benchmark Results
-
-            **Overall Pass Rate:** ${results.overall_pass_rate.toFixed(1)}% (target: ≥99%)
-            **P95 Latency:** ${results.p95_latency.toFixed(1)}ms (target: ≤20ms)
-
-            ### Category Breakdown:
-            ${Object.entries(results.category_stats).map(([cat, stats]) => 
-              `- **${cat}:** ${stats.pass_rate.toFixed(1)}% (${stats.passed}/${stats.total})`
-            ).join('\n')}
-
-            ${results.flaky_count > 0 ? `\n⚠️ **Flaky Tests:** ${results.flaky_count} detected` : ''}
-
-            ${results.overall_pass_rate >= 99 && results.p95_latency <= 20 ? '✅ All gates passed!' : '❌ Some gates failed!'}`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-
   art-gates:
     name: Check Gates
     runs-on: ubuntu-latest
     needs: art-aggregate
-    if: github.event_name == 'schedule' || github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
@@ -189,6 +160,6 @@ jobs:
       - name: Fail if gates not met
         if: failure()
         run: |
-          echo "❌ ART benchmark gates not met!"
+          echo "ART benchmark gates not met!"
           echo "Check the dashboard for details."
           exit 1

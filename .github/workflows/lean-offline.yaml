@@ -125,6 +125,7 @@ jobs:
       - name: Restore network access
         if: always()
         run: |
+          # ci-honesty: justified wave7-remediation
           sudo iptables -P OUTPUT ACCEPT || true
           echo "Network access restored"
 
