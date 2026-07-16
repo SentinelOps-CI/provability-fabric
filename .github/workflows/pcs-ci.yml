@@ -570,13 +570,14 @@ jobs:
           test -f "${LABTRUST}/failure_localization/bundle_hash_mismatch.failure_localization_result.v0.json"
           python3 -c "import json; m=json.load(open('${LABTRUST}/admission_benchmark_suite.v0.json'))['metrics']; assert m['valid_release_admission_rate']==1.0; assert m['invalid_release_rejection_rate']>=0.85; assert m['failure_localization_accuracy']>=0.85"
           test -f "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
-          cd "$GITHUB_WORKSPACE"
-          go run ./tools/pcs-validate \
+          cd "$GITHUB_WORKSPACE/tools/pcs-validate"
+          go run . \
             "${LABTRUST}/benchmark_report.v0.json" \
             "${LABTRUST}/coverage_report.v0.json" \
             "${LABTRUST}/explain_quality_report.v0.json" \
             "${LABTRUST}/pcs_bench_ingest.v0.json"
-          go run ./tools/pcs-validate --benchmark-bundle "${LABTRUST}" --pcs-core "$PCS_CORE_PATH"
+          go run . --benchmark-bundle "${LABTRUST}" --pcs-core "$PCS_CORE_PATH"
+          cd "$GITHUB_WORKSPACE"
           pip install -q -e "${PCS_CORE_PATH}/python"
           pcs validate "${LABTRUST}/pcs_bench_ingest.v0.json"
           pcs validate "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
