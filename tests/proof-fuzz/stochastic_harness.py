@@ -58,7 +58,7 @@ class StochasticHarness:
     def __init__(self, config_path: str = "config.yaml"):
         self.config = self._load_config(config_path)
         self.results: List[PerturbationResult] = []
-        self.repo = git.Repo(".")
+        self.repo = git.Repo(search_parent_directories=True)
         self.random_seed = self.config.get("random_seed", 42)
         random.seed(self.random_seed)
 
