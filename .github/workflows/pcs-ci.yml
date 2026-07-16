@@ -421,10 +421,17 @@ jobs:
         run: |
           cd core/cli/pf
           COMPUTATION="$GITHUB_WORKSPACE/tests/pcs/fixtures/computation"
+          COMP_RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/computation-release"
           FORMAL="$GITHUB_WORKSPACE/tests/pcs/fixtures/formal/computation"
+          if [ -f "$COMP_RELEASE/proof_obligation.v0.json" ]; then
+            FORMAL="$COMP_RELEASE"
+          fi
           PROFILE="$GITHUB_WORKSPACE/adapters/pcs/admission_profiles/scientific_computation_reproducibility.json"
-          HANDOFF="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json"
-          PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
+          HANDOFF="$COMP_RELEASE/handoff_to_pf.json"
+          if [ ! -f "$HANDOFF" ]; then
+            HANDOFF="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/handoff_to_pf.json"
+          fi
+          PF_COMMIT="$(python -c "import json;print(json.load(open('$COMP_RELEASE/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
           FORMAL_ARGS=(
