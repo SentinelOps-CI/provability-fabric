@@ -9,11 +9,13 @@ on:
       - "spec-templates/**"
       - "core/lean-libs/**"
       - "tests/proof-fuzz/**"
+      - ".github/workflows/proof-fuzz.yaml"
   pull_request:
     paths:
       - "spec-templates/**"
       - "core/lean-libs/**"
       - "tests/proof-fuzz/**"
+      - ".github/workflows/proof-fuzz.yaml"
 
 jobs:
   stochastic-proof-regression:
@@ -33,12 +35,15 @@ jobs:
 
       - name: Set up Lean 4
         run: |
-          # Install Lean 4 using the official installation script
-          curl -L https://raw.githubusercontent.com/leanprover/lean4/master/elan/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> $GITHUB_PATH
           export PATH="$HOME/.elan/bin:$PATH"
-          source $HOME/.profile
-          lean --version
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          if ! "$HOME/.elan/bin/elan" toolchain list | grep -Fq "$TOOLCHAIN"; then
+            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          fi
+          "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
+          "$HOME/.elan/bin/lean" --version
 
       - name: Install dependencies
         run: |
