@@ -105,6 +105,8 @@ jobs:
             schemas
             python
             examples/labtrust-release
+            examples/workflow_profiles
+            examples/artifact_registry.valid.json
 
       - uses: actions/setup-go@v5
         with:
