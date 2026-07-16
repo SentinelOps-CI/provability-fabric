@@ -88,10 +88,9 @@ jobs:
           BASELINE_RUN_ID=$(find "$EXP/baseline" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           PF_RUN_ID=$(find "$EXP/pf" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | head -1)
           if [ -n "$BASELINE_RUN_ID" ] && [ -n "$PF_RUN_ID" ]; then
-            # ci-honesty: justified wave7-remediation — harness needs Docker images; compare is the gate
             python experiments/scripts/run_swebench_eval.py \
               --baseline-predictions "$EXP/baseline/predictions.jsonl" --pf-predictions "$EXP/pf/predictions.jsonl" \
-              --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true
+              --baseline-eval-dir "$EXP/baseline/eval" --pf-eval-dir "$EXP/pf/eval" 2>/dev/null || true  # ci-honesty: justified wave7-remediation
             python experiments/scripts/compare_runs.py --experiment-dir "$EXP" \
               --baseline-run-dir "$EXP/baseline/$BASELINE_RUN_ID" --pf-run-dir "$EXP/pf/$PF_RUN_ID"
           else
