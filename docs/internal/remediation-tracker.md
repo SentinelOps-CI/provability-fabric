@@ -1,10 +1,10 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-15** (main @ `f4b0859e`).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-16** (main tip `b8b78b94`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
-**North-star:** inventory exit 0 on all push/schedule workflows (achieved **60/60** @ `7d48b3d4`, 2026-07-16); trust chain fail-closed; burn-down reflects code reality.
+**North-star:** inventory exit 0 on all push/schedule workflows (achieved **60/60** @ `7d48b3d4`, reconfirmed tip `b8b78b94`, 2026-07-16); trust chain fail-closed; burn-down reflects code reality. Do **not** claim literal 67/67.
 
 ---
 
@@ -20,13 +20,13 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Latest run **failure / cancelled** (ungated / PR-only) | 11 |
 | No run / unknown | 16 |
 
-**Green snapshot (60/60 gated, inventory exit 0 ×2, 2026-07-16 @ `7d48b3d4`):** all push/schedule workflows green after **PR #206** honest ungating of seven SaaS/AWS leftovers. See [ci-inventory-latest.md](ci-inventory-latest.md).
+**Green snapshot (60/60 gated, inventory exit 0 ×2, 2026-07-16):** all push/schedule workflows green after **PR #206** honest ungating of seven SaaS/AWS leftovers; tip `b8b78b94` (#207 docs). See [ci-inventory-latest.md](ci-inventory-latest.md).
 
 **No run on main (gated):** none — full gated set green.
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
-**Note:** **PR #206 merged** at `7d48b3d4` (2026-07-16): ungate `dr-cross` + six `disabled_inactivity` workflows to `workflow_dispatch` only (same honesty pattern as #194/#196). Inventory **60/60** exit 0 ×2. Prior: **PR #204** release/verify-publish/CodeQL (**60/67**); **PR #203** trust-fire + swebench stress. Wave 7: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Note:** **PR #206 merged** at `7d48b3d4`; tip **`b8b78b94`** after **PR #207** (2026-07-16). Inventory **60/60** exit 0 ×2. Phase 3 hardening proof + Phase 4 sign-off: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md) Phase D/E. F23/F24 **DONE**.
 
 ---
 
@@ -61,11 +61,11 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 
 | ID | Sev | Finding (summary) | Wave | Status | Burn-down | PR | CI proof |
 |----|-----|-------------------|------|--------|-----------|-----|----------|
-| F01 | P0 | Signature verification stubbed (Go/Rust/TS) | 2 | **DONE** | ST-005, TD-001, TD-003–TD-005, TD-008, PH-004 | — | `tests/crypto/test_cross_lang_dsse.py`; `PF_ENFORCE_DSSE=1` documented in deployment-guide + compose `full` profile |
-| F02 | P0 | Shadow mode always allows; `is_tool_enabled` always true | 2 | **DONE** | PH-004, PH-005 | — | `env_config.rs`: deny-by-default `PF_ENABLED_TOOLS`; documented in deployment-guide + compose |
-| F03 | P0 | Ledger Docker runs `index-simple.js`; MCP only in `index.ts` | 4 | **DONE** | — | — | `runtime/ledger/Dockerfile` CMD → `dist/index.js`; `tests/integration/test_ledger_mcp_tenant.py` |
-| F04 | P0 | MCP tenant field mismatch (`tid` vs `tenant_id`) | 4 | **DONE** | TD-006 | — | `mcp-proxy.ts` + `mcp-service.ts` + integration test |
-| F05 | P0 | `retrieval-gateway` unbuildable | 5 | **DONE** | PH-006 | — | `cargo build/test -p retrieval-gateway`; `.github/workflows/retrieval-gateway.yml` |
+| F01 | P0 | Signature verification stubbed (Go/Rust/TS) | 2 | **DONE** | ST-005, TD-001, TD-003–TD-005, TD-008, PH-004 | — | `ci.yml` → `reusable-ci-extended.yml` DSSE green on `main`: [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623), [29529736631](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736631) |
+| F02 | P0 | Shadow mode always allows; `is_tool_enabled` always true | 2 | **DONE** | PH-004, PH-005 | — | Compose `PF_ENABLED_TOOLS=` via F21 smoke [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757); in-tree `enabled_tools_deny_by_default` (not in curated `reusable-ci-rust` `--lib`) |
+| F03 | P0 | Ledger Docker runs `index-simple.js`; MCP only in `index.ts` | 4 | **DONE** | — | — | `integration.yaml` MCP tenant tests green: [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757), [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
+| F04 | P0 | MCP tenant field mismatch (`tid` vs `tenant_id`) | 4 | **DONE** | TD-006 | — | Same integration runs as F03 (4 tenant tests) |
+| F05 | P0 | `retrieval-gateway` unbuildable | 5 | **DONE** | PH-006 | — | `retrieval-gateway.yml` green ×2: [29410389588](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29410389588), [28639549745](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549745) |
 | F06 | P0 | Ghost integration tests in CI | 1 | **DONE** | — | — | `tests/integration/test_*.py` (10 pytest smoke tests) |
 | F07 | P0 | Broken MCP fraud demo | 5 | **DONE** | — | — | `demos/verifiable-mcp-fraud/scripts/run-demo.ts` |
 | F08 | P0 | Broken edge-middleware example import | 5 | **DONE** | — | — | `examples/edge-middleware/index.ts` |
@@ -81,7 +81,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | F18 | P1 | Demo imports `SentinelOpsClient` | 5 | **DONE** | TD-009 | — | SDK exports |
 | F19 | P1 | SLO Gates — no root lockfile | 1 | **DONE** | — | — | Mock PF server in workflow |
 | F20 | P1 | CodeQL artifact upload broken | 1 | **DONE** | — | — | `codeql.yaml` matrix |
-| F21 | P1 | Runtime components absent from compose | 5 | **DONE** | — | — | `docker-compose.yml` profiles + `scripts/docker-compose-smoke.sh` |
+| F21 | P1 | Runtime components absent from compose | 5 | **DONE** | — | — | `integration.yaml` compose smoke green: [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757), [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
 | F22 | P1 | `ws` missing from ledger | 4 | **DONE** | — | — | `package.json`; `mcp-websocket.test.cjs` smoke stub |
 | F23 | P1 | Bench Nightly Criterion regression | 1 | **DONE** | — | [#197](https://github.com/SentinelOps-CI/provability-fabric/pull/197), [#198](https://github.com/SentinelOps-CI/provability-fabric/pull/198) | Green ×3 on `main` @ `1ab0d2d5`: [29508973817](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973817) (push), [29509027731](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509027731) + [29509041247](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509041247) (`refresh_baseline`); timeout CI overrides + ring-buffer MPMC hang fix |
 | F24 | P1 | Paper Conformance sidecar integration failures | 1, 3 | **DONE** | — | [#176](https://github.com/SentinelOps-CI/provability-fabric/pull/176) | `paper-conformance.yaml` green ×2 on `main` @ `f4b0859e`: [29441338434](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338434) (push), [29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127) (dispatch); integration gates unchanged |
@@ -114,7 +114,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
 | 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
-| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `1ab0d2d5` on `main`; F23+F24 DONE; inventory **51/67**; next clear gated reds: `multiarch-build` / `perf.yaml` / DR-AWS cluster |
+| 7 | CI green program | All CI clusters | 60/60 gated green twice on main (honest; not 67/67) | **DONE** — tip `b8b78b94`; F23+F24 DONE; inventory exit 0 ×2; Phase 3 hardening proof + Phase 4 sign-off recorded |
 
 ---
 
@@ -132,7 +132,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
 | Criterion `refresh_baseline` | **DONE** | Green ×3 @ `1ab0d2d5`; `bench/BASELINE.md` recorded; #197/#198 |
 
-**Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green). Seven leftovers remain `workflow_dispatch`-only (not gated; not proven in CI): `dr-cross` (AWS secret-presence skip), `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer`. See [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green); tip `b8b78b94` after #207. Seven leftovers remain `workflow_dispatch`-only (not gated; not proven in CI): `dr-cross` (AWS secret-presence skip), `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer`. Phase 3+4: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 

@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-16 — Wave 7 inventory gate closed):** **PR #206** merged at `7d48b3d4`. Inventory on `main`: **60/60** gated workflows green, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC). Seven SaaS/AWS leftovers were honestly moved to `workflow_dispatch` only (not gated; DR/load/SaaS paths not proven in CI). Historical “67/67” target is satisfied as inventory exit 0 after the gated set shrank by those honest ungates. See [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md) and [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Current posture (2026-07-16 — Wave 7 Phase 3+4 sign-off):** Tip `b8b78b94` (**PR #206** ungates + **PR #207** docs). Inventory on `main`: **60/60** gated workflows green, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC @ `7d48b3d4`; reconfirmed on tip). Seven SaaS/AWS leftovers remain `workflow_dispatch` only (not gated; DR/load/SaaS paths not proven in CI). Do **not** claim literal 67/67. Phase 3 hardening proof (F01–F05, F21) and Phase 4 docs: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md) Phase D/E; [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 ×2 claimed** at tip `7d48b3d4` (not the legacy 67 gated count — gated count is now 60).
+**Inventory exit 0 ×2 claimed** at **60/60** gated (tip `b8b78b94`; ceremony first closed @ `7d48b3d4`).
 
 ### Path to 67/67 (Wave 7 — closed 2026-07-16)
 
@@ -34,7 +34,7 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 | M2 | ~25/68 | + Lean (paper-conformance) partial | F24 rate-limit + integration_tests in CI with `PF_SHADOW_MODE=1`; Invariants.lean sorry-free; lean-style mathlib cache; merge to main |
 | M3 | ~35/67 | + Platform | `integration.yaml` F06 smokes; operational-excellence real paths |
 | M4 | ~50/67 | + Bench + Docs | Criterion baseline on main; `docs-build.yaml` green |
-| M5 | 60/60 (exit 0) | Honest ungates + tip green | **DONE** 2026-07-16 @ `7d48b3d4` (PR #206); historical label was 67/67 |
+| M5 | 60/60 (exit 0) | Honest ungates + tip green | **DONE** 2026-07-16 @ `7d48b3d4` / tip `b8b78b94` (PR #206/#207); historical label was 67/67 — not claimed |
 
 1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows after Linux validation.
 2. **Security cluster** — CodeQL artifact chain (F20 done locally); cargo-deny all-features; wasm-scan empty-registry skip.
@@ -96,7 +96,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
 | Wave 7 post-merge (2026-07-03, `95bcd563`) | 68 | 5 | 63 | 18 queued |
-| Wave 7 inventory gate (2026-07-16, `7d48b3d4`) | **60** | **60** | 11 (ungated) | 16 |
+| Wave 7 inventory gate (2026-07-16, `7d48b3d4` → tip `b8b78b94`) | **60** | **60** | 11 (ungated) | 16 |
 
 ### Path to 67/67 (Wave 7)
 
@@ -109,7 +109,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 _Superseded by milestone table above (2026-07-02 refresh)._
 
-Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` @ `7d48b3d4` (**60/60** gated).
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` (**60/60** gated); tip `b8b78b94`; F23/F24 **DONE**; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
 
 Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 
