@@ -1,6 +1,6 @@
 # Wave 7 post-merge runbook
 
-Operational steps to green **67/67** gated workflows on `main` after audit remediation merges. Work **one cluster per PR**; mark a cluster DONE only after **two consecutive** successful `main` runs.
+Operational steps to green all **gated** (push/schedule) workflows on `main` after audit remediation merges. Work **one cluster per PR**; mark a cluster DONE only after **two consecutive** successful `main` runs. Honest target after #206: **60/60** gated (not a literal 67/67).
 
 Helper: `bash scripts/wave7_cluster_status.sh` (requires `gh`).
 
@@ -8,19 +8,25 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-16 — Wave 7 / inventory gate closed)
+## Status (2026-07-16 — Wave 7 / Phase 3+4 sign-off)
 
-**Merged:** **PR #206** (honest ungate of seven SaaS/AWS leftovers to `workflow_dispatch` only; `dr-cross` AWS secret-presence skip). **Main head:** `7d48b3d4`. Inventory **60/60 gated green**, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC).
+**Merged:** **PR #206** (honest ungate) + **PR #207** (inventory docs). **Main tip:** `b8b78b94`. Inventory **60/60 gated green**, exit **0 ×2** (ceremony @ `7d48b3d4` 2026-07-16T20:48Z / 20:50Z; reconfirmed tip 2026-07-16T21:37Z / 21:40Z UTC). Phase 3 hardening proof table below (Phase D).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
-| 0 — Merge gate | **DONE** | `7d48b3d4` on `main` |
+| 0 — Merge gate | **DONE** | `b8b78b94` on `main` |
 | 1.4 Lean + paper | **DONE (F24)** | `paper-conformance` green ×2 @ `f4b0859e` |
 | 1.5 Bench + docs | **DONE (F23)** | `bench-nightly-criterion` green ×3 @ `1ab0d2d5` lineage |
-| 1.6 Remaining | **DONE** | Inventory exit 0 ×2; tip CI/CodeQL/multiarch/ops-excellence green @ `7d48b3d4` ([29529736631](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736631), [29529735993](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529735993), [29529736127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736127), [29529736174](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736174)) |
-| **Next action** | **Phase E sign-off** | Optional: revive ungated workflows only with real SaaS/AWS smoke; otherwise ceremony complete |
+| 1.6 Remaining | **DONE** | Inventory exit 0 ×2; tip CI/CodeQL/multiarch/ops-excellence green @ `b8b78b94` ([29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623), [29534144603](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534144603), [29534140842](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534140842), [29534144458](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534144458)) |
+| Phase D / Phase 3 | **DONE** | Hardening proof table with run IDs (below) |
+| Phase E / Phase 4 | **DONE** | Tracker + closure + reassessment updated; F23/F24 **DONE**; **60/60** ×2; ungated list recorded |
+| **Next action** | **Optional** | Revive ungated workflows only with real SaaS/AWS smoke |
 
 **Honest ungated (not in gate; not proven in CI):** `dr-cross`, `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer` (+ prior #194/#196: `lean-offline`, `art-benchmark`).
+
+### Prior status (2026-07-16 — Wave 7 / inventory gate closed @ `7d48b3d4`)
+
+**Merged:** **PR #206**. **Main head:** `7d48b3d4`. Inventory **60/60**, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC).
 
 ### Prior status (2026-07-16 — Wave 7 / release + verify-publish + CodeQL)
 
@@ -226,21 +232,21 @@ bash scripts/ci_workflow_inventory.sh   # second consecutive exit 0
 
 ---
 
-## Phase D — Production hardening proof (post-merge)
+## Phase D — Production hardening proof (post-merge) — **DONE**
 
-| ID | Proof on `main` |
-|----|-----------------|
-| F01 DSSE | `tests/crypto/test_cross_lang_dsse.py` in `reusable-ci-extended.yml` |
-| F02 deny-by-default tools | `env_config::enabled_tools_deny_by_default` unit test + compose `PF_ENABLED_TOOLS=` |
-| F03/F04 MCP tenant | `tests/integration/test_ledger_mcp_tenant.py` in `integration.yaml` |
-| F05 retrieval-gateway | `retrieval-gateway.yml` green twice |
-| F21 compose smoke | `scripts/docker-compose-smoke.sh` in `integration.yaml` |
+| ID | Hardening | Wired in CI | Main proof (run IDs) |
+|----|-----------|-------------|----------------------|
+| F01 | Cross-lang DSSE | `ci.yml` → `reusable-ci-extended.yml` → `tests/crypto/test_cross_lang_dsse.py` | Green: [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) (`b8b78b94`, log: `cross-lang DSSE tests passed`); [29529736631](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736631) (`7d48b3d4`) |
+| F02 | Deny-by-default tools | Compose `PF_ENABLED_TOOLS=` + in-tree `env_config::enabled_tools_deny_by_default` | Compose empty allow-list exercised by `docker-compose-smoke.sh full` in `integration.yaml` [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757) + [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636). Unit test is in-tree; `reusable-ci-rust.yml` curated suite does **not** run sidecar `--lib` (hang avoidance) |
+| F03/F04 | Ledger MCP tenant | `integration.yaml` → `tests/integration/test_ledger_mcp_tenant.py` | Green: [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757) (4 tenant tests passed); [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
+| F05 | retrieval-gateway | `retrieval-gateway.yml` | Green ×2+: [29410389588](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29410389588), [28639549745](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549745) |
+| F21 | Compose smoke | `integration.yaml` → `scripts/docker-compose-smoke.sh full` | Green: [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757) (`=== docker-compose smoke passed ===`); [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
 
 ---
 
-## Phase E — Sign-off ceremony
+## Phase E — Sign-off ceremony — **DONE** (2026-07-16)
 
-When inventory exit 0 ×2 achieved (2026-07-16 @ `7d48b3d4`, **60/60** gated):
+Inventory exit 0 ×2 achieved (2026-07-16 @ `7d48b3d4`, **60/60** gated; tip `b8b78b94` after #207). Do **not** claim literal 67/67.
 
 ```bash
 bash scripts/ci_workflow_inventory.sh
@@ -251,4 +257,4 @@ python scripts/count_sidecar_unwraps.py --max 10
 python scripts/count_ledger_any.py --max 20
 ```
 
-Update [remediation-tracker.md](remediation-tracker.md), [evidence-program-closure.md](../roadmap/evidence-program-closure.md), and publish [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md).
+Updated: [remediation-tracker.md](remediation-tracker.md), [evidence-program-closure.md](../roadmap/evidence-program-closure.md), [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md).

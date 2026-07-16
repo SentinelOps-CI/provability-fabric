@@ -8,11 +8,11 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Scope | Detail |
 |-------|--------|
-| **Code state** | **Merged to `main`** at `95bcd563` (PR #136 + #144, 2026-07-03). |
-| **CI on `main`** | Post-merge inventory **5 / 68** gated workflows green (2026-07-03); **43 push workflows queued** on first merge wave (runs `28585705xxx`). Pre-merge baseline was 13/68. |
-| **Main CI** | [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) queued on `95bcd563`. |
-| **Local gates** | All merge-gate commands below passed on working tree (2026-07-03). |
-| **68/68 sign-off** | **Not claimed.** Requires two consecutive `ci_workflow_inventory.sh` exit 0 on `main`. |
+| **Code state** | Audit remediation merged; Wave 7 tip `b8b78b94` (2026-07-16; #206 ungates + #207 docs). |
+| **CI on `main`** | Inventory **60 / 60** gated green, exit **0 ×2** (2026-07-16). Do **not** claim literal 67/67. |
+| **Main CI** | Tip CI green [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) on `b8b78b94`. |
+| **Local gates** | All merge-gate commands below passed on working tree (2026-07-03); burn-down gates unchanged. |
+| **60/60 sign-off** | **Claimed** (honest gated set after ungates). Literal 67/67 **not claimed**. |
 
 ---
 
@@ -20,8 +20,8 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Metric | 2026-07-02 reassessment | 2026-07-03 v2 |
 |--------|-------------------------|---------------|
-| Findings DONE | 32 | **36** |
-| Findings PARTIAL | 6 | **3** (F23, F24, F33 root Policy + MicroInterp) |
+| Findings DONE | 32 | **38** (F23/F24 closed 2026-07-16) |
+| Findings PARTIAL | 6 | **1** (F33 root Policy + MicroInterp); F23/F24 **DONE** (2026-07-16) |
 | Findings OPEN | 1 (F38) | **0** |
 | Gated workflows green on `main` | 13 / 68 | **5 / 68** post-merge snapshot (43 queued); refresh after wave completes |
 | Sidecar production unwrap/expect | 40 | **0** (`--max 10`) |
@@ -54,16 +54,14 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 ## Findings summary
 
-### DONE locally (36) — main CI proof pending merge
+### DONE (38) — including main CI proof
 
-F01–F22, F25–F32, F34–F39. Trust chain, ledger/MCP, sidecar burn-down, CI honesty, demos, ESLint 9, retention SQL guard, retrieval-gateway, compose profiles.
+F01–F32, F34–F39. Trust chain, ledger/MCP, sidecar burn-down, CI honesty, demos, ESLint 9, retention SQL guard, retrieval-gateway, compose profiles, F23 Criterion, F24 paper-conformance. Phase 3 hardening run IDs in Phase D table.
 
-### PARTIAL (3)
+### PARTIAL (1)
 
 | ID | Local | Remaining for DONE |
 |----|-------|-------------------|
-| **F23** | `bench-nightly-criterion.yaml` + `refresh_baseline` documented | Dispatch on `main`, commit baseline, two green runs |
-| **F24** | `integration_tests` 9/9 + rate-limit cluster; `PF_SHADOW_MODE=1` in workflows | Two green `paper-conformance.yaml` on `main` |
 | **F33** | `Invariants.lean` **0 sorry** + **CI-enforced**; `proofs/Policy.lean` **0 sorry** | Consolidate root `Policy.lean` (4 sorry); prove MicroInterp (2) |
 
 #### F33 — Invariants enforced-set expansion (2026-07-03)
@@ -76,15 +74,15 @@ F38 ESLint 9 migration complete (root flat config + packages).
 
 ---
 
-## Production hardening — CI wiring (Phase D)
+## Production hardening — CI proof (Phase D / Phase 3) — **DONE**
 
 | ID | Hardening | Wired in CI | Main proof |
 |----|-----------|-------------|------------|
-| F01 | `PF_ENFORCE_DSSE=1` | `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | Main run pending [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) queued |
-| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | `env_config::enabled_tools_deny_by_default` in `sidecar-watcher --lib` tests (`reusable-ci-rust.yml`) + compose `PF_ENABLED_TOOLS=` | Main CI queued |
-| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085) queued |
-| F05 | retrieval-gateway | `retrieval-gateway.yml` | [28585706166](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706166) queued |
-| F21 | Compose smoke | `integration.yaml` → `docker-compose-smoke.sh` | [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085) queued |
+| F01 | Cross-lang DSSE | `ci.yml` → `reusable-ci-extended.yml` → `test_cross_lang_dsse.py` | [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) (`b8b78b94`); [29529736631](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29529736631) (`7d48b3d4`) |
+| F02 | Deny-by-default `PF_ENABLED_TOOLS=` | Compose `PF_ENABLED_TOOLS=` in F21 smoke; in-tree `enabled_tools_deny_by_default` (not in curated `reusable-ci-rust` `--lib`) | [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757); [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
+| F03/F04 | MCP tenant | `integration.yaml` → `test_ledger_mcp_tenant.py` | [29508973757](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973757); [29489277636](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29489277636) |
+| F05 | retrieval-gateway | `retrieval-gateway.yml` | [29410389588](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29410389588); [28639549745](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28639549745) |
+| F21 | Compose smoke | `integration.yaml` → `docker-compose-smoke.sh full` | Same integration runs as F03/F04 |
 
 ---
 
@@ -98,8 +96,8 @@ F38 ESLint 9 migration complete (root flat config + packages).
 | phase1-bench-docs | **IN PROGRESS** | `docs-build.yaml` [28585705338](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705338) queued; Criterion [28585900934](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585900934) queued |
 | phase1-remaining-workflows | **IN PROGRESS** | Inventory **5/68** honest snapshot; refresh after queue drains |
 | phase2-f33-policy | **PARTIAL** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry; `MicroInterp.lean` 2 sorry |
-| phase3-hardening-proof | **IN PROGRESS** | F01/F03-F05/F21 runs queued on `95bcd563`; no conclusions yet |
-| phase4-signoff | **IN PROGRESS** | Docs + inventory refreshed; 68/68 **not claimed** |
+| phase3-hardening-proof | **DONE** | F01/F02/F03–F05/F21 proven on `main` with run IDs (Phase D table); tip `b8b78b94` |
+| phase4-signoff | **DONE** | Inventory **60/60** exit 0 ×2; F23/F24 DONE; ungated list recorded; literal 67/67 **not claimed** |
 
 ### Wave 7 execution log (2026-07-03, session 2 — superseded)
 
@@ -125,7 +123,7 @@ F38 ESLint 9 migration complete (root flat config + packages).
 | M2 | ~25/68 | + Lean (paper-conformance) |
 | M3 | ~35/68 | + Platform |
 | M4 | ~50/68 | + Bench + Docs |
-| M5 | 68/68 | Remaining ~30 |
+| M5 | 60/60 (exit 0) | **DONE** — honest ungates; not literal 67/67 |
 
 Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster helper: `bash scripts/wave7_cluster_status.sh`.
 
@@ -133,7 +131,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Code remediation merged to `main` (`95bcd563`).** Wave 7 Phase 1 is **in progress**: post-merge inventory reports **5/68** green with **43 workflows queued** on the first push wave. Cluster proof (replay, security, platform, lean, bench) awaits run conclusions — main CI [28585705582](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705582) still queued. **PR #143** (dependabot docs) rebased; CI [28586333806](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28586333806) pending — merge blocked until **CI required checks**, **smoke**, **evidence-schema-only**, **Documentation Build** green. **PR #138** remains **CONFLICTING** with `main`. Do not publish 68/68 or full evidence-program sign-off until inventory ceremony passes on `main` twice.
+**Wave 7 Phase 3+4 complete (2026-07-16).** Tip `b8b78b94`. Inventory **60/60** gated green, exit **0 ×2**. F23/F24 **DONE**. Phase 3 hardening (F01–F05, F21) proven with main run IDs. Seven SaaS/AWS workflows remain honestly ungated (`workflow_dispatch` only). Literal **67/67 is not claimed**. F33 Lean sorry debt remains PARTIAL (root Policy + MicroInterp).
 
 ---
 
