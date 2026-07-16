@@ -12,8 +12,8 @@
     "signed_bundle_hash": "sha256:514d66748739e7b5d7778f20022be8cfafeb0650b0dcf94bd62fc0ba09e9eeeb"
   },
   "release_chain_validation_result": {
-    "path": "release_chain_validation_result.v0.json",
-    "sha256": "sha256:49c9508bcd082ebf38fc3aaf6dbd626d14d6403009ffc2d1a77c46211b161bd5"
+    "path": "release_chain_validation_result.json",
+    "sha256": "sha256:48b6570334919b45d14ddf1ef6f7c7759bc0ac5a748cb667ab9c3d32083555b1"
   },
   "canonical_signed_bundle": {
     "path": "signed_science_claim_bundle.json",
