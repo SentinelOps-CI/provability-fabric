@@ -12,12 +12,14 @@ import json
 import random
 import string
 import time
-from typing import Dict, List, Tuple, Optional
-import aiohttp
+from typing import TYPE_CHECKING, Dict, List, Tuple, Optional
 import hashlib
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import logging
+
+if TYPE_CHECKING:
+    import aiohttp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -251,7 +253,7 @@ class ABACFuzzTester:
         logger.info(f"Generated {len(self.test_cases)} test cases")
 
     async def execute_test_case(
-        self, session: aiohttp.ClientSession, test_case: TestCase
+        self, session: "aiohttp.ClientSession", test_case: TestCase
     ) -> TestResult:
         """Execute a single test case"""
         start_time = time.time()
@@ -335,6 +337,8 @@ class ABACFuzzTester:
 
     async def run_fuzz_tests(self) -> None:
         """Run all fuzz tests"""
+        import aiohttp
+
         logger.info("Starting ABAC fuzz tests...")
 
         connector = aiohttp.TCPConnector(limit=self.max_workers)
