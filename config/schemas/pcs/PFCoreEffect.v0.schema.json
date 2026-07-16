@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreEffect.v0.schema.json",
+  "title": "PFCoreEffect.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "effect_kind",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreEffect.v0" },
+    "effect_kind": { "$ref": "pf_core.defs.json#/$defs/effect_kind" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

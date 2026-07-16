@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreDecision.v0.schema.json",
+  "title": "PFCoreDecision.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "decision",
+    "decision_reason",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreDecision.v0" },
+    "decision": { "$ref": "pf_core.defs.json#/$defs/decision" },
+    "decision_reason": { "type": "string" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

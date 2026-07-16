@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCorePrincipal.v0.schema.json",
+  "title": "PFCorePrincipal.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "principal_id",
+    "principal_kind",
+    "tenant",
+    "roles",
+    "capabilities",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCorePrincipal.v0" },
+    "principal_id": { "type": "string", "minLength": 1 },
+    "principal_kind": { "$ref": "pf_core.defs.json#/$defs/principal_kind" },
+    "tenant": { "type": "string", "minLength": 1 },
+    "roles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

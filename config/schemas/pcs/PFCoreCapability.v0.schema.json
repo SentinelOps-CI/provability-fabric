@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreCapability.v0.schema.json",
+  "title": "PFCoreCapability.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "capability_id",
+    "effect_kind",
+    "resource_pattern",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreCapability.v0" },
+    "capability_id": { "type": "string", "minLength": 1 },
+    "effect_kind": { "$ref": "pf_core.defs.json#/$defs/effect_kind" },
+    "resource_pattern": { "type": "string", "minLength": 1 },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

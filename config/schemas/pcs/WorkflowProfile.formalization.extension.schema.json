@@ -16,6 +16,14 @@
     "formalization_scope": {
       "type": "string",
       "const": "trust_envelope_only"
+    },
+    "pf_core": {
+      "type": "object",
+      "required": ["required_certificate_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "required_certificate_mode": { "$ref": "pf_core.defs.json#/$defs/certificate_mode" }
+      }
     }
   }
 }

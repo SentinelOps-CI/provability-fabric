@@ -33,9 +33,14 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/tool_call" }
     },
+    "handoffs": {
+      "type": "array",
+      "items": { "$ref": "PFCoreHandoff.v0.schema.json" }
+    },
     "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },
+    "local_dev": { "type": "boolean" },
     "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   },
   "$defs": {
@@ -67,7 +72,9 @@
         "policy_refs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "resource_uri": { "type": "string", "minLength": 1 },
+        "tenant": { "type": "string", "minLength": 1 }
       }
     }
   }

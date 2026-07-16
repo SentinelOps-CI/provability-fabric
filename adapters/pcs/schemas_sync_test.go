@@ -57,7 +57,13 @@ func TestSchemaMirrorMatchesPCSCore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := os.ReadFile(filepath.Join(vendor, e.Name()))
+		vendorPath := filepath.Join(vendor, e.Name())
+		// Match scripts/pcs-schema-diff.sh: PF keeps PCSBenchIngest as a CLI alias
+		// for pcs-core's PcsBenchIngest on case-sensitive filesystems.
+		if _, err := os.Stat(vendorPath); err != nil && e.Name() == "PcsBenchIngest.v0.schema.json" {
+			vendorPath = filepath.Join(vendor, "PCSBenchIngest.v0.schema.json")
+		}
+		got, err := os.ReadFile(vendorPath)
 		if err != nil {
 			t.Fatalf("provability-fabric missing schema %s: %v", e.Name(), err)
 		}
