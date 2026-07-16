@@ -120,6 +120,9 @@ func TestLabtrustReferenceIngestProducerContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	bundle := filepath.Join(root, "benchmark_runs", "labtrust_admission")
+	if st, err := os.Stat(bundle); err != nil || !st.IsDir() {
+		t.Skip("benchmark_runs/labtrust_admission missing; materialize via pcs-ci admission benchmark step")
+	}
 	pyExe, pyPrefix, ok := workingPythonForContractTest()
 	if !ok {
 		t.Skip("working python not on PATH")

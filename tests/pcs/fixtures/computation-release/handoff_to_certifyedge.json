@@ -10,19 +10,19 @@
   "input_artifacts": {
     "dataset_receipt.json": {
       "artifact_type": "DatasetReceipt.v0",
-      "sha256": "sha256:d54994e19c32caeb7508edbb73a14efc94341ffd93013873af527e180385dfec"
+      "sha256": "sha256:f94a4a839cea893cd0abeea758326e0e28f01a293b6ac87f8436ca5cca753e79"
     },
     "environment_receipt.json": {
       "artifact_type": "EnvironmentReceipt.v0",
-      "sha256": "sha256:6335e612b739e925d74ca94a39690380f8be7c9db836fcad4c8ff0ba8b6c98ae"
+      "sha256": "sha256:c01a8f055da8965e01c1172eb7ff9f58e702619261a6d6159e24ee861e134598"
     },
     "computation_run_receipt.json": {
       "artifact_type": "ComputationRunReceipt.v0",
-      "sha256": "sha256:c14b4fed421343459ad081e74f7b613b39b6bca803eca27ffde0fdda1a8dd12a"
+      "sha256": "sha256:567e0adeec5bc61786efa529dcb777f5ac2ddda1f8cb1160d67e5638405cbd4a"
     },
     "result_artifact.json": {
       "artifact_type": "ResultArtifact.v0",
-      "sha256": "sha256:a38eeaab2b0cd104ac461b6a061bfa09e4f797253c27173107452a5acd9c42ed"
+      "sha256": "sha256:a2b8d26f9d0e056e7fd963156021a88b43c764c84357e2ff8ae70cd2c2d99acc"
     }
   },
   "expected_outputs": {
@@ -35,5 +35,5 @@
     "dataset_hash": "sha256:84c9037231eef6a1742c1d6d0a043878b4de8395397c168026450d8ca9e647e3"
   },
   "status": "Validated",
-  "signature_or_digest": "sha256:bafff8665c39e3662b34563a34671f518639fbb46853d889925a537a964c1b41"
+  "signature_or_digest": "sha256:00a3731d61029e4ae124bd4503e3eae35eb7b1c271cf3f5f3930cfe2a89e137f"
 }

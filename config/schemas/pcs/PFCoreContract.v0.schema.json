@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreContract.v0.schema.json",
+  "title": "PFCoreContract.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "contract_id",
+    "name",
+    "pre",
+    "post",
+    "invariant",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreContract.v0" },
+    "contract_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "pre": { "$ref": "#/$defs/contract_pre" },
+    "post": { "$ref": "#/$defs/contract_post" },
+    "invariant": { "$ref": "#/$defs/contract_invariant" },
+    "semantics_layer": { "$ref": "#/$defs/semantics_layer" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "semantics_layer_value": {
+      "type": "string",
+      "enum": ["lean", "runtime", "out_of_scope"]
+    },
+    "semantics_layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_capability": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_effect": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_role": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_tenant_match": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_policy_ref": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_evidence_ref": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_decision": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_event_safe": { "$ref": "#/$defs/semantics_layer_value" },
+        "require_trace_safe": { "$ref": "#/$defs/semantics_layer_value" }
+      }
+    },
+    "contract_pre": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_capability": { "type": "string", "minLength": 1 },
+        "require_effect": { "$ref": "pf_core.defs.json#/$defs/effect_kind" },
+        "require_role": { "type": "string", "minLength": 1 },
+        "require_tenant_match": { "type": "boolean" },
+        "require_policy_ref": { "type": "string", "minLength": 1 },
+        "require_evidence_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "contract_post": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_decision": { "$ref": "pf_core.defs.json#/$defs/decision" },
+        "require_event_safe": { "type": "boolean" }
+      }
+    },
+    "contract_invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_trace_safe": { "type": "boolean" }
+      }
+    }
+  }
+}

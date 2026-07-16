@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PCSBridgeCertificate.v0.schema.json",
+  "title": "PCSBridgeCertificate.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "bridge_id",
+    "pcs_certificate_id",
+    "pfcore_trace_hash",
+    "claim_class",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PCSBridgeCertificate.v0" },
+    "bridge_id": { "type": "string", "minLength": 1 },
+    "pcs_certificate_id": { "type": "string", "minLength": 1 },
+    "pfcore_trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "pfcore_certificate_id": { "type": "string", "minLength": 1 },
+    "adapter": { "type": "string", "minLength": 1 },
+    "adapter_version": { "type": "string", "minLength": 1 },
+    "claim_class": { "$ref": "pf_core.defs.json#/$defs/certificate_claim_class" },
+    "assumption_refs": { "$ref": "common.defs.json#/$defs/ref_list" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "local_dev": { "type": "boolean" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}

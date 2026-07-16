@@ -18,7 +18,17 @@ if ! resolve_pf "${ROOT}"; then
   echo "go or core/cli/pf/pf.exe not found; set PF=... or use scripts/pcs-pf-clean-chain.ps1" >&2
   exit 2
 fi
-PCS="${PCS:-${ROOT}/scripts/pcs}"
+PCS="${PCS:-}"
+if [[ -z "${PCS}" ]]; then
+  if command -v pcs >/dev/null 2>&1; then
+    PCS="$(command -v pcs)"
+  elif [[ -x "${ROOT}/scripts/pcs" ]]; then
+    PCS="${ROOT}/scripts/pcs"
+  else
+    echo "pcs CLI not found on PATH; pip install -e pcs-core/python or set PCS=..." >&2
+    exit 2
+  fi
+fi
 
 RELEASE_FIXTURES="${ROOT}/tests/pcs/fixtures/labtrust-release"
 SEED_BUNDLE="${RELEASE_FIXTURES}/science_claim_bundle.certified.json"

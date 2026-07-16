@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreEvent.v0.schema.json",
+  "title": "PFCoreEvent.v0",
+  "$ref": "pf_core.defs.json#/$defs/embedded_event"
+}

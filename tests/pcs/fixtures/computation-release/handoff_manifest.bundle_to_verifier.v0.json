@@ -10,7 +10,7 @@
   "input_artifacts": {
     "science_claim_bundle.certified.json": {
       "artifact_type": "ScienceClaimBundle.v0",
-      "sha256": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d"
+      "sha256": "sha256:5a6a675d23354d219e85daec27a89443d8648d158249e86c48b99528b4412643"
     }
   },
   "expected_outputs": {
@@ -24,8 +24,8 @@
   "invariants": {
     "witness_id": "witness-sci-comp-repro-001",
     "run_receipt_hash": "sha256:9c74749d2ad46c6a60394db676e5527929f9b7bef9a012439d6d14b26d960828",
-    "certified_bundle_hash": "sha256:c47168f2de32da5f25407f34ab66cba9e853390e22108bf56ea24712343fd60d"
+    "certified_bundle_hash": "sha256:5a6a675d23354d219e85daec27a89443d8648d158249e86c48b99528b4412643"
   },
   "status": "Validated",
-  "signature_or_digest": "sha256:3db04a8c9656ed55c3efbc7bb08ebd2a606d9b26f21f492d201e0071c8b7e968"
+  "signature_or_digest": "sha256:91f0cdb6ab949b0ab706bcbf64281bac53f48083476944d1ef3a09a29d4e5a0e"
 }

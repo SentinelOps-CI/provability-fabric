@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreTrace.v0.schema.json",
+  "title": "PFCoreTrace.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "trace_id",
+    "workflow_id",
+    "events",
+    "trace_hash",
+    "policy_hash",
+    "contract_hash",
+    "claim_class",
+    "source_repo",
+    "source_commit",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreTrace.v0" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "pf_core.defs.json#/$defs/embedded_event" }
+    },
+    "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "policy_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "contract_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "claim_class": { "$ref": "pf_core.defs.json#/$defs/trace_claim_class" },
+    "source_repo": { "type": "string", "format": "uri" },
+    "source_commit": { "type": "string", "minLength": 7 },
+    "local_dev": { "type": "boolean" },
+    "required_certificate_mode": { "$ref": "pf_core.defs.json#/$defs/certificate_mode" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  }
+}
