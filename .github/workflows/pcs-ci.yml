@@ -298,7 +298,10 @@ jobs:
         run: |
           cd core/cli/pf
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
+          # Fixture RCR is Rejected; explain exits non-zero but must still emit JSON.
+          set +e
           go run . explain release-chain "$RELEASE/release_chain_validation_result.json" --json | tee "$RUNNER_TEMP/explain_rc.json"
+          set -e
           grep -q '"failed_count"' "$RUNNER_TEMP/explain_rc.json"
 
       - name: pf explain formal Lean release-chain failure
@@ -342,7 +345,9 @@ jobs:
           }
           print(json.dumps(rc, indent=2))
           PY
+          set +e
           go run . explain release-chain "$RUNNER_TEMP/formal_lean_rc.json" 2>&1 | tee "$RUNNER_TEMP/explain_formal.txt"
+          set -e
           grep -q 'CertificateMatchesRuntime' "$RUNNER_TEMP/explain_formal.txt"
           grep -q 'trace_hash_alignment' "$RUNNER_TEMP/explain_formal.txt"
           grep -q 'admissible_release_has_matching_trace_hash' "$RUNNER_TEMP/explain_formal.txt"
