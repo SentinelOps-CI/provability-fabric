@@ -20,16 +20,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Type check import
+      - name: Install and typecheck
+        working-directory: adapters/express-cert-middleware
         run: |
-          cd adapters/express-cert-middleware
-          if [ ! -f package.json ]; then npm init -y >/dev/null 2>&1; fi
-          npm i -D typescript @types/node
-          if [ ! -f tsconfig.json ]; then npx tsc --init >/dev/null 2>&1; fi
-          npx tsc --noEmit
+          npm install
+          npm run typecheck
       - name: Validate emitted CERT shape (sample)
+        working-directory: adapters/express-cert-middleware
         run: |
-          node -e "const {createCertMiddleware}=require('./adapters/express-cert-middleware/index.js'); const mw=createCertMiddleware({}); const req={method:'GET',originalUrl:'/health',headers:{}}; const res={ statusCode:200, on:(e,f)=>f() }; const next=()=>{}; console.log('OK');"
+          npm run build
+          node -e "const {createCertMiddleware}=require('./dist/index.js'); const mw=createCertMiddleware({}); if (typeof mw !== 'function') { throw new Error('middleware factory failed'); } console.log('OK');"
 
   python-fastapi:
     runs-on: ubuntu-latest
@@ -38,6 +38,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install adapter deps
+        run: pip install -r adapters/fastapi_cert_middleware/requirements.txt
       - name: Import check
         run: |
           python -c "import importlib.util, sys; sys.path.append('adapters'); import fastapi_cert_middleware"
@@ -47,6 +49,7 @@ jobs:
           from adapters.fastapi_cert_middleware import CertMiddleware
           print('OK')
           PY
+
 
   go-chi:
     runs-on: ubuntu-latest
