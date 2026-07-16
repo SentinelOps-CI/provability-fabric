@@ -358,19 +358,30 @@ jobs:
       - name: Install benchmark dependencies
         run: pip install psutil
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build sidecar watcher
+        run: cargo build --release --bin sidecar-watcher --manifest-path runtime/sidecar-watcher/Cargo.toml
+
       - name: Run performance benchmarks
+        env:
+          SIDECAR_BIN: target/release/sidecar-watcher
         run: |
-          # Run from repo root so bench.py can find runtime/sidecar-watcher.
+          # Prebuilt binary via SIDECAR_BIN; health wait is in scripts/bench.py.
           python scripts/bench.py --count 10000 --output scripts/perf-results.json
 
-          # Analyze results
+          # Analyze results (bench.py emits *_latency_us keys)
           python -c "
           import json
           with open('scripts/perf-results.json') as f:
               data = json.load(f)
-          print(f'Average latency: {data[\"avg_latency\"]:.2f}ms')
-          print(f'P95 latency: {data[\"p95_latency\"]:.2f}ms')
-          print(f'Throughput: {data[\"throughput\"]:.2f} req/s')
+          mean_ms = data['mean_latency_us'] / 1000.0
+          p95_ms = data['p95_latency_us'] / 1000.0
+          count = data['action_count']
+          print(f'Average latency: {mean_ms:.4f}ms')
+          print(f'P95 latency: {p95_ms:.4f}ms')
+          print(f'Actions measured: {count}')
           "
 
       - name: Upload performance results

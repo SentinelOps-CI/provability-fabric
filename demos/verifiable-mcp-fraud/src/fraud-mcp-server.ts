@@ -9,7 +9,7 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { SentinelOpsClient } from "@sentinelops/platform-sdk";
+import { SentinelOpsClient } from "@provability-fabric/core-sdk-typescript";
 
 interface Transaction {
   id: string;
