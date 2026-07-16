@@ -83,7 +83,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | F20 | P1 | CodeQL artifact upload broken | 1 | **DONE** | — | — | `codeql.yaml` matrix |
 | F21 | P1 | Runtime components absent from compose | 5 | **DONE** | — | — | `docker-compose.yml` profiles + `scripts/docker-compose-smoke.sh` |
 | F22 | P1 | `ws` missing from ledger | 4 | **DONE** | — | — | `package.json`; `mcp-websocket.test.cjs` smoke stub |
-| F23 | P1 | Bench Nightly Criterion regression | 1 | **PARTIAL** | — | — | `bench-nightly-criterion.yaml` `refresh_baseline` input; `bench/BASELINE.md`; needs main CI refresh |
+| F23 | P1 | Bench Nightly Criterion regression | 1 | **DONE** | — | [#197](https://github.com/SentinelOps-CI/provability-fabric/pull/197), [#198](https://github.com/SentinelOps-CI/provability-fabric/pull/198) | Green ×3 on `main` @ `1ab0d2d5`: [29508973817](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973817) (push), [29509027731](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509027731) + [29509041247](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509041247) (`refresh_baseline`); timeout CI overrides + ring-buffer MPMC hang fix |
 | F24 | P1 | Paper Conformance sidecar integration failures | 1, 3 | **DONE** | — | [#176](https://github.com/SentinelOps-CI/provability-fabric/pull/176) | `paper-conformance.yaml` green ×2 on `main` @ `f4b0859e`: [29441338434](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29441338434) (push), [29443718127](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29443718127) (dispatch); integration gates unchanged |
 | F25 | P1 | Egress cert evidence hardcoded accept | 2 | **DONE** | PH-005 | — | `env_config::resolve_evidence_hash`; `egress_evidence_enforcement.rs` |
 | F26 | P2 | Duplicate ledger entrypoints | 4 | **DONE** | — | — | `index-simple.ts` / `index-production.ts` removed; single `index.ts` + PROFILE env |
@@ -108,13 +108,13 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | Wave | Focus | Findings | Exit gate | Status (2026-07-02) |
 |------|-------|----------|-----------|---------------------|
 | 0 | Foundation / truth baseline | F36 | Tracker + burn-down reconciled | **DONE** |
-| 1 | CI unblock and honesty | F06, F10–F12, F19–F24 | Replay green; ≥25/67 workflows green | **MOSTLY DONE** — F24 closed on `main` @ `f4b0859e` (paper-conformance ×2); F23 Criterion baseline refresh still pending |
+| 1 | CI unblock and honesty | F06, F10–F12, F19–F24 | Replay green; ≥25/67 workflows green | **DONE** — F24 closed @ `f4b0859e`; F23 Criterion green ×3 on `main` @ `1ab0d2d5` (#197/#198) |
 | 2 | Trust chain core | F01–F02, F17, F25 | Cross-lang DSSE; fail-closed when enforced | **DONE** |
 | 3 | Runtime hardening + sidecar CI | F13–F16, F30–F31, F35 | Sidecar in PR CI | **DONE** |
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
 | 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
-| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `f4b0859e` on `main`; F24 DONE; next multiarch GHCR/cache retry (#164 merged, last run red on GHA cache export); F23 + demo-e2e / ops-excellence / billing still red |
+| 7 | CI green program | All CI clusters | 69/69 gated green twice on main | **IN PROGRESS** — `1ab0d2d5` on `main`; F23+F24 DONE; inventory **51/67**; next clear gated reds: `multiarch-build` / `perf.yaml` / DR-AWS cluster |
 
 ---
 
@@ -130,9 +130,9 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | `passWithNoTests` removed | **DONE** | `marketplace-e2e.yaml` — conditional Jest or skip |
 | Sidecar `integration_tests` in PR Rust CI | **DONE** | `reusable-ci-rust.yml` with `PF_SHADOW_MODE=1` |
 | Paper-conformance shadow mode | **DONE** (wired) | `paper-conformance.yaml` integration job sets `PF_SHADOW_MODE=1` |
-| Criterion `refresh_baseline` | **DOCUMENTED** | `bench/BASELINE.md` + `bench-nightly-criterion.yaml` `workflow_dispatch` input |
+| Criterion `refresh_baseline` | **DONE** | Green ×3 @ `1ab0d2d5`; `bench/BASELINE.md` recorded; #197/#198 |
 
-**Still pending main CI proof:** multiarch (GHCR/Actions cache retry; #164 merged), bench baseline refresh (F23), confirmed-red triage (demo-e2e, operational-excellence DR/AWS, billing), 69/69 inventory ×2. Main @ `f4b0859e`; F24 DONE — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
+**Still pending main CI proof:** multiarch (GHCR/Actions cache), `perf.yaml` / DR-AWS / stress / weekly-full cluster, 67/67 inventory ×2. Main @ `1ab0d2d5`; F23+F24 DONE — see [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
 ---
 
