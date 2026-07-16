@@ -1,9 +1,10 @@
 name: Edge API Load Testing
 
+# Depends on live edge endpoints (api.*.provability-fabric.org), Cloudflare /
+# Terraform-deployed infra, and optional InfluxDB. Cannot honestly smoke on
+# GitHub-hosted runners without that SaaS/infra. Kept as workflow_dispatch-only
+# so inventory is not gated on an unachievable path (same pattern as #194/#196).
 on:
-  schedule:
-    # Run weekly on Mondays at 3 AM UTC
-    - cron: "0 3 * * 1"
   workflow_dispatch:
     inputs:
       test_duration:

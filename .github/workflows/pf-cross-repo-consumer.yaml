@@ -1,9 +1,12 @@
 name: Cross-Repo PF CI Consumer
 
+# Calls org/ci-workflows reusable workflow (external SaaS/org wiring). Cannot
+# pass without that org repo and historically failed as disabled_inactivity.
+# Kept as workflow_dispatch-only so inventory is not gated on an unachievable
+# path (same pattern as #194/#196). In-repo PF CI remains pf-reusable-caller /
+# pf-ci.yaml.
 on:
-  pull_request:
-  schedule:
-    - cron: "0 3 * * *"
+  workflow_dispatch:
 
 jobs:
   pf-ci:

@@ -1,9 +1,10 @@
 name: Revocation List Sync
 
+# Intended to fetch/sign a canonical external revocation list; current body is
+# a mock/demo path and historically failed as disabled_inactivity. Kept as
+# workflow_dispatch-only so inventory is not gated on an unachievable path
+# (same pattern as #194/#196).
 on:
-  schedule:
-    # Run daily at 4 AM UTC
-    - cron: "0 4 * * *"
   workflow_dispatch:
 
 jobs:

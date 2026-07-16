@@ -1,12 +1,10 @@
 name: Load Testing
 
+# Requires docker-compose ledger scale-out, k6 against a live local stack, and
+# historically failed as disabled_inactivity. Not maintainable as a gated
+# workflow without a dedicated smoke path. Kept as workflow_dispatch-only so
+# inventory is not gated on an unachievable path (same pattern as #194/#196).
 on:
-  schedule:
-    # Run daily at 3 AM UTC
-    - cron: "0 3 * * *"
-  pull_request:
-    paths:
-      - "runtime/**"
   workflow_dispatch:
 
 jobs:
