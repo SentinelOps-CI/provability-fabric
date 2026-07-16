@@ -68,6 +68,11 @@ def _run_main(
         if sys.platform == "win32" and not fail_fcntl and not fail_resource and "fcntl" not in sys.modules:
             sys.modules["fcntl"] = types.ModuleType("fcntl")
             stubbed.append("fcntl")
+        if not fail_datasets_swebench:
+            for mod_name in ("datasets", "swebench"):
+                if mod_name not in fail_imports and mod_name not in sys.modules:
+                    sys.modules[mod_name] = types.ModuleType(mod_name)
+                    stubbed.append(mod_name)
 
         with mock.patch.dict(mod.os.environ, env_patch, clear=False):
             with mock.patch.object(mod.sys, "argv", av):
