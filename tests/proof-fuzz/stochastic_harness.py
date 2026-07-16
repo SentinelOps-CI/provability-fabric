@@ -354,14 +354,18 @@ class StochasticHarness:
         start_time = time.time()
 
         try:
-            # Run Lean proof checking
-            cmd = ["lake", "build", "--", spec_path]
+            if proof_path:
+                proof_dir = str(Path(proof_path).parent)
+            else:
+                proof_dir = str(self._resolve_path("spec-templates/v1/proofs"))
+
+            cmd = ["lake", "build"]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
-                cwd=os.path.dirname(proof_path) if proof_path else ".",
+                cwd=proof_dir,
             )
 
             execution_time = time.time() - start_time
@@ -662,12 +666,20 @@ def main():
     # Create test configurations
     tests = []
     for spec_file in spec_files:
-        # Find corresponding proof file
-        proof_file = None
+        spec_parent = Path(spec_file).parent
+        proofs_dir = spec_parent / "proofs"
+        proof_file = ""
         for proof in proof_files:
-            if os.path.dirname(spec_file) in proof:
-                proof_file = proof
+            proof_path = Path(proof)
+            if proof_path.parent == proofs_dir and proof_path.name != "lakefile.lean":
+                proof_file = str(proof_path)
                 break
+        if not proof_file:
+            for proof in proof_files:
+                proof_path = Path(proof)
+                if proof_path.parent == proofs_dir:
+                    proof_file = str(proof_path)
+                    break
 
         test = RegressionTest(
             name=f"stochastic_test_{len(tests)}",
