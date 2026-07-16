@@ -8,10 +8,13 @@ on:
     branches: [main]
     paths:
       - "runtime/admission-controller/opa/**"
+      - ".github/workflows/opa-test.yaml"
   pull_request:
     branches: [main]
     paths:
       - "runtime/admission-controller/opa/**"
+      - ".github/workflows/opa-test.yaml"
+  workflow_dispatch:
 
 jobs:
   opa-test:
@@ -22,28 +25,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install conftest
+      - name: Install OPA and conftest
         run: |
-          curl -L https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_$(uname -s)_$(uname -m).tar.gz | tar xz
-          sudo mv conftest /usr/local/bin/
+          set -euo pipefail
+          OPA_VERSION="0.70.0"
+          CONFTEST_VERSION="0.68.2"
+          curl -fsSL -o opa "https://openpolicyagent.org/downloads/v${OPA_VERSION}/opa_linux_amd64_static"
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+          curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" | tar xz
+          sudo mv conftest /usr/local/bin/conftest
+          opa version
+          conftest --version
 
-      - name: Run OPA tests
+      - name: Run OPA unit tests
         run: |
+          set -euo pipefail
           cd runtime/admission-controller/opa
-
-          # Run tests with coverage threshold
-          conftest verify --policy . --test-files tests/ --coverage-threshold 100
-
-          # Run tests with coverage report
-          conftest verify --policy . --test-files tests/ --coverage
-
-          echo "✅ OPA policy tests passed with 100% coverage"
+          # Rego v0 syntax; coverage gate via opa (conftest verify has no threshold flags)
+          opa test . -v --threshold 100.0 --v0-compatible
+          conftest verify --policy . --rego-version v0
 
       - name: Test policy with sample data
         run: |
+          set -euo pipefail
           cd runtime/admission-controller/opa
 
-          # Create sample test data
           cat > test-data.json << 'EOF'
           {
             "request": {
@@ -61,11 +68,12 @@ jobs:
           }
           EOF
 
-          # Test with valid signature
-          conftest test --policy . test-data.json
+          # Evaluate allow directly (policy is allow-based, not conftest deny-style)
+          ALLOW=$(opa eval -f raw --v0-compatible -d policy.rego -i test-data.json 'data.provability.allow')
+          test "$ALLOW" = "true"
 
-          # Test with revoked signature
           echo '{"request":{"kind":{"kind":"Pod"},"object":{"metadata":{"annotations":{"spec.sig":"revoked:some_signature"}}}}}' > revoked-test.json
-          conftest test --policy . revoked-test.json
+          DENY=$(opa eval -f raw --v0-compatible -d policy.rego -i revoked-test.json 'data.provability.allow')
+          test "$DENY" = "false"
 
-          echo "✅ Policy validation tests passed"
+          echo "OPA policy sample evaluations passed"
