@@ -434,9 +434,14 @@ jobs:
           PF_COMMIT="$(python -c "import json;print(json.load(open('$COMP_RELEASE/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
           export PF_RELEASE_MODE=1
+          MANIFEST="$COMP_RELEASE/release_manifest.v0.json"
+          if [ ! -f "$MANIFEST" ]; then
+            MANIFEST="$COMP_RELEASE/release_manifest.json"
+          fi
           FORMAL_ARGS=(
             --proof-obligations "$FORMAL/proof_obligation.v0.json"
             --lean-check-result "$FORMAL/lean_check_result.v0.json"
+            --manifest "$MANIFEST"
           )
           go run . verify science-claim "$COMPUTATION/valid_computation_bundle.json" \
             --handoff "$HANDOFF" \
