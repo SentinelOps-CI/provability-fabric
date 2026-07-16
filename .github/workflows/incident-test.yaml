@@ -35,10 +35,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Verify runner Docker and tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io curl jq
+          # ubuntu-latest already ships Docker Engine; apt docker.io conflicts with
+          # the preinstalled containerd.io package (containerd.io Conflicts: containerd).
+          docker version
+          command -v curl
+          command -v jq
+          curl --version | head -n1
+          jq --version
 
       - name: Install Kind
         run: |
