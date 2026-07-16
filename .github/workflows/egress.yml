@@ -7,12 +7,14 @@ on:
       - "scripts/check-egress.sh"
       - ".github/workflows/egress.yml"
       - "external/**"
+      - "tests/replay/**"
   pull_request:
     branches: [main, develop]
     paths:
       - "scripts/check-egress.sh"
       - ".github/workflows/egress.yml"
       - "external/**"
+      - "tests/replay/**"
   workflow_dispatch:
 
 jobs:
@@ -30,7 +32,10 @@ jobs:
       - name: Generate replay outputs for egress analysis
         run: |
           chmod +x tests/replay/run_replays.sh
-          export REPLAY_RUNS=1
+          # Pairwise low-view needs >=2 CERT runs per bundle
+          export REPLAY_RUNS=2
+          export CERT_V1_SCHEMA_REQUIRED=1
+          export CERT_V1_SCHEMA_PATH=/work/tests/replay/schema/trace-replay-cert.schema.json
           bash tests/replay/run_replays.sh
 
       - name: Run EGRESS-DET-P1 harness

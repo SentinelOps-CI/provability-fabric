@@ -9,10 +9,19 @@ KIT_DIR="$ROOT_DIR/external/TRACE-REPLAY-KIT/runner"
 OUT_DIR="$ROOT_DIR/tests/replay/out"
 CERT_DIR="$OUT_DIR/certs"
 ENV_JSON="$ROOT_DIR/tests/replay/env.json"
+OVERLAY_RUNNER="$ROOT_DIR/tests/replay/overlays/replay_run.py"
+# Local fixture: upstream CERT-V1 raw URL 404s (private + wrong filename)
+DEFAULT_SCHEMA="/work/tests/replay/schema/trace-replay-cert.schema.json"
+CERT_V1_SCHEMA_PATH="${CERT_V1_SCHEMA_PATH:-$DEFAULT_SCHEMA}"
 
 mkdir -p "$CERT_DIR"
 
 echo "Using TRACE-REPLAY-KIT at: $KIT_DIR"
+
+if [ ! -f "$OVERLAY_RUNNER" ]; then
+  echo "Error: missing runner overlay at $OVERLAY_RUNNER" >&2
+  exit 1
+fi
 
 # Build Docker image for reproducible runs
 IMAGE_TAG="trace-replay-runner:kit"
@@ -33,11 +42,15 @@ for b in "$ROOT_DIR/tests/replay/bundles"/*; do
   for i in $(seq 1 "$REPLAY_RUNS"); do
     cert_out_host="$CERT_DIR/${name}_run${i}.cert.json"
 
-    # Invoke runner inside container with mounted repo for deterministic env
-    # Image ENTRYPOINT is `python replay_run.py`; pass CLI args directly.
+    # Invoke runner inside container with mounted repo for deterministic env.
+    # ENTRYPOINT is `python replay_run.py` with -w set to the KIT runner dir, so the
+    # overlay must replace that path (not /app/replay_run.py alone).
     docker run --rm \
       -e TZ=UTC -e LC_ALL=C.UTF-8 \
+      -e CERT_V1_SCHEMA_PATH="$CERT_V1_SCHEMA_PATH" \
+      -e CERT_V1_SCHEMA_REQUIRED="${CERT_V1_SCHEMA_REQUIRED:-0}" \
       -v "$ROOT_DIR":/work \
+      -v "$OVERLAY_RUNNER":/work/external/TRACE-REPLAY-KIT/runner/replay_run.py:ro \
       -w /work/external/TRACE-REPLAY-KIT/runner \
       "$IMAGE_TAG" \
         --bundle "/work/tests/replay/bundles/$name" \
