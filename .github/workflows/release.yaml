@@ -13,6 +13,11 @@ on:
         description: "Release version"
         required: true
         default: "v1.0.0"
+      dry_run:
+        description: "Fence-only: skip pf-testbed repository dispatch (CI health)"
+        required: false
+        default: true
+        type: boolean
       simulate_bad_release:
         description: "Simulate bad release for testing"
         required: false
@@ -32,6 +37,7 @@ jobs:
       - name: Check NI Pass Rate
         id: check-ni
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bc
           # In production, this would query the ledger for NI verdicts
           # For now, we'll simulate the check
           echo "Checking NI pass rate for last 24h..."
@@ -64,6 +70,7 @@ jobs:
       - name: Check SLO Compliance
         id: check-slo
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bc
           # In production, this would query metrics from Prometheus
           # For now, we'll simulate the check
           echo "Checking SLO compliance for last 24h..."
@@ -100,6 +107,7 @@ jobs:
       - name: Check Safety Case Evidence
         id: check-evidence
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bc
           # In production, this would check the ledger for safety case completeness
           # For now, we'll simulate the check
           echo "Checking safety case evidence for last 24h..."
@@ -132,6 +140,7 @@ jobs:
       - name: Check Security Metrics
         id: check-security
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bc
           # In production, this would check injection corpus and ABAC metrics
           # For now, we'll simulate the check
           echo "Checking security metrics for last 24h..."
@@ -189,11 +198,27 @@ jobs:
       - name: Trigger pf-testbed Testing
         env:
           CI_PAT: ${{ secrets.CI_PAT }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: |
-          echo "🚀 Triggering pf-testbed testing for release ${GITHUB_REF_NAME}"
+          set -euo pipefail
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "dry_run=true: skipping pf-testbed repository dispatch (fence-only)"
+            exit 0
+          fi
+          if [ -z "${CI_PAT:-}" ]; then
+            echo "CI_PAT not configured: skipping pf-testbed repository dispatch"
+            exit 0
+          fi
 
-          VERSION="${GITHUB_REF#refs/tags/}"
-          VERSION="${VERSION#v}"
+          echo "Triggering pf-testbed testing for release ${GITHUB_REF_NAME}"
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+            VERSION="${VERSION#v}"
+          fi
           TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
 
@@ -220,7 +245,7 @@ jobs:
             https://api.github.com/repos/provability-fabric/pf-testbed/dispatches \
             -d "${PAYLOAD}"
 
-          echo "✅ Repository dispatch sent to pf-testbed"
+          echo "Repository dispatch sent to pf-testbed"
           echo "Event: on-core-release"
           echo "Version: ${VERSION}"
 

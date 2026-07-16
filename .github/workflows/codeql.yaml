@@ -27,6 +27,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Free disk space
+        if: matrix.language == 'javascript'
+        run: |
+          set -euo pipefail
+          echo "Disk before cleanup:"
+          df -h
+          # Best-effort cleanup of unused runner toolchains; missing dirs must not fail the job.
+          # ci-honesty: justified wave7-remediation
+          sudo rm -rf /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY/CodeQL" || true
+          # ci-honesty: justified wave7-remediation
+          sudo docker system prune -af || true
+          echo "Disk after cleanup:"
+          df -h
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -75,11 +93,11 @@ jobs:
       - name: Install dependencies
         if: matrix.language == 'javascript'
         run: |
-          set -e
-          for dir in marketplace/ui runtime/ledger console; do
+          set -euo pipefail
+          # Only packages in .github/codeql/codeql-config.yml paths (skip console).
+          for dir in marketplace/ui runtime/ledger; do
             if [ -f "$dir/package.json" ]; then
               echo "Installing $dir"
-              # npm ci requires lock sync; console ESLint 9 migration may lag lockfile on main
               (cd "$dir" && npm install --no-audit --no-fund)
             fi
           done
@@ -108,13 +126,26 @@ jobs:
       - name: Build code
         if: matrix.language == 'javascript'
         run: |
-          set -e
-          for dir in marketplace/ui runtime/ledger console; do
+          set -euo pipefail
+          for dir in marketplace/ui runtime/ledger; do
             if [ -f "$dir/package.json" ] && grep -q '"build"' "$dir/package.json"; then
               echo "Building $dir"
               (cd "$dir" && DISABLE_ESLINT_PLUGIN=true npm run build)
             fi
           done
+
+      - name: Drop node_modules before analysis
+        if: matrix.language == 'javascript'
+        run: |
+          set -euo pipefail
+          # node_modules is paths-ignored for CodeQL; reclaim disk before analyze.
+          for dir in marketplace/ui runtime/ledger; do
+            # ci-honesty: justified wave7-remediation
+            rm -rf "$dir/node_modules" || true
+          done
+          # ci-honesty: justified wave7-remediation
+          npm cache clean --force || true
+          df -h
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

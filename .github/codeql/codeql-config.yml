@@ -18,5 +18,6 @@ paths-ignore:
   - "docs"
 
 queries:
-  - uses: security-and-quality
+  # Prefer security-extended over security-and-quality to keep JS analysis
+  # within GitHub-hosted runner disk limits (quality suite previously OOM'd disk).
   - uses: security-extended

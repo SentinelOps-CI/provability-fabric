@@ -40,6 +40,10 @@ Thumbs.db
 *.log
 logs/
 *.log.*
+# Keep verify-publish-bundle fixture logs (required by verifier + MANIFEST.sha256)
+!experiments/fixtures/verify_publish_bundle/publish/logs/
+!experiments/fixtures/verify_publish_bundle/publish/logs/**
+!experiments/fixtures/verify_publish_bundle/publish/logs/**/*.log
 
 # Runtime data
 pids
