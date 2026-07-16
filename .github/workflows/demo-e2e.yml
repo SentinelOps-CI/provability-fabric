@@ -13,6 +13,7 @@ on:
     branches: [ main ]
     paths:
       - 'demos/verifiable-mcp-fraud/**'
+      - '.github/workflows/demo-e2e.yml'
 
 jobs:
   demo-e2e:
@@ -85,18 +86,18 @@ jobs:
         echo "Latency P95: ${LATENCY_P95}ms"
         echo "Error Rate: ${ERROR_RATE}"
 
-        python -c "
-import sys
-latency = float('$LATENCY_P95')
-error_rate = float('$ERROR_RATE')
-if latency > 5.0:
-    print(f'Latency P95 {latency}ms exceeds 5ms threshold')
-    sys.exit(1)
-if error_rate > 0.05:
-    print(f'Error rate {error_rate*100:.2f}% exceeds 5% threshold')
-    sys.exit(1)
-print('SLO metrics within acceptable ranges')
-"
+        python <<PY
+        import sys
+        latency = float("${LATENCY_P95}")
+        error_rate = float("${ERROR_RATE}")
+        if latency > 5.0:
+            print(f"Latency P95 {latency}ms exceeds 5ms threshold")
+            sys.exit(1)
+        if error_rate > 0.05:
+            print(f"Error rate {error_rate*100:.2f}% exceeds 5% threshold")
+            sys.exit(1)
+        print("SLO metrics within acceptable ranges")
+        PY
 
     - name: Export compliance packets
       run: |
@@ -148,24 +149,24 @@ print('SLO metrics within acceptable ranges')
           echo "No replay artifacts in this smoke path; skipping"
           exit 0
         fi
-        python -c "
-import json, glob, sys
-reports = glob.glob('replay_artifacts/*/lowview_report.json')
-total_jobs = len(reports)
-passing_jobs = 0
-for report_file in reports:
-    with open(report_file, 'r') as f:
-        report = json.load(f)
-    match_pct = report.get('low_view_match_pct', 0.0)
-    if match_pct >= 0.999:
-        passing_jobs += 1
-    print(f'Replay {report.get(\"job_id\", report_file)}: {match_pct*100:.3f}% match')
-print(f'Replay success rate: {passing_jobs}/{total_jobs}')
-if total_jobs > 0 and passing_jobs / total_jobs < 0.95:
-    print('Replay success rate below 95%')
-    sys.exit(1)
-print('Replay validation passed')
-"
+        python <<PY
+        import json, glob, sys
+        reports = glob.glob("replay_artifacts/*/lowview_report.json")
+        total_jobs = len(reports)
+        passing_jobs = 0
+        for report_file in reports:
+            with open(report_file, "r") as f:
+                report = json.load(f)
+            match_pct = report.get("low_view_match_pct", 0.0)
+            if match_pct >= 0.999:
+                passing_jobs += 1
+            print(f"Replay {report.get('job_id', report_file)}: {match_pct*100:.3f}% match")
+        print(f"Replay success rate: {passing_jobs}/{total_jobs}")
+        if total_jobs > 0 and passing_jobs / total_jobs < 0.95:
+            print("Replay success rate below 95%")
+            sys.exit(1)
+        print("Replay validation passed")
+        PY
 
     - name: Cleanup
       if: always()
