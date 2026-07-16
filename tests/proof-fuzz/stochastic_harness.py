@@ -58,9 +58,17 @@ class StochasticHarness:
     def __init__(self, config_path: str = "config.yaml"):
         self.config = self._load_config(config_path)
         self.results: List[PerturbationResult] = []
-        self.repo = git.Repo(".")
+        self.repo = git.Repo(search_parent_directories=True)
+        self.repo_root = Path(self.repo.working_tree_dir)
         self.random_seed = self.config.get("random_seed", 42)
         random.seed(self.random_seed)
+
+    def _resolve_path(self, path: str) -> Path:
+        """Resolve repo-relative paths even when cwd is tests/proof-fuzz."""
+        candidate = Path(path)
+        if candidate.is_absolute():
+            return candidate
+        return self.repo_root / candidate
 
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from YAML file"""
@@ -100,19 +108,26 @@ class StochasticHarness:
     def find_spec_files(self) -> List[str]:
         """Find all specification files in the project"""
         spec_files = []
-        spec_path = self.config.get("spec_templates_path", "spec-templates")
+        spec_path = self._resolve_path(
+            self.config.get("spec_templates_path", "spec-templates")
+        )
 
         for pattern in ["**/spec.yaml", "**/spec.yml", "**/*.spec.yaml"]:
-            spec_files.extend(Path(spec_path).glob(pattern))
+            spec_files.extend(spec_path.glob(pattern))
         return [str(f) for f in spec_files]
 
     def find_proof_files(self) -> List[str]:
         """Find all proof files in the project"""
         proof_files = []
-        lean_path = self.config.get("lean_libs_path", "core/lean-libs")
+        lean_path = self._resolve_path(
+            self.config.get("lean_libs_path", "core/lean-libs")
+        )
 
         for pattern in ["**/*.lean", "**/proofs/**/*.lean"]:
-            proof_files.extend(Path(lean_path).glob(pattern))
+            proof_files.extend(lean_path.glob(pattern))
+        proof_files.extend(
+            self._resolve_path("spec-templates").glob("**/proofs/**/*.lean")
+        )
         return [str(f) for f in proof_files]
 
     def load_spec(self, spec_path: str) -> Dict[str, Any]:
@@ -339,14 +354,18 @@ class StochasticHarness:
         start_time = time.time()
 
         try:
-            # Run Lean proof checking
-            cmd = ["lake", "build", "--", spec_path]
+            if proof_path:
+                proof_dir = str(Path(proof_path).parent)
+            else:
+                proof_dir = str(self._resolve_path("spec-templates/v1/proofs"))
+
+            cmd = ["lake", "build"]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
-                cwd=os.path.dirname(proof_path) if proof_path else ".",
+                cwd=proof_dir,
             )
 
             execution_time = time.time() - start_time
@@ -647,12 +666,20 @@ def main():
     # Create test configurations
     tests = []
     for spec_file in spec_files:
-        # Find corresponding proof file
-        proof_file = None
+        spec_parent = Path(spec_file).parent
+        proofs_dir = spec_parent / "proofs"
+        proof_file = ""
         for proof in proof_files:
-            if os.path.dirname(spec_file) in proof:
-                proof_file = proof
+            proof_path = Path(proof)
+            if proof_path.parent == proofs_dir and proof_path.name != "lakefile.lean":
+                proof_file = str(proof_path)
                 break
+        if not proof_file:
+            for proof in proof_files:
+                proof_path = Path(proof)
+                if proof_path.parent == proofs_dir:
+                    proof_file = str(proof_path)
+                    break
 
         test = RegressionTest(
             name=f"stochastic_test_{len(tests)}",
