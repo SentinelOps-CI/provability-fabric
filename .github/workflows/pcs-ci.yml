@@ -174,7 +174,9 @@ jobs:
 
       - name: pf verify release-chain (ReleaseManifest.v0)
         run: |
-          python3 scripts/refresh-release-manifest-pins.py pcs-core/examples/labtrust-release
+          # Validate the in-repo labtrust-release fixtures (kept hash-aligned with
+          # PF signed wrappers). pcs-core tip examples can drift independently.
+          python3 scripts/refresh-release-manifest-pins.py tests/pcs/fixtures/labtrust-release
           pip install -q -e "${{ github.workspace }}/pcs-core/python"
           cd core/cli/pf
           PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
@@ -182,14 +184,7 @@ jobs:
           export PF_RELEASE_MODE=1
           OUT="$RUNNER_TEMP/release_chain_validation_result.json"
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
-          RC_DIR="${{ github.workspace }}/pcs-core/examples/labtrust-release"
-          if [ ! -f "$RC_DIR/science_claim_bundle.certified.json" ]; then
-            RC_DIR="$RELEASE"
-          fi
-          MANIFEST="$RC_DIR/release_manifest.v0.json"
-          if [ ! -f "$MANIFEST" ]; then
-            MANIFEST="$RELEASE/release_manifest.v0.json"
-          fi
+          MANIFEST="$RELEASE/release_manifest.v0.json"
           if [ ! -f "$MANIFEST" ]; then
             MANIFEST="$RELEASE/release_manifest.json"
           fi
@@ -198,7 +193,7 @@ jobs:
           go run . verify release-chain \
             --manifest "$MANIFEST" \
             --registry "$REGISTRY" \
-            --artifact-dir "$RC_DIR" \
+            --artifact-dir "$RELEASE" \
             --admission-profile labtrust_qc_release \
             --release-mode \
             "${FORMAL_ARGS[@]}" \
