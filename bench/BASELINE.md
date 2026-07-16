@@ -1,12 +1,11 @@
 # Criterion Baseline (F23)
 
-Status: **workflow ready** — `workflow_dispatch` input `refresh_baseline` is wired in
-`.github/workflows/bench-nightly-criterion.yaml`. Measured baseline refresh is pending the
-first green `save-baseline` run on Linux CI.
+Status: **DONE** — baseline refreshed on Linux CI (`save-baseline` green ×3 on `main` @
+`1ab0d2d5`, including push + two `refresh_baseline=true` dispatches).
 
 The nightly `Bench Nightly Criterion` workflow compares against a Criterion baseline named `main`
-under `target/criterion/`. Until a baseline is saved from a green main run, scheduled compare jobs
-seed a baseline on first cache miss (see `compare-baseline` job).
+under `target/criterion/` (Actions cache key `criterion-main-*`). Scheduled compare jobs seed a
+baseline on first cache miss (see `compare-baseline` job).
 
 CI passes Criterion CLI overrides (`--sample-size 50 --measurement-time 5 --noplot`) so jobs stay
 inside the Actions timeout budget; local `make bench-save-baseline` still uses the full group
@@ -23,18 +22,19 @@ with date (UTC), git SHA, and machine metadata.
 
 ## Refresh via CI
 
-1. Merge Wave 1 workflow fixes to `main`.
-2. In GitHub Actions, run **Bench Nightly Criterion** with `workflow_dispatch` and set
+1. In GitHub Actions, run **Bench Nightly Criterion** with `workflow_dispatch` and set
    `refresh_baseline: true` (boolean input). A push to `main` under `bench/**` also triggers
    the `save-baseline` job.
-3. Record the green run SHA and date below after the first successful refresh.
-4. Confirm the next scheduled compare job passes.
+2. Record the green run SHA and date below after a successful refresh.
+3. Confirm a subsequent scheduled (or non-refresh dispatch) compare job passes.
 
 | Field | Value |
 |-------|-------|
-| Last refresh SHA | _pending first CI run_ |
-| Last refresh date (UTC) | _pending_ |
+| Last refresh SHA | `1ab0d2d53ca09d97bc4bab2b013fef25b668d7c4` |
+| Last refresh date (UTC) | 2026-07-16T15:25:40Z |
+| Last refresh machine | Linux 6.17.0-1018-azure x86_64 (GitHub Actions ubuntu-latest) |
 | Workflow | `bench-nightly-criterion.yaml` (`refresh_baseline: true`) |
+| Proof runs | [29508973817](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973817) (push), [29509027731](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509027731) (dispatch), [29509041247](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509041247) (dispatch) |
 
 ## Thresholds
 

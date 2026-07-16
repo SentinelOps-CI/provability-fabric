@@ -8,9 +8,21 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-15 — Wave 7 post-merge, session 6)
+## Status (2026-07-16 — Wave 7 / F23 closeout)
 
-**Merged:** PR #136 + #144 at `95bcd563`; **PR #146** merged 2026-07-02; **PR #151** at `ee68659c`; **PR #163** (F24 scheduler); **PR #164** (multiarch musl); **PR #176** at `f4b0859e` (paper-conformance geiger drop / F24 closeout). **Main head:** `f4b0859e`.
+**Merged:** **PR #197** (Criterion CI timeouts/overrides); **PR #198** (ring-buffer MPMC hang). **Main head:** `1ab0d2d5`. Inventory **51/67**.
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| 0 — Merge gate | **DONE** | `1ab0d2d5` on `main` |
+| 1.4 Lean + paper | **DONE (F24)** | `paper-conformance` green ×2 @ `f4b0859e` |
+| 1.5 Bench + docs | **DONE (F23)** | `bench-nightly-criterion` green ×3 @ `1ab0d2d5`: [29508973817](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973817), [29509027731](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509027731), [29509041247](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29509041247) |
+| 1.6 Remaining | **IN PROGRESS** | Next clear gated red: `perf.yaml` (confirmed failure); `multiarch-build` tip run in progress |
+| **Next action** | **Triage `perf.yaml`** | Last fail [29473421092](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29473421092); watch multiarch [29508973857](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29508973857) |
+
+### Prior status (2026-07-15 — Wave 7 post-merge, session 6)
+
+**Merged:** PR #136 + #144 at `95bcd563`; **PR #146** merged 2026-07-02; **PR #151** at `ee68659c`; **PR #163** (F24 scheduler); **PR #164** (multiarch musl); **PR #176** at `f4b0859e` (paper-conformance geiger drop / F24 closeout). **Main head (then):** `f4b0859e`.
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
