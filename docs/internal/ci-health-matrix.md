@@ -144,7 +144,7 @@ Verified on `main` (post-#118): each workflow below runs `make submodules` with 
 |----------|---------|-----|--------|
 | nightly-replay.yml | Instant failure on every push (invalid YAML) | Single workflow definition | Fixed |
 | demo-e2e.yml | Runs on all main pushes | Path filter on push | Fixed |
-| pf-ci.yaml | `workflow_call` only — spurious failed check on push | No push trigger; caller via pf-reusable-caller | Waived — reusable only |
+| pf-ci.yaml | Stale push-era failures; `workflow_call` only | `workflow_dispatch` smoke (default) + full Kind via call/`mode=full`; caller via pf-reusable-caller | Smoke clears inventory; not a SaaS re-gate |
 
 ## Required secrets (org prerequisites)
 
@@ -165,7 +165,7 @@ Contributor-facing steps: [CONTRIBUTING.md — STANDARDS_GITHUB_TOKEN](https://g
 | Secret / service | Workflows blocked | Action |
 |------------------|-------------------|--------|
 | `STANDARDS_GITHUB_TOKEN` | `platform-cert-validate.yml`, `cert-validate.yml`, `replay.yml`, `evidence-v01-smoke.yml`, `standards-pin.yml`, `docs-build.yaml`, `egress.yml`, `nightly-replay.yml`, `platform-replay.yml` | Org admin steps above; each workflow runs `make submodules` with `STANDARDS_GITHUB_TOKEN` env |
-| CLA hosted service | `cla-bot.yaml` (PR only after #118) | **Option B applied:** no `push: main`; skip when `/health` fails. Option A: restore hosted API at URL in `cla/cla.json` |
+| CLA hosted service | `cla-bot.yaml` (PR + `workflow_dispatch` after #118) | **Option B applied:** no `push: main`; skip when CLA URL unreachable; dispatch smoke has no contributor range. Option A: restore hosted API at URL in `CLA/cla.json` |
 | `CI_PAT` (optional) | `release.yaml` cross-repo dispatch | Only if release workflows must pass in closure sweep |
 | `AWS_*` (optional) | `dr-cross.yaml`, `evidence.yaml` | Only if DR/evidence collection scheduled jobs are in scope |
 
