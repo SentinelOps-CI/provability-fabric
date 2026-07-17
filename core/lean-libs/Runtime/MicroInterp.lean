@@ -201,7 +201,7 @@ Burn-down before these placeholders can close:
 
 Do **not** vacuous-close with `axiom` / `by assumption`, and do **not** add
 this file to the lean-style enforced set until both placeholders are gone.
-See `docs/internal/lean-sorry-burn-down.md`. -/
+See docs/internal F33 Lean burn-down tracker (P4 section). -/
 theorem dfa_semantics_match
   (clauses : List ActionDSL.ActionClause)
   (M : DFAM) (sem : Semantics) :
