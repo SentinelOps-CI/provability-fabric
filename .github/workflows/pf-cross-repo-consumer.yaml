@@ -1,8 +1,8 @@
 name: Cross-Repo PF CI Consumer
 
 # Documents the intended cross-repo consumer contract without referencing a
-# non-existent external repo. A prior placeholder
-# (`org/ci-workflows/.github/workflows/pf-ci.yaml@v1`) made Dependabot Updates
+# non-existent external reusable-workflow repository. A prior placeholder
+# uses: line (fictional OWNER/ci-workflows pf-ci@v1) made Dependabot Updates
 # fail with git_dependencies_not_reachable.
 #
 # Real reusable PF CI lives in-repo at .github/workflows/pf-ci.yaml and is
@@ -40,10 +40,11 @@ jobs:
           grep -q '^on:' .github/workflows/pf-ci.yaml
           grep -q 'workflow_call:' .github/workflows/pf-ci.yaml
           grep -q 'name: PF CI Workflow' .github/workflows/pf-ci.yaml
-          # Callers must use the in-repo reusable workflow, not a fake org URL.
-          grep -q 'uses: \./\.github/workflows/pf-ci.yaml' .github/workflows/pf-reusable-caller.yaml
-          if grep -R --include='*.yml' --include='*.yaml' -n 'org/ci-workflows' .github/workflows/; then
-            echo "ERROR: unreachable org/ci-workflows placeholder must not appear in workflow files (breaks Dependabot)."
+          # Callers must use the in-repo reusable workflow, not a fake external URL.
+          grep -q 'uses: ./.github/workflows/pf-ci.yaml' .github/workflows/pf-reusable-caller.yaml
+          # Dependabot resolves uses: git deps; ban unreachable placeholder hosts.
+          if grep -R --include='*.yml' --include='*.yaml' -nE '^\s*uses:\s*org/ci-workflows/' .github/workflows/; then
+            echo "ERROR: unreachable uses: org/ci-workflows/... must not appear in workflow files (breaks Dependabot)."
             exit 1
           fi
           echo "PF CI consumer contract OK (in-repo reusable workflow only)."
