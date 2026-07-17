@@ -24,6 +24,33 @@ on:
     secrets:
       CI_PAT:
         required: false
+  # Lightweight main-branch smoke so inventory is not stuck on stale push-era
+  # failures. Full Kind/TRUST-FIRE path remains workflow_call (pf-reusable-caller)
+  # or workflow_dispatch with mode=full.
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "smoke (inventory clear) or full Kind/TRUST-FIRE"
+        required: false
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - full
+      pr_number:
+        description: "Pull Request Number (full mode only; optional)"
+        required: false
+        type: string
+      run_phases:
+        description: "Comma-separated TRUST-FIRE phases (full mode; default: 2,3,6)"
+        required: false
+        default: "2,3,6"
+        type: string
+      kind_cluster_name:
+        description: "Kind cluster name (full mode)"
+        required: false
+        default: "pf-ci"
+        type: string
 
 env:
   PYTHON_VERSION: "3.11"
@@ -33,8 +60,33 @@ env:
   HELM_VERSION: "v3.13.0"
 
 jobs:
+  dispatch-smoke:
+    name: PF CI dispatch smoke
+    # Reusable workflows inherit the *caller's* event_name (pull_request/schedule),
+    # not workflow_call — only skip Kind when this file is dispatched with mode=smoke.
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Validate reusable PF CI contract
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/pf-ci.yaml
+          test -f .github/workflows/pf-reusable-caller.yaml
+          test -f tests/privacy/privacy_burn_down.py
+          test -f tests/security/malicious_adapter_test.py
+          test -f tests/compliance/evidence_kpi_audit.py
+          echo "pf-ci workflow_dispatch smoke OK (full Kind path via caller / mode=full)"
+
   setup:
     name: Setup Toolchain, Kind, and Build Images
+    # Run for caller invocations (PR/schedule) and for dispatch mode=full.
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -300,6 +352,7 @@ jobs:
 
   trust-fire:
     name: Run TRUST-FIRE Phases 2/3/6 and Gate on PASS
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'full'
     runs-on: ubuntu-latest
     needs: setup
     timeout-minutes: 10
@@ -322,10 +375,10 @@ jobs:
   cleanup:
     name: Cleanup Kind Cluster
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.mode == 'full')
     needs: [setup, trust-fire]
     steps:
       - name: Delete Kind cluster
         run: |
           # ci-honesty: justified wave7-remediation
-          kind delete cluster --name "${{ inputs.kind_cluster_name }}" || true
+          kind delete cluster --name "${{ inputs.kind_cluster_name || 'pf-ci' }}" || true

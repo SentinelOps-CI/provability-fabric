@@ -184,7 +184,24 @@ theorem refinement_preserves_safety
     -- This would be proven based on the specific non-interference property
     exact (by assumption)
 
-/-- Verification that DFA tables match semantics -/
+/-- Verification that DFA tables match semantics.
+
+F33 / P4 burn-down (2026-07-17): both directions stay unfinished on purpose.
+The claim is not provable from the current hypotheses alone: `clauses`, `M`,
+and `sem` are unconstrained, and there is no in-tree
+`compileClauses : List ActionDSL.ActionClause → DFAM × Semantics` (or
+equivalent) that couples DFA acceptance to `sem.Checked`.
+
+Burn-down before these placeholders can close:
+
+1. Formalize ActionDSL → DFA export (sidecar compiler) as Lean functions.
+2. Define matching `Semantics` from the same clauses so per-step `Checked`
+   witnesses mirror `δ` / acceptance (likely a trace fold over step checks).
+3. Prove soundness + completeness for that pair; derive this biconditional.
+
+Do **not** vacuous-close with `axiom` / `by assumption`, and do **not** add
+this file to the lean-style enforced set until both placeholders are gone.
+See `docs/internal/lean-sorry-burn-down.md`. -/
 theorem dfa_semantics_match
   (clauses : List ActionDSL.ActionClause)
   (M : DFAM) (sem : Semantics) :
@@ -193,17 +210,16 @@ theorem dfa_semantics_match
   -- Therefore M.accepts τ ↔ sem satisfies τ
   ∀ τ : ActionDSL.Trace,
   M.accepts τ ↔ (∃ w : sem.SidecarWitness, sem.Checked τ w) := by
-  -- This would be proven based on the specific DFA generation algorithm
-  -- and semantics implementation
+  -- Blocked on DFA↔semantics generator (see docstring above).
   intro τ
   constructor
   · -- Prove M.accepts τ → ∃ w : sem.SidecarWitness, sem.Checked τ w
     intro h_accepts
-    -- This would be proven based on the DFA generation algorithm
+    -- Needs compileClauses soundness (accept ⇒ witness).
     sorry
   · -- Prove ∃ w : sem.SidecarWitness, sem.Checked τ w → M.accepts τ
     intro h_exists
-    -- This would be proven based on the DFA generation algorithm
+    -- Needs compileClauses completeness (witness ⇒ accept).
     sorry
 
 end PF.Runtime

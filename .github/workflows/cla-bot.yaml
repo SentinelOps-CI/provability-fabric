@@ -41,132 +41,154 @@ jobs:
       - name: Get unique contributors
         id: contributors
         run: |
+          set -euo pipefail
           echo "Analyzing contributors..."
+          : > contributors.txt
 
-          # Get all unique commit authors in this PR
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # For PRs, get commits in the PR
-            git log --format="%an|%ae" ${{ github.event.pull_request.base.sha }}..HEAD | sort -u > contributors.txt
+            git log --format="%an|%ae" "${{ github.event.pull_request.base.sha }}..HEAD" | sort -u > contributors.txt
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            if [ -n "$BEFORE" ] && [ -n "$AFTER" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git log --format="%an|%ae" "${BEFORE}..${AFTER}" | sort -u > contributors.txt
+            else
+              echo "Push range unavailable; treating as no contributors for this event"
+            fi
           else
-            # For pushes to main, get commits in this push
-            git log --format="%an|%ae" ${{ github.event.before }}..${{ github.event.after }} | sort -u > contributors.txt
+            # workflow_dispatch (and other non-PR events): inventory/smoke only.
+            # No commit range — leave contributors empty; Option B skip still applies.
+            echo "Non-PR event (${{ github.event_name }}): skipping contributor range analysis"
           fi
 
-          # Extract usernames and emails
-          cat contributors.txt | cut -d'|' -f1 | sort -u > usernames.txt
-          cat contributors.txt | cut -d'|' -f2 | sort -u > emails.txt
+          cut -d'|' -f1 contributors.txt | sort -u > usernames.txt
+          cut -d'|' -f2 contributors.txt | sort -u > emails.txt
 
           echo "Found contributors:"
           cat contributors.txt
 
       - name: Check for exempt users
         run: |
+          set -euo pipefail
           echo "Checking for exempt users..."
+          : > exempt_contributors.txt
 
-          # Load exempt users from CLA config
-          jq -r '.exemptions.whitelisted_users[]' "$CLA_CONFIG_PATH" > exempt_users.txt
+          jq -r '.exemptions.whitelisted_users[]?' "$CLA_CONFIG_PATH" > exempt_users.txt || : > exempt_users.txt
 
-          # Check if any contributors are exempt
           while IFS= read -r user; do
-            if grep -q "^$user$" usernames.txt; then
-              echo "✅ Exempt user found: $user"
+            [ -z "$user" ] && continue
+            if [ -s usernames.txt ] && grep -qxF "$user" usernames.txt; then
+              echo "Exempt user found: $user"
               echo "$user" >> exempt_contributors.txt
             fi
           done < exempt_users.txt
 
-          # Remove exempt users from contributors list
-          if [ -f exempt_contributors.txt ]; then
-            grep -v -f exempt_contributors.txt contributors.txt > non_exempt_contributors.txt
+          if [ -s exempt_contributors.txt ]; then
+            # Keep non-exempt rows; empty result is fine.
+            grep -v -F -f exempt_contributors.txt contributors.txt > non_exempt_contributors.txt || : > non_exempt_contributors.txt
           else
             cp contributors.txt non_exempt_contributors.txt
           fi
 
       - name: Check for trivial changes
         run: |
+          set -euo pipefail
           echo "Checking for trivial changes..."
+          echo "TRIVIAL_CHANGES=false" >> "$GITHUB_ENV"
+          : > changed_files.txt
 
-          # Get list of changed files
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD > changed_files.txt
+            git diff --name-only "${{ github.event.pull_request.base.sha }}..HEAD" > changed_files.txt
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            if [ -n "$BEFORE" ] && [ -n "$AFTER" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git diff --name-only "${BEFORE}..${AFTER}" > changed_files.txt
+            fi
           else
-            git diff --name-only ${{ github.event.before }}..${{ github.event.after }} > changed_files.txt
+            echo "Non-PR event: treating as trivial for CLA smoke"
+            echo "TRIVIAL_CHANGES=true" >> "$GITHUB_ENV"
           fi
 
-          # Check if changes are trivial
-          TRIVIAL_CHANGES=true
-
-          # Check for documentation-only changes
-          if ! grep -q -v "\.md$\|\.txt$\|\.rst$\|docs/" changed_files.txt; then
-            echo "✅ Documentation-only changes detected"
-            echo "TRIVIAL_CHANGES=true" >> $GITHUB_ENV
-          fi
-
-          # Check for typo fixes (simplified heuristic)
-          if [ $(wc -l < changed_files.txt) -lt 3 ]; then
-            echo "✅ Small number of changes detected"
-            echo "TRIVIAL_CHANGES=true" >> $GITHUB_ENV
+          if [ ! -s changed_files.txt ]; then
+            echo "No changed files in range"
+            echo "TRIVIAL_CHANGES=true" >> "$GITHUB_ENV"
+          elif ! grep -q -vE '\.(md|txt|rst)$|^docs/' changed_files.txt; then
+            echo "Documentation-only changes detected"
+            echo "TRIVIAL_CHANGES=true" >> "$GITHUB_ENV"
+          elif [ "$(wc -l < changed_files.txt)" -lt 3 ]; then
+            echo "Small number of changes detected"
+            echo "TRIVIAL_CHANGES=true" >> "$GITHUB_ENV"
           fi
 
       - name: Verify CLA signatures
         id: cla-verify
         run: |
+          set -euo pipefail
           echo "Verifying CLA signatures..."
 
           # Option B (ci-health-matrix): when CLA hosted service is unavailable, skip
-          # verification on workflow_dispatch and do not block push-to-main (no push trigger).
+          # verification. No push trigger on main; workflow_dispatch is advisory smoke.
           if ! curl -fsS --max-time 10 "${CLA_URL}" >/dev/null 2>&1; then
             echo "CLA service unreachable at ${CLA_URL}; skipping check (configure hosted CLA or restore API)"
-            echo "cla_status=success" >> $GITHUB_OUTPUT
-            echo "missing_contributors=" >> $GITHUB_OUTPUT
+            echo "cla_status=success" >> "$GITHUB_OUTPUT"
+            echo "missing_contributors=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # Skip CLA check for trivial changes if configured
-          if [ "$TRIVIAL_CHANGES" = "true" ] && [ "$(jq -r '.exemptions.trivial_changes' "$CLA_CONFIG_PATH")" = "true" ]; then
-            echo "✅ Trivial changes detected, skipping CLA check"
-            echo "cla_status=success" >> $GITHUB_OUTPUT
-            echo "missing_contributors=" >> $GITHUB_OUTPUT
+          if [ "${TRIVIAL_CHANGES:-false}" = "true" ] && [ "$(jq -r '.exemptions.trivial_changes' "$CLA_CONFIG_PATH")" = "true" ]; then
+            echo "Trivial changes detected, skipping CLA check"
+            echo "cla_status=success" >> "$GITHUB_OUTPUT"
+            echo "missing_contributors=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Check each non-exempt contributor
+          # No contributors (e.g. workflow_dispatch smoke) → success
+          if [ ! -s non_exempt_contributors.txt ]; then
+            echo "No non-exempt contributors to verify"
+            echo "cla_status=success" >> "$GITHUB_OUTPUT"
+            echo "missing_contributors=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           missing_contributors=""
 
           while IFS='|' read -r username email; do
+            [ -z "${username:-}" ] && continue
             echo "Checking CLA for: $username ($email)"
-            
-            # Call CLA verification API
+
             response=$(curl -s -w "%{http_code}" \
               -H "Content-Type: application/json" \
               -d "{\"username\": \"$username\", \"email\": \"$email\"}" \
               "$CLA_URL/verify")
-            
+
             http_code="${response: -3}"
             body="${response%???}"
-            
+
             if [ "$http_code" = "200" ]; then
               cla_status=$(echo "$body" | jq -r '.signed // false')
-              
+
               if [ "$cla_status" = "true" ]; then
-                echo "✅ CLA signed by $username"
+                echo "CLA signed by $username"
               else
-                echo "❌ CLA not signed by $username"
+                echo "CLA not signed by $username"
                 missing_contributors="$missing_contributors $username"
               fi
             else
-              echo "❌ CLA verification failed for $username"
+              echo "CLA verification failed for $username (HTTP $http_code)"
               missing_contributors="$missing_contributors $username"
             fi
           done < non_exempt_contributors.txt
 
           if [ -n "$missing_contributors" ]; then
-            echo "❌ Missing CLA signatures: $missing_contributors"
-            echo "cla_status=failure" >> $GITHUB_OUTPUT
-            echo "missing_contributors=$missing_contributors" >> $GITHUB_OUTPUT
+            echo "Missing CLA signatures: $missing_contributors"
+            echo "cla_status=failure" >> "$GITHUB_OUTPUT"
+            echo "missing_contributors=$missing_contributors" >> "$GITHUB_OUTPUT"
           else
-            echo "✅ All contributors have signed the CLA"
-            echo "cla_status=success" >> $GITHUB_OUTPUT
-            echo "missing_contributors=" >> $GITHUB_OUTPUT
+            echo "All contributors have signed the CLA"
+            echo "cla_status=success" >> "$GITHUB_OUTPUT"
+            echo "missing_contributors=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Update GitHub Check
