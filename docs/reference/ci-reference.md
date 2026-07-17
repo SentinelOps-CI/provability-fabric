@@ -120,23 +120,16 @@ jobs:
 
 ## Cross-repo usage
 
-Publish the reusable workflow to a central repository (e.g., `org/ci-workflows`) under `.github/workflows/pf-ci.yaml` and tag a version (e.g., `v1`). Then call it:
+In this repository, callers must use the **in-repo** reusable workflow
+(`.github/workflows/pf-ci.yaml`). See `pf-reusable-caller.yaml` and the
+contract smoke in `pf-cross-repo-consumer.yaml`.
 
-```yaml
-name: Cross-Repo PF CI Consumer
-on:
-  pull_request:
-  schedule:
-    - cron: "0 3 * * *"
-jobs:
-  pf-ci:
-    uses: org/ci-workflows/.github/workflows/pf-ci.yaml@v1
-    with:
-      pr_number: ${{ github.event.pull_request.number || '' }}
-      run_phases: "2,3,6"
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+Do **not** put unreachable placeholder `uses:` URLs (for example a fictional
+`OWNER/ci-workflows` repo) into workflow files: GitHub Dependabot treats those
+as git dependencies and fails Updates with `git_dependencies_not_reachable`.
+
+If a future shared org publishes a real reusable copy, pin that live repository
+and tag explicitly after it exists; until then keep the in-repo `uses:` path.
 
 ---
 
