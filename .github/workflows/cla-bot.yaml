@@ -65,7 +65,7 @@ jobs:
           cut -d'|' -f2 contributors.txt | sort -u > emails.txt
 
           echo "Found contributors:"
-          cat contributors.txt || true
+          cat contributors.txt
 
       - name: Check for exempt users
         run: |
