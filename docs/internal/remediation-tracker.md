@@ -1,6 +1,6 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-16** (main tip `b8b78b94`).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-17** (F33 Policy align in progress; tip was `34baba39`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
@@ -93,7 +93,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | F30 | P2 | Egress-firewall regex recompiled per call | 3 | **DONE** | — | — | `lazy_static!` cached regexes |
 | F31 | P2 | MD5 for approval token IDs | 3 | **DONE** | — | — | UUID in tool-broker |
 | F32 | P2 | Documentation drift | 5 | **DONE** | — | — | `make docs-strict` green (2026-07-02 local) |
-| F33 | P2 | Lean sorry debt | 6 | **PARTIAL** | LN-* | — | [lean-sorry-burn-down.md](lean-sorry-burn-down.md): Invariants.lean **0 sorry** + **CI-enforced** (2026-07-03 Wave 7); `proofs/Policy.lean` **4→0** sorry; root `Policy.lean` **4** + MicroInterp **2** remain |
+| F33 | P2 | Lean sorry debt | 6 | **PARTIAL** | LN-* | — | [lean-sorry-burn-down.md](lean-sorry-burn-down.md): Invariants **0** + enforced; `proofs/Policy.lean` **0**; root `Policy.lean` **4→0** (aligned 2026-07-17); MicroInterp **2** remain (not tractable without DFA↔semantics generator) |
 | F34 | P2 | Two parallel VS Code extensions | 5 | **DONE** | TD-013 | — | [documentation-map.md](../documentation-map.md) § VS Code |
 | F35 | P2 | Crate-wide `#![allow(dead_code)]` on sidecar | 3 | **DONE** | — | — | Module allows removed; lib `-D dead_code` in `reusable-ci-rust.yml` (lib + `integration_tests`); bin scaffold deferred |
 | F36 | P3 | No pre-commit hooks | 0 | **DONE** | — | Wave 0 | `.pre-commit-config.yaml` |
@@ -113,7 +113,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 | 3 | Runtime hardening + sidecar CI | F13–F16, F30–F31, F35 | Sidecar in PR CI | **DONE** |
 | 4 | Ledger + MCP consolidation | F03–F04, F09, F11, F22, F26–F28 | Docker MCP + Jest suite | **DONE** |
 | 5 | Architecture, demos, topology | F05, F07–F08, F18, F21, F29, F32, F34 | Demos/examples pass | **DONE** |
-| 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants **0** sorry + enforced; `proofs/Policy.lean` **0** sorry; root Policy + MicroInterp **6** remain); F38 done |
+| 6 | Quality, docs, formal methods | F33, F37–F39 | mkdocs strict; Lean enforced targets | **MOSTLY DONE** — F33 partial (Invariants + both Policy trees **0** sorry; MicroInterp **2** remain); F38 done |
 | 7 | CI green program | All CI clusters | 60/60 gated green twice on main (honest; not 67/67) | **DONE** — tip `b8b78b94`; F23+F24 DONE; inventory exit 0 ×2; Phase 3 hardening proof + Phase 4 sign-off recorded |
 
 ---
