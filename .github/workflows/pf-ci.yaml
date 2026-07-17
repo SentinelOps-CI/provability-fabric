@@ -62,7 +62,9 @@ env:
 jobs:
   dispatch-smoke:
     name: PF CI dispatch smoke
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'full'
+    # Reusable workflows inherit the *caller's* event_name (pull_request/schedule),
+    # not workflow_call — only skip Kind when this file is dispatched with mode=smoke.
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -79,11 +81,12 @@ jobs:
           test -f tests/privacy/privacy_burn_down.py
           test -f tests/security/malicious_adapter_test.py
           test -f tests/compliance/evidence_kpi_audit.py
-          echo "pf-ci workflow_dispatch smoke OK (full Kind path via workflow_call / mode=full)"
+          echo "pf-ci workflow_dispatch smoke OK (full Kind path via caller / mode=full)"
 
   setup:
     name: Setup Toolchain, Kind, and Build Images
-    if: github.event_name == 'workflow_call' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'full')
+    # Run for caller invocations (PR/schedule) and for dispatch mode=full.
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -349,7 +352,7 @@ jobs:
 
   trust-fire:
     name: Run TRUST-FIRE Phases 2/3/6 and Gate on PASS
-    if: github.event_name == 'workflow_call' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'full')
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'full'
     runs-on: ubuntu-latest
     needs: setup
     timeout-minutes: 10
@@ -372,11 +375,10 @@ jobs:
   cleanup:
     name: Cleanup Kind Cluster
     runs-on: ubuntu-latest
-    if: always() && (github.event_name == 'workflow_call' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'full'))
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.mode == 'full')
     needs: [setup, trust-fire]
     steps:
       - name: Delete Kind cluster
         run: |
           # ci-honesty: justified wave7-remediation
-          CLUSTER="${{ inputs.kind_cluster_name || github.event.inputs.kind_cluster_name || 'pf-ci' }}"
-          kind delete cluster --name "$CLUSTER" || true
+          kind delete cluster --name "${{ inputs.kind_cluster_name || 'pf-ci' }}" || true
