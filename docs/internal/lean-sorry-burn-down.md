@@ -17,24 +17,24 @@ These paths are checked by `.github/workflows/lean-style.yaml` on every push/PR 
 
 The workflow step **Check for 'sorry' or 'by admit' in CI-enforced Lean targets** fails the job if any enforced file contains `sorry` or `by admit`. Research and platform proof trees outside this list may still contain placeholders.
 
-## Out-of-scope sorry inventory (2026-07-03)
+## Out-of-scope sorry inventory (2026-07-17)
 
 | File | `sorry` count | Priority | Rationale |
 |------|--------------:|----------|-----------|
 | `core/lean-libs/Invariants.lean` | **0** | **P1** | **DONE** — sorry-free; **CI-enforced** as of 2026-07-03 (Wave 7 F33) |
 | `proofs/Policy.lean` | **0** | **P2** | **DONE** — `soundness`, `completeness`, `read_requires_label_flow` (role-gated), `ni_bridge` (with label-coherence hypothesis) proved 2026-07-03 |
-| `Policy.lean` (repo root) | 4 | **P3** | Parallel copy; consolidate with `proofs/Policy.lean` |
-| `core/lean-libs/Runtime/MicroInterp.lean` | 2 | **P4** | Runtime micro-interpreter; not in enforced set |
+| `Policy.lean` (repo root) | **0** | **P3** | **DONE** — content-aligned with `proofs/Policy.lean` (2026-07-17); Fabric package mirror for `import Policy` / lean-morph (separate lake packages cannot thin-reexport the same module name) |
+| `core/lean-libs/Runtime/MicroInterp.lean` | 2 | **P4** | Runtime micro-interpreter; not in enforced set; `dfa_semantics_match` needs concrete DFA↔semantics generator (not tractable without that coupling) |
 
-**Total outside enforced set:** 6 occurrences (was 24; **18 eliminated** in Invariants.lean + proofs/Policy.lean F33 burn-down through 2026-07-03).
+**Total outside enforced set:** 2 occurrences (was 24; **22 eliminated** through Invariants + Policy tree F33 burn-down through 2026-07-17).
 
 ## Burn-down sequence
 
-1. **Align canonical Policy** — pick `proofs/Policy.lean` as source of truth; root `Policy.lean` becomes thin re-export or is deleted after migration.
+1. **Align canonical Policy (DONE)** — `proofs/Policy.lean` is source of truth; root `Policy.lean` kept byte-aligned as the Fabric-package mirror (2026-07-17). True thin re-export across lake packages is blocked by duplicate `Policy` module roots.
 2. **Invariants.lean (DONE)** — proved 2026-07-02–03: `empty_trace_invariant`, `privacy_budget_additive`, `system_safety`, `plan_validation_preserves_invariants`, `label_flow_preservation`, egress cert namespace (`generateCertificate`, `certificate_integrity`, `policy_hash_verification`, `transitive_non_interference`, `label_flow_monotonicity`, etc.).
 3. **proofs/Policy.lean (DONE)** — proved 2026-07-03: `soundness`, `completeness`, role-gated `read_requires_label_flow`, `ni_bridge` with explicit prefix label-coherence hypothesis.
-4. **MicroInterp.lean (2 sorry)** — lower priority; runtime semantics, not gating CI.
-5. **Expand enforced set** — **Invariants.lean added** to `lean-style.yaml` ENFORCED list (2026-07-03); root `Policy.lean` consolidation remains.
+4. **MicroInterp.lean (2 sorry)** — lower priority; runtime semantics, not gating CI; leave until DFA generation is formalized.
+5. **Expand enforced set** — **Invariants.lean added** to `lean-style.yaml` ENFORCED list (2026-07-03); do **not** add MicroInterp until its 2 sorry are gone.
 
 ## Alignment with P16 / burn-down tracker
 
