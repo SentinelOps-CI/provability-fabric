@@ -13,8 +13,6 @@
 ##############################################################################################
 </pre>
 
-# Provability Fabric
-
 **Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
 
 <sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
