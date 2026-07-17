@@ -1,18 +1,49 @@
 name: Cross-Repo PF CI Consumer
 
-# Calls org/ci-workflows reusable workflow (external SaaS/org wiring). Cannot
-# pass without that org repo and historically failed as disabled_inactivity.
-# Kept as workflow_dispatch-only so inventory is not gated on an unachievable
-# path (same pattern as #194/#196). In-repo PF CI remains pf-reusable-caller /
-# pf-ci.yaml.
+# Documents the intended cross-repo consumer contract without referencing a
+# non-existent external repo. A prior placeholder
+# (`org/ci-workflows/.github/workflows/pf-ci.yaml@v1`) made Dependabot Updates
+# fail with git_dependencies_not_reachable.
+#
+# Real reusable PF CI lives in-repo at .github/workflows/pf-ci.yaml and is
+# exercised by pf-reusable-caller.yaml. This workflow only checks the local
+# reusable-workflow contract (no SaaS secrets, no Kind/TRUST-FIRE run).
 on:
+  push:
+    paths:
+      - ".github/workflows/pf-ci.yaml"
+      - ".github/workflows/pf-cross-repo-consumer.yaml"
+      - ".github/workflows/pf-reusable-caller.yaml"
+  pull_request:
+    paths:
+      - ".github/workflows/pf-ci.yaml"
+      - ".github/workflows/pf-cross-repo-consumer.yaml"
+      - ".github/workflows/pf-reusable-caller.yaml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  pf-ci:
-    uses: org/ci-workflows/.github/workflows/pf-ci.yaml@v1
-    with:
-      pr_number: ${{ github.event.pull_request.number || '' }}
-      run_phases: "2,3,6"
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  consumer-contract:
+    name: Verify in-repo PF CI consumer contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assert reusable PF CI workflow contract
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/pf-ci.yaml
+          grep -q '^on:' .github/workflows/pf-ci.yaml
+          grep -q 'workflow_call:' .github/workflows/pf-ci.yaml
+          grep -q 'name: PF CI Workflow' .github/workflows/pf-ci.yaml
+          # Callers must use the in-repo reusable workflow, not a fake org URL.
+          grep -q 'uses: \./\.github/workflows/pf-ci.yaml' .github/workflows/pf-reusable-caller.yaml
+          if grep -R --include='*.yml' --include='*.yaml' -n 'org/ci-workflows' .github/workflows/; then
+            echo "ERROR: unreachable org/ci-workflows placeholder must not appear in workflow files (breaks Dependabot)."
+            exit 1
+          fi
+          echo "PF CI consumer contract OK (in-repo reusable workflow only)."
