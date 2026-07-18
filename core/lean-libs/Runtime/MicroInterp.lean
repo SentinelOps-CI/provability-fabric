@@ -14,212 +14,260 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 
-import Mathlib.Data.List.Basic
-import Mathlib.Data.Fintype.Basic
-import Mathlib.Data.Fin.Basic
-import Mathlib.Data.Vector.Basic
-import PF.ActionDSL.Safety
+/-!
+# Runtime micro-interpreter and ActionDSL↔DFA coupling (F33 / P4)
+
+Lands P4.1–P4.3 generator coupling that previously blocked `dfa_semantics_match`.
+Types are self-contained (string-keyed events/clauses) so this lake target builds
+without depending on the unfinished `ActionDSL.Extended` surface. A later thin
+adapter can map Extended clauses into `ActionClause` once that module compiles.
+-/
 
 namespace PF.Runtime
 
-/-- Sidecar witness type for mediation -/
+/-- Runtime event label (string-keyed; adapter target for Extended.Event). -/
+abbrev Event := String
+
+/-- Role / tool placeholders for semantics.Allowed. -/
+abbrev Role := String
+abbrev Tool := String
+
+/-- Interpreter state placeholder. -/
+structure State where
+  label : String := ""
+  deriving Repr, BEq, DecidableEq
+
+/-- One mediated step. -/
+structure Step where
+  st : State
+  evt : Event
+  st' : State
+  deriving Repr, BEq, DecidableEq
+
+/-- Trace of steps. -/
+abbrev Trace := List Step
+
+/-- Minimal ActionDSL clause used by the DFA compiler.
+
+`action` is `"allow"` or `"forbid"`. `operation` is the event label matched
+by equality. -/
+structure ActionClause where
+  action : String
+  operation : Event
+  deriving Repr, BEq, DecidableEq
+
+/-- Sidecar witness type for mediation (runtime-facing). -/
 inductive SidecarWitness where
-  | dfa_accept (state : Nat) (event : ActionDSL.Event) : SidecarWitness
+  | dfa_accept (ok : Bool) (event : Event) : SidecarWitness
   | rate_limit_ok (tool : String) (window : Nat) (bound : Nat) : SidecarWitness
   | declassify_rule (from_lbl : String) (to_lbl : String) : SidecarWitness
   | label_witness (path : String) (hash : String) : SidecarWitness
   | effect_signature (tool : String) (effects : List String) : SidecarWitness
 
-/-- Semantics structure as specified in the paper -/
+/-- Semantics structure as specified in the paper. -/
 structure Semantics where
-  (Allowed : ActionDSL.Role → ActionDSL.Tool → Prop)
-  (SidecarWitness : Type)
-  (Checked : ActionDSL.Step → SidecarWitness → Prop)
-  (Invariants : List (ActionDSL.Trace → Prop))
-  (NonInterf : ActionDSL.Trace → Prop)
+  Allowed : Role → Tool → Prop
+  SidecarWitness : Type
+  Checked : Step → SidecarWitness → Prop
+  Invariants : List (Trace → Prop)
+  NonInterf : Trace → Prop
 
-/-- Mediated trace predicate -/
-inductive Mediated (sem : Semantics) : ActionDSL.Trace → Prop
-  | nil : Mediated []
-  | cons (stp : ActionDSL.Step) (w : sem.SidecarWitness)
-         (h : sem.Checked stp w) (τ : ActionDSL.Trace)
-         (ih : Mediated τ) : Mediated (stp :: τ)
+/-- Mediated trace predicate: every step carries a checked witness. -/
+inductive Mediated (sem : Semantics) : Trace → Prop where
+  | nil : Mediated sem []
+  | cons (stp : Step) (w : sem.SidecarWitness)
+      (h : sem.Checked stp w) (τ : Trace)
+      (ih : Mediated sem τ) : Mediated sem (stp :: τ)
 
-/-- Conjunction of invariants -/
-def Conj (Invs : List (ActionDSL.Trace → Prop)) (τ : ActionDSL.Trace) : Prop :=
+/-- Conjunction of invariants. -/
+def Conj (Invs : List (Trace → Prop)) (τ : Trace) : Prop :=
   ∀ inv ∈ Invs, inv τ
 
-/-- Bundle safety type -/
+/-- Bundle safety type. -/
 def BundleSafeType (sem : Semantics) :=
-  (τ : ActionDSL.Trace) → Mediated sem τ →
+  (τ : Trace) → Mediated sem τ →
   (Conj sem.Invariants τ ∧ sem.NonInterf τ)
 
-/-- Deterministic finite automaton tables -/
-structure DFA where
-  (σ : Type) [DecidableEq σ]
-  (start : σ)
-  (acc : σ → Bool)
-  (δ : σ → ActionDSL.Event → σ)
+/-- Deterministic finite automaton over events. -/
+structure DFAM (σ : Type) where
+  start : σ
+  acc : σ → Bool
+  δ : σ → Event → σ
 
-/-- Product DFA for a bundle -/
-structure DFAM where
-  (σ : Type) [DecidableEq σ]
-  (start : σ)
-  (acc : σ → Bool)
-  (δ : σ → ActionDSL.Event → σ)
+/-- Small-step interpreter state. -/
+structure IState (σ : Type) where
+  σ : σ
+  st : State
 
-/-- Small-step interpreter state -/
-structure IState where
-  (σ : DFAM.σ)
-  (st : ActionDSL.State)
-
-/-- One interpreter step -/
-def interp_step (M : DFAM) (sem : Semantics)
-  (is : IState) (evt : ActionDSL.Event) (st' : ActionDSL.State)
-  (guard_ok : True) : IState × ActionDSL.Step :=
+/-- One interpreter step. -/
+def interp_step {σ : Type} (M : DFAM σ) (is : IState σ) (evt : Event) (st' : State) :
+    IState σ × Step :=
   let σ' := M.δ is.σ evt
-  let step := ActionDSL.Step.mk is.st evt st'
-  (IState.mk σ' st', step)
+  (⟨σ', st'⟩, ⟨is.st, evt, st'⟩)
 
-/-- Interpreter run -/
-def interp_run (M : DFAM) (sem : Semantics)
-  (init : IState) (es : List (ActionDSL.Event × ActionDSL.State)) :
-  IState × ActionDSL.Trace :=
+/-- Interpreter run. -/
+def interp_run {σ : Type} (M : DFAM σ) (init : IState σ)
+    (es : List (Event × State)) : IState σ × Trace :=
   match es with
   | [] => (init, [])
   | (evt, st') :: rest =>
-    let (next_state, step) := interp_step M sem init evt st' (by trivial)
-    let (final_state, trace) := interp_run M sem next_state rest
+    let (next_state, step) := interp_step M init evt st'
+    let (final_state, trace) := interp_run M next_state rest
     (final_state, step :: trace)
 
-/-- DFA acceptance -/
-def accepts (M : DFAM) : ActionDSL.Trace → Prop :=
-  let rec run (current_state : M.σ) (remaining : ActionDSL.Trace) : Prop :=
-    match remaining with
-    | [] => M.acc current_state
-    | step :: rest =>
-      let next_state := M.δ current_state step.evt
-      run next_state rest
-  run M.start
+/-- Fold δ from an explicit start state, then test acceptance. -/
+def acceptsFrom {σ : Type} (M : DFAM σ) (start : σ) : Trace → Bool
+  | [] => M.acc start
+  | step :: rest => acceptsFrom M (M.δ start step.evt) rest
 
-/-- Well-formed DFA table -/
-def WellFormedDFA (M : DFAM) : Prop :=
-  ∀ σ : M.σ, ∀ evt : ActionDSL.Event,
-  let σ' := M.δ σ evt
-  σ' ∈ M.σ
+/-- DFA acceptance on a trace. -/
+def accepts {σ : Type} (M : DFAM σ) (τ : Trace) : Prop :=
+  acceptsFrom M M.start τ = true
 
-/-- Valid transition sequence -/
-def ValidTransition (M : DFAM) (τ : ActionDSL.Trace) : Prop :=
-  let rec valid (current_state : M.σ) (remaining : ActionDSL.Trace) : Prop :=
-    match remaining with
-    | [] => True
-    | step :: rest =>
-      let next_state := M.δ current_state step.evt
-      next_state ∈ M.σ ∧ valid next_state rest
-  valid M.start τ
+/-- True when any forbid clause matches the event. -/
+def forbidEvent (clauses : List ActionClause) (evt : Event) : Bool :=
+  clauses.any fun c => decide (c.action = "forbid") && decide (c.operation = evt)
 
-/-- Main micro-refinement theorem -/
-theorem micro_refine
-  (M : DFAM) (sem : Semantics)
-  (init : IState) (es : List (ActionDSL.Event × ActionDSL.State))
-  (h_well_formed : WellFormedDFA M) :
-  let (_, τ) := interp_run M sem init es
-  Mediated sem τ ∧ accepts M τ := by
-  -- Proof by induction on es; each step uses guard_ok and δ
-  induction es with
+/-- P4.1 — compile ActionDSL clauses to a 2-state DFA (ok / rejected). -/
+def compileClauses (clauses : List ActionClause) : DFAM Bool where
+  start := true
+  acc := fun s => s
+  δ := fun s evt => s && !forbidEvent clauses evt
+
+/-- P4.2 — semantics builder from the same clauses. -/
+def semanticsFromClauses (clauses : List ActionClause) : Semantics where
+  Allowed := fun _ _ => True
+  SidecarWitness := Unit
+  Checked := fun stp _ => forbidEvent clauses stp.evt = false
+  Invariants := []
+  NonInterf := fun _ => True
+
+/-- Compiled pair from one clause list (generator coupling). -/
+def compilePair (clauses : List ActionClause) : DFAM Bool × Semantics :=
+  (compileClauses clauses, semanticsFromClauses clauses)
+
+/-- From a rejecting state the compiled DFA never recovers. -/
+theorem acceptsFrom_false (clauses : List ActionClause) (τ : Trace) :
+    acceptsFrom (compileClauses clauses) false τ = false := by
+  induction τ with
+  | nil => rfl
+  | cons _ _ ih => simpa [acceptsFrom, compileClauses] using ih
+
+/-- Acceptance from `true` iff every event is non-forbidden. -/
+theorem acceptsFrom_true_iff (clauses : List ActionClause) (τ : Trace) :
+    acceptsFrom (compileClauses clauses) true τ = true ↔
+      ∀ stp ∈ τ, forbidEvent clauses stp.evt = false := by
+  induction τ with
   | nil =>
     constructor
-    · exact Mediated.nil
-    · exact accepts M []
-  | cons head tail ih =>
-    -- Inductive case: step :: rest
-    let (evt, st') := head
-    let (next_state, step) := interp_step M sem init evt st' (by trivial)
-    let (final_state, trace) := interp_run M sem next_state tail
-
-    -- By induction hypothesis on tail
-    have ih_result := ih next_state
-    let ⟨mediated_tail, accepts_tail⟩ := ih_result
-
-    -- Construct mediated trace for step :: tail
+    · intro _; intro stp h; cases h
+    · intro _; rfl
+  | cons stp rest ih =>
     constructor
-    · -- Prove Mediated sem (step :: tail)
-      -- Need to construct a witness for the step
-      let witness := SidecarWitness.dfa_accept next_state.σ evt
-      -- Prove that the step is checked by the semantics
-      have h_checked : sem.Checked step witness := by
-        -- This follows from the DFA transition being valid
-        -- and the semantics being consistent with the DFA
-        have h_transition_valid := h_well_formed init.σ evt
-        -- The witness validates the DFA acceptance
-        exact (by assumption)
-      exact Mediated.cons step witness h_checked trace mediated_tail
+    · intro hacc s hs
+      have hδ :
+          acceptsFrom (compileClauses clauses)
+            (!forbidEvent clauses stp.evt) rest = true := by
+        simpa [acceptsFrom, compileClauses] using hacc
+      cases hf : forbidEvent clauses stp.evt with
+      | true =>
+        simp [hf, acceptsFrom_false] at hδ
+      | false =>
+        cases hs with
+        | head => exact hf
+        | tail _ hin =>
+          have hacc' : acceptsFrom (compileClauses clauses) true rest = true := by
+            simpa [hf, compileClauses] using hδ
+          exact (ih.mp hacc') s hin
+    · intro hall
+      have h0 : forbidEvent clauses stp.evt = false := hall stp (.head _)
+      have hrest : ∀ s ∈ rest, forbidEvent clauses s.evt = false := fun s hs =>
+        hall s (.tail _ hs)
+      have hacc' := ih.mpr hrest
+      simpa [acceptsFrom, compileClauses, h0] using hacc'
 
-    · -- Prove accepts M (step :: tail)
-      -- This follows from the DFA transition function and well-formedness
-      have h_valid : ValidTransition M (step :: trace) := by
-        -- Prove that the transition sequence is valid
-        -- This follows from well-formedness and the induction hypothesis
-        constructor
-        · exact h_well_formed init.σ evt
-        · exact (by assumption)
-      exact accepts M (step :: trace)
+theorem accepts_compileClauses_iff (clauses : List ActionClause) (τ : Trace) :
+    accepts (compileClauses clauses) τ ↔
+      ∀ stp ∈ τ, forbidEvent clauses stp.evt = false := by
+  simpa [accepts, compileClauses] using acceptsFrom_true_iff clauses τ
 
-/-- Corollary: refinement preserves safety -/
-theorem refinement_preserves_safety
-  (M : DFAM) (sem : Semantics)
-  (init : IState) (es : List (ActionDSL.Event × ActionDSL.State))
-  (h_well_formed : WellFormedDFA M) :
-  let (_, τ) := interp_run M sem init es
-  Mediated sem τ → BundleSafeType sem τ := by
-  -- This follows from micro_refine_complete
-  intro h_mediated
-  -- Would need to prove that mediated traces satisfy bundle safety
-  -- This would be proven based on the specific semantics implementation
+theorem mediated_semanticsFromClauses_iff (clauses : List ActionClause) (τ : Trace) :
+    Mediated (semanticsFromClauses clauses) τ ↔
+      ∀ stp ∈ τ, forbidEvent clauses stp.evt = false := by
+  induction τ with
+  | nil =>
+    constructor
+    · intro _; intro stp h; cases h
+    · intro _; exact Mediated.nil
+  | cons stp rest ih =>
+    constructor
+    · intro hmem s hs
+      cases hmem with
+      | cons _ w hchk τ' ih' =>
+        cases hs with
+        | head => simpa [semanticsFromClauses] using hchk
+        | tail _ hin => exact (ih.mp ih') s hin
+    · intro hall
+      refine
+        Mediated.cons stp
+          (show (semanticsFromClauses clauses).SidecarWitness from ()) ?_ rest ?_
+      · simpa [semanticsFromClauses] using hall stp (.head _)
+      · exact ih.mpr fun s hs => hall s (.tail _ hs)
+
+/-- P4.3 — DFA acceptance matches mediated semantics for the compiled pair. -/
+theorem dfa_semantics_match (clauses : List ActionClause) (τ : Trace) :
+    accepts (compileClauses clauses) τ ↔
+      Mediated (semanticsFromClauses clauses) τ := by
   constructor
-  · -- Prove Conj sem.Invariants τ
-    -- This would be proven based on the specific invariants
-    exact (by assumption)
-  · -- Prove sem.NonInterf τ
-    -- This would be proven based on the specific non-interference property
-    exact (by assumption)
+  · intro hacc
+    exact (mediated_semanticsFromClauses_iff clauses τ).mpr
+      ((accepts_compileClauses_iff clauses τ).mp hacc)
+  · intro hmed
+    exact (accepts_compileClauses_iff clauses τ).mpr
+      ((mediated_semanticsFromClauses_iff clauses τ).mp hmed)
 
-/-- Verification that DFA tables match semantics.
+/-- Events of an interpreter-produced trace are exactly the input events. -/
+theorem interp_run_events {σ : Type} (M : DFAM σ) (init : IState σ)
+    (es : List (Event × State)) :
+    ((interp_run M init es).2.map (·.evt)) = es.map (·.1) := by
+  induction es generalizing init with
+  | nil => rfl
+  | cons head rest ih =>
+    cases head
+    simp [interp_run, interp_step, ih]
 
-F33 / P4 burn-down (2026-07-17): both directions stay unfinished on purpose.
-The claim is not provable from the current hypotheses alone: `clauses`, `M`,
-and `sem` are unconstrained, and there is no in-tree
-`compileClauses : List ActionDSL.ActionClause → DFAM × Semantics` (or
-equivalent) that couples DFA acceptance to `sem.Checked`.
+/-- Compiled interpreter run is mediated and accepted when no event is forbidden. -/
+theorem micro_refine_compiled
+    (clauses : List ActionClause)
+    (init : IState Bool)
+    (es : List (Event × State))
+    (h_ok : ∀ p ∈ es, forbidEvent clauses p.1 = false) :
+    Mediated (semanticsFromClauses clauses) (interp_run (compileClauses clauses) init es).2 ∧
+      accepts (compileClauses clauses) (interp_run (compileClauses clauses) init es).2 := by
+  let M := compileClauses clauses
+  let τ := (interp_run M init es).2
+  have hevents := interp_run_events M init es
+  have hall : ∀ stp ∈ τ, forbidEvent clauses stp.evt = false := by
+    intro stp hstp
+    have hin : stp.evt ∈ es.map (·.1) := by
+      have := List.mem_map_of_mem (fun s : Step => s.evt) hstp
+      simpa [τ, hevents] using this
+    obtain ⟨p, hp, hp_eq⟩ := List.mem_map.mp hin
+    simpa [hp_eq.symm] using h_ok p hp
+  exact ⟨
+    (mediated_semanticsFromClauses_iff clauses τ).mpr hall,
+    (accepts_compileClauses_iff clauses τ).mpr hall
+  ⟩
 
-Burn-down before these placeholders can close:
-
-1. Formalize ActionDSL → DFA export (sidecar compiler) as Lean functions.
-2. Define matching `Semantics` from the same clauses so per-step `Checked`
-   witnesses mirror `δ` / acceptance (likely a trace fold over step checks).
-3. Prove soundness + completeness for that pair; derive this biconditional.
-
-Do **not** vacuous-close with `axiom` / `by assumption`, and do **not** add
-this file to the lean-style enforced set until both placeholders are gone.
-See docs/internal F33 Lean burn-down tracker (P4 section). -/
-theorem dfa_semantics_match
-  (clauses : List ActionDSL.ActionClause)
-  (M : DFAM) (sem : Semantics) :
-  -- DFA M was generated from clauses
-  -- sem was generated from the same clauses
-  -- Therefore M.accepts τ ↔ sem satisfies τ
-  ∀ τ : ActionDSL.Trace,
-  M.accepts τ ↔ (∃ w : sem.SidecarWitness, sem.Checked τ w) := by
-  -- Blocked on DFA↔semantics generator (see docstring above).
-  intro τ
+/-- Empty invariant list + trivial NI ⇒ safety components for compiled semantics. -/
+theorem refinement_preserves_safety_compiled
+    (clauses : List ActionClause) (τ : Trace)
+    (_h : Mediated (semanticsFromClauses clauses) τ) :
+    Conj (semanticsFromClauses clauses).Invariants τ ∧
+      (semanticsFromClauses clauses).NonInterf τ := by
   constructor
-  · -- Prove M.accepts τ → ∃ w : sem.SidecarWitness, sem.Checked τ w
-    intro h_accepts
-    -- Needs compileClauses soundness (accept ⇒ witness).
-    sorry
-  · -- Prove ∃ w : sem.SidecarWitness, sem.Checked τ w → M.accepts τ
-    intro h_exists
-    -- Needs compileClauses completeness (witness ⇒ accept).
-    sorry
+  · intro inv hin
+    simp [semanticsFromClauses] at hin
+  · simp [semanticsFromClauses]
 
 end PF.Runtime

@@ -239,32 +239,67 @@ def generate_updates_md(metrics: Dict[str, Dict]) -> str:
     return content
 
 
+def dry_run_fixture_metrics() -> Dict[str, Dict]:
+    """Deterministic fixture metrics for CI dry-run (no Prometheus / GitHub)."""
+    return {
+        "pii_memorization": {
+            "value": 0,
+            "threshold": METRICS_CONFIG["pii_memorization"]["threshold"],
+            "critical": True,
+            "status": "PASS",
+        },
+        "abac_fuzz": {
+            "value": 0,
+            "threshold": METRICS_CONFIG["abac_fuzz"]["threshold"],
+            "critical": True,
+            "status": "PASS",
+        },
+        "injection_corpus": {
+            "value": 0.99,
+            "threshold": METRICS_CONFIG["injection_corpus"]["threshold"],
+            "critical": False,
+            "status": "PASS",
+        },
+        "latency_p95": {
+            "value": 0.5,
+            "threshold": METRICS_CONFIG["latency_p95"]["threshold"],
+            "critical": False,
+            "status": "PASS",
+        },
+        "latency_p99": {
+            "value": 1.0,
+            "threshold": METRICS_CONFIG["latency_p99"]["threshold"],
+            "critical": False,
+            "status": "PASS",
+        },
+    }
+
+
 def main():
     """Main function."""
-    print("📊 Collecting metrics...")
+    dry_run = "--dry-run" in sys.argv or os.getenv("PUBLISH_UPDATES_DRY_RUN") == "1"
+    print("Collecting metrics..." + (" (dry-run)" if dry_run else ""))
 
-    # Collect metrics
-    metrics = collect_metrics()
+    metrics = dry_run_fixture_metrics() if dry_run else collect_metrics()
 
     if not metrics:
-        print("❌ No metrics collected")
+        print("No metrics collected")
         return 1
 
-    print(f"✅ Collected {len(metrics)} metrics")
+    print(f"Collected {len(metrics)} metrics")
 
-    # Generate updates.md
     content = generate_updates_md(metrics)
-
-    # Write to docs/updates.md
-    output_path = Path("docs/updates.md")
+    if dry_run:
+        output_path = Path(os.getenv("PUBLISH_UPDATES_OUT", "docs/updates.dry-run.md"))
+    else:
+        output_path = Path("docs/updates.md")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"✅ Updated {output_path}")
+    print(f"Updated {output_path}")
 
-    # Check for failures
     critical_failures = [
         name
         for name, metric in metrics.items()
@@ -272,10 +307,10 @@ def main():
     ]
 
     if critical_failures:
-        print(f"⚠️  Critical failures: {', '.join(critical_failures)}")
+        print(f"Critical failures: {', '.join(critical_failures)}")
         return 1
 
-    print("🎉 All metrics passing!")
+    print("All metrics passing")
     return 0
 
 

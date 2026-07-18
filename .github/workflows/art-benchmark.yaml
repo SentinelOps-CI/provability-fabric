@@ -1,165 +1,63 @@
 name: ART Benchmark
 
-# Incomplete ART CI scaffold — not maintainable as a gated workflow:
-# - Matrix include used `shard: [1..8]`, which expands to job name
-#   "Shard Array/8" (failure run 19399502401, Nov 2025).
-# - Job depends on `make lean-offline`, which is workflow_dispatch-only
-#   after #194 (unachievable cold-cache path on GitHub-hosted runners).
-# - Workflow references missing tools: art_aggregate.py, art_dashboard.py,
-#   art_gates.py; art_runner.py does not implement the --shard/--output CLI.
-# Kept as workflow_dispatch-only so it can be revived without gating the
-# main inventory. Push-gated bench Lean remains lean-morph / swebench smoke.
+# CI-sized ART smoke: deterministic Python suite (no Lean offline, no missing
+# aggregate/dashboard tools). Full sharded bench remains available via
+# workflow_dispatch with --full.
 on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "scripts/art_runner.py"
+      - ".github/workflows/art-benchmark.yaml"
+      - "bundles/art/**"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "scripts/art_runner.py"
+      - ".github/workflows/art-benchmark.yaml"
+      - "bundles/art/**"
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      full:
+        description: "Run full generated suite (heavy)"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: art-benchmark-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  art-benchmark:
-    name: ART Benchmark (Shard ${{ matrix.shard }}/${{ matrix.total-shards }})
+  art-smoke:
+    name: ART Smoke
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      # Honest single-axis shard matrix (no bogus include arrays).
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
-        total-shards: [8]
-
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Needed for git diff
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Run ART smoke
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-xdist
-
-      - name: Set up Lean
-        run: |
-          # Install Lean 4
-          wget -q https://github.com/leanprover/lean4/releases/download/v4.7.0/lean-4.7.0-linux.tar.gz
-          tar -xzf lean-4.7.0-linux.tar.gz
-          sudo mv lean-4.7.0-linux /usr/local/lean
-          echo '/usr/local/lean/bin' >> $GITHUB_PATH
-
-      - name: Build Lean proofs
-        run: |
-          make lean-offline
-
-      - name: Run ART benchmark
-        run: |
-          # Create results directory
           mkdir -p tests/art_results
-
-          # Generate run ID
-          RUN_ID=$(date +%Y%m%d_%H%M%S)_${{ matrix.shard }}
-
-          # Run ART benchmark with sharding
-          python scripts/art_runner.py \
-            --shard ${{ matrix.shard }} \
-            --total-shards ${{ matrix.total-shards }} \
-            --output tests/art_results/run_${RUN_ID}.json \
-            --resume-from ${{ github.event_name == 'schedule' && 'last_run_id' || '' }}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full }}" = "true" ]; then
+            python scripts/art_runner.py --full --shard 1 --total-shards 1 \
+              --output tests/art_results/run_full.json
+          else
+            python scripts/art_runner.py --smoke --seed 42 \
+              --output tests/art_results/run_smoke.json
+          fi
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: art-results-shard-${{ matrix.shard }}
-          path: tests/art_results/run_*.json
-
-      - name: Detect flakiness
-        if: matrix.shard == 1
-        run: |
-          python tools/art_flake_detect.py \
-            --results-dir tests/art_results \
-            --output flake_report.json
-
-      - name: Upload flakiness report
-        if: matrix.shard == 1
-        uses: actions/upload-artifact@v4
-        with:
-          name: flake-report
-          path: flake_report.json
-
-  art-aggregate:
-    name: Aggregate Results
-    runs-on: ubuntu-latest
-    needs: art-benchmark
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Download all results
-        uses: actions/download-artifact@v4
-        with:
-          pattern: art-results-shard-*
-          merge-multiple: true
-
-      - name: Aggregate results
-        run: |
-          # Combine all shard results
-          python tools/art_aggregate.py \
-            --input-dir tests/art_results \
-            --output aggregate_results.json
-
-      - name: Generate dashboard
-        run: |
-          python tools/art_dashboard.py \
-            --input aggregate_results.json \
-            --output dashboard.html
-
-      - name: Upload dashboard
-        uses: actions/upload-artifact@v4
-        with:
-          name: art-dashboard
-          path: dashboard.html
-
-  art-gates:
-    name: Check Gates
-    runs-on: ubuntu-latest
-    needs: art-aggregate
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Download aggregate results
-        uses: actions/download-artifact@v4
-        with:
-          name: aggregate_results
-          path: .
-
-      - name: Check gates
-        run: |
-          python tools/art_gates.py \
-            --input aggregate_results.json \
-            --strict
-
-      - name: Fail if gates not met
-        if: failure()
-        run: |
-          echo "ART benchmark gates not met!"
-          echo "Check the dashboard for details."
-          exit 1
+          name: art-smoke-results
+          path: tests/art_results/*.json
+          retention-days: 14
