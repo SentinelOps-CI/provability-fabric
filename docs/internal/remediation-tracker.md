@@ -1,10 +1,10 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-18** (F33 MicroInterp `dfa_semantics_match` proved — 0 sorry; Wave 8 re-gate of previously ungated smokes in progress).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-18** (F33 MicroInterp `dfa_semantics_match` proved — 0 sorry; Wave 8 re-gates landed in **PR #215**; tip follow-up pins k6 to clear `platform-perf-smoke`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
-**North-star:** inventory exit 0 on all push/schedule workflows (achieved **60/60** @ `7d48b3d4`, reconfirmed tip `b8b78b94`, 2026-07-16); trust chain fail-closed; burn-down reflects code reality. Do **not** claim literal 67/67.
+**North-star:** inventory exit 0 on all push/schedule workflows (Wave 7 **60/60** @ `7d48b3d4`; Wave 8 expands gated set via honest smokes — **not** literal 67/67); trust chain fail-closed; burn-down reflects code reality.
 
 ---
 
@@ -134,7 +134,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 
 **Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green); tip `b8b78b94` after #207. Phase 3+4: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
-**Wave 8 revive (2026-07-18):** Re-gate previously abandoned leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Full SaaS/AWS paths stay dispatch-only. Do **not** claim literal 67/67.
+**Wave 8 revive (2026-07-18):** **PR #215** re-gated leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Tip inventory after #215: **69** gated; sole red was `platform-perf-smoke` (k6 `releases/latest` API 403) — fixed by pinning `K6_VERSION=0.47.0`. Full SaaS/AWS / vendored-mathlib offline paths stay dispatch-only. Do **not** claim literal 67/67.
 
 ---
 

@@ -19,6 +19,8 @@ env:
   BASE_URL: http://localhost:8080
   K6_BINARY: k6
   NODE_VERSION: '18'
+  # Pin: do not query api.github.com/releases/latest (unauthenticated 403 flakiness).
+  K6_VERSION: "0.47.0"
 
 jobs:
   # PR / main push smoke test - quick performance validation
@@ -33,7 +35,6 @@ jobs:
       
     - name: Install k6
       run: |
-        K6_VERSION=$(curl -fsSL https://api.github.com/repos/grafana/k6/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
         curl -fsSL "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" -o /tmp/k6.tgz
         sudo tar -xzf /tmp/k6.tgz -C /usr/local/bin --strip-components=1 "k6-v${K6_VERSION}-linux-amd64/k6"
         k6 version
@@ -78,7 +79,6 @@ jobs:
 
     - name: Install k6
       run: |
-        K6_VERSION=$(curl -fsSL https://api.github.com/repos/grafana/k6/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
         curl -fsSL "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" -o /tmp/k6.tgz
         sudo tar -xzf /tmp/k6.tgz -C /usr/local/bin --strip-components=1 "k6-v${K6_VERSION}-linux-amd64/k6"
         k6 version
