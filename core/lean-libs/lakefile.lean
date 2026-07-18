@@ -10,6 +10,11 @@ lean_lib ActionDSL {
   roots := #[`ActionDSL, `ActionDSL.Safety]
 }
 
+/-- Runtime micro-interpreter + ActionDSL↔DFA coupling (F33 / P4). -/
+lean_lib Runtime {
+  roots := #[`Runtime.MicroInterp]
+}
+
 lean_lib Budget {
   roots := #[`Budget]
 }

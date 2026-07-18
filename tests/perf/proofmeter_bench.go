@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -133,7 +134,7 @@ func (w *Worker) makeRequest() {
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", w.config.Endpoint, nil)
+	req, err := http.NewRequest("POST", w.config.Endpoint, bytes.NewReader(jsonData))
 	if err != nil {
 		w.results <- LatencyResult{
 			Timestamp: start,
@@ -268,6 +269,7 @@ func checkGates(summary SummaryStats, config BenchmarkConfig) (bool, []string) {
 
 func main() {
 	var config BenchmarkConfig
+	var noGates bool
 
 	flag.IntVar(&config.TargetRPS, "rps", 5000, "Target requests per second")
 	flag.DurationVar(&config.Duration, "duration", 10*time.Minute, "Benchmark duration")
@@ -276,7 +278,15 @@ func main() {
 	flag.DurationVar(&config.Timeout, "timeout", 30*time.Second, "Request timeout")
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file")
 	flag.Int64Var(&config.Seed, "seed", time.Now().UnixNano(), "Random seed")
+	flag.BoolVar(&noGates, "no-gates", false, "Skip RPS/latency gates (CI smoke)")
 	flag.Parse()
+
+	if config.Concurrency < 1 {
+		config.Concurrency = 1
+	}
+	if config.TargetRPS < config.Concurrency {
+		config.TargetRPS = config.Concurrency
+	}
 
 	// Set random seed for deterministic results
 	rand.Seed(config.Seed)
@@ -319,11 +329,14 @@ func main() {
 		Timestamp: time.Now(),
 	}
 
-	// Check gates
-	gatesPassed, failures := checkGates(summary, config)
+	// Check gates (optional for CI smoke)
+	gatesPassed, failures := true, []string{}
+	if !noGates {
+		gatesPassed, failures = checkGates(summary, config)
+	}
 
 	// Print results
-	fmt.Printf("🔍 ProofMeter Benchmark Results\n")
+	fmt.Printf("ProofMeter Benchmark Results\n")
 	fmt.Printf("================================\n")
 	fmt.Printf("Duration: %v\n", config.Duration)
 	fmt.Printf("Target RPS: %d\n", config.TargetRPS)
