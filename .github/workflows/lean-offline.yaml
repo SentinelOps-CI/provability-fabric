@@ -65,9 +65,18 @@ jobs:
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           lean --version
 
-      - name: Build Runtime.MicroInterp
+      - name: Compile Runtime.MicroInterp
         working-directory: core/lean-libs
-        run: lake build Runtime
+        run: |
+          set -euo pipefail
+          # MicroInterp has no imports; compile with lean directly so CI does not
+          # require a vendored mathlib tree (lake package still declares mathlib).
+          if [ -f ../../vendor/mathlib/lakefile.lean ]; then
+            lake build Runtime
+          else
+            echo "vendor/mathlib absent; compiling MicroInterp.lean with lean"
+            lean Runtime/MicroInterp.lean
+          fi
 
       - name: Scoped sorry scan (enforced + Runtime)
         run: |
