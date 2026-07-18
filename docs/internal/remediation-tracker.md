@@ -15,12 +15,12 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Metric | Count |
 |--------|------:|
 | Total workflow files | 87 |
-| Gated (push/schedule on `main`) | 60 |
-| Latest run **success** | 60 |
-| Latest run **failure / cancelled** (ungated / PR-only) | 8 |
+| Gated (push/schedule on `main`) | 69 |
+| Latest run **success** | 71 |
+| Latest run **failure / cancelled** (ungated / PR-only) | 0 |
 | No run / unknown | 16 |
 
-**Green snapshot (60/60 gated, inventory exit 0 ×2, 2026-07-16):** all push/schedule workflows green after **PR #206** honest ungating of seven SaaS/AWS leftovers; tip `b8b78b94` (#207 docs). See [ci-inventory-latest.md](ci-inventory-latest.md).
+**Green snapshot (Wave 8 tip `e35ba5290`, 2026-07-18):** inventory exit **0** — **69** gated (push/schedule), **0** red. Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
 
 **No run on main (gated):** none — full gated set green.
 
