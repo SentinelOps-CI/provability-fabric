@@ -5,6 +5,7 @@
 set -euo pipefail
 
 echo "Vendoring mathlib for offline builds..."
+echo "vendor-mathlib start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Configuration
 MATHLIB_VERSION="v4.7.0"
@@ -79,3 +80,4 @@ echo "Mathlib vendored successfully!"
 echo "Location: $VENDOR_DIR"
 echo "Commit: $MATHLIB_COMMIT"
 echo "Version: $MATHLIB_VERSION"
+echo "vendor-mathlib complete $(date -u +%Y-%m-%dT%H:%M:%SZ)"

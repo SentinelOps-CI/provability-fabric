@@ -8,11 +8,11 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Scope | Detail |
 |-------|--------|
-| **Code state** | Audit remediation merged; Wave 7 tip `b8b78b94` (2026-07-16; #206 ungates + #207 docs). |
-| **CI on `main`** | Inventory **60 / 60** gated green, exit **0 ×2** (2026-07-16). Do **not** claim literal 67/67. |
-| **Main CI** | Tip CI green [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) on `b8b78b94`. |
+| **Code state** | Wave 8 tip lineage after #215–#217; F33 MicroInterp **0** sorry (2026-07-18). |
+| **CI on `main`** | Inventory **69** gated (Wave 8 re-gates); exit **0** after tip k6 pin (#216) + inventory refresh (#217). Do **not** claim literal 67/67. |
+| **Main CI** | Tip CI green [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) on historical `b8b78b94`; Wave 8 tip `386341a91`. |
 | **Local gates** | All merge-gate commands below passed on working tree (2026-07-03); burn-down gates unchanged. |
-| **60/60 sign-off** | **Claimed** (honest gated set after ungates). Literal 67/67 **not claimed**. |
+| **69/69 sign-off** | **Claimed** for gated set after Wave 8. Literal 67/67 **not claimed**. Live AWS/SaaS + cold-cache offline-full remain dispatch/schedule full paths. |
 
 ---
 
@@ -20,16 +20,16 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Metric | 2026-07-02 reassessment | 2026-07-03 v2 |
 |--------|-------------------------|---------------|
-| Findings DONE | 32 | **38** (F23/F24 closed 2026-07-16) |
-| Findings PARTIAL | 6 | **1** (F33 root Policy + MicroInterp); F23/F24 **DONE** (2026-07-16) |
+| Findings DONE | 32 | **39** (F23/F24 closed 2026-07-16; F33 MicroInterp closed 2026-07-18) |
+| Findings PARTIAL | 6 | **0** |
 | Findings OPEN | 1 (F38) | **0** |
-| Gated workflows green on `main` | 13 / 68 | **5 / 68** post-merge snapshot (43 queued); refresh after wave completes |
+| Gated workflows green on `main` | 13 / 68 | **69** gated after Wave 8 re-gates (#215–#217) |
 | Sidecar production unwrap/expect | 40 | **0** (`--max 10`) |
 | Ledger `any` | 76 | **0** (`--max 20`) |
 | CI honesty unjustified | 59 | **0** (56 justified) |
 | Invariants.lean `sorry` | 7 | **0** |
-| Out-of-scope Lean sorry | 15 | **6** (root Policy + MicroInterp) |
-| CI-enforced Lean targets | 5 paths | **6 paths** (+ `Invariants.lean`, 2026-07-03) |
+| Out-of-scope Lean sorry (F33 set) | 15 | **0** (Policy trees + MicroInterp closed) |
+| CI-enforced Lean targets | 5 paths | **6 paths** (+ `Invariants.lean`, 2026-07-03); MicroInterp scanned by lean-offline smoke |
 
 ---
 
@@ -54,19 +54,17 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 ## Findings summary
 
-### DONE (38) — including main CI proof
+### DONE (39) — including main CI proof
 
-F01–F32, F34–F39. Trust chain, ledger/MCP, sidecar burn-down, CI honesty, demos, ESLint 9, retention SQL guard, retrieval-gateway, compose profiles, F23 Criterion, F24 paper-conformance. Phase 3 hardening run IDs in Phase D table.
+F01–F39. Trust chain, ledger/MCP, sidecar burn-down, CI honesty, demos, ESLint 9, retention SQL guard, retrieval-gateway, compose profiles, F23 Criterion, F24 paper-conformance, **F33 Lean sorry debt** (Invariants + both Policy trees + MicroInterp **0** sorry; Runtime lake target; lean-style ENFORCED not weakened).
 
-### PARTIAL (1)
+### PARTIAL (0)
 
-| ID | Local | Remaining for DONE |
-|----|-------|-------------------|
-| **F33** | `Invariants.lean` **0 sorry** + **CI-enforced**; `proofs/Policy.lean` **0 sorry** | Consolidate root `Policy.lean` (4 sorry); prove MicroInterp (2) |
+None. F33 closed 2026-07-18 (PR #215): `dfa_semantics_match` proved; see [lean-sorry-burn-down.md](lean-sorry-burn-down.md).
 
-#### F33 — Invariants enforced-set expansion (2026-07-03)
+#### F33 — closed (2026-07-18)
 
-`core/lean-libs/Invariants.lean` is now in the `lean-style.yaml` **ENFORCED** list alongside ActionDSL, Budget, and bundle specs. The workflow step **Check for 'sorry' or 'by admit' in CI-enforced Lean targets** will fail if any placeholder is reintroduced in Invariants. Existing enforced targets were not weakened. See [lean-sorry-burn-down.md](lean-sorry-burn-down.md).
+`core/lean-libs/Invariants.lean` remains in the `lean-style.yaml` **ENFORCED** list. MicroInterp is lake-built and scanned by `lean-offline` smoke; do **not** add it to lean-style ENFORCED until an Extended.Event adapter exists. Existing enforced targets were not weakened.
 
 ### OPEN (0)
 
@@ -95,7 +93,7 @@ F38 ESLint 9 migration complete (root flat config + packages).
 | phase1-platform-lean | **IN PROGRESS** | `integration.yaml` [28585706085](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585706085), `paper-conformance.yaml` [28585705694](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705694) queued |
 | phase1-bench-docs | **IN PROGRESS** | `docs-build.yaml` [28585705338](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585705338) queued; Criterion [28585900934](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28585900934) queued |
 | phase1-remaining-workflows | **IN PROGRESS** | Inventory **5/68** honest snapshot; refresh after queue drains |
-| phase2-f33-policy | **PARTIAL** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry; `MicroInterp.lean` 2 sorry |
+| phase2-f33-policy | **DONE** | F33 closed 2026-07-18: MicroInterp **0** sorry + Runtime lake; Policy trees **0**; PR #215 |
 | phase3-hardening-proof | **DONE** | F01/F02/F03–F05/F21 proven on `main` with run IDs (Phase D table); tip `b8b78b94` |
 | phase4-signoff | **DONE** | Inventory **60/60** exit 0 ×2; F23/F24 DONE; ungated list recorded; literal 67/67 **not claimed** |
 
@@ -108,7 +106,7 @@ F38 ESLint 9 migration complete (root flat config + packages).
 | phase1-platform-lean | **NOT STARTED (main)** | `Invariants.lean` ENFORCED; `integration` compose smoke fix `05d9cd6a`; re-run [28583016953](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28583016953) queued |
 | phase1-bench-docs | **NOT STARTED (main)** | `Documentation Build` PR green [28582134001](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28582134001); Criterion baseline refresh not dispatched on `main` |
 | phase1-remaining-workflows | **NOT STARTED** | `main` 13/68; inventory refresh deferred until merge |
-| phase2-f33-policy | **PARTIAL** | `proofs/Policy.lean` 0 sorry; root `Policy.lean` 4 sorry; `MicroInterp.lean` 2 sorry |
+| phase2-f33-policy | **DONE** | F33 closed 2026-07-18: MicroInterp **0** sorry + Runtime lake; Policy trees **0**; PR #215 |
 | phase3-hardening-proof | **WIRED ONLY** | F01/F03-F05/F21 in workflows; no `main` CI run IDs |
 | phase4-signoff | **IN PROGRESS** | Docs updated with PR run IDs; 68/68 **not claimed** |
 
@@ -131,7 +129,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Wave 7 Phase 3+4 complete (2026-07-16).** Tip `b8b78b94`. Inventory **60/60** gated green, exit **0 ×2**. F23/F24 **DONE**. Phase 3 hardening (F01–F05, F21) proven with main run IDs. Seven SaaS/AWS workflows remain honestly ungated (`workflow_dispatch` only). Literal **67/67 is not claimed**. F33 Lean sorry debt remains PARTIAL (root Policy + MicroInterp).
+**Wave 7 Phase 3+4 complete (2026-07-16).** Historical tip `b8b78b94`. Inventory **60/60** gated green, exit **0 ×2**. F23/F24 **DONE**. Phase 3 hardening (F01–F05, F21) proven with main run IDs. **Wave 8 (2026-07-18):** F33 **DONE** (MicroInterp 0 sorry); 8 leftovers re-gated; tip `386341a91`; inventory **69** gated. Live AWS DR / multi-region SaaS / live registry publish / live revocation remain secret-gated or dispatch live modes. `lean-offline-full` is schedule + dispatch (not demoted to smoke-only). Literal **67/67 is not claimed**.
 
 ---
 
