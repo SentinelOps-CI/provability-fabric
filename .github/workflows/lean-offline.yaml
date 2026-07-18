@@ -191,6 +191,19 @@ jobs:
           test -d vendor/mathlib/.lake/build/lib
           test -n "$(ls -A vendor/mathlib/.lake/build/lib)"
 
+      # Mathlib pulls std (and friends) via Lake; those clones must finish
+      # before iptables DROP or offline `lake build` dies on DNS.
+      - name: Materialize Lake dependencies (online)
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          echo "lake deps start $(date -u +%H:%M:%S)"
+          for d in core/lean-libs spec-templates/v1/proofs bundles/my-agent/proofs bundles/test-new-user-agent/proofs; do
+            echo "lake update → $d"
+            (cd "$d" && lake update)
+          done
+          echo "lake deps complete $(date -u +%H:%M:%S)"
+
       - name: Block network access
         run: |
           set -euo pipefail
