@@ -8,11 +8,11 @@ Post-remediation reassessment of findings **F01–F39** after local audit progra
 
 | Scope | Detail |
 |-------|--------|
-| **Code state** | Wave 8 tip lineage after #215–#217; F33 MicroInterp **0** sorry (2026-07-18). |
-| **CI on `main`** | Inventory **69** gated (Wave 8 re-gates); exit **0** after tip k6 pin (#216) + inventory refresh (#217). Do **not** claim literal 67/67. |
-| **Main CI** | Tip CI green [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) on historical `b8b78b94`; Wave 8 tip `386341a91`. |
+| **Code state** | Wave 8 tip `6b99ef300` (#215–#221); F33 MicroInterp **0** sorry (2026-07-18). |
+| **CI on `main`** | Inventory **69** gated (Wave 8 re-gates); exit **0 ×2** @ tip (2026-07-18T15:02Z / 15:04Z UTC). Do **not** claim literal 67/67. |
+| **Main CI** | Tip CI green [29534141623](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29534141623) on historical `b8b78b94`; Wave 8 tip `6b99ef300`; `lean-offline-full` [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851). |
 | **Local gates** | All merge-gate commands below passed on working tree (2026-07-03); burn-down gates unchanged. |
-| **69/69 sign-off** | **Claimed** for gated set after Wave 8. Literal 67/67 **not claimed**. Live AWS/SaaS + cold-cache offline-full remain dispatch/schedule full paths. |
+| **69/69 sign-off** | **Claimed** for gated set after Wave 8 (inventory ×2 @ `6b99ef300`). Literal 67/67 **not claimed**. Live AWS DR / multi-region SaaS / live publish / live revocation remain secret/live-mode only. |
 
 ---
 
@@ -129,7 +129,7 @@ Runbook: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md). Cluster hel
 
 ## Honest bottom line
 
-**Wave 7 Phase 3+4 complete (2026-07-16).** Historical tip `b8b78b94`. Inventory **60/60** gated green, exit **0 ×2**. F23/F24 **DONE**. Phase 3 hardening (F01–F05, F21) proven with main run IDs. **Wave 8 (2026-07-18):** F33 **DONE** (MicroInterp 0 sorry); 8 leftovers re-gated; tip `386341a91`; inventory **69** gated. Live AWS DR / multi-region SaaS / live registry publish / live revocation remain secret-gated or dispatch live modes. `lean-offline-full` is schedule + dispatch (not demoted to smoke-only). Literal **67/67 is not claimed**.
+**Wave 7 Phase 3+4 complete (2026-07-16).** Historical tip `b8b78b94`. Inventory **60/60** gated green, exit **0 ×2**. F23/F24 **DONE**. Phase 3 hardening (F01–F05, F21) proven with main run IDs. **Wave 8 (2026-07-18):** F33 **DONE** (MicroInterp 0 sorry); 8 leftovers re-gated; `lean-offline-full` proven [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851); tip `6b99ef300`; inventory **69** gated, exit **0 ×2**. Live-only deferred: live AWS DR, multi-region SaaS load, live registry publish, live revocation sync. Literal **67/67 is not claimed**.
 
 ---
 
