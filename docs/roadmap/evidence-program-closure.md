@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-16 — Wave 7 Phase 3+4 sign-off):** Tip `b8b78b94` (**PR #206** ungates + **PR #207** docs). Inventory on `main`: **60/60** gated workflows green, exit **0 ×2** (2026-07-16T20:48Z / 20:50Z UTC @ `7d48b3d4`; reconfirmed on tip). Seven SaaS/AWS leftovers remain `workflow_dispatch` only (not gated; DR/load/SaaS paths not proven in CI). Do **not** claim literal 67/67. Phase 3 hardening proof (F01–F05, F21) and Phase 4 docs: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md) Phase D/E; [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Current posture (2026-07-18 — Final Wave 7 / Wave 8 verification):** Tip `6b99ef300` (**PR #221** sign-off; harden #218–#220; revive #215–#217). Inventory on `main`: **69** gated workflows green, exit **0 ×2** (2026-07-18T15:02Z / 15:04Z UTC). F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Live-only deferred (honest skips; not demoted): live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 ×2 claimed** at **60/60** gated (tip `b8b78b94`; ceremony first closed @ `7d48b3d4`).
+**Inventory exit 0 ×2 claimed** at **69** gated (tip `6b99ef300`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
 
 ### Path to 67/67 (Wave 7 — closed 2026-07-16)
 
@@ -97,6 +97,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
 | Wave 7 post-merge (2026-07-03, `95bcd563`) | 68 | 5 | 63 | 18 queued |
 | Wave 7 inventory gate (2026-07-16, `7d48b3d4` → tip `b8b78b94`) | **60** | **60** | 11 (ungated) | 16 |
+| Wave 8 final verification (2026-07-18, tip `6b99ef300`) | **69** | **69** | 0 | 16 |
 
 ### Path to 67/67 (Wave 7)
 
@@ -109,7 +110,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 _Superseded by milestone table above (2026-07-02 refresh)._
 
-Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` (**60/60** gated); tip `b8b78b94`; F23/F24 **DONE**; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` (**69** gated @ tip `6b99ef300`; historical Wave 7 **60/60** @ `b8b78b94`); F23/F24/F33 **DONE**; `lean-offline-full` proven; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
 
 Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 
@@ -122,6 +123,7 @@ Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — 
 - Upstream `v1.0.0` tags for `verifiable-ai-ci/*` standards repos
 - PCS `EvidenceBundle.v0` merge with Evidence JSON schemas (v0.3)
 - Full Kind/Litmus chaos and platform docker-compose perf at scale
+- **Live-only deferred (honest):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync
 
 ## Branch protection (applied 2026-06-16)
 

@@ -8,20 +8,25 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-18 — Wave 8 lean-offline-full harden)
+## Status (2026-07-18 — Final Wave 7 verification)
 
-**Tip:** `57664cf03` (#218–#220 lean-offline-full harden). Full offline green on dispatch [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851).
+**Tip:** `6b99ef300` (#221 lean-offline-full sign-off; harden lineage #218–#220). Inventory exit **0 ×2** on `main` (2026-07-18T15:02Z / 15:04Z UTC): **69** gated, **0** red. `lean-offline-full` green [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
 | Wave 7 Phase 3+4 | **DONE** | Historical **60/60** @ `b8b78b94` (below) |
 | Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; tracker + reassessment **DONE** |
 | Wave 8 re-gates | **DONE** | `art-benchmark`, `lean-offline` smoke, `dr-cross` secret-skip, `edge-load`/`loadtest`/`perf-proofmeter`, `publish-updates`/`revocation-sync` green on tip |
-| Tip unblock | **DONE** | `platform-perf-smoke` green @ tip after k6 pin ([29638438109](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29638438109)); inventory exit **0** |
+| Tip unblock | **DONE** | `platform-perf-smoke` green @ tip after k6 pin ([29638438109](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29638438109)) |
 | lean-offline-full | **DONE** | Tip proof [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851) (~5m): shared lean-style cache, vendor, lake update, iptables DROP, offline lake build; Monday schedule + dispatch |
+| Inventory ceremony | **DONE** | Exit **0 ×2** @ tip `6b99ef300` — **69** gated / **0** red |
 | **Next action** | **Optional** | Live SaaS/AWS remain secret/live-mode only |
 
 **Still deferred (honest; not demoted):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync. Smoke/dry-run/secret-skip paths stay gated and do not claim live proof. `lean-offline-full` is no longer dispatch-only — it also runs on the Monday schedule.
+
+### Prior status (2026-07-18 — Wave 8 lean-offline-full harden)
+
+**Tip (then):** `57664cf03` (#218–#220). Full offline green on dispatch [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851). F33 / re-gates / tip unblock / lean-offline-full already **DONE**; inventory exit 0 (single pass) before final ×2 ceremony.
 
 ### Prior status (2026-07-18 — Wave 8 revive + tip k6 pin)
 

@@ -1,6 +1,6 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-18** (F33 MicroInterp `dfa_semantics_match` proved — 0 sorry; Wave 8 re-gates landed in **PR #215**; tip follow-up pins k6 to clear `platform-perf-smoke`).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-18** (F33 MicroInterp `dfa_semantics_match` proved — 0 sorry; Wave 8 re-gates + lean-offline-full tip proof; final inventory exit **0 ×2** @ `6b99ef300`).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
@@ -20,7 +20,7 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Latest run **failure / cancelled** (ungated / PR-only) | 0 |
 | No run / unknown | 16 |
 
-**Green snapshot (Wave 8 tip `e35ba5290`, 2026-07-18):** inventory exit **0** — **69** gated (push/schedule), **0** red. Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
+**Green snapshot (Wave 8 tip `6b99ef300`, 2026-07-18):** inventory exit **0 ×2** — **69** gated (push/schedule), **0** red (ceremony 2026-07-18T15:02Z / 15:04Z UTC). Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
 
 **No run on main (gated):** none — full gated set green.
 
@@ -134,7 +134,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 
 **Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green); tip `b8b78b94` after #207. Phase 3+4: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
-**Wave 8 revive (2026-07-18):** **PR #215** re-gated leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Tip inventory after #215–#217: **69** gated. `lean-offline-full` schedule+dispatch **green** on tip ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851); #218–#220). Live SaaS/AWS stay secret/live-mode only. Do **not** claim literal 67/67.
+**Wave 8 revive (2026-07-18):** **PR #215** re-gated leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Tip inventory after #215–#217: **69** gated. `lean-offline-full` schedule+dispatch **green** ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851); #218–#221). Final Wave 7 verification @ `6b99ef300`: inventory exit **0 ×2**. Live-only deferred (not demoted): live AWS DR, multi-region SaaS load, live registry publish, live revocation sync. Do **not** claim literal 67/67.
 
 ---
 
