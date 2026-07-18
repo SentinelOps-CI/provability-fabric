@@ -193,9 +193,15 @@ jobs:
 
       - name: Block network access
         run: |
+          set -euo pipefail
+          # IPv4 only via iptables; ::1 must use ip6tables (iptables rejects it).
           sudo iptables -P OUTPUT DROP
+          sudo iptables -A OUTPUT -o lo -j ACCEPT
           sudo iptables -A OUTPUT -d 127.0.0.1 -j ACCEPT
-          sudo iptables -A OUTPUT -d ::1 -j ACCEPT
+          if command -v ip6tables >/dev/null 2>&1; then
+            sudo ip6tables -P OUTPUT DROP
+            sudo ip6tables -A OUTPUT -o lo -j ACCEPT
+          fi
 
       - name: Build Lean proofs (offline)
         timeout-minutes: 45
@@ -222,6 +228,9 @@ jobs:
         run: |
           # ci-honesty: justified wave8-remediation — cleanup after intentional DROP
           sudo iptables -P OUTPUT ACCEPT || true
+          if command -v ip6tables >/dev/null 2>&1; then
+            sudo ip6tables -P OUTPUT ACCEPT || true
+          fi
 
       - name: Write offline build report
         if: success()
