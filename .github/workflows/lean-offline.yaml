@@ -1,10 +1,12 @@
 name: Lean Offline Build
 
 # Two tracks:
-# 1) lean-offline-smoke (gated): builds Runtime.MicroInterp (no mathlib imports)
-#    and checks F33 / enforced sorry policy. Proves offline-ish value without
-#    the cold-cache mathlib vendor hang that cancelled tip runs.
-# 2) lean-offline-full (dispatch-only): original vendored-mathlib offline path.
+# 1) lean-offline-smoke (gated on push/PR/schedule): builds Runtime.MicroInterp
+#    (no mathlib imports) and checks F33 / enforced sorry policy.
+# 2) lean-offline-full (schedule + dispatch full=true): vendored-mathlib offline
+#    path. Cache keys/paths intentionally share lean-style's mathlib cache so
+#    weekly schedule hits a warm vendor tree instead of hanging on cold
+#    `lake exe cache get` (historical tip cancels).
 on:
   push:
     branches: [main, develop]
@@ -12,6 +14,7 @@ on:
       - "**/*.lean"
       - "**/lakefile.lean"
       - "lean-toolchain"
+      - "scripts/vendor-mathlib.sh"
       - ".github/workflows/lean-offline.yaml"
   pull_request:
     branches: [main, develop]
@@ -19,6 +22,7 @@ on:
       - "**/*.lean"
       - "**/lakefile.lean"
       - "lean-toolchain"
+      - "scripts/vendor-mathlib.sh"
       - ".github/workflows/lean-offline.yaml"
   schedule:
     - cron: "30 5 * * 1"
@@ -33,6 +37,9 @@ on:
 concurrency:
   group: lean-offline-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  MATHLIB_COMMIT: a45ae63747140c1b2cbad9d46f518015c047047a
 
 jobs:
   lean-offline-smoke:
@@ -100,10 +107,14 @@ jobs:
           fi
           echo "No sorry/by admit in enforced targets or Runtime.MicroInterp"
 
+  # Full offline path: schedule (Monday) + explicit dispatch. Not on every lean
+  # push — cold vendor can exceed runner patience; smoke covers push/PR gates.
   lean-offline-full:
-    if: github.event_name == 'workflow_dispatch' && inputs.full == true
+    if: >
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.full == true)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     name: "Lean Offline Full (vendored mathlib)"
     steps:
       - name: Checkout repository
@@ -111,6 +122,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Share lean-style cache key so weekly schedule restores a warm
+      # vendor/mathlib (.git + .lake). Historical cancels hung on cold
+      # `lake exe cache get` when .git was omitted from the cache paths.
       - name: Cache Lean toolchain and mathlib artifacts
         uses: actions/cache@v4
         with:
@@ -118,52 +132,64 @@ jobs:
             ~/.elan
             ~/.cache/lake
             vendor/mathlib/.lake
+            vendor/mathlib/.git
             core/lean-libs/.lake
             spec-templates/v1/proofs/.lake
             bundles/my-agent/proofs/.lake
             bundles/test-new-user-agent/proofs/.lake
-          key: lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-v4
+          key: lean-style-${{ hashFiles('lean-toolchain', 'scripts/vendor-mathlib.sh') }}
           restore-keys: |
-            lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-v4
+            lean-style-
+            lean-offline-${{ hashFiles('lean-toolchain') }}-mathlib-a45ae637-
+            lean-offline-
 
       - name: Set up Lean (elan)
         run: |
+          set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
           if ! "$HOME/.elan/bin/elan" toolchain list | grep -Fq "$TOOLCHAIN"; then
-            # ci-honesty: justified wave7-remediation
-            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN" || true
+            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
           fi
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           lean --version
 
       - name: Vendor mathlib and verify checkout
         id: vendor
-        timeout-minutes: 35
+        timeout-minutes: 25
         run: |
           set -euo pipefail
-          MATHLIB_COMMIT="a45ae63747140c1b2cbad9d46f518015c047047a"
+          MATHLIB_COMMIT="${{ env.MATHLIB_COMMIT }}"
+          echo "vendor start $(date -u +%H:%M:%S) commit=$MATHLIB_COMMIT"
           if [ -f vendor/mathlib/lakefile.lean ] && [ -d vendor/mathlib/.git ] \
              && [ -d vendor/mathlib/.lake/build/lib ] \
              && [ -n "$(ls -A vendor/mathlib/.lake/build/lib 2>/dev/null)" ]; then
             ACTUAL=$(git -C vendor/mathlib rev-parse HEAD)
             if [ "$ACTUAL" = "$MATHLIB_COMMIT" ]; then
-              echo "Cached vendored mathlib ready, skipping vendor script"
+              echo "Cached vendored mathlib ready (commit=$ACTUAL), skipping vendor script"
+              echo "cache_hit=true" >> "$GITHUB_OUTPUT"
             else
+              echo "Cached commit mismatch ($ACTUAL); refreshing via vendor script"
               chmod +x scripts/vendor-mathlib.sh
               bash scripts/vendor-mathlib.sh
+              echo "cache_hit=false" >> "$GITHUB_OUTPUT"
             fi
           else
+            echo "Warm cache incomplete; running vendor-mathlib.sh"
             chmod +x scripts/vendor-mathlib.sh
             bash scripts/vendor-mathlib.sh
+            echo "cache_hit=false" >> "$GITHUB_OUTPUT"
           fi
           ACTUAL_COMMIT=$(git -C vendor/mathlib rev-parse HEAD)
           if [ "$ACTUAL_COMMIT" != "$MATHLIB_COMMIT" ]; then
             echo "Mathlib commit mismatch: expected $MATHLIB_COMMIT got $ACTUAL_COMMIT"
             exit 1
           fi
+          echo "vendor complete $(date -u +%H:%M:%S) commit=$ACTUAL_COMMIT"
+          test -d vendor/mathlib/.lake/build/lib
+          test -n "$(ls -A vendor/mathlib/.lake/build/lib)"
 
       - name: Block network access
         run: |
@@ -172,15 +198,50 @@ jobs:
           sudo iptables -A OUTPUT -d ::1 -j ACCEPT
 
       - name: Build Lean proofs (offline)
-        timeout-minutes: 35
+        timeout-minutes: 45
         run: |
-          cd core/lean-libs && lake build
-          cd ../../spec-templates/v1/proofs && lake build
-          cd ../../../bundles/my-agent/proofs && lake build
-          cd ../../test-new-user-agent/proofs && lake build
+          set -euo pipefail
+          echo "offline build start $(date -u +%H:%M:%S)"
+          (cd core/lean-libs && lake build)
+          (cd spec-templates/v1/proofs && lake build)
+          (cd bundles/my-agent/proofs && lake build)
+          (cd bundles/test-new-user-agent/proofs && lake build)
+          echo "offline build complete $(date -u +%H:%M:%S)"
+
+      - name: Confirm network still blocked
+        run: |
+          set -euo pipefail
+          if git ls-remote https://github.com/leanprover-community/mathlib4.git HEAD >/dev/null 2>&1; then
+            echo "Network block failed: git ls-remote succeeded"
+            exit 1
+          fi
+          echo "Network block confirmed (git ls-remote failed as expected)"
 
       - name: Restore network access
         if: always()
         run: |
-          # ci-honesty: justified wave7-remediation
+          # ci-honesty: justified wave8-remediation — cleanup after intentional DROP
           sudo iptables -P OUTPUT ACCEPT || true
+
+      - name: Write offline build report
+        if: success()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          {
+            echo "lean-offline-full: success"
+            echo "mathlib_commit=${{ env.MATHLIB_COMMIT }}"
+            echo "vendor_cache_hit=${{ steps.vendor.outputs.cache_hit }}"
+            echo "toolchain=$(tr -d '\n\r' < lean-toolchain)"
+            echo "event=${{ github.event_name }}"
+            echo "sha=${{ github.sha }}"
+          } > artifacts/lean-offline-full.txt
+          cat artifacts/lean-offline-full.txt
+
+      - name: Upload offline build report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-offline-full-report
+          path: artifacts/lean-offline-full.txt
+          retention-days: 14

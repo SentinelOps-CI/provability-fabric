@@ -24,7 +24,7 @@ provability-fabric/
 
 - **Location**: `vendor/mathlib/`
 - **Version**: v4.7.0
-- **Commit**: `b5eba595428809e96f3ed113bc7ba776c5f801ac`
+- **Commit**: `a45ae63747140c1b2cbad9d46f518015c047047a` (pinned in `scripts/vendor-mathlib.sh`)
 - **Purpose**: Eliminates network dependencies during build
 
 ### 2. Pinned Lean Version
@@ -118,13 +118,12 @@ When updating to a new mathlib version:
 
 ### GitHub Actions
 
-The `.github/workflows/lean-offline.yaml` workflow:
+The `.github/workflows/lean-offline.yaml` workflow has two jobs:
 
-1. **Blocks network access** using `iptables`
-2. **Verifies vendored mathlib** exists and has correct commit
-3. **Builds all Lean projects** in offline mode
-4. **Tests network blocking** by attempting git fetch
-5. **Generates build report** with results
+1. **`lean-offline-smoke`** (push/PR/schedule) — compiles `Runtime.MicroInterp` without mathlib and runs the scoped sorry scan.
+2. **`lean-offline-full`** (Monday schedule + `workflow_dispatch` with `full=true`) — vendors mathlib, blocks network via `iptables`, builds core/spec/bundle Lean projects offline, and uploads a short report.
+
+Full-job cache paths include `vendor/mathlib/.git` and `.lake`, and the cache key matches `lean-style.yaml` so weekly runs restore a warm vendor tree. Historical tip cancels hung on cold `lake exe cache get` when `.git` was omitted from the cache.
 
 ### Local CI Testing
 
