@@ -1,17 +1,17 @@
 name: Publish Updates
 
-# CI dry-run: fixture metrics → docs/updates.dry-run.md (no Prometheus, no git push).
+# CI dry-run: fixture metrics → packaged/signed artifact against mock registry.
 # Live publish remains workflow_dispatch with dry_run=false.
 on:
   push:
     branches: [main, develop]
     paths:
-      - "tools/metrics/publish_updates.py"
+      - "tools/metrics/**"
       - ".github/workflows/publish-updates.yaml"
   pull_request:
     branches: [main, develop]
     paths:
-      - "tools/metrics/publish_updates.py"
+      - "tools/metrics/**"
       - ".github/workflows/publish-updates.yaml"
   schedule:
     - cron: "0 8 * * 1"
@@ -39,15 +39,32 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Dry-run publish
+      - name: Dry-run publish + package/sign
         if: github.event_name != 'workflow_dispatch' || inputs.dry_run == true
         env:
           PUBLISH_UPDATES_DRY_RUN: "1"
           PUBLISH_UPDATES_OUT: docs/updates.dry-run.md
+          PUBLISH_UPDATES_PACKAGE_DIR: artifacts/updates-package
+          PUBLISH_UPDATES_SIGNING_KEY: ci-local-publish-key
         run: |
           python tools/metrics/publish_updates.py --dry-run
           test -f docs/updates.dry-run.md
           grep -q "Recent Updates" docs/updates.dry-run.md
+          grep -q "All critical metrics passing\|critical metrics" docs/updates.dry-run.md
+          python tools/metrics/package_updates_artifact.py \
+            --src docs/updates.dry-run.md \
+            --out-dir artifacts/updates-package
+          test -f artifacts/updates-package/updates-package.tar.gz
+          test -f artifacts/updates-package/manifest.json
+          test -f artifacts/updates-package/mock-registry/updates-package.tar.gz
+          test -f artifacts/updates-package/package-report.json
+          python3 - <<'PY'
+          import json
+          r = json.load(open("artifacts/updates-package/package-report.json", encoding="utf-8"))
+          assert r["live_registry"] is False
+          assert r["sha256"]
+          print("publish package assertions ok")
+          PY
 
       - name: Live publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == false
@@ -61,11 +78,13 @@ jobs:
           git commit -m "Update metrics [skip ci]" || exit 0
           git push
 
-      - name: Upload dry-run artifact
+      - name: Upload dry-run artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: updates-dry-run
-          path: docs/updates.dry-run.md
+          name: updates-dry-run-package
+          path: |
+            docs/updates.dry-run.md
+            artifacts/updates-package/
           if-no-files-found: ignore
           retention-days: 14

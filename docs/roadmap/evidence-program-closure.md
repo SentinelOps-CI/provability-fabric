@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-18 — Final Wave 7 / Wave 8 verification):** Tip `6b99ef300` (**PR #221** sign-off; harden #218–#220; revive #215–#217). Inventory on `main`: **69** gated workflows green, exit **0 ×2** (2026-07-18T15:02Z / 15:04Z UTC). F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Live-only deferred (honest skips; not demoted): live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Current posture (2026-07-18 — CI-local proofs for deferred leftovers):** Prior tip `3f71ea97` (#222). F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Previously skip-only paths now have gated CI-local proofs: `dr-cross` (moto S3/Route53 + blue/green dry-run), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 ×2 claimed** at **69** gated (tip `6b99ef300`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
+**Inventory exit 0 claimed** at **69** gated (tip `3f71ea97` pre-proofs). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
 
 ### Path to 67/67 (Wave 7 — closed 2026-07-16)
 
@@ -123,7 +123,7 @@ Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — 
 - Upstream `v1.0.0` tags for `verifiable-ai-ci/*` standards repos
 - PCS `EvidenceBundle.v0` merge with Evidence JSON schemas (v0.3)
 - Full Kind/Litmus chaos and platform docker-compose perf at scale
-- **Live-only deferred (honest):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync
+- **Live-only deferred (honest; CI-local proofs exist):** production AWS DR, live multi-region SaaS load, live registry publish, live revocation fetch
 
 ## Branch protection (applied 2026-06-16)
 

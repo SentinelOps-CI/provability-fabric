@@ -8,21 +8,29 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-18 — Final Wave 7 verification)
+## Status (2026-07-18 — CI-local proofs for deferred leftovers)
 
-**Tip:** `6b99ef300` (#221 lean-offline-full sign-off; harden lineage #218–#220). Inventory exit **0 ×2** on `main` (2026-07-18T15:02Z / 15:04Z UTC): **69** gated, **0** red. `lean-offline-full` green [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851).
+**Prior tip:** `3f71ea97` (#222 docs sign-off). This wave replaces secret-absent empty skips with real CI-local proofs (moto DR, mock-registry sync/sign, packaged publish dry-run, multi-region k6 asserts).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
 | Wave 7 Phase 3+4 | **DONE** | Historical **60/60** @ `b8b78b94` (below) |
 | Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; tracker + reassessment **DONE** |
-| Wave 8 re-gates | **DONE** | `art-benchmark`, `lean-offline` smoke, `dr-cross` secret-skip, `edge-load`/`loadtest`/`perf-proofmeter`, `publish-updates`/`revocation-sync` green on tip |
-| Tip unblock | **DONE** | `platform-perf-smoke` green @ tip after k6 pin ([29638438109](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29638438109)) |
-| lean-offline-full | **DONE** | Tip proof [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851) (~5m): shared lean-style cache, vendor, lake update, iptables DROP, offline lake build; Monday schedule + dispatch |
-| Inventory ceremony | **DONE** | Exit **0 ×2** @ tip `6b99ef300` — **69** gated / **0** red |
-| **Next action** | **Optional** | Live SaaS/AWS remain secret/live-mode only |
+| Wave 8 re-gates | **DONE** | Prior smokes @ #215–#217 |
+| lean-offline-full | **DONE** | [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851) |
+| CI-local DR (`dr-cross`) | **DONE (CI)** | moto S3 CRR + Route53 failover flip + `blue_green_migrate.sh --dry-run` when AWS secrets absent |
+| publish-updates dry-run | **DONE (CI)** | fixture metrics → tar.gz package + HMAC sign + mock-registry publish |
+| revocation-sync dry-run | **DONE (CI)** | mock HTTP registry merge + package/sign assertions |
+| edge-load / loadtest / perf-proofmeter | **DONE (CI)** | local mock stack + k6/bench latency & error-rate asserts; multi-region edge smoke on :8081–8083 |
+| **Next action** | **Optional live** | Production AWS DR, live multi-region SaaS, live registry publish, live revocation sync |
 
-**Still deferred (honest; not demoted):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync. Smoke/dry-run/secret-skip paths stay gated and do not claim live proof. `lean-offline-full` is no longer dispatch-only — it also runs on the Monday schedule.
+**CI-proven (local/mock; gated):** cross-region DR scripts/terraform surface via moto; publish packaging/signing; revocation sync logic; CI-sized load profiles with hard asserts.
+
+**Still needs live secrets / production endpoints (honest; not demoted):** live AWS RDS/Route53/S3 DR, live multi-region SaaS edge load (`edge-load` mode=full), live registry publish (`publish-updates` dry_run=false), live external revocation fetch (`revocation-sync` mode=live).
+
+### Prior status (2026-07-18 — Final Wave 7 verification)
+
+**Tip (then):** `6b99ef300` (#221). Inventory exit **0 ×2** — **69** gated. `lean-offline-full` green [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851).
 
 ### Prior status (2026-07-18 — Wave 8 lean-offline-full harden)
 
