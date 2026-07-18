@@ -89,6 +89,7 @@ jobs:
                 FOUND="$FOUND $target"
               fi
             elif [ -d "$target" ]; then
+              # ci-honesty: justified wave8-remediation — empty find/grep is not a soft-fail of the scan
               HITS=$(find "$target" -name '*.lean' ! -path '*/.lake/*' -exec grep -lE 'sorry|by admit' {} \; 2>/dev/null || true)
               if [ -n "$HITS" ]; then
                 FOUND="$FOUND $HITS"

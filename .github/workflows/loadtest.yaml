@@ -90,7 +90,8 @@ jobs:
           timeout 120 bash -c 'until curl -f http://localhost:4000/health; do sleep 2; done'
       - name: Install k6
         run: |
-          sudo apt-get update && sudo apt-get install -y k6 || true
+          sudo apt-get update
+          sudo apt-get install -y k6
           k6 version
       - name: Run ledger_load.js
         run: k6 run --env LEDGER_URL=http://localhost:4000 tests/load/ledger_load.js
@@ -98,4 +99,5 @@ jobs:
         if: always()
         run: |
           cd runtime/ledger
+          # ci-honesty: justified wave8-remediation — teardown must not mask test result
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true
