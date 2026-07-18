@@ -61,7 +61,9 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.elan/bin:$PATH"
           TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
-          "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          if ! "$HOME/.elan/bin/elan" toolchain list | grep -Fq "$TOOLCHAIN"; then
+            "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          fi
           "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
           lean --version
 
@@ -71,12 +73,8 @@ jobs:
           set -euo pipefail
           # MicroInterp has no imports; compile with lean directly so CI does not
           # require a vendored mathlib tree (lake package still declares mathlib).
-          if [ -f ../../vendor/mathlib/lakefile.lean ]; then
-            lake build Runtime
-          else
-            echo "vendor/mathlib absent; compiling MicroInterp.lean with lean"
-            lean Runtime/MicroInterp.lean
-          fi
+          echo "compiling MicroInterp.lean with lean (no mathlib import)"
+          lean Runtime/MicroInterp.lean
 
       - name: Scoped sorry scan (enforced + Runtime)
         run: |
