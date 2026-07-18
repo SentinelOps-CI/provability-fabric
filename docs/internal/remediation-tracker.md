@@ -1,6 +1,6 @@
 # Audit Remediation Tracker
 
-Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-17** (F33 PARTIAL — MicroInterp 2 sorry blocked on DFA↔semantics generator; tip was `43367813b`).
+Maps findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md) to remediation waves, status, burn-down IDs, and CI proof. Established during **Wave 0** reconciliation (2026-07-01). Last verified against code: **2026-07-17** (F33 PARTIAL — MicroInterp 2 placeholders blocked on DFA↔semantics generator; tip `400be1de1` after #213).
 
 **Reassessment v2:** [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md)
 
@@ -17,7 +17,7 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Total workflow files | 87 |
 | Gated (push/schedule on `main`) | 60 |
 | Latest run **success** | 60 |
-| Latest run **failure / cancelled** (ungated / PR-only) | 11 |
+| Latest run **failure / cancelled** (ungated / PR-only) | 8 |
 | No run / unknown | 16 |
 
 **Green snapshot (60/60 gated, inventory exit 0 ×2, 2026-07-16):** all push/schedule workflows green after **PR #206** honest ungating of seven SaaS/AWS leftovers; tip `b8b78b94` (#207 docs). See [ci-inventory-latest.md](ci-inventory-latest.md).
