@@ -229,6 +229,7 @@ jobs:
           # ci-honesty: justified wave8-remediation — cleanup after intentional DROP
           sudo iptables -P OUTPUT ACCEPT || true
           if command -v ip6tables >/dev/null 2>&1; then
+            # ci-honesty: justified wave8-remediation — cleanup after intentional DROP
             sudo ip6tables -P OUTPUT ACCEPT || true
           fi
 
