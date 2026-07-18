@@ -10,7 +10,7 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ## Status (2026-07-18 — Wave 8 lean-offline-full harden)
 
-**Tip:** `386341a91` (#217 inventory refresh) prior to lean-offline-full harden PR.
+**Tip:** `57664cf03` (#218–#220 lean-offline-full harden). Full offline green on dispatch [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
@@ -18,8 +18,8 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 | Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; tracker + reassessment **DONE** |
 | Wave 8 re-gates | **DONE** | `art-benchmark`, `lean-offline` smoke, `dr-cross` secret-skip, `edge-load`/`loadtest`/`perf-proofmeter`, `publish-updates`/`revocation-sync` green on tip |
 | Tip unblock | **DONE** | `platform-perf-smoke` green @ tip after k6 pin ([29638438109](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29638438109)); inventory exit **0** |
-| lean-offline-full | **IN PROGRESS** | Vendor + iptables proved; offline build needs online `lake update` first (std clone). Materialize-deps step in follow-up |
-| **Next action** | **Prove full** | Dispatch `full=true` on tip after merge; Monday schedule inherits warm lean-style cache |
+| lean-offline-full | **DONE** | Tip proof [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851) (~5m): shared lean-style cache, vendor, lake update, iptables DROP, offline lake build; Monday schedule + dispatch |
+| **Next action** | **Optional** | Live SaaS/AWS remain secret/live-mode only |
 
 **Still deferred (honest; not demoted):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync. Smoke/dry-run/secret-skip paths stay gated and do not claim live proof. `lean-offline-full` is no longer dispatch-only — it also runs on the Monday schedule.
 

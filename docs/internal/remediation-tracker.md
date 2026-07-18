@@ -134,7 +134,7 @@ Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -
 
 **Wave 7 inventory gate:** **DONE** — inventory exit **0** twice on `main` @ `7d48b3d4` (**60/60** gated green); tip `b8b78b94` after #207. Phase 3+4: [wave7-post-merge-runbook.md](wave7-post-merge-runbook.md).
 
-**Wave 8 revive (2026-07-18):** **PR #215** re-gated leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Tip inventory after #215–#217: **69** gated. `lean-offline-full` is schedule + `workflow_dispatch` (`full=true`); cache shares `lean-style` mathlib key/paths (includes `.git`). Live SaaS/AWS stay secret/live-mode only. Do **not** claim literal 67/67.
+**Wave 8 revive (2026-07-18):** **PR #215** re-gated leftovers with honest smokes — `art-benchmark`, `lean-offline` (Runtime smoke), `dr-cross` (secret-presence skip), `edge-load` / `loadtest` / `perf-proofmeter` (local mock + tiny k6/bench), `publish-updates` / `revocation-sync` (dry-run). Tip inventory after #215–#217: **69** gated. `lean-offline-full` schedule+dispatch **green** on tip ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851); #218–#220). Live SaaS/AWS stay secret/live-mode only. Do **not** claim literal 67/67.
 
 ---
 
