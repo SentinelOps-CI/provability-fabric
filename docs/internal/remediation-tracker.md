@@ -20,7 +20,7 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Latest run **failure / cancelled** (ungated / PR-only) | 0 |
 | No run / unknown | 16 |
 
-**Green snapshot (tip `3f71ea97`, 2026-07-18):** inventory exit **0** — **69** gated (push/schedule) prior to CI-local-proofs PR; Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
+**Green snapshot (tip `bae36f642`, 2026-07-18):** inventory exit **0 ×2** — **69** gated (push/schedule), **0** red after **PR #223** CI-local proofs. Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
 
 **No run on main (gated):** none — full gated set green.
 
