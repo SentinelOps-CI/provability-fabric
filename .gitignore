@@ -274,3 +274,10 @@ core/cli/pf/pf
 # Private acceptance evidence packets (local only; never commit)
 private/
 
+# CI-local dry-run / mock-registry outputs (generated in workflows)
+docs/updates.dry-run.md
+artifacts/updates-package/
+reports/dr/
+runtime/admission-controller/revocation/revocations.synced.json
+.mlc-tmp/
+

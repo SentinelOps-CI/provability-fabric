@@ -1,6 +1,6 @@
 name: Load Testing
 
-# CI smoke: local mock + tiny k6 (no docker-compose ledger scale-out).
+# CI smoke: local mock + k6 with latency/error assertions (no compose scale-out).
 # Full ledger compose load remains dispatch-only (inputs.mode=full).
 on:
   push:
@@ -58,6 +58,8 @@ jobs:
         run: |
           k6 run --env BASE_URL=http://127.0.0.1:8080 tests/load/ci_smoke.js \
             --summary-export tests/load/results.json
+          python3 tests/load/assert_k6_summary.py tests/load/results.json \
+            --max-fail-rate 0.01 --max-p95-ms 500 --min-checks-rate 0.99
 
       - name: Upload k6 results
         uses: actions/upload-artifact@v4
@@ -70,7 +72,7 @@ jobs:
       - name: Stop mock
         if: always()
         run: |
-          # ci-honesty: justified wave8-remediation
+          # ci-honesty: justified wave8-local-proofs
           if [ -f /tmp/mock-ledger.pid ]; then kill "$(cat /tmp/mock-ledger.pid)" || true; fi
 
   load-full:
@@ -99,5 +101,5 @@ jobs:
         if: always()
         run: |
           cd runtime/ledger
-          # ci-honesty: justified wave8-remediation — teardown must not mask test result
+          # ci-honesty: justified wave8-local-proofs — teardown must not mask test result
           docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v || true

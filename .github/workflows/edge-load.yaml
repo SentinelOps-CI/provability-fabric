@@ -1,7 +1,7 @@
 name: Edge API Load Testing
 
-# CI smoke: local mock edge endpoints + tiny k6. Full multi-region SaaS load
-# remains workflow_dispatch-only via inputs.mode=full (still requires live APIs).
+# CI smoke: local multi-region mock edge stack + k6 with latency/error assertions.
+# Full multi-region SaaS load remains workflow_dispatch mode=full (live APIs).
 on:
   push:
     branches: [main, develop]
@@ -44,31 +44,50 @@ jobs:
           sudo cp "k6-v${K6_VERSION}-linux-amd64/k6" /usr/local/bin/
           k6 version
 
-      - name: Start mock edge API
+      - name: Start multi-region mock edge stack
         run: |
-          python3 tests/perf/mock_load_server.py &
-          echo $! > /tmp/mock-edge.pid
+          for port in 8081 8082 8083; do
+            MOCK_LOAD_PORT=$port python3 tests/perf/mock_load_server.py &
+            echo $! >> /tmp/mock-edge.pids
+          done
           sleep 1
-          curl -sf http://127.0.0.1:8080/health
+          for port in 8081 8082 8083; do
+            curl -sf "http://127.0.0.1:${port}/health"
+          done
 
       - name: Run CI-sized edge load smoke
         run: |
-          k6 run --env BASE_URL=http://127.0.0.1:8080 tests/load/ci_smoke.js \
+          k6 run --env BASE_URL=http://127.0.0.1:8081 tests/load/ci_smoke.js \
             --summary-export edge-smoke-summary.json
+          python3 tests/load/assert_k6_summary.py edge-smoke-summary.json \
+            --max-fail-rate 0.01 --max-p95-ms 500 --min-checks-rate 0.99
+
+      - name: Run CI multi-region edge smoke
+        run: |
+          k6 run \
+            --env REGION_URLS=http://127.0.0.1:8081,http://127.0.0.1:8082,http://127.0.0.1:8083 \
+            tests/load/ci_multi_region_smoke.js \
+            --summary-export edge-multi-region-summary.json
+          python3 tests/load/assert_k6_summary.py edge-multi-region-summary.json \
+            --max-fail-rate 0.01 --max-p95-ms 400 --min-checks-rate 0.99
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: edge-load-smoke-results
-          path: edge-smoke-summary.json
+          path: |
+            edge-smoke-summary.json
+            edge-multi-region-summary.json
           retention-days: 14
 
-      - name: Stop mock
+      - name: Stop mocks
         if: always()
         run: |
-          # ci-honesty: justified wave8-remediation
-          if [ -f /tmp/mock-edge.pid ]; then kill "$(cat /tmp/mock-edge.pid)" || true; fi
+          # ci-honesty: justified wave8-local-proofs
+          if [ -f /tmp/mock-edge.pids ]; then
+            while read -r pid; do kill "$pid" || true; done < /tmp/mock-edge.pids
+          fi
 
   edge-load-full:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'full'

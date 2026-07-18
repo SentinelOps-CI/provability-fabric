@@ -41,8 +41,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = HTTPServer(("127.0.0.1", 8080), Handler)
-    print("mock load server listening on :8080", flush=True)
+    import os
+
+    port = int(os.environ.get("MOCK_LOAD_PORT", "8080"))
+    host = os.environ.get("MOCK_LOAD_HOST", "127.0.0.1")
+    server = HTTPServer((host, port), Handler)
+    print(f"mock load server listening on {host}:{port}", flush=True)
     server.serve_forever()
 
 

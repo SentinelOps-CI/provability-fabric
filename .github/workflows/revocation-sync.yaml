@@ -1,24 +1,28 @@
 name: Revocation List Sync
 
-# CI dry-run: validate in-repo revocations.json schema/age (no external fetch, no PR).
-# Live sync remains workflow_dispatch with mode=live.
+# CI dry-run: validate in-tree list + mock-registry sync (merge, package, sign).
+# Live external registry sync remains workflow_dispatch mode=live.
 on:
   push:
     branches: [main, develop]
     paths:
       - "runtime/admission-controller/revocation/**"
+      - "scripts/revocation/**"
+      - "tests/fixtures/registry/**"
       - ".github/workflows/revocation-sync.yaml"
   pull_request:
     branches: [main, develop]
     paths:
       - "runtime/admission-controller/revocation/**"
+      - "scripts/revocation/**"
+      - "tests/fixtures/registry/**"
       - ".github/workflows/revocation-sync.yaml"
   schedule:
     - cron: "45 8 * * 1"
   workflow_dispatch:
     inputs:
       mode:
-        description: "dry-run (validate) or live (fetch/PR)"
+        description: "dry-run (validate+mock sync) or live (external fetch/PR)"
         required: false
         default: "dry-run"
         type: choice
@@ -33,26 +37,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate revocation list
+      - name: Validate local revocation list
         run: |
           set -euo pipefail
           FILE=runtime/admission-controller/revocation/revocations.json
           test -f "$FILE"
           python3 - <<'PY'
-          import json, sys
+          import json
           from pathlib import Path
           p = Path("runtime/admission-controller/revocation/revocations.json")
           data = json.loads(p.read_text(encoding="utf-8"))
-          assert "version" in data, "missing version"
-          assert "revocations" in data and isinstance(data["revocations"], list)
+          assert "version" in data
+          assert isinstance(data["revocations"], list)
           for i, entry in enumerate(data["revocations"]):
               for key in ("sig", "reason", "ts", "revoked_by"):
                   assert key in entry, f"entry {i} missing {key}"
-          print(f"ok: {len(data['revocations'])} revocations, version={data['version']}")
+          print(f"ok: {len(data['revocations'])} local revocations")
           PY
-          # Age check: file must exist; warn if > 365 days but do not fail dry-run
-          # on fixture dates (canonical list may be static until live sync exists).
-          echo "revocation dry-run validation passed"
+
+      - name: Mock registry sync + package/sign
+        env:
+          REVOCATION_SYNC_SIGNING_KEY: ci-local-revocation-key
+        run: |
+          set -euo pipefail
+          python3 scripts/revocation/mock_registry_sync.py \
+            --remote-fixture tests/fixtures/registry/remote_revocations.json \
+            --out runtime/admission-controller/revocation/revocations.synced.json
+          test -f runtime/admission-controller/revocation/revocations.synced.json
+          python3 - <<'PY'
+          import json
+          env = json.load(open("runtime/admission-controller/revocation/revocations.synced.json", encoding="utf-8"))
+          assert env["list"]["source"] == "mock-registry-sync"
+          assert len(env["list"]["revocations"]) >= 3
+          assert env["package"]["algorithm"] == "HMAC-SHA256"
+          assert len(env["package"]["signature"]) == 64
+          print("mock registry sync assertions ok")
+          PY
+
+      - name: Upload synced artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: revocations-synced
+          path: runtime/admission-controller/revocation/revocations.synced.json
+          retention-days: 14
 
   revocation-live:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
@@ -63,8 +90,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Live sync placeholder
+      - name: Live sync requires external registry secrets
         run: |
-          echo "Live external revocation fetch is not configured in this repo yet."
-          echo "Use dry-run mode for CI validation of the in-tree list."
+          echo "Live external revocation fetch is not configured (needs registry credentials)."
+          echo "CI dry-run proves mock registry sync + packaging/signing."
           exit 1
