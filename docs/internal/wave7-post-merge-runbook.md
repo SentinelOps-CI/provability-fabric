@@ -8,7 +8,21 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-16 — Wave 7 / Phase 3+4 sign-off)
+## Status (2026-07-18 — Wave 8 revive + tip k6 pin)
+
+**Merged:** **PR #215** (F33 MicroInterp 0 sorry + re-gate 8 leftover smokes) @ `ad4fafd20`. Inventory after tip: **69 gated**, **1 red** (`platform-perf-smoke` — unauthenticated GitHub API 403 fetching k6 `releases/latest`). Follow-up pins `K6_VERSION=0.47.0` in `platform-perf-smoke.yml` + `slo-gates.yaml`.
+
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| Wave 7 Phase 3+4 | **DONE** | Historical **60/60** @ `b8b78b94` (below) |
+| Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; lean-style ENFORCED not weakened |
+| Wave 8 re-gates | **DONE** | `art-benchmark`, `lean-offline` smoke, `dr-cross` secret-skip, `edge-load`/`loadtest`/`perf-proofmeter`, `publish-updates`/`revocation-sync` green on tip |
+| Tip unblock | **IN PROGRESS** | Pin k6; clear `platform-perf-smoke`; refresh inventory to exit 0 |
+| **Next action** | **Merge k6 pin** | Then inventory exit 0; full SaaS/AWS + lean-offline-full remain dispatch-only |
+
+**Still deferred (honest; not demoted — dispatch/full paths):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync, vendored-mathlib `lean-offline-full`. Smoke/dry-run/skip paths are gated.
+
+### Prior status (2026-07-16 — Wave 7 / Phase 3+4 sign-off)
 
 **Merged:** **PR #206** (honest ungate) + **PR #207** (inventory docs). **Main tip:** `b8b78b94`. Inventory **60/60 gated green**, exit **0 ×2** (ceremony @ `7d48b3d4` 2026-07-16T20:48Z / 20:50Z; reconfirmed tip 2026-07-16T21:37Z / 21:40Z UTC). Phase 3 hardening proof table below (Phase D).
 
@@ -22,7 +36,7 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 | Phase E / Phase 4 | **DONE** | Tracker + closure + reassessment updated; F23/F24 **DONE**; **60/60** ×2; ungated list recorded |
 | **Next action** | **Optional** | Revive ungated workflows only with real SaaS/AWS smoke |
 
-**Honest ungated (not in gate; not proven in CI):** `dr-cross`, `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer` (+ prior #194/#196: `lean-offline`, `art-benchmark`).
+**Then-honest ungated (superseded by Wave 8 #215):** `dr-cross`, `edge-load`, `loadtest`, `perf-proofmeter`, `publish-updates`, `revocation-sync`, `pf-cross-repo-consumer` (+ prior #194/#196: `lean-offline`, `art-benchmark`).
 
 ### Prior status (2026-07-16 — Wave 7 / inventory gate closed @ `7d48b3d4`)
 
