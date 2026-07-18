@@ -17,8 +17,8 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 | Wave 7 Phase 3+4 | **DONE** | Historical **60/60** @ `b8b78b94` (below) |
 | Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; lean-style ENFORCED not weakened |
 | Wave 8 re-gates | **DONE** | `art-benchmark`, `lean-offline` smoke, `dr-cross` secret-skip, `edge-load`/`loadtest`/`perf-proofmeter`, `publish-updates`/`revocation-sync` green on tip |
-| Tip unblock | **IN PROGRESS** | Pin k6; clear `platform-perf-smoke`; refresh inventory to exit 0 |
-| **Next action** | **Merge k6 pin** | Then inventory exit 0; full SaaS/AWS + lean-offline-full remain dispatch-only |
+| Tip unblock | **DONE** | `platform-perf-smoke` green @ tip after k6 pin ([29638438109](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29638438109)); inventory exit **0** |
+| **Next action** | **Optional** | Full SaaS/AWS + lean-offline-full remain dispatch-only |
 
 **Still deferred (honest; not demoted — dispatch/full paths):** live AWS DR (`dr-cross` with secrets), multi-region SaaS load, live registry publish, live revocation sync, vendored-mathlib `lean-offline-full`. Smoke/dry-run/skip paths are gated.
 
