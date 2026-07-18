@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-18 — CI-local proofs for deferred leftovers):** Prior tip `3f71ea97` (#222). F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Previously skip-only paths now have gated CI-local proofs: `dr-cross` (moto S3/Route53 + blue/green dry-run), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Current posture (2026-07-18 — CI-local proofs @ `bae36f642`):** **PR #223** merged. F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Gated CI-local proofs: `dr-cross` (moto), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Inventory exit **0 ×2** — **69** gated. Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 claimed** at **69** gated (tip `3f71ea97` pre-proofs). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
+**Inventory exit 0 ×2 claimed** at **69** gated (tip `bae36f642`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
 
 ### Path to 67/67 (Wave 7 — closed 2026-07-16)
 

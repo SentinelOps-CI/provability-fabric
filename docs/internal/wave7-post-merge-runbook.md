@@ -8,9 +8,9 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 
 ---
 
-## Status (2026-07-18 — CI-local proofs for deferred leftovers)
+## Status (2026-07-18 — CI-local proofs merged @ `bae36f642`)
 
-**Prior tip:** `3f71ea97` (#222 docs sign-off). This wave replaces secret-absent empty skips with real CI-local proofs (moto DR, mock-registry sync/sign, packaged publish dry-run, multi-region k6 asserts).
+**Tip:** `bae36f642` (**PR #223**). Inventory exit **0 ×2** — **69** gated / **0** red. Replaces secret-absent empty skips with real CI-local proofs (moto DR, mock-registry sync/sign, packaged publish dry-run, multi-region k6 asserts).
 
 | Phase | Status | Evidence |
 |-------|--------|----------|
@@ -18,15 +18,18 @@ Inventory baseline: [ci-inventory-latest.md](ci-inventory-latest.md). Cluster ma
 | Wave 8 F33 | **DONE** | MicroInterp `dfa_semantics_match` proved; tracker + reassessment **DONE** |
 | Wave 8 re-gates | **DONE** | Prior smokes @ #215–#217 |
 | lean-offline-full | **DONE** | [29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851) |
-| CI-local DR (`dr-cross`) | **DONE (CI)** | moto S3 CRR + Route53 failover flip + `blue_green_migrate.sh --dry-run` when AWS secrets absent |
-| publish-updates dry-run | **DONE (CI)** | fixture metrics → tar.gz package + HMAC sign + mock-registry publish |
-| revocation-sync dry-run | **DONE (CI)** | mock HTTP registry merge + package/sign assertions |
-| edge-load / loadtest / perf-proofmeter | **DONE (CI)** | local mock stack + k6/bench latency & error-rate asserts; multi-region edge smoke on :8081–8083 |
+| CI-local DR (`dr-cross`) | **DONE (CI)** | Tip green [29661142443](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142443) — moto S3 CRR + Route53 failover + `blue_green_migrate.sh --dry-run` |
+| publish-updates dry-run | **DONE (CI)** | Tip green [29661142449](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142449) — package + HMAC + mock-registry |
+| revocation-sync dry-run | **DONE (CI)** | Tip green [29661142430](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142430) — mock registry merge/sign |
+| edge-load / loadtest / perf-proofmeter | **DONE (CI)** | Tip green [29661142462](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142462) / [29661142440](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142440) / [29661142429](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29661142429) |
+| Inventory ceremony | **DONE** | Exit **0 ×2** @ `bae36f642` — **69** gated / **0** red |
 | **Next action** | **Optional live** | Production AWS DR, live multi-region SaaS, live registry publish, live revocation sync |
 
 **CI-proven (local/mock; gated):** cross-region DR scripts/terraform surface via moto; publish packaging/signing; revocation sync logic; CI-sized load profiles with hard asserts.
 
 **Still needs live secrets / production endpoints (honest; not demoted):** live AWS RDS/Route53/S3 DR, live multi-region SaaS edge load (`edge-load` mode=full), live registry publish (`publish-updates` dry_run=false), live external revocation fetch (`revocation-sync` mode=live).
+
+**Dependabot:** deferred (non-trivial Rust/JS bumps and conflict-prone PRs; #152 tiny but red checks).
 
 ### Prior status (2026-07-18 — Final Wave 7 verification)
 
