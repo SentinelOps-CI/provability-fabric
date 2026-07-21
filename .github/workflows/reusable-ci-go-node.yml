@@ -11,22 +11,22 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.23"
           cache: true
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
       - name: Cache Node.js dependencies
         id: cache-node
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.npm

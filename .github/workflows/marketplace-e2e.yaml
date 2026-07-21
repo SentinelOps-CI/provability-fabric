@@ -33,17 +33,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "18"
           cache: "npm"
           cache-dependency-path: marketplace/ui/package-lock.json
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: "1.21"
 
@@ -101,7 +101,7 @@ jobs:
           go test -v -run TestAdapterVerification
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: marketplace-e2e-results
@@ -114,10 +114,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: "1.21"
 
@@ -146,10 +146,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "18"
           cache: "npm"
@@ -175,7 +175,7 @@ jobs:
           npm run test:compatibility
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: marketplace-ui-coverage
@@ -201,15 +201,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "18"
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: "1.21"
 
@@ -240,7 +240,7 @@ jobs:
           npm run test:workflow
 
       - name: Upload integration test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: marketplace-integration-results
