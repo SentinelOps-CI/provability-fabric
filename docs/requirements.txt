@@ -1,4 +1,4 @@
 # MkDocs stack for CI and local builds (see root mkdocs.yml, docs_dir: docs).
-mkdocs-material>=9.5,<10
+mkdocs-material>=9.7.7,<10
 mkdocs-mermaid2-plugin>=1.1.0
 pymdown-extensions>=11.0.1
