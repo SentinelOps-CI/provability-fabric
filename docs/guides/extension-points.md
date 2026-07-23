@@ -10,11 +10,13 @@ Adapters live under the repository root `adapters/` directory. There are three c
 
 Solver adapters run verification engines (neural network or hybrid system) and produce proof artifacts. They are invoked as **scripts or CLIs** (often Python), not as long-running services.
 
-| Adapter | Location | Invocation | Inputs | Outputs |
-|---------|----------|------------|--------|---------|
-| Marabou | `adapters/marabou/` | Python script (`adapter.py`) | Model file, property file | Proof / UNSAT or counter-example |
-| DryVR | `adapters/dryvr/` | Shell script (`adapter.sh`) | Model, scenario, spec | Reach set / proof artifact |
-| alpha-beta-crown | `adapters/alpha-beta-crown/` | Python (`adapter.py`, CLI) | Model path, property path, output dir | Verification result, bounds, proof |
+**Status: unsupported / optional.** The wrappers under `adapters/marabou/`, `adapters/dryvr/`, and `adapters/alpha-beta-crown/` call external Docker images or local solver installs that are **not** provisioned or smoke-tested in CI. Adapters CI (`.github/workflows/adapters-ci.yml`) covers cert middleware and Rust I/O adapters only. Treat solver adapters as reference integrations: do not gate merges on them; bring your own solver runtime if you use them.
+
+| Adapter | Location | Invocation | Inputs | Outputs | CI |
+|---------|----------|------------|--------|---------|-----|
+| Marabou | `adapters/marabou/` | Python script (`adapter.py`) | Model file, property file | Proof / UNSAT or counter-example | Not gated |
+| DryVR | `adapters/dryvr/` | Shell script (`adapter.sh`) | Model, scenario, spec | Reach set / proof artifact | Not gated |
+| alpha-beta-crown | `adapters/alpha-beta-crown/` | Python (`adapter.py`, CLI) | Model path, property path, output dir | Verification result, bounds, proof | Not gated |
 
 **Contract for adding a new solver adapter:**
 
@@ -106,14 +108,18 @@ New templates do not require code changes in core; only the CLI `init` command w
 
 ### Rust workspace (optional crates)
 
-The root [Cargo.toml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/Cargo.toml) lists workspace members and documents **optional crates** in comments. These are not part of the default `cargo build --workspace` or require extra dependencies or APIs:
+The root [Cargo.toml](https://github.com/SentinelOps-CI/provability-fabric/blob/main/Cargo.toml) lists workspace members. Most crates build and test with `cargo test --workspace`. Special cases:
 
-- **egress-firewall** – needs native Hyperscan (libhs). Build with `cargo build -p egress-firewall` when deps are available.
-- **core/sdk/rust** – needs protoc. Build with `cargo build -p provability-fabric-core-sdk-rust` when deps are available.
-- **sidecar-watcher/fuzz** – fuzz targets; build with `cargo build -p sidecar-watcher-fuzz` (e.g. on Linux).
-- **telemetry-service, mpc-fintech, jwks-manager** – not in workspace by default; add to `members` in root `Cargo.toml` to build with the workspace.
+| Crate | Workspace member | Build / test notes |
+|-------|------------------|--------------------|
+| `runtime/telemetry-service` | yes | `cargo test -p telemetry-service` |
+| `runtime/jwks-manager` | yes | `cargo test -p jwks-manager` |
+| `runtime/mpc-fintech` | yes | `cargo test -p mpc-fintech` |
+| `runtime/egress-firewall` | yes | Default / CI: regex fallback — `cargo test -p egress-firewall --no-default-features`. Optional Hyperscan (native `libhs`): `cargo build -p egress-firewall --features hyperscan` (dedicated optional job only; not required for workspace green). |
+| `core/sdk/rust` | yes | Needs `protoc`. Often excluded from default CI: `cargo build -p provability-fabric-core-sdk-rust`. |
+| `runtime/sidecar-watcher/fuzz` | no | Fuzz targets; build with `cargo build -p sidecar-watcher-fuzz` (e.g. on Linux). |
 
-Build them separately when their dependencies are available. See the root Cargo.toml for dependency notes (e.g. redis, Hyperscan).
+See the root `Cargo.toml` comments for dependency notes (e.g. redis, Hyperscan).
 
 ### Adding a new runtime component
 

@@ -1,5 +1,7 @@
 # Real-Time Communication with WebSockets
 
+> **Historical marketing document.** Kept for audit trail. Live stub: [`docs/features/real-time-communication.md`](../../features/real-time-communication.md). Prefer [WebSocket API](../../reference/api/websocket-api.md).
+
 Provability-Fabric includes a comprehensive WebSocket-based real-time communication system that provides live updates, notifications, and monitoring capabilities across the entire platform.
 
 ## Overview
@@ -397,4 +399,4 @@ wscat -c "ws://localhost:8081?token=<your-jwt-token>"
 
 ## API Reference
 
-For complete API documentation, see [WebSocket API Reference](../reference/api/websocket-api.md).
+For complete API documentation, see [WebSocket API Reference](../../reference/api/websocket-api.md).

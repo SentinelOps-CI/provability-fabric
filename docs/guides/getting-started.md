@@ -1,3 +1,5 @@
+> **Canonical first-15-minutes path:** [docs/getting-started.md](../getting-started.md) (CLI, wiring, Compose). This page adds product concepts and a longer first-agent walkthrough.
+
 # Getting Started with Provability-Fabric
 
 Provability-Fabric is an open-source framework that binds every AI agent container image to a machine-checkable Lean proof (Proof-of-Behaviour), ensuring provable behavioral guarantees through formal verification.
@@ -21,7 +23,7 @@ This creates a complete pipeline from formal specification to deployed, verified
 - **Automatic Sidecar Injection** - Runtime monitoring without code changes
 - **Admission Controllers** - Validate proofs before deployment
 - **Transparency Ledger** - Immutable record of specifications and verification status
-- **Multiple Verification Engines** - Support for Marabou (neural networks), DryVR (hybrid systems), and α-β-CROWN (GPU-accelerated neural networks)
+- **Multiple Verification Engines** - Support for Marabou (neural networks), DryVR (hybrid systems), and Î±-Î²-CROWN (GPU-accelerated neural networks)
 - **Production Ready** - Comprehensive CI/CD integration, security policies, and community governance
 
 ## Quick Start
@@ -132,7 +134,7 @@ import Mathlib.Data.String.Basic
 def max_response_length : Nat := 1000
 
 theorem response_length_bound (response : String) : 
-  response.length ≤ max_response_length := by
+  response.length â‰¤ max_response_length := by
   -- Your proof here
   sorry
 ```
@@ -185,10 +187,10 @@ Apache 2.0 License - see [LICENSE](../LICENSE) for details.
 
 The console and CLI support anonymous, opt-in telemetry to help improve Developer Experience (DX).
 
-- What is collected: minimal event types and timestamps for “init → first valid cert” and “first replay success”. No PII is collected; payloads are scrubbed server-side.
-- Opt-in: Disabled by default unless `TELEMETRY_DEFAULT_ENABLED=true` is set on the API gateway. Users can enable/disable in the Console under Settings → Anonymous usage telemetry.
+- What is collected: minimal event types and timestamps for â€œinit â†’ first valid certâ€ and â€œfirst replay successâ€. No PII is collected; payloads are scrubbed server-side.
+- Opt-in: Disabled by default unless `TELEMETRY_DEFAULT_ENABLED=true` is set on the API gateway. Users can enable/disable in the Console under Settings â†’ Anonymous usage telemetry.
 - Disable:
-  - Console: Settings → toggle off “Anonymous usage telemetry”.
+  - Console: Settings â†’ toggle off â€œAnonymous usage telemetryâ€.
   - Environment: unset `TELEMETRY_DEFAULT_ENABLED` or set `TELEMETRY_DEFAULT_ENABLED=false` on the API gateway service.
 
 See also: [Configuration](../reference/configuration.md) for environment variables.

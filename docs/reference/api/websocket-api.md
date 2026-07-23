@@ -1,6 +1,6 @@
 # WebSocket API Reference
 
-Complete API reference for the Provability-Fabric WebSocket real-time communication system.
+Complete API reference for the Provability-Fabric WebSocket real-time communication system (ledger helper: `runtime/ledger/websocket-server.js`). The standalone `marketplace/` UI was removed; room name `marketplace` below is a ledger demo channel label only.
 
 ## Connection
 

@@ -1,45 +1,31 @@
-# Dev Mode (E4): Live Stream & DFA State
+# Dev Mode (E4): live stream and DFA state
 
-This document describes the Dev Mode live stream, per-decision latency, DFA state, and chunk/flush ticks visualization.
+Console Dev Mode visualizes replay job progress, per-decision latency, DFA state, and chunk/flush ticks.
 
-## Backend (Replay Service)
+## Backend (replay service)
 
-New endpoints (via API Gateway routing to Replay Service):
+Routed via the API gateway to the replay service:
 
-- `GET /api/v1/replay/:jobId/stream` Server-Sent Events stream of live dev-mode events
-- `GET /api/v1/replay/:jobId/dfa_state` Returns the last known DFA state for a job
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/v1/replay/:jobId/stream` | SSE stream of live Dev Mode events |
+| `GET` | `/api/v1/replay/:jobId/dfa_state` | Last known DFA state for a job |
 
-Event types emitted on the stream:
+Event types on the stream: `hello`, `progress`, `dfa_state`, `chunk_tick`, `flush_tick`, `decision_latency`, `job_started`, `job_completed`.
 
-- `hello`: initial handshake
-- `progress`: `{ progress }`
-- `dfa_state`: `{ state_id }`
-- `chunk_tick`: `{ sequence }`
-- `flush_tick`: `{ sequence }`
-- `decision_latency`: `{ latencies_ms: { permission_check, tool_call, egress } }`
-- `job_started`, `job_completed`
+Implementation: `services/replay-service/main.go` (`getDFAStateHandler`, stream routes).
 
 ## Console UI
 
-A new `Dev Mode` page is available at `/dev`:
+Page at `/dev` (`console/src/pages/DevModePage.tsx`):
 
-- Start a replay by entering a decision ID and clicking `Start Replay`
-- Click `Connect Stream` to attach to the job's dev-mode event stream
-- The page displays:
-  - Current DFA state (auto-updated via events and manually refreshable)
-  - Per-decision latency (ms)
-  - Chunk and flush ticks with mini progress bars
-  - Live events panel (latest first)
+- Start a replay by decision ID, then connect the SSE stream
+- Shows DFA state, decision latencies (ms), chunk/flush ticks, and a live events panel
 
-## API Client
-
-Added helpers in `console/src/services/api.ts`:
-
-- `getDevModeStreamUrl(jobId: string)` → EventSource URL
-- `getDFAState(jobId: string)` → `{ job_id, state_id }`
+API helpers in `console/src/services/api.ts`: `getDevModeStreamUrl`, `getDFAState`.
 
 ## Notes
 
-- SSE is used for low-latency updates with wide compatibility
-- Event payloads are JSON; clients should parse `event.data`
-- In production, decision latencies and DFA state should be produced by the runtime-sidecar instrumentation rather than simulated ticks
+- SSE payloads are JSON in `event.data`
+- Production-shaped deployments should emit latencies and DFA state from runtime/sidecar instrumentation rather than simulated ticks
+- Local stack ports: [local-workflows.md](../dev/local-workflows.md)

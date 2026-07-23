@@ -10,7 +10,7 @@ This guide is for users who want to fork the repository, run a minimal subset, o
 | **Standard** | Minimal + Rust workspace (attestor, sidecar-watcher, adapters/http-get, adapters/file-read, etc.) + optional Go services | Go, Rust; Node/Docker optional |
 | **Full** | All platform services, console, ledger, bench, experiments, demos | Go, Rust, Node, Python, Docker; see [Getting started](getting-started.md) |
 
-Components not required for a minimal fork: `bench/`, `experiments/`, `console/`, `marketplace/`, `demos/`, and optional Rust crates (egress-firewall, core/sdk/rust, fuzz). See [Extension points](extension-points.md) for runtime and adapter boundaries.
+Components not required for a minimal fork: `services/`, `console/`, `bench/`, `experiments/`, `demos/`, and optional Rust crates (egress-firewall, core/sdk/rust, fuzz). See [Extension points](extension-points.md) for runtime and adapter boundaries.
 
 ## Forking the repository
 
@@ -118,7 +118,7 @@ Make targets: `make install-minimal`, `make install-standard`, `make install-ful
 
 Adapters live under `adapters/`. There are three kinds:
 
-1. **Solver adapters** (e.g. Marabou, DryVR, alpha-beta-crown): invoked as scripts or CLIs; consume model + property, produce proof/artifact. Add a new directory under `adapters/` (e.g. `adapters/my-solver/`) with your script and any config; document how the platform invokes it (see [Extension points - Adapters](extension-points.md#adapters)).
+1. **Solver adapters** (e.g. Marabou, DryVR, alpha-beta-crown): **unsupported / optional** wrappers that call external solver images; not CI-gated. Invoked as scripts or CLIs; consume model + property, produce proof/artifact. Add a new directory under `adapters/` (e.g. `adapters/my-solver/`) with your script and any config; document how the platform invokes it (see [Extension points - Adapters](extension-points.md#adapters)).
 2. **I/O adapters** (Rust: httpget, fileread): integrate with policy and resource mapping. Add a new crate under `adapters/` and, if needed, add it to the root Cargo workspace. See [Adapters overview](../adapters/overview.md).
 3. **Middleware** (express, FastAPI, chi): integrate with your app stack. Add a new directory under `adapters/` (e.g. `adapters/my-middleware/`) and follow the same pattern as existing cert middleware.
 

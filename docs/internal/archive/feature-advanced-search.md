@@ -1,5 +1,7 @@
 # Advanced Search System
 
+> **Historical marketing document.** Kept for audit trail. Live stub: [`docs/features/advanced-search.md`](../../features/advanced-search.md).
+
 Provability-Fabric includes a powerful advanced search system that provides intelligent package discovery with fuzzy matching, multi-criteria filtering, and real-time search capabilities.
 
 ## Overview
