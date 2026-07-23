@@ -317,7 +317,7 @@ groups:
 
 ## Related Documentation
 
-- [Rollback Runbook](../../runbooks/rollback.md)
+- [Rollback Runbook](runbook-rollback.md)
 - [Incident response](../../runbooks/incident-response.md)
 - [Security overview](../../security/overview.md)
 - [Operations runbook](../../runbooks/operations.md)
