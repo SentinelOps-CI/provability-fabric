@@ -222,6 +222,10 @@ pub fn verify_access_receipt(
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    // Env-var based DSSE tests must not run concurrently.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn fixtures_dir() -> PathBuf {
         let candidates = [
@@ -239,6 +243,7 @@ mod tests {
 
     #[test]
     fn verify_fixture_envelope() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = fixtures_dir();
         std::env::set_var(ENV_TRUST_ROOT_PEM, dir.join("ed25519_public.pem"));
         std::env::set_var(ENV_ENFORCE_DSSE, "1");
@@ -250,6 +255,7 @@ mod tests {
 
     #[test]
     fn enforce_dsse_default_and_opt_out() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::remove_var(ENV_ENFORCE_DSSE);
         assert!(enforce_dsse(), "unset must enforce");
 
@@ -268,6 +274,7 @@ mod tests {
 
     #[test]
     fn reject_receipt_without_trust_root_when_unset() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::remove_var(ENV_ENFORCE_DSSE);
         std::env::remove_var(ENV_TRUST_ROOT_PEM);
         let receipt = AccessReceiptPayload {
@@ -291,6 +298,7 @@ mod tests {
 
     #[test]
     fn structural_pass_when_opt_out() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::set_var(ENV_ENFORCE_DSSE, "0");
         std::env::remove_var(ENV_TRUST_ROOT_PEM);
         let receipt = AccessReceiptPayload {
@@ -311,6 +319,7 @@ mod tests {
 
     #[test]
     fn reject_tampered_signature() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = fixtures_dir();
         std::env::set_var(ENV_TRUST_ROOT_PEM, dir.join("ed25519_public.pem"));
         let env_data = fs::read_to_string(dir.join("dsse_sample_envelope.json")).unwrap();

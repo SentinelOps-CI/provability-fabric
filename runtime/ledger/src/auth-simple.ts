@@ -8,12 +8,22 @@ const prisma = new PrismaClient()
 
 /** Dev-only auth. Production must use `auth.js` / `auth-production.ts`. */
 function assertDevProfile(): void {
-  const profile = (
+  const explicit = (
     process.env.PF_PROFILE ||
-    process.env.NODE_ENV ||
+    process.env.PROFILE ||
     ''
   ).toLowerCase()
-  if (profile === 'production' || profile === 'prod') {
+  // Explicit PROFILE/PF_PROFILE=dev|simple wins over Docker NODE_ENV=production.
+  if (explicit === 'dev' || explicit === 'simple') {
+    return
+  }
+  const nodeEnv = (process.env.NODE_ENV || '').toLowerCase()
+  if (
+    explicit === 'production' ||
+    explicit === 'prod' ||
+    nodeEnv === 'production' ||
+    nodeEnv === 'prod'
+  ) {
     throw new Error(
       'auth-simple must not run under production/prod; use auth.js / auth-production'
     )

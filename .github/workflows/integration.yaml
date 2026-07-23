@@ -65,7 +65,7 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: pytest pytest-asyncio requests pyyaml flake8-breakpoint
+          packages: pytest pytest-asyncio requests pyyaml flake8-breakpoint kubernetes
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
