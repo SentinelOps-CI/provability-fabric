@@ -10,10 +10,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
-use tracing::{info, debug, error, warn};
+use tracing::{info, debug};
 use sha2::{Sha256, Digest};
 
-use crate::{FinancialTransaction, MpcFinancialConfig};
+use crate::FinancialTransaction;
 
 /// Threshold signature implementation
 pub struct ThresholdSigner {
@@ -74,13 +74,17 @@ pub struct SignatureMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SignatureAlgorithm {
     /// ECDSA with secp256k1 curve
-    ECDSA_SECP256K1,
+    #[serde(rename = "ECDSA_SECP256K1")]
+    EcdsaSecp256k1,
     /// ECDSA with P-256 curve
-    ECDSA_P256,
+    #[serde(rename = "ECDSA_P256")]
+    EcdsaP256,
     /// EdDSA with Ed25519 curve
-    EDDSA_ED25519,
+    #[serde(rename = "EDDSA_ED25519")]
+    EddsaEd25519,
     /// BLS signatures for aggregation
-    BLS12_381,
+    #[serde(rename = "BLS12_381")]
+    Bls12_381,
 }
 
 /// Performance metrics for threshold operations
@@ -253,7 +257,7 @@ impl ThresholdSigner {
             signature: signature_result.signature,
             public_key: signature_result.public_key,
             metadata: SignatureMetadata {
-                algorithm: SignatureAlgorithm::ECDSA_SECP256K1,
+                algorithm: SignatureAlgorithm::EcdsaSecp256k1,
                 parties: signature_result.participating_parties,
                 timestamp: chrono::Utc::now(),
                 round: 1,
@@ -414,7 +418,7 @@ impl ThresholdSigner {
         hasher.update(&transaction.transaction_id);
         hasher.update(&transaction.from_account);
         hasher.update(&transaction.to_account);
-        hasher.update(&transaction.amount.to_le_bytes());
+        hasher.update(transaction.amount.to_le_bytes());
         hasher.update(&transaction.currency);
         format!("{:x}", hasher.finalize())
     }
@@ -674,12 +678,12 @@ mod tests {
         // First signature should be computed
         let start1 = std::time::Instant::now();
         let signature1 = signer.sign_transaction(&transaction).await.unwrap();
-        let time1 = start1.elapsed();
+        let _time1 = start1.elapsed();
         
         // Second signature should be cached (faster)
         let start2 = std::time::Instant::now();
         let signature2 = signer.sign_transaction(&transaction).await.unwrap();
-        let time2 = start2.elapsed();
+        let _time2 = start2.elapsed();
         
         // Cached signature should be the same
         assert_eq!(signature1.signature, signature2.signature);

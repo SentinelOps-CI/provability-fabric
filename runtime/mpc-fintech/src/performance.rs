@@ -7,8 +7,6 @@
 //! and optimization recommendations for financial MPC workloads.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use tracing::{info, debug, warn, error};

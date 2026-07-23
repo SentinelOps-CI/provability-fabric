@@ -5,12 +5,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use regex::Regex;
-use std::collections::HashSet;
 use lazy_static::lazy_static;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use std::thread;
 
 /// Egress request with text to be checked
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -454,24 +452,25 @@ impl EnhancedDupeDetector {
     
     fn calculate_simhash(&self, text: &str) -> String {
         // Simplified SimHash calculation
-        let mut hash = [0u64; 64];
+        let bits = self.simhash_bits;
+        let mut hash = vec![0i64; bits];
         let words: Vec<&str> = text.split_whitespace().collect();
         
         for word in words {
             let word_hash = self.hash_word(word);
-            for i in 0..64 {
+            for (i, slot) in hash.iter_mut().enumerate() {
                 if (word_hash >> i) & 1 == 1 {
-                    hash[i] += 1;
+                    *slot += 1;
                 } else {
-                    hash[i] -= 1;
+                    *slot -= 1;
                 }
             }
         }
         
         // Convert to hex string
         let mut result = String::new();
-        for i in 0..64 {
-            if hash[i] > 0 {
+        for slot in &hash {
+            if *slot > 0 {
                 result.push('1');
             } else {
                 result.push('0');
@@ -501,10 +500,10 @@ impl EnhancedDupeDetector {
         
         for gram in grams {
             let hash = self.hash_string(&gram);
-            for i in 0..self.minhash_permutations {
+            for (i, slot) in minhash.iter_mut().enumerate() {
                 let permuted_hash = self.permute_hash(hash, i);
-                if permuted_hash < minhash[i] {
-                    minhash[i] = permuted_hash;
+                if permuted_hash < *slot {
+                    *slot = permuted_hash;
                 }
             }
         }
@@ -1097,11 +1096,12 @@ impl EgressFirewall {
     }
 
     /// Determine if response should be blocked
+    #[allow(clippy::too_many_arguments)] // Detector/policy result bundle; keep call sites explicit
     fn determine_block_status(
         &self,
         pii_result: &PiiResult,
         secrets_result: &SecretsResult,
-        near_dupe_result: &NearDupeResult,
+        _near_dupe_result: &NearDupeResult,
         policy_violations: &[String],
         non_interference: &NonInterferenceVerdict,
         entropy_result: &EntropyResult,
@@ -1142,7 +1142,7 @@ impl EgressFirewall {
         let mut all_locations: Vec<&Location> = pii_result.locations.iter()
             .chain(secrets_result.locations.iter())
             .collect();
-        all_locations.sort_by(|a, b| b.start.cmp(&a.start));
+        all_locations.sort_by_key(|b| std::cmp::Reverse(b.start));
         
         for location in all_locations {
             let replacement = if location.text.contains('@') {
@@ -1164,6 +1164,7 @@ impl EgressFirewall {
     }
 
     /// Generate enhanced egress certificate
+    #[allow(clippy::too_many_arguments)] // Certificate fields assembled from detector bundle
     async fn generate_enhanced_certificate(
         &self,
         request: &EgressRequest,
@@ -1300,7 +1301,7 @@ impl EgressFirewall {
         let client = &*HTTP_CLIENT;
 
         let response = client
-            .post(&format!("{}/egress-certificates", self.ledger_url))
+            .post(format!("{}/egress-certificates", self.ledger_url))
             .json(certificate)
             .send()
             .await
@@ -1330,7 +1331,7 @@ impl EgressFirewall {
 
 /// HTTP handlers
 async fn egress_handler(
-    req: HttpRequest,
+    _req: HttpRequest,
     payload: web::Json<EgressRequest>,
     firewall: web::Data<EgressFirewall>,
 ) -> Result<HttpResponse, Error> {

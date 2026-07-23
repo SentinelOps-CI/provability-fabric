@@ -7,6 +7,10 @@
 //! complex financial workloads with extremely low latency requirements and
 //! comprehensive audit trails.
 
+// Workspace membership surfaces this scaffolding under `cargo clippy -D warnings`.
+// Private fields/methods are retained for the planned MPC control-plane surface.
+#![allow(dead_code)]
+
 pub mod threshold_signature;
 pub mod audit_trail;
 pub mod network;
@@ -16,7 +20,7 @@ pub mod compliance;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use tracing::{info, warn, error, debug};
+use tracing::{info, debug};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
