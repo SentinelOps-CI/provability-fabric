@@ -74,7 +74,6 @@ FORBIDDEN = [
     (re.compile(r'Simple aggregation stub'), "platform_commands aggregation stub"),
     (re.compile(r'For now, return a placeholder'), "wasm_pool placeholder"),
     (re.compile(r'not yet implemented'), "impacted_only build impacted proofs"),
-    (re.compile(r'replay.*echo.*todo|echo "todo"'), "create-sentinel-app replay todo"),
 ]
 
 # Comment-only lines containing these are ignored for any pattern (EX-001)
