@@ -49,7 +49,7 @@ validate_prerequisites() {
     
     local missing_tools=()
     
-    for tool in aws kubectl terraform docker; do
+    for tool in aws kubectl docker; do
         if ! command_exists "$tool"; then
             missing_tools+=("$tool")
         fi
@@ -112,17 +112,25 @@ deploy_to_region() {
     # Set kubectl context
     export KUBECONFIG="/tmp/kubeconfig-$region"
     
-    # Create namespace if it doesn't exist
+    # Create namespace if it does not exist
     kubectl create namespace provability-fabric --dry-run=client -o yaml | kubectl apply -f -
-    
-    # Apply Terraform configuration
-    cd ops/terraform/regions
-    terraform init
-    terraform apply -var="region=$region" -var="version=$version" -auto-approve
-    
-    # Deploy application
-    kubectl apply -f ../../../runtime/admission-controller/deploy/admission/templates/
-    kubectl apply -f ../../../runtime/ledger/deploy/
+
+    # In-repo Terraform was removed. Prefer Helm chart + admission manifests.
+    if [ -d charts/pf-enforce ]; then
+        helm upgrade --install pf-enforce charts/pf-enforce \
+            --namespace provability-fabric \
+            --set image.tag="$version" \
+            --wait --timeout "${DEPLOYMENT_TIMEOUT}s" || \
+            log_warning "helm upgrade skipped/failed; applying raw manifests"
+    fi
+
+    # Deploy application manifests when present
+    if [ -d runtime/admission-controller/deploy/admission/templates ]; then
+        kubectl apply -f runtime/admission-controller/deploy/admission/templates/
+    fi
+    if [ -d runtime/ledger/deploy ]; then
+        kubectl apply -f runtime/ledger/deploy/
+    fi
     
     # Wait for deployment to be ready
     kubectl rollout status deployment/ledger -n provability-fabric --timeout=${DEPLOYMENT_TIMEOUT}s

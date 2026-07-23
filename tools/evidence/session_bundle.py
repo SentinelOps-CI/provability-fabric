@@ -50,7 +50,7 @@ class SessionBundleGenerator:
                 return yaml.safe_load(f)
 
         return {
-            "ledger_endpoint": "http://localhost:3000",
+            "ledger_endpoint": "http://localhost:4000",
             "retrieval_gateway": "http://localhost:8080",
             "egress_firewall": "http://localhost:8081",
             "attestor_endpoint": "http://localhost:8082",

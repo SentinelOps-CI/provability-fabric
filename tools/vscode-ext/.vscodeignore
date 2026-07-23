@@ -1,9 +1,0 @@
-**/.git
-**/.DS_Store
-**/node_modules
-**/src
-**/tsconfig.json
-**/.vscode
-**/*.map
-
-

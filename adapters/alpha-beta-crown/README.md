@@ -2,6 +2,8 @@
 
 This adapter integrates α-β-CROWN, a GPU-accelerated neural network verifier, with the Provability Fabric framework.
 
+**Status: unsupported / optional.** Requires an external α-β-CROWN install or Docker image. Not smoke-tested in Adapters CI — bring your own solver runtime.
+
 ## Features
 
 - **GPU Acceleration**: Utilizes CUDA for faster verification
