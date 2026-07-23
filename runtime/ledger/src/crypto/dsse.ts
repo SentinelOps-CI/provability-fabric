@@ -14,9 +14,11 @@ export interface DsseEnvelope {
   signatures: Array<{ keyid: string; sig: string; alg?: string }>;
 }
 
+/** Fail-closed by default; opt out only with PF_ENFORCE_DSSE=0 or false. */
 export function enforceDsse(): boolean {
   const v = (process.env[ENV_ENFORCE_DSSE] ?? '').trim();
-  return v === '1' || v.toLowerCase() === 'true';
+  if (v === '0' || v.toLowerCase() === 'false') return false;
+  return true;
 }
 
 function loadTrustRootPem(): Buffer {

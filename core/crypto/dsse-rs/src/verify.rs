@@ -62,10 +62,15 @@ pub enum VerifyError {
     Message(String),
 }
 
+/// Returns true when DSSE verification must fail closed.
+/// Default is enforce (unset). Opt out only with `PF_ENFORCE_DSSE=0` or `false`.
 pub fn enforce_dsse() -> bool {
     match env::var(ENV_ENFORCE_DSSE) {
-        Ok(v) => v == "1" || v.eq_ignore_ascii_case("true"),
-        Err(_) => false,
+        Ok(v) => {
+            let v = v.trim();
+            !(v == "0" || v.eq_ignore_ascii_case("false"))
+        }
+        Err(_) => true,
     }
 }
 
@@ -241,6 +246,67 @@ mod tests {
         let env: Envelope = serde_json::from_str(&env_data).unwrap();
         let result = verify_envelope(&env, ACCESS_RECEIPT_TYPE);
         assert!(result.valid, "{:?}", result.reason);
+    }
+
+    #[test]
+    fn enforce_dsse_default_and_opt_out() {
+        std::env::remove_var(ENV_ENFORCE_DSSE);
+        assert!(enforce_dsse(), "unset must enforce");
+
+        std::env::set_var(ENV_ENFORCE_DSSE, "1");
+        assert!(enforce_dsse());
+        std::env::set_var(ENV_ENFORCE_DSSE, "true");
+        assert!(enforce_dsse());
+
+        std::env::set_var(ENV_ENFORCE_DSSE, "0");
+        assert!(!enforce_dsse());
+        std::env::set_var(ENV_ENFORCE_DSSE, "false");
+        assert!(!enforce_dsse());
+
+        std::env::remove_var(ENV_ENFORCE_DSSE);
+    }
+
+    #[test]
+    fn reject_receipt_without_trust_root_when_unset() {
+        std::env::remove_var(ENV_ENFORCE_DSSE);
+        std::env::remove_var(ENV_TRUST_ROOT_PEM);
+        let receipt = AccessReceiptPayload {
+            receipt_id: "rcpt-1".into(),
+            tenant: "tenant-a".into(),
+            subject_id: "user-1".into(),
+            query_hash: "abc".into(),
+            index_shard: "shard-0".into(),
+            timestamp: 1,
+            result_hash: "deadbeef".into(),
+            result_count: 0,
+            query_time_ms: 0,
+            signature: String::new(),
+        };
+        let err = verify_access_receipt(&receipt, "ed25519", "deadbeef").unwrap_err();
+        assert!(
+            err.to_string().contains("trust root"),
+            "unexpected: {err}"
+        );
+    }
+
+    #[test]
+    fn structural_pass_when_opt_out() {
+        std::env::set_var(ENV_ENFORCE_DSSE, "0");
+        std::env::remove_var(ENV_TRUST_ROOT_PEM);
+        let receipt = AccessReceiptPayload {
+            receipt_id: "rcpt-1".into(),
+            tenant: "tenant-a".into(),
+            subject_id: "user-1".into(),
+            query_hash: "abc".into(),
+            index_shard: "shard-0".into(),
+            timestamp: 1,
+            result_hash: "deadbeef".into(),
+            result_count: 0,
+            query_time_ms: 0,
+            signature: String::new(),
+        };
+        verify_access_receipt(&receipt, "ed25519", "deadbeef").expect("opt-out skips crypto");
+        std::env::remove_var(ENV_ENFORCE_DSSE);
     }
 
     #[test]

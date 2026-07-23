@@ -1,5 +1,9 @@
 # Deployment Guide
 
+Canonical production deployment guide for Provability Fabric: environment setup, configuration, monitoring, maintenance, and the [production trust-chain environment](#production-trust-chain-environment-f01--f02).
+
+The former web-stack page at `guides/deployment/production-deployment.md` is a **redirect stub**; historical demo packaging lives in [archive](../internal/archive/production-deployment-web-stack.md).
+
 This guide covers production deployment of Provability-Fabric applications, including environment setup, configuration, monitoring, and maintenance.
 
 ## Deployment Overview
@@ -717,11 +721,9 @@ Docker Compose profiles:
 | `labeler` | Proof-carrying JSON path labeler (library) | standalone | `cargo test -p labeler` |
 | `admission-controller` | K8s admission webhook | standalone | `cd runtime/admission-controller && go build .` |
 | `attestor` | TEE attestation helper | standalone | `cargo build -p attestor` |
-| `incident-bot` | Alertmanager / K8s incident bot | standalone | `cd runtime/incident-bot && npm ci && npm run build` |
 | `jwks-manager` | JWKS rotation utility | standalone | `cargo build -p jwks-manager` |
 | `kms-proxy` | KMS signing proxy | standalone | `cargo build -p kms-proxy` |
 | `mpc-fintech` | MPC network experiments | experimental | `cargo build -p mpc-fintech` |
-| `rag-guard` | RAG ingress guard (Node) | standalone | `cd runtime/rag-guard && npm ci && npm test` |
 | `telemetry-service` | Telemetry aggregation | standalone | `cargo build -p telemetry-service` |
 | `privacy` | (legacy path; epsilon guard lives in sidecar) | n/a | see `sidecar-watcher/src/privacy/` |
 
@@ -735,22 +737,24 @@ docker compose --profile full config
 
 ### Production trust-chain environment (F01 / F02)
 
-In production and `full` compose profiles, set fail-closed trust defaults:
+DSSE verification is **fail-closed by default**: unset `PF_ENFORCE_DSSE` means enforce.
+Opt out only with `PF_ENFORCE_DSSE=0` or `false` (local/dev and intentional skip-crypto test paths).
+When enforcing, `PF_TRUST_ROOT_PEM` is required; missing trust root fails closed (not structural-only).
 
-| Variable | Production value | Purpose |
-|----------|------------------|---------|
-| `PF_ENFORCE_DSSE` | `1` | Reject unsigned or invalid DSSE envelopes (ledger, sidecar, SDK, Go kernel). |
+| Variable | Production / default | Purpose |
+|----------|----------------------|---------|
+| `PF_ENFORCE_DSSE` | unset or `1` (enforce) | Reject unsigned or invalid DSSE envelopes (ledger, sidecar, SDK, Go kernel). Set `0`/`false` only for local skip-crypto. |
 | `PF_ENABLED_TOOLS` | _(empty)_ | Deny-by-default tool allow-list for sidecar; comma-separate tool names to permit. |
 | `PF_PROFILE` | `production` | Activates production evidence-hash resolution and disables shadow bypass. |
-| `PF_TRUST_ROOT_PEM` | PEM of trust anchor | Required when `PF_ENFORCE_DSSE=1` for signature verification. |
+| `PF_TRUST_ROOT_PEM` | PEM of trust anchor | **Required** whenever DSSE is enforced (default). File path or inline PEM. |
 
-Development profiles may omit these for ergonomics; never ship production without `PF_ENFORCE_DSSE=1` and an explicit `PF_ENABLED_TOOLS` allow-list.
+Never ship production with `PF_ENFORCE_DSSE=0`. Local compose/dev profiles that intentionally skip crypto must set `PF_ENFORCE_DSSE=0` explicitly; production and `full` profiles should provision `PF_TRUST_ROOT_PEM` (and may set `PF_ENFORCE_DSSE=1` for clarity).
 
-Cross-language DSSE contract tests: `python tests/crypto/test_cross_lang_dsse.py`.
+Cross-language DSSE contract tests: `python tests/crypto/test_cross_lang_dsse.py` (matrix: unset / `1` / `0`).
 
 
 Standalone components ship their own `Dockerfile` where containerization is supported
-(`admission-controller`, `attestor`, `incident-bot`, `jwks-manager`, `telemetry-service`).
+(`admission-controller`, `attestor`, `jwks-manager`, `telemetry-service`).
 Use those Dockerfiles directly or wire them into your cluster manifests.
 
 ## Conclusion

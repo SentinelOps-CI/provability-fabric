@@ -191,7 +191,7 @@ This document provides a comprehensive threat model for the Provability-Fabric s
 
 ### Application-Level Attacks
 - **SQL injection** in ledger database
-- **XSS attacks** in marketplace UI
+- **XSS attacks** in console UI
 - **Code injection** in WASM sandbox
 - **Buffer overflows** in native components
 

@@ -17,18 +17,24 @@ ENVELOPE = FIXTURES / "dsse_sample_envelope.json"
 PUBLIC_PEM = FIXTURES / "ed25519_public.pem"
 
 
-def _env() -> dict[str, str]:
+def _env(*, enforce: str | None = "1", trust_root: bool = True) -> dict[str, str]:
     env = os.environ.copy()
-    env["PF_TRUST_ROOT_PEM"] = str(PUBLIC_PEM)
-    env["PF_ENFORCE_DSSE"] = "1"
+    if trust_root:
+        env["PF_TRUST_ROOT_PEM"] = str(PUBLIC_PEM)
+    else:
+        env.pop("PF_TRUST_ROOT_PEM", None)
+    if enforce is None:
+        env.pop("PF_ENFORCE_DSSE", None)
+    else:
+        env["PF_ENFORCE_DSSE"] = enforce
     return env
 
 
-def _run(cmd: list[str], cwd: Path | None = None) -> dict:
+def _run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> dict:
     proc = subprocess.run(
         cmd,
         cwd=cwd or REPO_ROOT,
-        env=_env(),
+        env=env or _env(),
         capture_output=True,
         text=True,
         check=False,
@@ -68,6 +74,7 @@ def test_rust_dsse_verify() -> None:
 def _find_tsc_cmd() -> list[str]:
     for rel in (
         "core/crypto/dsse-ts/node_modules/typescript/bin/tsc",
+        "core/sdk/typescript/node_modules/typescript/bin/tsc",
         "runtime/ledger/node_modules/typescript/bin/tsc",
     ):
         tsc_js = REPO_ROOT / rel
@@ -107,9 +114,47 @@ def test_cross_lang_outputs_match() -> None:
     assert go_result == rust_result, (go_result, rust_result)
 
 
+def test_unset_enforce_matches_explicit_one() -> None:
+    """Unset PF_ENFORCE_DSSE must enforce the same as PF_ENFORCE_DSSE=1."""
+    dsse_dir = REPO_ROOT / "core" / "crypto" / "dsse"
+    with_one = _run(
+        ["go", "run", "./cmd/dsse-verify", str(ENVELOPE)],
+        cwd=dsse_dir,
+        env=_env(enforce="1"),
+    )
+    with_unset = _run(
+        ["go", "run", "./cmd/dsse-verify", str(ENVELOPE)],
+        cwd=dsse_dir,
+        env=_env(enforce=None),
+    )
+    assert with_one == with_unset
+    assert with_unset["valid"] is True
+
+
+def test_go_rejects_without_trust_root_when_unset() -> None:
+    dsse_dir = REPO_ROOT / "core" / "crypto" / "dsse"
+    proc = subprocess.run(
+        ["go", "run", "./cmd/dsse-verify", str(ENVELOPE)],
+        cwd=dsse_dir,
+        env=_env(enforce=None, trust_root=False),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # CLI prints JSON then exits non-zero on invalid.
+    assert proc.stdout.strip(), (proc.stdout, proc.stderr)
+    result = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert result["valid"] is False, result
+    reason = (result.get("reason") or "").lower()
+    assert "trust" in reason, result
+    assert proc.returncode != 0
+
+
 if __name__ == "__main__":
     test_go_dsse_verify()
     test_rust_dsse_verify()
     test_typescript_dsse_verify()
     test_cross_lang_outputs_match()
+    test_unset_enforce_matches_explicit_one()
+    test_go_rejects_without_trust_root_when_unset()
     print("cross-lang DSSE tests passed")
