@@ -9,13 +9,11 @@ use (
 	./core/evidence
 	./core/policy-kernel
 	./core/sdk/go
-	./marketplace/api
 	./runtime/admission-controller
 	./runtime/retrieval-gateway
 	./services/api-gateway
 	./services/build-orchestrator
 	./services/evidence-service
-	./services/policy-diff-service
 	./services/proof-service
 	./services/replay-service
 	./services/spec-service
@@ -23,7 +21,6 @@ use (
 	./tools/explain-state-repl
 	./tools/metering
 	./tools/pcs-validate
-	./tools/pr-bot
 	./tools/privacy
 	./tools/specgraph
 )

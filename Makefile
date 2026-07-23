@@ -1,22 +1,13 @@
-# Developer convenience: bring up full stack locally
-.PHONY: dev-up
-dev-up:
-	@echo "Starting platform services via docker compose..."
-	docker compose up -d --build
-	@echo "API Gateway: http://localhost:8000"
-	@echo "Spec Service: http://localhost:8001"
-	@echo "Replay Service: http://localhost:8005"
-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test test-windows go-work clean demo-up demo-down demo-setup install dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs
+.PHONY: help build test test-windows go-work clean demo-up demo-down demo-setup install install-dev install-minimal install-standard install-full dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs platform-up platform-up-build ledger-up enforcement-up full-up compose-smoke check-wiring
 
 include scripts/proto.mk
 
 # ---------- Cross-platform helpers ----------
-# Seconds to wait after starting containers (override with: make demo-up WAIT=10)
-WAIT ?= 30
+# Health-wait timeout for compose --wait (override with: make platform-up WAIT=120)
+WAIT ?= 180
 
 ifeq ($(OS),Windows_NT)
 SLEEP        = powershell -NoProfile -Command "Start-Sleep -Seconds"
@@ -40,22 +31,31 @@ PF ?= go -C core/cli/pf run .
 help:
 	@$(ECHOOK) "SentinelOps Platform - Available Commands:"
 	@$(ECHOOK) ""
-	@$(ECHOOK) "Development:"
-	@$(ECHOOK) "  make dev             - Start development environment"
+	@$(ECHOOK) "Development (see docs/dev/local-workflows.md):"
+	@$(ECHOOK) "  make platform-up     - Default profile (platform + sidecar), health-wait"
+	@$(ECHOOK) "  make ledger-up       - Platform + ledger (:4000), PROFILE=dev"
+	@$(ECHOOK) "  make enforcement-up  - Platform + egress-firewall"
+	@$(ECHOOK) "  make full-up         - Full profile (console, demos, monitoring)"
+	@$(ECHOOK) "  make platform-up-build - platform-up with --build"
+	@$(ECHOOK) "  make compose-smoke   - Compose profile smoke (scripts/docker-compose-smoke.sh)"
+	@$(ECHOOK) "  make check-wiring    - Assert local ports/URLs match code defaults"
+	@$(ECHOOK) "  make dev             - Alias for platform-up (no Console UI)"
 	@$(ECHOOK) "  make build           - Build all services"
 	@$(ECHOOK) "  make test            - Run all tests"
 	@$(ECHOOK) "  make clean           - Clean build artifacts"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Demo:"
-	@$(ECHOOK) "  make demo-up         - Start complete demo environment"
+	@$(ECHOOK) "  make demo-up         - Full profile + demo setup (heavy)"
 	@$(ECHOOK) "  make demo-down       - Stop demo environment"
 	@$(ECHOOK) "  make demo-setup      - Setup demo data and policies"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Platform:"
 	@$(ECHOOK) "  make install         - Install platform locally (full mode)"
+	@$(ECHOOK) "  make install-dev     - Path-aware install (SCOPE=auto|go|node|python|rust|all)"
 	@$(ECHOOK) "  make install-minimal - CLI + bundles only (Go required)"
 	@$(ECHOOK) "  make install-standard - CLI + Rust workspace"
 	@$(ECHOOK) "  make install-full    - Full install (all Python/Node deps)"
+	@$(ECHOOK) "  make go-work         - Init local go.work from go.work.example"
 	@$(ECHOOK) "  make validate-certs  - Validate all CERT-V1 certificates"
 	@$(ECHOOK) "  make submodules      - Init/update external standards submodules"
 	@$(ECHOOK) "  make standards-pin-check - Verify submodule tags match versions.json"
@@ -87,17 +87,46 @@ evidence-verify: dev-standards
 	bash testbed/evidence-v0.2/run_deep_replay.sh
 	@$(ECHOOK) "Evidence verification passed"
 
-# ---------- Development ----------
-dev:
-	@$(ECHOOK) "🚀 Starting SentinelOps Platform development environment..."
-	$(DC) up --build -d postgres redis
-	@$(ECHOOK) "⏳ Waiting for databases to be ready..."
-	@$(SLEEP) 10
-	@$(ECHOOK) "🔧 Starting platform services..."
-	$(DC) up --build api-gateway spec-service proof-service build-orchestrator evidence-service replay-service runtime-sidecar
-	@$(ECHOOK) "✅ Development environment ready!"
-	@$(ECHOOK) "🌐 Console UI: http://localhost:3000"
-	@$(ECHOOK) "🔗 API Gateway: http://localhost:8000"
+# ---------- Local compose launch (Wave E1) ----------
+# Warm paths omit --build; use platform-up-build / * -build when images must rebuild.
+# Health-wait via docker compose --wait (no fixed sleep).
+
+platform-up:
+	@$(ECHOOK) "Starting default profile (platform + sidecar)..."
+	$(DC) up -d --wait --timeout $(WAIT)
+	@$(ECHOOK) "Ready. API Gateway: http://localhost:8000  Sidecar: http://localhost:8006"
+	@$(ECHOOK) "Console UI is not in the default profile - use make full-up"
+	@$(ECHOOK) "See docs/dev/local-workflows.md"
+
+platform-up-build:
+	@$(ECHOOK) "Starting default profile with --build..."
+	$(DC) up -d --build --wait --timeout $(WAIT)
+	@$(ECHOOK) "Ready. API Gateway: http://localhost:8000  Sidecar: http://localhost:8006"
+
+ledger-up:
+	@$(ECHOOK) "Starting ledger profile (platform + ledger @ :4000, PROFILE=dev)..."
+	$(DC) --profile ledger up -d --wait --timeout $(WAIT)
+	@$(ECHOOK) "Ready. Ledger GraphQL/health: http://localhost:4000"
+	@$(ECHOOK) "Sidecar: http://localhost:8006"
+
+enforcement-up:
+	@$(ECHOOK) "Starting enforcement profile (platform + egress-firewall)..."
+	$(DC) --profile enforcement up -d --wait --timeout $(WAIT)
+	@$(ECHOOK) "Ready. Egress firewall: http://localhost:8081"
+
+full-up:
+	@$(ECHOOK) "Starting full profile (console, demos, monitoring, ledger, enforcement)..."
+	$(DC) --profile full up -d --wait --timeout $(WAIT)
+	@$(ECHOOK) "Ready. Console: http://localhost:3000  Ledger: http://localhost:4000  API: http://localhost:8000"
+
+compose-smoke:
+	bash scripts/docker-compose-smoke.sh $(or $(PROFILE),full)
+
+check-wiring:
+	python scripts/check_wiring.py
+
+# Alias: default platform only (no Console). Prefer platform-up / ledger-up / full-up.
+dev: platform-up
 
 # ---------- Build / Test ----------
 build:
@@ -249,14 +278,15 @@ test-windows:
 	cargo test --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher --exclude labeler --exclude tool-broker
 	@$(ECHOOK) "✅ Windows smoke complete — run full gates in WSL: make evidence-verify"
 
+# Go workspace: prefer scripts/go-work-init.sh (also used by install-dev).
 go-work:
 	@$(ECHOOK) "Creating go.work from go.work.example..."
 ifeq ($(OS),Windows_NT)
-	powershell -NoProfile -Command "Copy-Item -Force go.work.example go.work"
+	bash scripts/go-work-init.sh --force || powershell -NoProfile -Command "Copy-Item -Force go.work.example go.work"
 else
-	cp go.work.example go.work
+	bash scripts/go-work-init.sh --force
 endif
-	@$(ECHOOK) "✅ go.work ready (gitignored). Run: go work sync"
+	@$(ECHOOK) "✅ go.work ready (gitignored). Optional: go work sync"
 
 clean:
 	@$(ECHOOK) "🧹 Cleaning build artifacts..."
@@ -267,40 +297,19 @@ clean:
 
 # ---------- Demo ----------
 demo-up:
-	@$(ECHOOK) "🎬 Starting SentinelOps Platform Demo..."
-	@$(ECHOOK) "📋 This will start the complete platform with the Verifiable MCP Fraud demo"
-	# Default profile = platform + sidecar. Avoid compose "full" here: it also
-	# pulls enforcement (egress-firewall) whose image currently cannot build.
-	$(DC) up --build -d
-	@$(ECHOOK) "⏳ Waiting for API gateway health (up to $(WAIT)s)..."
-	@ok=0; i=0; \
-	while [ $$i -lt $(WAIT) ]; do \
-	  if curl -sf http://localhost:8000/health >/dev/null 2>&1; then ok=1; break; fi; \
-	  i=$$((i+1)); sleep 1; \
-	done; \
-	if [ $$ok -ne 1 ]; then \
-	  echo "API gateway /health not ready after $(WAIT)s"; \
-	  $(DC) ps || true; \
-	  exit 1; \
-	fi
-	@$(ECHOOK) "🎯 Setting up demo data..."
+	@$(ECHOOK) "Starting full demo stack (compose profile full + demo setup)..."
+	@$(ECHOOK) "For lighter loops prefer: make platform-up | ledger-up (docs/dev/local-workflows.md)"
+	$(DC) --profile full up -d --build --wait --timeout $(WAIT)
+	@$(ECHOOK) "Setting up demo data..."
 	$(MAKE) demo-setup
 	@$(ECHOOK) ""
-	@$(ECHOOK) "✅ Demo environment ready!"
-	@$(ECHOOK) ""
-	@$(ECHOOK) "🌐 Access Points:"
+	@$(ECHOOK) "Demo environment ready!"
 	@$(ECHOOK) "  Console UI:     http://localhost:3000"
 	@$(ECHOOK) "  API Gateway:    http://localhost:8000"
-	@$(ECHOOK) "  Grafana:        http://localhost:3002 (admin/admin)"
+	@$(ECHOOK) "  Ledger:         http://localhost:4000"
+	@$(ECHOOK) "  Sidecar:        http://localhost:8006"
+	@$(ECHOOK) "  Grafana:        http://localhost:3003 (admin/admin)"
 	@$(ECHOOK) "  Demo App:       http://localhost:3001"
-	@$(ECHOOK) ""
-	@$(ECHOOK) "🎯 Demo Flow:"
-	@$(ECHOOK) "  1. Open Console UI and go to Policies tab"
-	@$(ECHOOK) "  2. See the fraud detection policy compiled and deployed"
-	@$(ECHOOK) "  3. Go to Runtime tab to monitor live metrics"
-	@$(ECHOOK) "  4. Go to Evidence tab to see CERT-V1 certificates"
-	@$(ECHOOK) "  5. Run replays to verify 99.9%+ low-view equality"
-	@$(ECHOOK) "  6. Download compliance packets"
 
 demo-down:
 	@$(ECHOOK) "🛑 Stopping demo environment..."
@@ -321,6 +330,14 @@ demo-run:
 
 # ---------- Platform ----------
 install: install-full
+
+# Path-aware install (Wave E4). Prefer SCOPE= over LANG= (LANG overrides locale).
+# Examples: make install-dev | make install-dev SCOPE=node | make install-dev SCOPE=go,python
+SCOPE ?= auto
+install-dev:
+	@$(ECHOOK) "Installing path-aware dev deps (SCOPE=$(SCOPE))..."
+	bash scripts/install-dev.sh --scope=$(SCOPE)
+	@$(ECHOOK) "install-dev completed (use SCOPE=all for full bootstrap)"
 
 install-minimal:
 	@$(ECHOOK) "Installing (minimal: CLI + bundles only)..."
@@ -514,19 +531,13 @@ logs:
 
 rebuild:
 	$(DC) build --no-cache
-	$(MAKE) demo-up
+	$(MAKE) platform-up-build
 
-quick-start: build demo-up
+quick-start: platform-up
 	@$(ECHOOK) ""
-	@$(ECHOOK) "🎉 SentinelOps Platform is ready!"
-	@$(ECHOOK) ""
-	@$(ECHOOK) "👨‍💻 For Developers:"
-	@$(ECHOOK) "  Write policy in English → see ActionDSL preview → compile → proof run → deploy"
-	@$(ECHOOK) ""
-	@$(ECHOOK) "🛡️  For Security/Compliance:"
-	@$(ECHOOK) "  Browse certificates → filter by policy/tenant → export compliance packet"
-	@$(ECHOOK) ""
-	@$(ECHOOK) "⚙️  For SRE/Platform:"
-	@$(ECHOOK) "  Monitor SLOs → check cert validation → roll back epochs → fetch artifacts"
+	@$(ECHOOK) "Platform (default profile) is ready."
+	@$(ECHOOK) "  API Gateway: http://localhost:8000"
+	@$(ECHOOK) "  Sidecar:     http://localhost:8006"
+	@$(ECHOOK) "Next: make ledger-up | make full-up | see docs/dev/local-workflows.md"
 
 # ci: path-filter trigger for evidence smoke merge gate (docs-only PR #143)

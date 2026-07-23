@@ -6,9 +6,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm install --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 COPY . .
+# Leave REACT_APP_API_BASE_URL unset so the SPA uses same-origin (nginx → api-gateway).
 RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 FROM nginx:alpine

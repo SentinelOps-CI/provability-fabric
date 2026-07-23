@@ -186,6 +186,15 @@ prisma/migrations/
 /workspaces/
 bench/swebench/workspaces/
 
+# Built Go service binaries (never commit)
+/services/api-gateway/api-gateway
+/services/build-orchestrator/build-orchestrator
+/services/evidence-service/evidence-service
+/services/proof-service/proof-service
+/services/replay-service/replay-service
+/services/spec-service/spec-service
+/services/policy-diff-service/policy-diff-service
+
 # Specific to this project
 malicious_adapter_test.log
 privacy_burn_down.log
@@ -279,5 +288,12 @@ docs/updates.dry-run.md
 artifacts/updates-package/
 reports/dr/
 runtime/admission-controller/revocation/revocations.synced.json
+runtime/admission-controller/revocation/live-sync-report.json
 .mlc-tmp/
 
+
+# Local cleanup / backups
+.gap-closure-backup/
+
+# Local criterion / markdown-link-check scratch
+criterion/baselines/local/

@@ -105,10 +105,10 @@ if [ "$INSTALL_MODE" = "full" ]; then
         fi
     done
 
-    if [ "$NODE_AVAILABLE" = true ] && [ -f "marketplace/ui/package.json" ]; then
-        echo "Installing Node.js dependencies..."
-        cd marketplace/ui && npm install && cd ../..
-        echo "Installed UI dependencies"
+    if [ "$NODE_AVAILABLE" = true ] && [ -f "console/package.json" ]; then
+        echo "Installing console Node.js dependencies..."
+        cd console && npm install --no-audit --no-fund && cd ..
+        echo "Installed console dependencies"
     fi
 fi
 
