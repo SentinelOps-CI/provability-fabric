@@ -58,6 +58,8 @@ export class JCSValidator {
   private logger: winston.Logger;
   private schemaCache: Map<string, SchemaDefinition> = new Map();
   private validationCache: Map<string, ValidationResult> = new Map();
+  private cacheHits = 0;
+  private cacheMisses = 0;
 
   constructor(logger: winston.Logger) {
     this.logger = logger;
@@ -73,6 +75,14 @@ export class JCSValidator {
     options: ValidationOptions = {}
   ): ValidationResult {
     try {
+      const cacheKey = this.generateCacheKey(input, schema);
+      const cached = this.validationCache.get(cacheKey);
+      if (cached) {
+        this.cacheHits += 1;
+        return cached;
+      }
+      this.cacheMisses += 1;
+
       const errors: string[] = [];
       const warnings: string[] = [];
 
@@ -148,8 +158,6 @@ export class JCSValidator {
         schemaDigest
       };
 
-      // Cache result for performance
-      const cacheKey = this.generateCacheKey(input, schema);
       this.validationCache.set(cacheKey, result);
 
       this.logger.debug('MCP: JCS validation completed', {
@@ -547,16 +555,21 @@ export class JCSValidator {
     schemaCount: number;
     cacheSize: number;
     cacheHitRate: number;
+    cacheHits: number;
+    cacheMisses: number;
   } {
+    const lookups = this.cacheHits + this.cacheMisses;
     return {
       schemaCount: this.schemaCache.size,
       cacheSize: this.validationCache.size,
-      cacheHitRate: 0 // TODO: Implement hit rate tracking
+      cacheHitRate: lookups === 0 ? 0 : this.cacheHits / lookups,
+      cacheHits: this.cacheHits,
+      cacheMisses: this.cacheMisses,
     };
   }
 
   /**
-   * Clear validation cache
+   * Clear validation cache (hit/miss counters are retained for lifetime rate).
    */
   public clearCache(): void {
     this.validationCache.clear();

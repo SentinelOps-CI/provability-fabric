@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
+//
+// LOCAL DEMO ONLY — not a production server.
+// Prefer `npm run dev` / compose ledger (PROFILE=dev). See docs/dev/local-workflows.md.
 
 import express from 'express'
 import cors from 'cors'
@@ -8,27 +11,39 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { wsServer } from './websocket-server.js'
 
+if (process.env.NODE_ENV === 'production') {
+  console.error(
+    'minimal-server.js is a local demo harness and refuses NODE_ENV=production. ' +
+      'Use the full ledger (`npm run dev` / `npm run dev:production`) or compose.'
+  )
+  process.exit(1)
+}
+
 const app = express()
 const port = process.env.PORT || 8080
-const JWT_SECRET = process.env.JWT_SECRET || 'provability-fabric-dev-secret-2025'
+// Demo JWT signing material — never a real secret. Override locally if needed.
+const JWT_SECRET = process.env.JWT_SECRET || 'DEMO-ONLY-not-a-real-secret'
 
-// Mock user database (in production, use a real database)
+// In-memory demo users. Password for both accounts is the literal string "password"
+// (well-known bcrypt fixture). Do not treat as production credentials.
+const DEMO_PASSWORD_HASH =
+  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
 const users = new Map()
 users.set('admin@provability-fabric.org', {
   id: 'admin-001',
   email: 'admin@provability-fabric.org',
-  passwordHash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+  passwordHash: DEMO_PASSWORD_HASH,
   role: 'admin',
   name: 'System Administrator',
-  createdAt: new Date('2025-01-01')
+  createdAt: new Date('2025-01-01'),
 })
 users.set('developer@provability-fabric.org', {
   id: 'dev-001',
   email: 'developer@provability-fabric.org',
-  passwordHash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+  passwordHash: DEMO_PASSWORD_HASH,
   role: 'developer',
   name: 'Developer User',
-  createdAt: new Date('2025-01-15')
+  createdAt: new Date('2025-01-15'),
 })
 
 // Security middleware
@@ -121,9 +136,11 @@ const authenticateToken = (req, res, next) => {
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Welcome to Provability-Fabric Ledger API',
-    version: '1.0.0',
+  res.json({
+    message: 'Provability-Fabric Ledger (local demo harness)',
+    demo: true,
+    warning: 'Non-production. Demo accounts use the literal password "password".',
+    version: '1.0.0-demo',
     timestamp: new Date().toISOString(),
     features: ['REST API', 'GraphQL', 'WebSocket Real-time', 'Authentication'],
     endpoints: {
@@ -132,13 +149,13 @@ app.get('/', (req, res) => {
       auth: {
         login: 'POST /auth/login',
         register: 'POST /auth/register',
-        profile: 'GET /auth/profile'
+        profile: 'GET /auth/profile',
       },
       graphql: '/graphql',
       websocket: 'ws://localhost:8081',
       capsules: '/tenant/:tid/capsules',
-      quotes: '/tenant/:tid/quote/:hash'
-    }
+      quotes: '/tenant/:tid/quote/:hash',
+    },
   })
 })
 
@@ -511,14 +528,13 @@ app.get('/install/:installId', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Provability-Fabric Ledger running on port ${port}`)
-  console.log(`📊 Health check: http://localhost:${port}/health`)
-  console.log(`🔍 GraphQL: http://localhost:${port}/graphql`)
-  console.log(`📡 API Status: http://localhost:${port}/api/status`)
-  console.log(`🔐 Authentication: http://localhost:${port}/auth/login`)
-  console.log(`👤 Mock tenant: http://localhost:${port}/tenant/dev-tenant/capsules`)
-  
-  // Initialize WebSocket server
+  console.log(`[demo] minimal-server listening on port ${port}`)
+  console.log(`[demo] Health: http://localhost:${port}/health`)
+  console.log(`[demo] Auth login: http://localhost:${port}/auth/login`)
+  console.log(
+    '[demo] Seeded users use the literal password "password" — not production credentials.'
+  )
+
   wsServer.initialize()
-  console.log(`📡 Real-time features activated`)
+  console.log('[demo] WebSocket server initialized')
 }) 

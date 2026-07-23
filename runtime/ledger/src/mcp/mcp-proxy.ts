@@ -6,20 +6,38 @@
  * Provides policy enforcement and audit logging for MCP requests
  */
 
+import http from 'http';
+import https from 'https';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import winston from 'winston';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { ToolSignatureManager } from './tool-signature-manager.js';
 import { CertificateManager } from './certificate-manager.js';
 import { EgressProfileManager } from './egress-profile-manager.js';
 import { JCSValidator } from './jcs-validator.js';
+import { SlidingWindowRateLimiter } from './sliding-window-rate-limiter.js';
 import type {
   JsonRpcRequest,
   PolicyEnforcementResult,
   McpProxyStats,
 } from './types.js';
 import type { McpAuthenticatedRequest } from '../types/express-mcp.js';
+
+/** Compose-aligned sidecar / policy-kernel default (see docs/dev/local-workflows.md). */
+export const DEFAULT_SIDECAR_URL = 'http://localhost:8006';
+
+const sidecarHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+const sidecarHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 64 });
+
+function isProductionProfile(): boolean {
+  const profile = (
+    process.env.PF_PROFILE ||
+    process.env.PROFILE ||
+    ''
+  ).toLowerCase();
+  return profile === 'production';
+}
 
 interface McpRequest {
   method: string;
@@ -28,27 +46,56 @@ interface McpRequest {
   jsonrpc?: string;
 }
 
+/** Per-method rate limits: request count and window length in seconds. */
+const MCP_RATE_LIMITS: Record<string, { requests: number; window: number }> = {
+  'tools/call': { requests: 100, window: 60 },
+  'tools/list': { requests: 10, window: 60 },
+  'resources/read': { requests: 50, window: 60 },
+  default: { requests: 20, window: 60 },
+};
+
 export class McpProxy {
   private prisma: PrismaClient;
   private logger: winston.Logger;
   private sidecarUrl: string;
+  private http: AxiosInstance;
+  private failClosed: boolean;
   private toolSignatureManager: ToolSignatureManager;
   private certificateManager: CertificateManager;
   private egressProfileManager: EgressProfileManager;
   private jcsValidator: JCSValidator;
+  /**
+   * Single-node in-memory limiter keyed by `tenant:method`.
+   * Not shared across replicas — Redis (or similar) is required for multi-instance.
+   */
+  private rateLimiter: SlidingWindowRateLimiter;
+  private totalRequests = 0;
+  private blockedRequests = 0;
+  private latencySumMs = 0;
+  private latencySamples = 0;
 
   constructor(
     prisma: PrismaClient, 
     logger: winston.Logger,
-    sidecarUrl: string = 'http://localhost:8081'
+    sidecarUrl: string = DEFAULT_SIDECAR_URL,
+    rateLimiter?: SlidingWindowRateLimiter,
+    options?: { failClosed?: boolean }
   ) {
     this.prisma = prisma;
     this.logger = logger;
     this.sidecarUrl = sidecarUrl;
+    this.failClosed = options?.failClosed ?? isProductionProfile();
+    this.http = axios.create({
+      timeout: 5000,
+      httpAgent: sidecarHttpAgent,
+      httpsAgent: sidecarHttpsAgent,
+      headers: { 'Content-Type': 'application/json' },
+    });
     this.toolSignatureManager = new ToolSignatureManager(logger);
     this.certificateManager = new CertificateManager(logger);
     this.egressProfileManager = new EgressProfileManager(logger);
     this.jcsValidator = new JCSValidator(logger);
+    this.rateLimiter = rateLimiter ?? new SlidingWindowRateLimiter();
   }
 
   /**
@@ -56,6 +103,11 @@ export class McpProxy {
    */
   middleware() {
     return async (req: Request, res: Response, next: NextFunction) => {
+      const startedAt = Date.now();
+      const finish = (blocked: boolean): void => {
+        this.recordRequestStats(Date.now() - startedAt, blocked);
+      };
+
       try {
         const mcpReq = req as McpAuthenticatedRequest;
         // Parse tenant from JWT (set by auth middleware) — canonical field is tid
@@ -76,6 +128,7 @@ export class McpProxy {
             tenantId
           });
 
+          finish(true);
           return res.status(400).json({
             jsonrpc: '2.0',
             error: {
@@ -106,6 +159,7 @@ export class McpProxy {
               violations: rlsValidation.violations
             });
 
+            finish(true);
             return res.status(403).json({
               jsonrpc: '2.0',
               error: {
@@ -162,6 +216,7 @@ export class McpProxy {
             userId
           });
 
+          finish(true);
           return res.status(403).json({
             jsonrpc: '2.0',
             error: {
@@ -205,6 +260,7 @@ export class McpProxy {
           decisionId
         };
 
+        finish(false);
         next();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -214,6 +270,7 @@ export class McpProxy {
           stack: errorStack
         });
 
+        finish(true);
         res.status(500).json({
           jsonrpc: '2.0',
           error: {
@@ -408,36 +465,60 @@ export class McpProxy {
   }
 
   /**
-   * Check rate limits for MCP methods
+   * Check rate limits for MCP methods using an in-memory sliding window
+   * keyed by `tenant:method`. Single-node only (see SlidingWindowRateLimiter).
    */
   private async checkRateLimit(
     method: string, 
     tenantId?: string, 
     userId?: string
   ): Promise<PolicyEnforcementResult> {
-    // Simple in-memory rate limiting (use Redis for production)
-    const key = `mcp_rate_limit:${tenantId || 'anonymous'}:${method}`;
-    
-    // Rate limits per method type
-    const rateLimits: Record<string, { requests: number; window: number }> = {
-      'tools/call': { requests: 100, window: 60 }, // 100 requests per minute
-      'tools/list': { requests: 10, window: 60 },  // 10 requests per minute
-      'resources/read': { requests: 50, window: 60 }, // 50 requests per minute
-      'default': { requests: 20, window: 60 } // Default limit
-    };
-
-    const limit = rateLimits[method] || rateLimits.default;
-    
-    // TODO: Implement proper rate limiting with sliding window
-    // For now, just log and allow
-    this.logger.debug('MCP: Rate limit check', {
-      method,
-      limit,
-      tenantId,
-      userId
+    const tenant = tenantId || 'anonymous';
+    const key = `${tenant}:${method}`;
+    const limit = MCP_RATE_LIMITS[method] || MCP_RATE_LIMITS.default;
+    const allowed = this.rateLimiter.tryAcquire(key, {
+      requests: limit.requests,
+      windowMs: limit.window * 1000,
     });
 
+    this.logger.debug('MCP: Rate limit check', {
+      method,
+      key,
+      limit,
+      allowed,
+      tenantId,
+      userId,
+    });
+
+    if (!allowed) {
+      return {
+        allowed: false,
+        reason: 'Rate limit exceeded',
+        violatedConstraints: ['rate_limit'],
+      };
+    }
+
     return { allowed: true };
+  }
+
+  /**
+   * Public entry for rate-limit checks (tests / metrics introspection).
+   */
+  async evaluateRateLimit(
+    method: string,
+    tenantId?: string,
+    userId?: string
+  ): Promise<PolicyEnforcementResult> {
+    return this.checkRateLimit(method, tenantId, userId);
+  }
+
+  private recordRequestStats(latencyMs: number, blocked: boolean): void {
+    this.totalRequests += 1;
+    if (blocked) {
+      this.blockedRequests += 1;
+    }
+    this.latencySumMs += Math.max(0, latencyMs);
+    this.latencySamples += 1;
   }
 
   /**
@@ -575,17 +656,15 @@ export class McpProxy {
     tenantId?: string
   ): Promise<PolicyEnforcementResult> {
     try {
-      // Send request to sidecar for advanced constraint checking
-      const sidecarResponse = await axios.post(`${this.sidecarUrl}/check-constraints`, {
-        mcpRequest: request,
-        tenantId,
-        timestamp: new Date().toISOString()
-      }, {
-        timeout: 5000,
-        headers: {
-          'Content-Type': 'application/json'
+      // Keep-alive axios agent reuses TCP to the co-located sidecar (compose network).
+      const sidecarResponse = await this.http.post(
+        `${this.sidecarUrl}/check-constraints`,
+        {
+          mcpRequest: request,
+          tenantId,
+          timestamp: new Date().toISOString(),
         }
-      });
+      );
 
       const { allowed, violations } = sidecarResponse.data;
       
@@ -600,13 +679,26 @@ export class McpProxy {
       return { allowed: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn('MCP: Sidecar constraint check failed, allowing request', {
+
+      if (this.failClosed) {
+        this.logger.error('MCP: Sidecar constraint check failed (fail-closed)', {
+          error: errorMessage,
+          method: request.method,
+          tenantId,
+          sidecarUrl: this.sidecarUrl,
+        });
+        return {
+          allowed: false,
+          reason: `Sidecar unavailable (fail-closed): ${errorMessage}`,
+          violatedConstraints: ['sidecar_unreachable'],
+        };
+      }
+
+      this.logger.warn('MCP: Sidecar constraint check failed, allowing request (non-production)', {
         error: errorMessage,
         method: request.method,
-        tenantId
+        tenantId,
       });
-
-      // Fail open for sidecar connectivity issues (configurable)
       return { allowed: true };
     }
   }
@@ -645,29 +737,29 @@ export class McpProxy {
    * Get proxy statistics for monitoring
    */
   async getStats(tenantId?: string): Promise<McpProxyStats> {
-    // Clean up expired entries
-    this.toolSignatureManager.cleanupExpiredEntries();
-    this.certificateManager.cleanupExpiredEntries();
-    this.egressProfileManager.cleanupOldExplanations();
-    this.jcsValidator.clearCache();
-    
-    // Get component stats
+    // Snapshot component stats before cleanup so hit-rate remains meaningful
     const toolStats = this.toolSignatureManager.getCacheStats();
     const certStats = this.certificateManager.getStats();
     const egressStats = this.egressProfileManager.getStats();
     const jcsStats = this.jcsValidator.getStats();
-    
-    // Return proxy statistics for monitoring dashboard
+
+    this.toolSignatureManager.cleanupExpiredEntries();
+    this.certificateManager.cleanupExpiredEntries();
+    this.egressProfileManager.cleanupOldExplanations();
+
+    const averageResponseTime =
+      this.latencySamples === 0 ? 0 : this.latencySumMs / this.latencySamples;
+
     return {
-      totalRequests: 0, // TODO: Implement counters
-      blockedRequests: 0,
-      averageResponseTime: 0,
+      totalRequests: this.totalRequests,
+      blockedRequests: this.blockedRequests,
+      averageResponseTime,
       tenantId,
       timestamp: new Date().toISOString(),
       toolSignatureManager: toolStats,
       certificateManager: certStats,
       egressProfileManager: egressStats,
-      jcsValidator: jcsStats
+      jcsValidator: jcsStats,
     };
   }
 }

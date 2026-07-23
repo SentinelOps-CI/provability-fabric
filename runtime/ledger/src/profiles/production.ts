@@ -42,7 +42,7 @@ export async function startProductionProfile(): Promise<void> {
       version: '1.0.0',
       description: 'Model Context Protocol integration for Provability-Fabric',
       enableWebSocket: true,
-      sidecarUrl: process.env.SIDECAR_URL || 'http://localhost:8081',
+      sidecarUrl: process.env.SIDECAR_URL || 'http://localhost:8006',
       enableMultiTenant: true,
     },
     prisma,
