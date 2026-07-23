@@ -8,6 +8,13 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/go-redis/redis/v8"
+)
+
+const (
+	redisDecisionPrefix = "pf:policy-kernel:decision:"
+	redisPolicyPrefix   = "pf:policy-kernel:policy:"
 )
 
 // CacheKey represents the unique identifier for cached decisions
@@ -27,6 +34,7 @@ func (ck CacheKey) String() string {
 // CachedDecision represents a cached decision with metadata
 type CachedDecision struct {
 	Decision    Decision  `json:"decision"`
+	Key         CacheKey  `json:"key"`
 	ExpiresAt   time.Time `json:"expires_at"`
 	AccessCount int64     `json:"access_count"`
 	LastAccess  time.Time `json:"last_access"`
@@ -50,13 +58,15 @@ type DecisionCache struct {
 	keyToFreq   map[string]int64 // key -> frequency mapping
 	maxSize     int
 	ttl         time.Duration
-	redisClient interface{} // Will be properly typed when Redis is available
+	redisClient *redis.Client
 	stats       CacheStats
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
 
-// NewDecisionCache creates a new decision cache instance
+// NewDecisionCache creates a new decision cache instance.
+// When redisAddr is non-empty, an L2 Redis client is dialed (Ping required).
+// Connection failure falls back to in-memory-only caching.
 func NewDecisionCache(maxSize int, ttl time.Duration, redisAddr string) *DecisionCache {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -70,65 +80,64 @@ func NewDecisionCache(maxSize int, ttl time.Duration, redisAddr string) *Decisio
 		cancel:      cancel,
 	}
 
-	// Initialize Redis client if address is provided
 	if redisAddr != "" {
-		// Redis client not initialized; configure when Redis dependency is available
-		// cache.redisClient = redis.NewClient(&redis.Options{
-		//     Addr:     redisAddr,
-		//     Password: "",
-		//     DB:       0,
-		// })
-
-		// Start background cleanup and Redis sync
-		go cache.backgroundCleanup()
-		go cache.redisSync()
+		client := redis.NewClient(&redis.Options{
+			Addr:     redisAddr,
+			Password: "",
+			DB:       0,
+		})
+		pingCtx, pingCancel := context.WithTimeout(ctx, 2*time.Second)
+		err := client.Ping(pingCtx).Err()
+		pingCancel()
+		if err != nil {
+			_ = client.Close()
+		} else {
+			cache.redisClient = client
+			go cache.backgroundCleanup()
+			go cache.redisSync()
+		}
 	}
 
 	return cache
+}
+
+// RedisEnabled reports whether L2 Redis is active.
+func (dc *DecisionCache) RedisEnabled() bool {
+	return dc.redisClient != nil
 }
 
 // Get retrieves a cached decision if it exists and is valid
 func (dc *DecisionCache) Get(key CacheKey) (*Decision, bool) {
 	cacheKey := key.String()
 
-	// Try in-memory cache first
 	dc.mu.RLock()
 	if cached, exists := dc.inMemory[cacheKey]; exists {
 		if time.Now().Before(cached.ExpiresAt) {
-			// Update access metrics
 			cached.AccessCount++
 			cached.LastAccess = time.Now()
-
-			// Update frequency for LFU
 			dc.updateFrequency(cacheKey, cached.AccessCount)
-
+			decision := cached.Decision
 			dc.mu.RUnlock()
-
-			// Update stats
 			dc.updateStats(true)
-
-			return &cached.Decision, true
-		} else {
-			// Expired, remove from cache
-			dc.mu.RUnlock()
-			dc.mu.Lock()
-			delete(dc.inMemory, cacheKey)
-			delete(dc.keyToFreq, cacheKey)
-			dc.mu.Unlock()
+			return &decision, true
 		}
+		dc.mu.RUnlock()
+		dc.mu.Lock()
+		delete(dc.inMemory, cacheKey)
+		delete(dc.keyToFreq, cacheKey)
+		dc.mu.Unlock()
+	} else {
+		dc.mu.RUnlock()
 	}
-	dc.mu.RUnlock()
 
-	// Try Redis if available
 	if dc.redisClient != nil {
 		if cached, exists := dc.getFromRedis(cacheKey); exists {
-			// Add back to in-memory cache
 			dc.mu.Lock()
 			dc.addToMemoryCache(cacheKey, cached)
 			dc.mu.Unlock()
-
 			dc.updateStats(true)
-			return &cached.Decision, true
+			decision := cached.Decision
+			return &decision, true
 		}
 	}
 
@@ -142,18 +151,17 @@ func (dc *DecisionCache) Set(key CacheKey, decision Decision) error {
 
 	cached := &CachedDecision{
 		Decision:    decision,
+		Key:         key,
 		ExpiresAt:   time.Now().Add(dc.ttl),
 		AccessCount: 1,
 		LastAccess:  time.Now(),
 		CreatedAt:   time.Now(),
 	}
 
-	// Add to in-memory cache
 	dc.mu.Lock()
 	dc.addToMemoryCache(cacheKey, cached)
 	dc.mu.Unlock()
 
-	// Add to Redis if available
 	if dc.redisClient != nil {
 		return dc.setToRedis(cacheKey, cached)
 	}
@@ -164,29 +172,20 @@ func (dc *DecisionCache) Set(key CacheKey, decision Decision) error {
 // InvalidateByPolicyHash removes all cached decisions for a specific policy
 func (dc *DecisionCache) InvalidateByPolicyHash(policyHash string) error {
 	dc.mu.Lock()
-	defer dc.mu.Unlock()
-
-	// Find and remove all keys with matching policy hash
 	var keysToRemove []string
-	for keyStr := range dc.inMemory {
-		// Parse the key to extract policy hash
-		if key, err := dc.parseCacheKey(keyStr); err == nil && key.PolicyHash == policyHash {
+	for keyStr, cached := range dc.inMemory {
+		if cached.Key.PolicyHash == policyHash {
 			keysToRemove = append(keysToRemove, keyStr)
 		}
 	}
-
-	// Remove from in-memory cache
 	for _, key := range keysToRemove {
 		delete(dc.inMemory, key)
 		delete(dc.keyToFreq, key)
 	}
+	dc.mu.Unlock()
 
-	// Remove from Redis if available
 	if dc.redisClient != nil {
-		// Redis deletion not implemented; client not typed
-		// for _, key := range keysToRemove {
-		//     dc.redisClient.Del(dc.ctx, key)
-		// }
+		return dc.invalidatePolicyInRedis(policyHash)
 	}
 
 	return nil
@@ -212,8 +211,7 @@ func (dc *DecisionCache) Close() error {
 	dc.cancel()
 
 	if dc.redisClient != nil {
-		// Redis close not implemented; client not typed
-		// return dc.redisClient.Close()
+		return dc.redisClient.Close()
 	}
 
 	return nil
@@ -221,7 +219,6 @@ func (dc *DecisionCache) Close() error {
 
 // addToMemoryCache adds an item to the in-memory cache with LFU eviction
 func (dc *DecisionCache) addToMemoryCache(key string, cached *CachedDecision) {
-	// If cache is full, evict least frequently used item
 	if len(dc.inMemory) >= dc.maxSize {
 		dc.evictLFU()
 	}
@@ -274,47 +271,77 @@ func (dc *DecisionCache) updateStats(hit bool) {
 	}
 }
 
+func redisDecisionKey(key string) string {
+	return redisDecisionPrefix + key
+}
+
+func redisPolicyKey(policyHash string) string {
+	return redisPolicyPrefix + policyHash
+}
+
 // getFromRedis retrieves a cached decision from Redis
 func (dc *DecisionCache) getFromRedis(key string) (*CachedDecision, bool) {
-	// Redis get not implemented; client not typed
-	// data, err := dc.redisClient.Get(dc.ctx, key).Bytes()
-	// if err != nil {
-	//     return nil, false
-	// }
-	//
-	// var cached CachedDecision
-	// if err := json.Unmarshal(data, &cached); err != nil {
-	//     return nil, false
-	// }
-	//
-	// // Check if expired
-	// if time.Now().After(cached.ExpiresAt) {
-	//     dc.redisClient.Del(dc.ctx, key)
-	//     return nil, false
-	// }
-	//
-	// return &cached, true
-	return nil, false
+	data, err := dc.redisClient.Get(dc.ctx, redisDecisionKey(key)).Bytes()
+	if err != nil {
+		return nil, false
+	}
+
+	var cached CachedDecision
+	if err := json.Unmarshal(data, &cached); err != nil {
+		return nil, false
+	}
+
+	if time.Now().After(cached.ExpiresAt) {
+		_ = dc.redisClient.Del(dc.ctx, redisDecisionKey(key)).Err()
+		if cached.Key.PolicyHash != "" {
+			_ = dc.redisClient.SRem(dc.ctx, redisPolicyKey(cached.Key.PolicyHash), key).Err()
+		}
+		return nil, false
+	}
+
+	return &cached, true
 }
 
-// setToRedis stores a cached decision in Redis
+// setToRedis stores a cached decision in Redis and indexes it by policy hash
 func (dc *DecisionCache) setToRedis(key string, cached *CachedDecision) error {
-	// Redis set not implemented; client not typed
-	// data, err := json.Marshal(cached)
-	// if err != nil {
-	//     return err
-	// }
-	//
-	// ttl := time.Until(cached.ExpiresAt)
-	// return dc.redisClient.Set(dc.ctx, key, data, ttl).Err()
-	return nil
+	data, err := json.Marshal(cached)
+	if err != nil {
+		return err
+	}
+
+	ttl := time.Until(cached.ExpiresAt)
+	if ttl <= 0 {
+		return fmt.Errorf("refusing to cache expired decision")
+	}
+
+	pipe := dc.redisClient.TxPipeline()
+	pipe.Set(dc.ctx, redisDecisionKey(key), data, ttl)
+	if cached.Key.PolicyHash != "" {
+		pkey := redisPolicyKey(cached.Key.PolicyHash)
+		pipe.SAdd(dc.ctx, pkey, key)
+		pipe.Expire(dc.ctx, pkey, ttl)
+	}
+	_, err = pipe.Exec(dc.ctx)
+	return err
 }
 
-// parseCacheKey attempts to parse a cache key string back to CacheKey struct
-func (dc *DecisionCache) parseCacheKey(keyStr string) (*CacheKey, error) {
-	// This is a simplified implementation - in practice, you might want to store
-	// the original key components separately or use a different serialization approach
-	return nil, fmt.Errorf("key parsing not implemented")
+func (dc *DecisionCache) invalidatePolicyInRedis(policyHash string) error {
+	pkey := redisPolicyKey(policyHash)
+	members, err := dc.redisClient.SMembers(dc.ctx, pkey).Result()
+	if err != nil && err != redis.Nil {
+		return err
+	}
+
+	if len(members) > 0 {
+		keys := make([]string, 0, len(members)+1)
+		for _, m := range members {
+			keys = append(keys, redisDecisionKey(m))
+		}
+		keys = append(keys, pkey)
+		return dc.redisClient.Del(dc.ctx, keys...).Err()
+	}
+
+	return dc.redisClient.Del(dc.ctx, pkey).Err()
 }
 
 // backgroundCleanup periodically removes expired items from the in-memory cache
@@ -352,7 +379,7 @@ func (dc *DecisionCache) cleanupExpired() {
 	}
 }
 
-// redisSync synchronizes the in-memory cache with Redis
+// redisSync periodically warms in-memory cache from Redis decision keys
 func (dc *DecisionCache) redisSync() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -367,7 +394,33 @@ func (dc *DecisionCache) redisSync() {
 	}
 }
 
-// syncWithRedis performs a one-way sync from Redis to in-memory cache
+// syncWithRedis performs a one-way sync from Redis to in-memory cache via SCAN
 func (dc *DecisionCache) syncWithRedis() {
-	// Redis sync not configured; implement pub/sub when Redis client is available
+	if dc.redisClient == nil {
+		return
+	}
+
+	var cursor uint64
+	for {
+		keys, next, err := dc.redisClient.Scan(dc.ctx, cursor, redisDecisionPrefix+"*", 64).Result()
+		if err != nil {
+			return
+		}
+		for _, fullKey := range keys {
+			hashKey := fullKey[len(redisDecisionPrefix):]
+			cached, ok := dc.getFromRedis(hashKey)
+			if !ok {
+				continue
+			}
+			dc.mu.Lock()
+			if _, exists := dc.inMemory[hashKey]; !exists {
+				dc.addToMemoryCache(hashKey, cached)
+			}
+			dc.mu.Unlock()
+		}
+		cursor = next
+		if cursor == 0 {
+			return
+		}
+	}
 }
