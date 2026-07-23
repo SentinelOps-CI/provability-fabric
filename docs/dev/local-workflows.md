@@ -93,7 +93,7 @@ just up full       # → make full-up
 
 ## Related
 
-- Compose profiles: root [docker-compose.yml](../../docker-compose.yml)
-- Env schema: [schemas/pf-env.schema.json](../../schemas/pf-env.schema.json)
-- Contributing overview: [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- Compose profiles: root [`docker-compose.yml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/docker-compose.yml)
+- Env schema: [`schemas/pf-env.schema.json`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/schemas/pf-env.schema.json)
+- Contributing overview: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md)
 - Dev Mode (console `/dev`): [dev-mode-e4.md](../features/dev-mode-e4.md)

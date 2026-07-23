@@ -24,7 +24,7 @@ graph TD
 ## Infrastructure Components
 
 In-repo Terraform under `ops/terraform/` was removed. CI-local DR proof is
-`scripts/dr/` plus [`.github/workflows/dr-cross.yaml`](../../.github/workflows/dr-cross.yaml)
+`scripts/dr/` plus [`dr-cross.yaml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/dr-cross.yaml)
 (moto by default; live AWS only via `workflow_dispatch`). Production multi-region
 layout remains an operator concern outside this repository.
 

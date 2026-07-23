@@ -30,7 +30,7 @@ scripts/ci_workflow_inventory.sh --markdown
 | 4 | Local check: `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards` |
 | 5 | CI check: dispatch **Evidence v0.1 smoke** or **Standards Pin Drift Check** — `make submodules` must pass |
 
-Contributor-facing steps: [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Contributor-facing steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md).
 
 | Secret / service | Notes |
 |------------------|-------|

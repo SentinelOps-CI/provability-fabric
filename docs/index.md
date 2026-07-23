@@ -7,7 +7,7 @@ Map for newcomers and operators. Prefer these entry points over digging through 
 | Audience | First page | Then |
 |----------|------------|------|
 | **New users** | [Getting started (15 min)](getting-started.md) | [Local workflows](dev/local-workflows.md) |
-| **Contributors** | [CONTRIBUTING.md](../CONTRIBUTING.md) | [Developer guide](guides/developer-guide.md) · [CI reference](reference/ci-reference.md) |
+| **Contributors** | [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md) | [Developer guide](guides/developer-guide.md) · [CI reference](reference/ci-reference.md) |
 | **Operators** | [Runbooks](runbooks/README.md) | [Deployment](guides/deployment-guide.md) |
 | **Science / lab** | [Proof-Carrying Science](pcs/README.md) | [Release checklist](pcs/release-checklist.md) |
 
@@ -73,7 +73,7 @@ Folder-level map (MkDocs, VS Code extension): [documentation-map.md](documentati
 
 ## Repository layout (product tree)
 
-See the root [README repository layout](../README.md#repository-layout) for which top-level directories remain and why. Marketing on-ramps, sample recipe stacks, LaTeX figures, and aspirational in-repo Terraform/Flux were removed in favor of `docs/`, `charts/`, `ops/` (observability only), and `scripts/dr/`.
+See the root [README repository layout](https://github.com/SentinelOps-CI/provability-fabric/blob/main/README.md#repository-layout) for which top-level directories remain and why. Marketing on-ramps, sample recipe stacks, LaTeX figures, and aspirational in-repo Terraform/Flux were removed in favor of `docs/`, `charts/`, `ops/` (observability only), and `scripts/dr/`.
 
 ## License
 

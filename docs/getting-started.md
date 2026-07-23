@@ -1,6 +1,6 @@
 # Getting started (first 15 minutes)
 
-This is the shortest path from a clean clone to a running local stack. For contribution norms, see [CONTRIBUTING.md](../CONTRIBUTING.md). For the full launch matrix, see [dev/local-workflows.md](dev/local-workflows.md).
+This is the shortest path from a clean clone to a running local stack. For contribution norms, see [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md). For the full launch matrix, see [dev/local-workflows.md](dev/local-workflows.md).
 
 ## What you get
 

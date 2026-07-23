@@ -1,6 +1,6 @@
 # Advanced Search System
 
-> **Historical marketing document.** Kept for audit trail. Live stub: [`docs/features/advanced-search.md`](../../features/advanced-search.md).
+> **Historical marketing document.** Kept for audit trail. Marketplace advanced-search UI was removed; prefer [WebSocket API](../../reference/api/websocket-api.md) for live real-time docs.
 
 Provability-Fabric includes a powerful advanced search system that provides intelligent package discovery with fuzzy matching, multi-criteria filtering, and real-time search capabilities.
 

@@ -27,7 +27,7 @@ Out of scope: Lean/mathlib wall-clock (see [lean-build.md](../dev/lean-build.md)
 1. Push a commit that touches only `docs/**` (or open a docs-only PR and compare the `changes` job outputs).
 2. In Actions, open the `CI` workflow run → confirm `ci-rust` / `ci-go-node` / `ci-extended` / Lean language jobs are **skipped**.
 3. Sum wall-clock of jobs that actually ran (typically honesty + path filter + any always-on prepare steps that still apply). Target **&lt;5 min**.
-4. Cross-check: weekly [ci-weekly-full.yml](../../.github/workflows/ci-weekly-full.yml) still exercises the full matrix on a schedule (honesty: path skip ≠ “never tested”).
+4. Cross-check: weekly [`ci-weekly-full.yml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/ci-weekly-full.yml) still exercises the full matrix on a schedule (honesty: path skip ≠ “never tested”).
 
 ```bash
 # Local approximation of the filter (no Actions):
@@ -66,7 +66,7 @@ Do **not** include `make platform-up-build` or first-time image builds in the &l
 /usr/bin/time -p make compose-smoke
 ```
 
-Scheduled CI mirror: [engineering-budget-smoke.yml](../../.github/workflows/engineering-budget-smoke.yml) times both and fails with an explicit over-budget message.
+Scheduled CI mirror: [`engineering-budget-smoke.yml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/engineering-budget-smoke.yml) times both and fails with an explicit over-budget message.
 
 ---
 

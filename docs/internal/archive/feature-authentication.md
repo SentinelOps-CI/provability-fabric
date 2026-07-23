@@ -1,6 +1,6 @@
 # Authentication & User Management
 
-> **Historical marketing document.** Kept for audit trail. Live stub: [`docs/features/authentication.md`](../../features/authentication.md). Do not use demo passwords from this page in production.
+> **Historical marketing document.** Kept for audit trail. Marketplace auth UI was removed. Do not use demo passwords from this page in production.
 
 Provability-Fabric provides a comprehensive authentication and user management system with JWT-based security, role-based access control, and seamless integration across all platform components.
 

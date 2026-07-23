@@ -1,6 +1,6 @@
 # Real-Time Communication with WebSockets
 
-> **Historical marketing document.** Kept for audit trail. Live stub: [`docs/features/real-time-communication.md`](../../features/real-time-communication.md). Prefer [WebSocket API](../../reference/api/websocket-api.md).
+> **Historical marketing document.** Kept for audit trail. Marketplace real-time marketing page was removed; prefer [WebSocket API](../../reference/api/websocket-api.md).
 
 Provability-Fabric includes a comprehensive WebSocket-based real-time communication system that provides live updates, notifications, and monitoring capabilities across the entire platform.
 

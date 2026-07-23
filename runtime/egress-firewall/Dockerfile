@@ -14,8 +14,8 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY Cargo.toml Cargo.lock ./
+# Workspace member: lockfile lives at repo root; build this crate standalone in image context.
+COPY Cargo.toml ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs

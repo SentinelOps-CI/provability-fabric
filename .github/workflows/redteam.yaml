@@ -80,8 +80,7 @@ jobs:
       - name: Build and load images
         run: |
           # Build admission controller
-          cd runtime/admission-controller
-          docker build -t provability-fabric/admission-controller:test .
+          docker build -t provability-fabric/admission-controller:test runtime/admission-controller
           kind load docker-image provability-fabric/admission-controller:test --name redteam-test
 
           # Build sidecar watcher (repo-root context for pf-dsse path dep)

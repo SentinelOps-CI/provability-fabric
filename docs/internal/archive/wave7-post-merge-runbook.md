@@ -398,4 +398,4 @@ python scripts/count_sidecar_unwraps.py --max 10
 python scripts/count_ledger_any.py --max 20
 ```
 
-Updated: [remediation-tracker.md](remediation-tracker.md), [evidence-program-closure.md](../roadmap/evidence-program-closure.md), [archive/full-repo-audit-reassessment-2026-07-03.md](archive/full-repo-audit-reassessment-2026-07-03.md).
+Updated: [remediation-tracker.md](../remediation-tracker.md), [evidence-program-closure.md](../../roadmap/evidence-program-closure.md), [full-repo-audit-reassessment-2026-07-03.md](full-repo-audit-reassessment-2026-07-03.md).

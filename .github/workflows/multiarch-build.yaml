@@ -221,7 +221,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }}
           # ignore-error: GHA cache export 400s must not fail the job after a successful
           # GHCR push (build+push is the gate; cache is best-effort).
-          cache-to: ${{ github.event_name == 'pull_request' && format('type=inline') || format('type=gha,mode=max,scope={0}-{1},ignore-error=true', matrix.service, matrix.arch) }}
+          cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || format('type=gha,mode=max,scope={0}-{1},ignore-error=true', matrix.service, matrix.arch) }}
 
       - name: Image size report
         if: github.event_name != 'pull_request'
@@ -254,6 +254,8 @@ jobs:
         env:
           SERVICE: ${{ matrix.service }}
           SHA_SHORT: ${{ github.sha }}
+          GIT_REF: ${{ github.ref }}
+          GIT_REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
@@ -266,14 +268,14 @@ jobs:
           echo "Merging ${amd} + ${arm} -> ${base}:sha-${short}"
           docker buildx imagetools create -t "${base}:sha-${short}" "${amd}" "${arm}"
 
-          if [ "${{ github.ref }}" = "refs/heads/main" ] || [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [ "${GIT_REF}" = "refs/heads/main" ] || [[ "${GIT_REF}" == refs/tags/v* ]]; then
             docker buildx imagetools create -t "${base}:latest" \
               "${base}:latest-amd64" "${base}:latest-arm64" || \
               echo "::warning::latest-* tags missing; sha manifest created only"
           fi
 
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            tag="${GITHUB_REF_NAME}"
+          if [[ "${GIT_REF}" == refs/tags/v* ]]; then
+            tag="${GIT_REF_NAME}"
             docker buildx imagetools create -t "${base}:${tag}" \
               "${base}:${tag}-amd64" "${base}:${tag}-arm64" || \
               echo "::warning::semver arch tags missing for ${tag}"
