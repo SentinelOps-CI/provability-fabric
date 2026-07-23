@@ -301,7 +301,7 @@ impl NetworkManager {
                 healthy: is_healthy,
                 rtt_us: connection.metrics.rtt_us,
                 error_count: connection.metrics.error_count,
-                last_activity: connection.last_activity,
+                last_activity_secs_ago: connection.last_activity.elapsed().as_secs(),
             });
         }
         
@@ -334,8 +334,8 @@ pub struct HealthCheck {
     pub rtt_us: u64,
     /// Error count
     pub error_count: u64,
-    /// Last activity timestamp
-    pub last_activity: std::time::Instant,
+    /// Seconds since last activity
+    pub last_activity_secs_ago: u64,
 }
 
 #[cfg(test)]

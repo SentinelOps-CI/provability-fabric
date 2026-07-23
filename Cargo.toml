@@ -1,8 +1,8 @@
-# Optional / out-of-workspace crates (build separately when deps or API are available):
-# - runtime/egress-firewall: needs native Hyperscan (libhs). Build: cargo build -p egress-firewall
+# Optional / special-build crates:
+# - runtime/egress-firewall: in workspace; CI uses --no-default-features (regex fallback).
+#   Hyperscan (libhs) is feature-gated: cargo build -p egress-firewall --features hyperscan
 # - core/sdk/rust: needs protoc. Build: cargo build -p provability-fabric-core-sdk-rust
 # - runtime/sidecar-watcher/fuzz: fuzz targets; build with cargo build -p sidecar-watcher-fuzz (e.g. on Linux)
-# - runtime/telemetry-service, runtime/mpc-fintech, runtime/jwks-manager: not in workspace; add to members above to build with cargo build --workspace
 #
 # Known dependency notes:
 # - redis: attestor/kms-proxy use redis-rs with tokio-comp (see their Cargo.toml).
@@ -18,6 +18,10 @@ members = [
     "runtime/retrieval-gateway",
     "runtime/labeler",
     "runtime/wasm-sandbox",
+    "runtime/telemetry-service",
+    "runtime/jwks-manager",
+    "runtime/mpc-fintech",
+    "runtime/egress-firewall",
     "adapters/http-get",
     "adapters/file-read",
 ]

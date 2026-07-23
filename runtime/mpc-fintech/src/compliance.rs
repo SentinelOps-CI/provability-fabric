@@ -487,7 +487,7 @@ impl ComplianceValidator {
         debug!("Validating compliance for transaction: {}", transaction.transaction_id);
         
         let mut rule_results = Vec::new();
-        let mut risk_score = 0.0;
+        let mut risk_score: f64 = 0.0;
         let mut required_actions = Vec::new();
         
         // Validate against all applicable rules

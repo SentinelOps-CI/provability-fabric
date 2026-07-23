@@ -28,8 +28,9 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 anyhow = "1.0"
 thiserror = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
 # Performance optimizations
-mimalloc = "0.1"
+mimalloc = { version = "0.1", optional = true }
 bytes = "1.0"
 dashmap = "5.0"
 parking_lot = "0.12"
@@ -43,28 +44,10 @@ cc = "1.0"
 pkg-config = "0.3"
 
 [features]
-default = ["mimalloc"]
+# Default: regex/aho-corasick fallback (no native Hyperscan). CI uses --no-default-features.
+default = ["fallback", "mimalloc"]
+# Optional: requires native libhs. Dedicated optional CI/job only.
 hyperscan = ["dep:hyperscan"]
 fallback = []
-mimalloc = ["mimalloc/override"]
+mimalloc = ["dep:mimalloc", "mimalloc/override"]
 io_uring = ["tokio/io-util"]
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-# Additional performance optimizations
-strip = true
-overflow-checks = false
-
-[profile.dev]
-opt-level = 0
-debug = true
-# Enable additional checks in development
-overflow-checks = true
-
-# Profile for performance analysis
-[profile.release.pgo]
-inherits = "release"
-profile = "release"

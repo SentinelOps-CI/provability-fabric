@@ -215,6 +215,18 @@ pub trait NearDupeDetector: Send + Sync {
     fn detect(&self, text: &str, history: &[String]) -> NearDupeResult;
     fn name(&self) -> &str;
     fn update_history(&mut self, text: String);
+    fn calculate_simhash(&self, text: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(text.as_bytes());
+        hex_encode(hasher.finalize().as_slice())
+    }
+    fn calculate_minhash(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// Policy template
@@ -344,7 +356,7 @@ impl SecretDetector for ApiKeyDetector {
         let api_key_patterns = vec![
             r"sk-[a-zA-Z0-9]{32,}",
             r"pk_[a-zA-Z0-9]{32,}",
-            r"api_key['\"]?\s*[:=]\s*['\"]?[a-zA-Z0-9]{32,}",
+            r#"api_key['"]?\s*[:=]\s*['"]?[a-zA-Z0-9]{32,}"#,
         ];
         
         let mut detected = false;
@@ -385,9 +397,9 @@ pub struct PasswordDetector;
 impl SecretDetector for PasswordDetector {
     fn detect(&self, text: &str) -> SecretsResult {
         let password_patterns = vec![
-            r"password['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
-            r"passwd['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
-            r"pwd['\"]?\s*[:=]\s*['\"]?[^\s'\"]+",
+            r#"password['"]?\s*[:=]\s*['"]?[^\s'"]+"#,
+            r#"passwd['"]?\s*[:=]\s*['"]?[^\s'"]+"#,
+            r#"pwd['"]?\s*[:=]\s*['"]?[^\s'"]+"#,
         ];
         
         let mut detected = false;
@@ -488,7 +500,7 @@ impl EnhancedDupeDetector {
         let mut minhash = vec![u64::MAX; self.minhash_permutations];
         
         for gram in grams {
-            let hash = self.hash_string(gram);
+            let hash = self.hash_string(&gram);
             for i in 0..self.minhash_permutations {
                 let permuted_hash = self.permute_hash(hash, i);
                 if permuted_hash < minhash[i] {
@@ -612,6 +624,14 @@ impl NearDupeDetector for EnhancedDupeDetector {
             self.history.remove(0);
         }
     }
+
+    fn calculate_simhash(&self, text: &str) -> String {
+        EnhancedDupeDetector::calculate_simhash(self, text)
+    }
+
+    fn calculate_minhash(&self, text: &str) -> Option<String> {
+        EnhancedDupeDetector::calculate_minhash(self, text)
+    }
 }
 
 impl EnhancedDupeDetector {
@@ -651,8 +671,8 @@ impl EntropyAnalyzer {
         }
         
         let words: Vec<&str> = text.split_whitespace().collect();
-        let word_freq: HashMap<&str, usize> = words.iter().fold(HashMap::new(), |mut acc, &&w| {
-            *acc.entry(w).or_insert(0) += 1;
+        let word_freq: HashMap<&str, usize> = words.iter().fold(HashMap::new(), |mut acc, w| {
+            *acc.entry(*w).or_insert(0) += 1;
             acc
         });
         
@@ -902,7 +922,7 @@ impl EgressFirewall {
     /// Detect PII in text
     fn detect_pii(&self, text: &str) -> PiiResult {
         let mut all_types = Vec::new();
-        let mut max_confidence = 0.0;
+        let mut max_confidence: f64 = 0.0;
         let mut any_redacted = false;
         let mut all_locations = Vec::new();
         
@@ -928,7 +948,7 @@ impl EgressFirewall {
     /// Detect secrets in text
     fn detect_secrets(&self, text: &str) -> SecretsResult {
         let mut all_types = Vec::new();
-        let mut max_confidence = 0.0;
+        let mut max_confidence: f64 = 0.0;
         let mut any_redacted = false;
         let mut all_locations = Vec::new();
         
@@ -1222,7 +1242,7 @@ impl EgressFirewall {
     fn calculate_text_hash(&self, text: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(text.as_bytes());
-        hex::encode(hasher.finalize())
+        hex_encode(hasher.finalize().as_slice())
     }
 
     /// Calculate SHA-256 hash of policy
@@ -1231,29 +1251,17 @@ impl EgressFirewall {
             .unwrap_or_else(|| panic!("No policy found for tenant: {}", tenant));
         let mut hasher = Sha256::new();
         hasher.update(format!("{:?}", policy).as_bytes());
-        hex::encode(hasher.finalize())
+        hex_encode(hasher.finalize().as_slice())
     }
 
     /// Calculate SimHash
     fn calculate_simhash(&self, text: &str) -> String {
-        // Use the enhanced detector's SimHash calculation
-        if let Some(enhanced_detector) = self.near_dupe_detector.as_any().downcast_ref::<EnhancedDupeDetector>() {
-            enhanced_detector.calculate_simhash(text)
-        } else {
-            // Fallback to basic hash
-            let mut hasher = Sha256::new();
-            hasher.update(text.as_bytes());
-            hex::encode(hasher.finalize())
-        }
+        self.near_dupe_detector.calculate_simhash(text)
     }
 
     /// Calculate MinHash
     fn calculate_minhash(&self, text: &str) -> Option<String> {
-        if let Some(enhanced_detector) = self.near_dupe_detector.as_any().downcast_ref::<EnhancedDupeDetector>() {
-            enhanced_detector.calculate_minhash(text)
-        } else {
-            None
-        }
+        self.near_dupe_detector.calculate_minhash(text)
     }
 
     /// Sign certificate
@@ -1272,7 +1280,7 @@ impl EgressFirewall {
         hasher.update(key);
         let result = hasher.finalize();
 
-        Some(hex::encode(result))
+        Some(hex_encode(result.as_slice()))
     }
 
     /// Store certificate in ledger
@@ -1376,10 +1384,12 @@ async fn main() -> std::io::Result<()> {
     // Set signing key
     firewall.set_signing_key(b"test_signing_key".to_vec());
 
+    let firewall_data = web::Data::new(firewall);
+
     // Start HTTP server
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(firewall.clone()))
+            .app_data(firewall_data.clone())
             .route("/egress", web::post().to(egress_handler))
             .route("/health", web::get().to(health_handler))
     })

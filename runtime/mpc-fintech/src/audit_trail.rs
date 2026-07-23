@@ -269,6 +269,7 @@ struct MonitoringConfig {
 }
 
 /// Compliance validator trait
+#[async_trait::async_trait]
 trait ComplianceValidator: Send + Sync {
     async fn validate(&self, transaction: &FinancialTransaction, context: &SecurityContext) -> Result<CheckResult, AuditError>;
 }

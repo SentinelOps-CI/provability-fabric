@@ -27,6 +27,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Logging
 tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # Error handling
 thiserror = "1.0"
@@ -50,13 +51,3 @@ required-features = ["benchmarking"]
 [[bin]]
 name = "mpc-fintech-demo"
 path = "src/bin/demo.rs"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-
-[profile.bench]
-opt-level = 3
-debug = true

@@ -301,13 +301,14 @@ impl PerformanceMonitor {
         checkpoint_name: &str,
         additional_metrics: HashMap<String, f64>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let memory_usage_bytes = self.get_current_memory_usage();
         if let Some(tracker) = self.active_operations.get_mut(operation_id) {
             let elapsed = tracker.start_time.elapsed();
             let checkpoint = PerformanceCheckpoint {
                 name: checkpoint_name.to_string(),
                 timestamp: Utc::now(),
                 elapsed_us: elapsed.as_micros() as u64,
-                memory_usage_bytes: self.get_current_memory_usage(),
+                memory_usage_bytes,
                 metrics: additional_metrics,
             };
             
@@ -381,39 +382,41 @@ impl PerformanceMonitor {
     
     /// Check for performance alerts
     async fn check_performance_alerts(&mut self, metrics: &PerformanceMetrics) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let thresholds = &self.config.alert_thresholds;
+        let max_latency_us = self.config.alert_thresholds.max_latency_us;
+        let min_throughput_tps = self.config.alert_thresholds.min_throughput_tps;
+        let max_memory_mb = self.config.alert_thresholds.max_memory_mb;
         
         // Check latency threshold
-        if metrics.total_latency_us > thresholds.max_latency_us {
+        if metrics.total_latency_us > max_latency_us {
             self.create_alert(
                 AlertSeverity::Warning,
                 AlertType::LatencyThreshold,
                 format!("Latency {}μs exceeds threshold {}μs", 
-                       metrics.total_latency_us, thresholds.max_latency_us),
+                       metrics.total_latency_us, max_latency_us),
                 vec!["total_latency_us".to_string()],
                 vec!["Investigate network latency".to_string(), "Check computational load".to_string()],
             ).await?;
         }
         
         // Check throughput threshold
-        if metrics.throughput_ops < thresholds.min_throughput_tps as f64 {
+        if metrics.throughput_ops < min_throughput_tps as f64 {
             self.create_alert(
                 AlertSeverity::Warning,
                 AlertType::ThroughputBelow,
                 format!("Throughput {:.2} TPS below threshold {} TPS", 
-                       metrics.throughput_ops, thresholds.min_throughput_tps),
+                       metrics.throughput_ops, min_throughput_tps),
                 vec!["throughput_ops".to_string()],
                 vec!["Scale up resources".to_string(), "Optimize algorithms".to_string()],
             ).await?;
         }
         
         // Check memory usage
-        if metrics.memory_usage_bytes > thresholds.max_memory_mb * 1024 * 1024 {
+        if metrics.memory_usage_bytes > max_memory_mb * 1024 * 1024 {
             self.create_alert(
                 AlertSeverity::Critical,
                 AlertType::ResourceUtilizationHigh,
                 format!("Memory usage {} MB exceeds threshold {} MB", 
-                       metrics.memory_usage_bytes / (1024 * 1024), thresholds.max_memory_mb),
+                       metrics.memory_usage_bytes / (1024 * 1024), max_memory_mb),
                 vec!["memory_usage_bytes".to_string()],
                 vec!["Increase memory allocation".to_string(), "Optimize memory usage".to_string()],
             ).await?;
@@ -425,7 +428,7 @@ impl PerformanceMonitor {
     /// Check for performance regression
     async fn check_performance_regression(&mut self, current_metrics: &PerformanceMetrics) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.historical_data.len() < 10 {
-            return Ok((); // Need more data for regression analysis
+            return Ok(()); // Need more data for regression analysis
         }
         
         // Calculate baseline from historical data

@@ -587,7 +587,10 @@ impl MpcFinancialService {
     /// Get audit trail for a transaction
     pub async fn get_audit_trail(&self, transaction_id: &str) -> Result<Vec<audit_trail::AuditEntry>, Box<dyn std::error::Error + Send + Sync>> {
         let audit_manager = self.audit_manager.lock().await;
-        audit_manager.get_transaction_audit_trail(transaction_id).await
+        audit_manager
+            .get_transaction_audit_trail(transaction_id)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
     
     /// Shutdown the service gracefully

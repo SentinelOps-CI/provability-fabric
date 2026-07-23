@@ -21,7 +21,7 @@ use prometheus_client::{
     registry::Registry,
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct TelemetryData {
     // Time-to-first-cert metrics
     time_to_first_cert_samples: Vec<f64>,
@@ -50,7 +50,7 @@ struct TelemetryResponse {
     aggregated_data: Option<AggregatedTelemetry>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct AggregatedTelemetry {
     avg_time_to_first_cert: f64,
     replay_pass_rate: f64,
@@ -136,7 +136,7 @@ impl TelemetryService {
         }
 
         // Get current aggregated metrics
-        let aggregated = self.aggregated_metrics.read().await.clone();
+        let aggregated = (*self.aggregated_metrics.read().await).clone();
 
         Ok(TelemetryResponse {
             success: true,
@@ -174,7 +174,7 @@ impl TelemetryService {
     }
 
     async fn aggregate_telemetry(&self) -> Result<()> {
-        let raw_data = self.raw_telemetry.read().await.clone();
+        let raw_data = (*self.raw_telemetry.read().await).clone();
         
         if raw_data.is_empty() {
             return Ok(());
@@ -187,7 +187,7 @@ impl TelemetryService {
         let mut total_passed_tests = 0;
         let mut total_cert_issuance = 0;
         let mut total_cert_failures = 0;
-        let mut all_latency_samples = Vec::new();
+        let mut all_latency_samples: Vec<f64> = Vec::new();
 
         for data in &raw_data {
             // Aggregate time-to-first-cert
@@ -273,7 +273,7 @@ impl TelemetryService {
     }
 
     async fn get_aggregated_metrics(&self) -> AggregatedTelemetry {
-        self.aggregated_metrics.read().await.clone()
+        (*self.aggregated_metrics.read().await).clone()
     }
 
     fn hash_tenant_id(tenant_id: &str) -> String {

@@ -307,7 +307,7 @@ async fn run_compliance_analysis(mpc_service: &MpcFinancialService) -> Result<()
                 info!("   Audit Entries: {}", audit_entries.len());
                 
                 for entry in audit_entries.iter().take(3) { // Show first 3 entries
-                    info!("   - {}: {} at {}", 
+                    info!("   - {:?}: {:?} at {}", 
                           entry.event_type, 
                           entry.compliance_verification.status,
                           entry.timestamp.format("%H:%M:%S%.3f"));
