@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Init external standards
         env:
@@ -38,12 +38,12 @@ jobs:
         run: make submodules
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Install dependencies
         run: |
@@ -76,7 +76,7 @@ jobs:
           python tools/compliance/check_compliance.py --threshold 0.999
 
       - name: Upload validation report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cert-validation-report

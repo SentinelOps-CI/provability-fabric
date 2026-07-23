@@ -21,15 +21,15 @@ jobs:
         runs: [3]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Init external standards
         env:
@@ -83,14 +83,14 @@ jobs:
 
       - name: Upload replay outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: replay-outputs
           path: tests/replay/out/
 
       - name: Upload zipped bundles
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: replay-bundles-zipped
           path: artifact/replay_zips/

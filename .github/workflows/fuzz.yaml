@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -40,7 +40,7 @@ jobs:
           cargo +nightly fuzz run json_actions -- -runs=1000 -max_total_time=120
 
       - name: Upload fuzz artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fuzz-artifacts
