@@ -4,10 +4,9 @@
 # Multi-stage build for optimal image size and security
 FROM rust:1.88-alpine AS builder
 
-# Install build dependencies
+# Install build dependencies (no openssl: reqwest uses rustls-tls)
 RUN apk add --no-cache \
     musl-dev \
-    openssl-dev \
     pkgconfig \
     && rm -rf /var/cache/apk/*
 

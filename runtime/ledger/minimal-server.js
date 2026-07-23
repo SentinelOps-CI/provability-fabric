@@ -7,6 +7,7 @@
 import express from 'express'
 import cors from 'cors'
 import compression from 'compression'
+import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { wsServer } from './websocket-server.js'
@@ -84,29 +85,21 @@ function sanitizeForLog(value) {
   return String(value ?? '').replace(/[\r\n\t\x00-\x1f\x7f]/g, '')
 }
 
-/**
- * Demo-only in-memory sliding-window limiter (no external dep).
- * Applied to auth + authenticated routes flagged by CodeQL js/missing-rate-limiting.
- */
-function createRateLimiter({ windowMs, max, name }) {
-  const buckets = new Map()
-  return (req, res, next) => {
-    const key = `${name}:${req.ip || 'unknown'}`
-    const now = Date.now()
-    const cutoff = now - windowMs
-    const recent = (buckets.get(key) || []).filter((ts) => ts > cutoff)
-    if (recent.length >= max) {
-      res.setHeader('Retry-After', String(Math.ceil(windowMs / 1000)))
-      return res.status(429).json({ error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' })
-    }
-    recent.push(now)
-    buckets.set(key, recent)
-    next()
-  }
-}
-
-const authRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'auth' })
-const apiRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 120, name: 'api' })
+// express-rate-limit is recognized by CodeQL js/missing-rate-limiting (custom Map limters are not).
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+})
+const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+})
 
 // Simple in-memory cache
 const cache = new Map()
