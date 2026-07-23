@@ -1394,7 +1394,8 @@ async fn main() -> std::io::Result<()> {
             .route("/egress", web::post().to(egress_handler))
             .route("/health", web::get().to(health_handler))
     })
-    .bind("127.0.0.1:8081")?
+    // Bind on all interfaces so Docker healthchecks and peer services can reach us.
+    .bind(("0.0.0.0", 8081))?
     .run()
     .await
 }

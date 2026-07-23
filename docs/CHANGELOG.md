@@ -302,7 +302,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 1. **Update Dependencies**:
    ```bash
    cd runtime/ledger && npm install
-   cd marketplace/ui && npm install
+   # The standalone marketplace/ui tree was removed; console is under console/
+   cd console && npm install
    ```
 
 2. **Environment Configuration**:

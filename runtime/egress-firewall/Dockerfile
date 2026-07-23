@@ -23,19 +23,20 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Build dependencies (this layer will be cached)
 RUN cargo build --release --no-default-features --features mimalloc
 
-# Copy source code
+# Copy source code and force a real binary rebuild (Cargo can keep the dummy
+# binary when mtimes do not invalidate the release artifact).
 COPY src/ ./src/
-
-# Build the application
-RUN cargo build --release --no-default-features --features mimalloc
+RUN touch src/main.rs \
+    && cargo build --release --no-default-features --features mimalloc
 
 # Runtime stage
 FROM alpine:3.19
 
-# Install runtime dependencies
+# Install runtime dependencies (wget for compose/Dockerfile healthchecks)
 RUN apk add --no-cache \
     ca-certificates \
     libc6-compat \
+    wget \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user
@@ -57,12 +58,12 @@ RUN chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-# Expose port (if needed)
-EXPOSE 8080
+# Expose port (matches compose mapping and actix bind)
+EXPOSE 8081
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8081/health || exit 1
 
 # Run the application
 CMD ["./egress-firewall"]

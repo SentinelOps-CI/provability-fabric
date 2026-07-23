@@ -79,6 +79,35 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+/** Strip control chars so user-controlled URL/path values cannot inject log lines. */
+function sanitizeForLog(value) {
+  return String(value ?? '').replace(/[\r\n\t\x00-\x1f\x7f]/g, '')
+}
+
+/**
+ * Demo-only in-memory sliding-window limiter (no external dep).
+ * Applied to auth + authenticated routes flagged by CodeQL js/missing-rate-limiting.
+ */
+function createRateLimiter({ windowMs, max, name }) {
+  const buckets = new Map()
+  return (req, res, next) => {
+    const key = `${name}:${req.ip || 'unknown'}`
+    const now = Date.now()
+    const cutoff = now - windowMs
+    const recent = (buckets.get(key) || []).filter((ts) => ts > cutoff)
+    if (recent.length >= max) {
+      res.setHeader('Retry-After', String(Math.ceil(windowMs / 1000)))
+      return res.status(429).json({ error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' })
+    }
+    recent.push(now)
+    buckets.set(key, recent)
+    next()
+  }
+}
+
+const authRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, name: 'auth' })
+const apiRateLimit = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 120, name: 'api' })
+
 // Simple in-memory cache
 const cache = new Map()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
@@ -87,7 +116,7 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const cacheMiddleware = (req, res, next) => {
   if (req.method !== 'GET') return next()
   
-  const key = `${req.method}:${req.url}`
+  const key = `${req.method}:${sanitizeForLog(req.url)}`
   const cached = cache.get(key)
   
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -112,7 +141,9 @@ app.use(cacheMiddleware)
 // Request logging middleware
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString()
-  console.log(`[${timestamp}] ${req.method} ${req.url} - ${req.ip}`)
+  console.log(
+    `[${timestamp}] ${sanitizeForLog(req.method)} ${sanitizeForLog(req.url)} - ${sanitizeForLog(req.ip)}`
+  )
   next()
 })
 
@@ -160,7 +191,7 @@ app.get('/', (req, res) => {
 })
 
 // Authentication endpoints
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authRateLimit, async (req, res) => {
   try {
     const { email, password } = req.body
     
@@ -207,7 +238,7 @@ app.post('/auth/login', async (req, res) => {
   }
 })
 
-app.post('/auth/register', async (req, res) => {
+app.post('/auth/register', authRateLimit, async (req, res) => {
   try {
     const { email, password, name } = req.body
     
@@ -262,7 +293,7 @@ app.post('/auth/register', async (req, res) => {
   }
 })
 
-app.get('/auth/profile', authenticateToken, (req, res) => {
+app.get('/auth/profile', apiRateLimit, authenticateToken, (req, res) => {
   const userEmail = req.user.email
   const user = users.get(userEmail)
   
@@ -488,7 +519,7 @@ app.get('/search', (req, res) => {
   });
 });
 
-app.post('/install', authenticateToken, (req, res) => {
+app.post('/install', apiRateLimit, authenticateToken, (req, res) => {
   const { tenantId, packageId, version } = req.body;
   
   // Mock installation response
