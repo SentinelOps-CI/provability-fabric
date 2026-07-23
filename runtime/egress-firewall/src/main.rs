@@ -1392,7 +1392,12 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(firewall_data.clone())
             .route("/egress", web::post().to(egress_handler))
-            .route("/health", web::get().to(health_handler))
+            // GET + HEAD: Docker/wget --spider uses HEAD and must not 404.
+            .service(
+                web::resource("/health")
+                    .route(web::get().to(health_handler))
+                    .route(web::head().to(health_handler)),
+            )
     })
     // Bind on all interfaces so Docker healthchecks and peer services can reach us.
     .bind(("0.0.0.0", 8081))?

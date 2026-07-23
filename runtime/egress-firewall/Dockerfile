@@ -60,9 +60,9 @@ USER appuser
 # Expose port (matches compose mapping and actix bind)
 EXPOSE 8081
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8081/health || exit 1
+# Health check uses GET (not wget --spider/HEAD) so /health must respond to GET.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8081/health || exit 1
 
 # Run the application
 CMD ["./egress-firewall"]
