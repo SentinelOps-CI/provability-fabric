@@ -6,6 +6,15 @@ type Request = any;
 type Response = any;
 type NextFunction = any;
 import { ProvabilityFabricSDK, type TraceVerificationResult } from '../index';
+import { createIdempotentRetry } from '../retry.js';
+export {
+  createIdempotentRetry,
+  retryMiddleware,
+  DEFAULT_IDEMPOTENT_METHODS,
+  DEFAULT_RETRY_STATUS_CODES,
+  type IdempotentRetryFn,
+  type RetryMiddlewareOptions,
+} from '../retry.js';
 
 export interface PFMiddlewareOptions {
   sdk: ProvabilityFabricSDK;
@@ -102,45 +111,20 @@ export function circuitBreakerMiddleware(options: {
 }
 
 /**
- * Retry middleware with exponential backoff
+ * Attach an idempotent outbound retry helper on `req.pfRetry`.
+ *
+ * Does **not** retry Express `next()` / inbound handling. Callers should use
+ * `req.pfRetry(method, () => sdk.getClient().request(...))` for GET/HEAD/OPTIONS.
  */
-export function retryMiddleware(options: {
+export function attachRetryMiddleware(options: {
   maxRetries: number;
   baseDelay: number;
   maxDelay: number;
 }) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    let attempt = 0;
-    const maxAttempts = options.maxRetries + 1;
-
-    const attemptRequest = async (): Promise<any> => {
-      try {
-        attempt++;
-        // TODO: Implement actual retry logic
-        return next();
-      } catch (error) {
-        if (attempt >= maxAttempts) {
-          throw error;
-        }
-
-        const delay = Math.min(
-          options.baseDelay * Math.pow(2, attempt - 1),
-          options.maxDelay
-        );
-
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return attemptRequest();
-      }
-    };
-
-    try {
-      await attemptRequest();
-    } catch (error) {
-      res.status(500).json({
-        error: 'Request failed after retries',
-        details: error instanceof Error ? error.message : String(error)
-      });
-    }
+  const withRetry = createIdempotentRetry(options);
+  return (req: Request, _res: Response, next: NextFunction) => {
+    req.pfRetry = withRetry;
+    next();
   };
 }
 
