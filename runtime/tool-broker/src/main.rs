@@ -2,7 +2,6 @@
 #![allow(dead_code, unused_variables)]
 
 use anyhow::{Context, Result};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -631,6 +630,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod wave10_tests {
     use super::*;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     use ratelimit::{TenantRateLimit, ToolRateLimit};
     use std::sync::OnceLock;
     use tokio::sync::{Mutex, MutexGuard};

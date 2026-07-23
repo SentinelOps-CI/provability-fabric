@@ -1,23 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
+use anyhow::Result;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
-use tracing::{error, info, warn};
+use tokio::time::interval;
+use tracing::{error, info};
 use reqwest::Client;
 use prometheus_client::{
     encoding::text::encode,
-    metrics::{counter::Counter, gauge::Gauge, histogram::Histogram},
     registry::Registry,
 };
 
@@ -81,7 +78,7 @@ struct TelemetryService {
 
 impl TelemetryService {
     fn new() -> Self {
-        let mut registry = Registry::default();
+        let registry = Registry::default();
         
         // Initialize aggregated metrics
         let aggregated_metrics = Arc::new(RwLock::new(AggregatedTelemetry {
@@ -152,11 +149,11 @@ impl TelemetryService {
         }
 
         // Validate data ranges
-        if data.time_to_first_cert_samples.iter().any(|&x| x < 0.0 || x > 3600.0) {
+        if data.time_to_first_cert_samples.iter().any(|&x| !(0.0..=3600.0).contains(&x)) {
             return Err(anyhow::anyhow!("Invalid time-to-first-cert samples"));
         }
 
-        if data.latency_samples.iter().any(|&x| x < 0.0 || x > 3600.0) {
+        if data.latency_samples.iter().any(|&x| !(0.0..=3600.0).contains(&x)) {
             return Err(anyhow::anyhow!("Invalid latency samples"));
         }
 
@@ -276,6 +273,7 @@ impl TelemetryService {
         (*self.aggregated_metrics.read().await).clone()
     }
 
+    #[allow(dead_code)] // Public helper for callers hashing tenant IDs before ingest
     fn hash_tenant_id(tenant_id: &str) -> String {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
