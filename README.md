@@ -15,9 +15,9 @@
 
 # Provability Fabric
 
-**Formal guarantees for agent behavior** — proofs, runtime guards, and auditable evidence in one open stack.
+**Formal specs, runtime policy, and evidence trails** â€” Lean specifications and proofs where present, fail-closed crypto by default, and auditable evidence in one open stack.
 
-<sub>Prove · Enforce · Audit — formal specs, runtime policy, and evidence on one track.</sub>
+<sub>Guarantees are conditional on configured trust roots and deployment policy. Lean in-repo does not mean every production path is proven end-to-end. See [Evidence non-claims](docs/roadmap/evidence-v0.2-status.md#explicit-non-claims) and [deployment trust](docs/guides/deployment-guide.md#production-trust-chain-environment-f01--f02).</sub>
 
 <br/>
 
@@ -33,7 +33,7 @@
 
 <br/>
 
-[Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [CI reference](docs/reference/ci-reference.md)
+[Documentation](https://provability-fabric.org) Â· [Contributing](CONTRIBUTING.md) Â· [Security](SECURITY.md) Â· [CI reference](docs/reference/ci-reference.md)
 
 </div>
 
@@ -51,41 +51,51 @@ Provability Fabric ties **specifications and proofs** to **what actually runs**.
 
 ---
 
-## Repository map
+## Repository layout
 
-The tree is large; use this as a compass. For CI, supply chain, and local commands, see [**CONTRIBUTING.md**](CONTRIBUTING.md) and [**docs/reference/ci-reference.md**](docs/reference/ci-reference.md).
+Intentional top-level surface (everything else is product code under these trees):
 
-| Area | Path | Notes |
-|------|------|--------|
-| **CLI & core** | [`core/`](core/) | `core/cli/pf` — Go CLI; specs, bundles, SDKs |
-| **Proofs & templates** | [`spec-templates/v1`](spec-templates/v1), [`lakefile.lean`](lakefile.lean) | Lean 4; `lake build` from proof dirs |
-| **Runtime** | [`runtime/`](runtime/) | Rust: attestor, KMS proxy, tool-broker, sidecar-watcher, labeler, wasm-sandbox; Node ledger; Go admission-controller |
-| **Adapters** | [`adapters/`](adapters/) | HTTP/file and framework adapters (Rust, Node, Python, Go) |
-| **Proof-Carrying Science** | [`docs/pcs/`](docs/pcs/README.md), [`adapters/pcs/`](adapters/pcs/) | Verify and sign science claim bundles; release admission benchmarks |
-| **Platform & UI** | [`services/`](services/), [`console/`](console/), [`marketplace/`](marketplace/) | APIs, console, marketplace |
-| **Config & schemas** | [`config/`](config/) | JSON schemas and specification assets |
-| **Benchmarks** | [`bench/swebench/`](bench/swebench/README.md) | SWE-bench runner; Linux/WSL for real runs; details in package README |
-| **Experiments** | [`experiments/`](experiments/README.md) | Eval manifests, compare/replay tooling |
-| **Docs** | [`docs/`](docs/) | MkDocs site; build with `pip install -r docs/requirements.txt` then `mkdocs build` |
-| **Tests** | [`tests/`](tests/) | Unit, integration, replay, privacy suites |
+| Path | Why it stays |
+|------|----------------|
+| [`core/`](core/) | CLI, SDKs, Lean libs, policy kernel |
+| [`runtime/`](runtime/) | Sidecar, ledger, brokers, admission |
+| [`adapters/`](adapters/) | Framework / protocol adapters |
+| [`services/`](services/), [`console/`](console/) | **Platform** — Compose-backed Go APIs (default profile) and admin console (`--profile full`) |
+
+| [`proofs/`](proofs/), [`spec-templates/`](spec-templates/), [`bundles/`](bundles/) | Lean policy proofs and agent bundles |
+| [`schemas/`](schemas/), [`config/`](config/), [`api/`](api/), [`specs/`](specs/) | Schemas, protos, evidence specs |
+| [`cmd/`](cmd/), [`releaser/`](releaser/) | Specdoc CLI; Nix supply-chain reproducibility helper |
+| [`artifact/`](artifact/) | Checked-in DFA export outputs and golden cases |
+| [`charts/`](charts/), [`ops/`](ops/) | Helm (`charts/pf-enforce`); Compose Grafana/Prometheus + retention under `ops/` |
+| [`external/`](external/) | CERT-V1 / TRACE-REPLAY-KIT submodules |
+| [`bench/`](bench/), [`experiments/`](experiments/), [`benchmarks/`](benchmarks/) | SWE-bench / eval / PCS admission |
+| [`examples/`](examples/), [`demos/`](demos/), [`testbed/`](testbed/) | CI-backed evidence walkthroughs (`evidence-*`, `forensic-*`, `runtime-*`) and MCP fraud demo |
+| [`tests/`](tests/), [`tools/`](tools/), [`scripts/`](scripts/), [`docs/`](docs/) | Verification, tooling, docs |
+| [`CLA/`](CLA/), [`.github/`](.github/) | CLA config; CI workflows and shared actions |
+
+Root config stays thin: `README`, `CONTRIBUTING`, `LICENSE`, `Makefile`, `justfile`, `Cargo.toml`, `package.json`, `go.work.example`, `docker-compose.yml`, `mkdocs.yml`, Lean toolchain files.
 
 <details>
-<summary><strong>Full top-level layout</strong> (click to expand)</summary>
+<summary><strong>Compact tree</strong> (click to expand)</summary>
 
 ```
 provability-fabric/
-├── core/              # CLI, SDKs, bundles
+├── core/              # CLI, SDKs, Lean libs
 ├── runtime/           # Rust / Go / Node services
 ├── adapters/          # Integration adapters
-├── config/            # Schemas and specs
-├── bench/             # Benchmarks (see bench/swebench/README.md)
-├── experiments/       # Research / eval harness (see experiments/README.md)
-├── tests/             # Test suites
-├── docs/              # Documentation source
-├── tools/             # Dev and compliance tooling
-├── Cargo.toml         # Rust workspace
-├── Makefile           # Compose and convenience targets
-└── lean-toolchain     # Pinned Lean version
+├── services/ console/   # Platform APIs + admin UI
+├── proofs/            # Canonical Policy.lean package
+├── charts/            # Helm (pf-enforce)
+├── ops/               # Observability + retention only
+├── schemas/ config/ api/ specs/
+├── cmd/ releaser/ artifact/
+├── examples/ demos/ testbed/
+├── bench/ experiments/ benchmarks/
+├── tests/ tools/ scripts/ docs/
+├── CLA/
+├── Cargo.toml
+├── Makefile
+└── lean-toolchain
 ```
 
 </details>
@@ -105,8 +115,8 @@ cargo clippy --workspace -- -D warnings
 ### How pieces fit together
 
 - **Minimal (CLI + bundles):** [`core/cli/pf`](core/cli/pf), [`bundles/`](bundles/), [`config/`](config/). See [Reuse and extend](docs/guides/reuse-and-extend.md).
-- **Full platform:** Go services, console, ledger, gateway — use Docker Compose or the launch scripts below.
-- **Optional:** A CLI-only or forked minimal setup can omit `bench/`, `experiments/`, `console/`, `marketplace/`, and `demos/`.
+- **Full platform:** Go services under `services/`, admin console, ledger, gateway — use Docker Compose (`make platform-up` / `make full-up`). See [local workflows](docs/dev/local-workflows.md).
+- **CLI-only forks:** Can omit `services/`, `console/`, `bench/`, `experiments/`, and `demos/`.
 
 ---
 
@@ -114,11 +124,11 @@ cargo clippy --workspace -- -D warnings
 
 Adopt shared schemas, replay tooling, and CI patterns alongside this repo:
 
-- [CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) — schema and verifiers  
-- [TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) — runner and oracles  
-- [morph-lean-ci](https://github.com/SentinelOps-CI/morph-lean-ci) — sharded Lean CI  
-- [morph-replay-runner](https://github.com/SentinelOps-CI/morph-replay-runner) — branch replays  
-- [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) — permissions, epochs, IFC  
+- [CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) â€” schema and verifiers  
+- [TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) â€” runner and oracles  
+- [morph-lean-ci](https://github.com/SentinelOps-CI/morph-lean-ci) â€” sharded Lean CI  
+- [morph-replay-runner](https://github.com/SentinelOps-CI/morph-replay-runner) â€” branch replays  
+- [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) â€” permissions, epochs, IFC  
 
 In-repo: [`docs/specs/standards.md`](docs/specs/standards.md), [`docs/evidence/overview.md`](docs/evidence/overview.md), [`docs/evidence/replay.md`](docs/evidence/replay.md).
 
@@ -139,7 +149,11 @@ Full PCS documentation lives at [docs/pcs/README.md](docs/pcs/README.md).
 
 ## Quick start
 
-### Option 1 — Install script (recommended)
+**Canonical path (3 clicks):** [Getting started (15 min)](docs/getting-started.md) → [Local workflows](docs/dev/local-workflows.md) → [Deployment guide](docs/guides/deployment-guide.md) when you need production trust-chain env.
+
+Prefer Make / Compose targets from those docs over ad-hoc scripts. Longer product concepts: [guides/getting-started.md](docs/guides/getting-started.md).
+
+### Option 1 — Install script
 
 ```bash
 git clone --recurse-submodules https://github.com/SentinelOps-CI/provability-fabric
@@ -157,29 +171,15 @@ scripts\test-new-user.bat
 
 Git Bash on Windows can mis-handle paths and execution; prefer **cmd** or **PowerShell** for `install.bat` / `test-new-user.bat`. For Git Bash issues: `bash scripts/windows-troubleshoot.sh`.
 
-### Option 2 — Web stack (Docker or scripts)
-
-Full stack is optional; for CLI-only workflows see [Reuse and extend](docs/guides/reuse-and-extend.md).
-
-- **Services only:** `docker compose up`  
-- **Console and demos:** `docker compose --profile full up`  
-- **Convenience:** `./launch-web-interfaces.sh` (Unix) or `launch-web-interfaces.bat` (Windows)
-
-**Manual pieces (examples):**
+### Option 2 — Compose (Make wrappers)
 
 ```bash
-# Ledger API (example)
-cd runtime/ledger && node minimal-server.js
-# → http://localhost:8080
-
-# Console
-cd console && npm install && npm start
-# → http://localhost:3000
-
-# Docs (from repo root, after pip install -r docs/requirements.txt)
-mkdocs serve --dev-addr=127.0.0.1:8002
-# → http://127.0.0.1:8002
+make install-dev
+make platform-up          # or: make ledger-up / make full-up
+make compose-smoke
 ```
+
+See [local-workflows.md](docs/dev/local-workflows.md) for the launch matrix, ports, and console (`make full-up` / `--profile full`). Docs: `make docs-serve` (port `8002`).
 
 ### Option 3 — Build the CLI from source
 
@@ -242,7 +242,7 @@ flowchart TD
     M --> N[Reach set]
     N --> C
 
-    GNN[GPU neural network] --> ABC["α-β-CROWN adapter"]
+    GNN[GPU neural network] --> ABC["Î±-Î²-CROWN adapter"]
     ABC --> GPUP[GPU verification proof]
     GPUP --> C
 
@@ -250,7 +250,7 @@ flowchart TD
     TL --> GQL[GraphQL API]
 ```
 
-**Major surfaces:** specification bundles (YAML + proofs), runtime guards (sidecars), solver adapters (e.g. Marabou, DryVR, α-β-CROWN), marketplace/console UIs, WebSocket updates, and JWT-based auth where enabled.
+**Major surfaces:** specification bundles (YAML + proofs), runtime guards (sidecars), solver adapters (e.g. Marabou, DryVR, Î±-Î²-CROWN), platform APIs + admin console, WebSocket updates, and JWT-based auth where enabled.
 
 ---
 
@@ -292,8 +292,8 @@ python tests/trust_fire_orchestrator.py
 | Python errors | Run scripts from the **repository root** unless a doc says otherwise. |
 | K8s YAML / Helm | Many deployables are Helm templates, not raw `kubectl apply` files. |
 | Windows paths | Prefer **forward slashes** in Git Bash; use **cmd** for `.bat` installers. |
-| “Device or resource busy” | Close editors/explorers holding files; retry. |
-| UI / Heroicons | Match icon names to your `package.json` / TypeScript setup (see `marketplace/ui/tsconfig.json`). |
+| â€œDevice or resource busyâ€ | Close editors/explorers holding files; retry. |
+| UI / Heroicons | Match icon names to your `package.json` / TypeScript setup (see `console/tsconfig.json`). |
 
 **Windows:** Use `pf.exe` and Command Prompt for install scripts when Git Bash misbehaves. More detail: `bash scripts/windows-troubleshoot.sh`.
 
@@ -309,23 +309,23 @@ The default branch is protected by workflows including dependency review (PRs), 
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache License 2.0 â€” see [LICENSE](LICENSE).
 
 ---
 
 ## Acknowledgments
 
-- [Lean 4](https://leanprover.github.io/) — interactive theorem proving  
-- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) — neural network verification  
-- [DryVR](https://github.com/verivital/dryvr) — hybrid systems  
-- [α-β-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) — GPU-accelerated NN verification  
-- [Sigstore](https://sigstore.dev/) — signing and transparency  
-- [Memurai](https://docs.memurai.com/) — Redis-compatible server for Windows  
+- [Lean 4](https://leanprover.github.io/) â€” interactive theorem proving  
+- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) â€” neural network verification  
+- [DryVR](https://github.com/verivital/dryvr) â€” hybrid systems  
+- [Î±-Î²-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) â€” GPU-accelerated NN verification  
+- [Sigstore](https://sigstore.dev/) â€” signing and transparency  
+- [Memurai](https://docs.memurai.com/) â€” Redis-compatible server for Windows  
 
 ---
 
 <div align="center">
 
-<sub>Provability Fabric — specifications, enforcement, and evidence for trustworthy agents.</sub>
+<sub>Provability Fabric â€” specifications, enforcement, and evidence for trustworthy agents.</sub>
 
 </div>
