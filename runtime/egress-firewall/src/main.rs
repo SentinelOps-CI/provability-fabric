@@ -1335,7 +1335,7 @@ async fn egress_handler(
     firewall: web::Data<EgressFirewall>,
 ) -> Result<HttpResponse, Error> {
     let response = firewall.process_egress(payload.into_inner()).await
-        .map_err(|e| actix_web::error::ErrorBadRequest(e))?;
+        .map_err(actix_web::error::ErrorBadRequest)?;
 
     Ok(HttpResponse::Ok().json(response))
 }
