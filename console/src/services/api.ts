@@ -281,31 +281,6 @@ export const promoteToGolden = async (decisionId: string, testVectorPath: string
 };
 
 /**
- * Get policy diff analysis
- */
-export const getPolicyDiffAnalysis = async (analysisId: string): Promise<any> => {
-  const response = await api.get(`/api/v1/policy-diff/analysis/${analysisId}`);
-  return response.data;
-};
-
-/**
- * Start policy diff analysis
- */
-export const startPolicyDiffAnalysis = async (request: {
-  pull_request_id: string;
-  base_policy_hash: string;
-  head_policy_hash: string;
-  sample_size?: number;
-  tenant_id?: string;
-  start_time?: string;
-  end_time?: string;
-  include_replay?: boolean;
-}): Promise<any> => {
-  const response = await api.post('/api/v1/policy-diff/analyze', request);
-  return response.data;
-};
-
-/**
  * Get enhanced replay status with metrics
  */
 export const getEnhancedReplayStatus = async (jobId: string): Promise<any> => {

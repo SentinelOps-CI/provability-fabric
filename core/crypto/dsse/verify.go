@@ -46,9 +46,13 @@ type VerifyResult struct {
 }
 
 // EnforceDSSE returns true when DSSE verification must fail closed.
+// Default is enforce (unset / empty). Opt out only with PF_ENFORCE_DSSE=0 or false.
 func EnforceDSSE() bool {
 	v := strings.TrimSpace(os.Getenv(EnvEnforceDSSE))
-	return v == "1" || strings.EqualFold(v, "true")
+	if v == "0" || strings.EqualFold(v, "false") {
+		return false
+	}
+	return true
 }
 
 // TrustRootConfigured reports whether a trust root is available.

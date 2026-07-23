@@ -74,11 +74,11 @@ if exist "tests\proof-fuzz\requirements.txt" pip install -r tests\proof-fuzz\req
 if exist "tools\compliance\requirements.txt" pip install -r tools\compliance\requirements.txt
 if exist "tools\insure\requirements.txt" pip install -r tools\insure\requirements.txt
 if exist "tools\proofbot\requirements.txt" pip install -r tools\proofbot\requirements.txt
-if "%NODE_AVAILABLE%"=="true" if exist "marketplace\ui\package.json" (
-    cd marketplace\ui
-    npm install
-    cd ..\..
-    echo Installed UI dependencies
+if "%NODE_AVAILABLE%"=="true" if exist "console\package.json" (
+    cd console
+    npm install --no-audit --no-fund
+    cd ..
+    echo Installed console dependencies
 )
 
 :do_test

@@ -234,8 +234,8 @@ lake build
 # Check proof quality
 make lean-gate
 
-# Verify specific proofs
-lake exe proofbench
+# Core libs (includes experimental ProofBench module when present)
+cd core/lean-libs && lake build
 ```
 
 ### Neural Network Verification
@@ -304,7 +304,7 @@ go test -bench=. ./core/...
 cargo bench
 
 # Run Lean benchmarks
-lake exe proofbench --benchmark
+cd core/lean-libs && lake build
 ```
 
 ## Test Automation

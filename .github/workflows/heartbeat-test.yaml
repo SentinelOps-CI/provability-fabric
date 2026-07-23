@@ -41,8 +41,8 @@ jobs:
 
       - name: Build sidecar image
         run: |
-          cd runtime/sidecar-watcher
-          docker build -t provability-fabric/sidecar:test .
+          # Repo-root context required for pf-dsse path dep (see Dockerfile header)
+          docker build -f runtime/sidecar-watcher/Dockerfile -t provability-fabric/sidecar:test .
 
       - name: Load images into Kind
         run: |

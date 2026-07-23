@@ -115,7 +115,7 @@ if usage.requests_last_minute > burst_limit {
 ```rust
 use runtime::tool_broker::ToolBroker;
 
-let broker = ToolBroker::new("http://localhost:8080".to_string());
+let broker = ToolBroker::new("http://localhost:8006".to_string());
 
 // Check rate limits before tool execution
 let decision = broker.rate_limiter.check_rate_limit(
@@ -203,7 +203,7 @@ cargo test --test ratelimit_test
 
 ### Environment Variables
 
-- `KERNEL_URL`: URL of the Policy Kernel service (default: http://localhost:8080)
+- `KERNEL_URL`: URL of the Policy Kernel / sidecar service (default: `http://localhost:8006`, matches compose `runtime-sidecar`)
 
 ### Rate Limiting Configuration
 

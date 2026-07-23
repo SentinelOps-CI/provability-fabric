@@ -38,11 +38,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - name: Init external standards
         env:
           STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
@@ -59,10 +54,11 @@ jobs:
             exit 1
           fi
 
-      - name: Install validation dependencies
-        run: |
-          cd tools/cert-validate
-          pip install -r requirements.txt
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.11"
+          requirements-file: tools/cert-validate/requirements.txt
 
       - name: Validate CERT files (fail-closed)
         run: make validate-certs

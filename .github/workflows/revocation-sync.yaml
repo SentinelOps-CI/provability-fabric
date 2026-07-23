@@ -1,7 +1,7 @@
 name: Revocation List Sync
 
 # CI dry-run: validate in-tree list + mock-registry sync (merge, package, sign).
-# Live external registry sync remains workflow_dispatch mode=live.
+# Live external registry sync: workflow_dispatch mode=live; fail-closed without secrets.
 on:
   push:
     branches: [main, develop]
@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dry-run (validate+mock sync) or live (external fetch/PR)"
+        description: "dry-run (validate+mock sync) or live (external fetch/merge/sign)"
         required: false
         default: "dry-run"
         type: choice
@@ -85,13 +85,77 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Live sync requires external registry secrets
+          fetch-depth: 0
+
+      - name: Live sync (fetch + merge + sign; fail-closed)
+        env:
+          REVOCATION_REGISTRY_URL: ${{ secrets.REVOCATION_REGISTRY_URL }}
+          REVOCATION_REGISTRY_TOKEN: ${{ secrets.REVOCATION_REGISTRY_TOKEN }}
+          REVOCATION_SYNC_SIGNING_KEY: ${{ secrets.REVOCATION_SYNC_SIGNING_KEY }}
+          REVOCATION_LIVE_REPORT: runtime/admission-controller/revocation/live-sync-report.json
         run: |
-          echo "Live external revocation fetch is not configured (needs registry credentials)."
-          echo "CI dry-run proves mock registry sync + packaging/signing."
-          exit 1
+          set -euo pipefail
+          python3 scripts/revocation/live_registry_sync.py \
+            --out runtime/admission-controller/revocation/revocations.synced.json
+          test -f runtime/admission-controller/revocation/revocations.synced.json
+          test -f runtime/admission-controller/revocation/live-sync-report.json
+          python3 - <<'PY'
+          import json
+          env = json.load(open("runtime/admission-controller/revocation/revocations.synced.json", encoding="utf-8"))
+          report = json.load(open("runtime/admission-controller/revocation/live-sync-report.json", encoding="utf-8"))
+          assert env.get("live_registry") is True
+          assert env["list"]["source"] == "live-registry-sync"
+          assert report.get("live_registry") is True
+          assert env["package"]["algorithm"] == "HMAC-SHA256"
+          assert len(env["package"]["signature"]) == 64
+          print("live registry sync assertions ok")
+          PY
+
+      - name: Open PR with synced list (protected-branch policy)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="chore/live-revocation-sync-$(date -u +%Y%m%d%H%M%S)"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b "$BRANCH"
+          # Commit only the synced artifact + report; never overwrite canonical list without review.
+          git add \
+            runtime/admission-controller/revocation/revocations.synced.json \
+            runtime/admission-controller/revocation/live-sync-report.json
+          if git diff --cached --quiet; then
+            echo "No revocation artifact changes; skipping PR"
+          else
+            git commit -m "chore: live revocation registry sync artifact"
+            git push -u origin "$BRANCH"
+            gh pr create \
+              --title "chore: live revocation registry sync" \
+              --body "$(cat <<'EOF'
+          ## Summary
+          - Live \`revocation-sync\` (\`mode=live\`) fetched external registry, merged, and HMAC-signed
+          - Artifacts: \`revocations.synced.json\` + \`live-sync-report.json\` (\`live_registry: true\`)
+
+          ## Review notes
+          - Review before promoting entries into \`revocations.json\`
+          - Protected branch: merge via review
+
+          EOF
+          )" --base main
+          fi
+
+      - name: Upload live synced artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: revocations-synced-live
+          path: |
+            runtime/admission-controller/revocation/revocations.synced.json
+            runtime/admission-controller/revocation/live-sync-report.json
+          retention-days: 30

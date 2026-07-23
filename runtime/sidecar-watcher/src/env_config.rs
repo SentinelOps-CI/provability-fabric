@@ -9,8 +9,15 @@ pub const ENV_TRUST_ROOT_PEM: &str = "PF_TRUST_ROOT_PEM";
 pub const ENV_PROFILE: &str = "PF_PROFILE";
 pub const ENV_ENABLED_TOOLS: &str = "PF_ENABLED_TOOLS";
 
+/// Fail-closed by default; opt out only with `PF_ENFORCE_DSSE=0` or `false`.
 pub fn enforce_dsse() -> bool {
-    env_flag(ENV_ENFORCE_DSSE)
+    match env::var(ENV_ENFORCE_DSSE) {
+        Ok(v) => {
+            let v = v.trim();
+            !(v == "0" || v.eq_ignore_ascii_case("false"))
+        }
+        Err(_) => true,
+    }
 }
 
 /// Shadow bypass is dev-only: requires PF_SHADOW_MODE=1 and non-production profile.
@@ -74,7 +81,7 @@ pub fn resolve_evidence_hash(name: &str, dev_default: &str) -> Result<String, St
         Ok(v) => v,
         Err(_) if evidence_hash_enforced() => {
             return Err(format!(
-                "missing {name} when PF_ENFORCE_DSSE=1 or production profile"
+                "missing {name} when DSSE enforcement is active or production profile"
             ));
         }
         Err(_) => {
@@ -89,7 +96,7 @@ pub fn resolve_evidence_hash(name: &str, dev_default: &str) -> Result<String, St
 
     if evidence_hash_enforced() && is_placeholder_evidence_value(&raw) {
         return Err(format!(
-            "rejecting placeholder {name}={raw:?} when PF_ENFORCE_DSSE=1 or production profile"
+            "rejecting placeholder {name}={raw:?} when DSSE enforcement is active or production profile"
         ));
     }
 
@@ -120,8 +127,20 @@ mod evidence_hash_tests {
     fn allows_dev_fallback_when_not_enforced() {
         let _guard = env_test_guard();
         clear_evidence_env();
+        env::set_var(ENV_ENFORCE_DSSE, "0");
         let value = resolve_evidence_hash("POLICY_HASH", "test-policy-hash").expect("dev fallback");
         assert_eq!(value, "test-policy-hash");
+        clear_evidence_env();
+    }
+
+    #[test]
+    fn rejects_missing_hash_when_unset_defaults_to_enforce() {
+        let _guard = env_test_guard();
+        clear_evidence_env();
+        // Unset PF_ENFORCE_DSSE → fail-closed (enforce).
+        let err = resolve_evidence_hash("POLICY_HASH", "test-policy-hash").unwrap_err();
+        assert!(err.contains("missing POLICY_HASH"));
+        clear_evidence_env();
     }
 
     #[test]

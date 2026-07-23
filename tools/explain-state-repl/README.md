@@ -14,8 +14,18 @@ Interactive tool for analyzing DFA states and transitions in real-time. This REP
 
 ### Starting the REPL
 
+From the repo root (module is in `go.work`):
+
 ```bash
-go run main.go
+go run ./tools/explain-state-repl
+```
+
+Or from this directory:
+
+```bash
+go build -o explain-state-repl .
+./explain-state-repl
+# or: go run .
 ```
 
 ### Loading a DFA

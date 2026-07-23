@@ -3,7 +3,7 @@
 """CI-local cross-region DR proof using moto (LocalStack-equivalent).
 
 Exercises S3 cross-region object presence, Route53 health-check/DNS flip
-bookkeeping, terraform layout presence, and blue/green migrate --dry-run.
+bookkeeping, DR script layout presence, and blue/green migrate --dry-run.
 Does not claim live AWS DR.
 """
 
@@ -29,11 +29,10 @@ ZONE_NAME = "provability-fabric.local."
 
 
 def _require_layout() -> None:
-    regions = REPO / "ops" / "terraform" / "regions"
-    assert regions.is_dir(), "missing ops/terraform/regions"
-    assert (regions / "cross-region-dr.tf").is_file(), "missing cross-region-dr.tf"
+    assert (REPO / "scripts" / "dr").is_dir(), "missing scripts/dr"
     assert (REPO / "scripts" / "db" / "blue_green_migrate.sh").is_file()
-    print("layout: terraform + blue_green_migrate.sh present")
+    assert (REPO / "scripts" / "zero-downtime-upgrade.sh").is_file()
+    print("layout: scripts/dr + blue_green_migrate.sh + zero-downtime-upgrade.sh present")
 
 
 def _run_blue_green_dry_run() -> None:

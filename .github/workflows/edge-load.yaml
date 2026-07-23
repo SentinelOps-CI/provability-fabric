@@ -1,7 +1,7 @@
 name: Edge API Load Testing
 
 # CI smoke: local multi-region mock edge stack + k6 with latency/error assertions.
-# Full multi-region SaaS load remains workflow_dispatch mode=full (live APIs).
+# Full multi-region SaaS load: workflow_dispatch mode=full; fail-closed without edge secrets.
 on:
   push:
     branches: [main, develop]
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "smoke (local mock) or full (live edge APIs)"
+        description: "smoke (local mock) or full (live edge APIs; secrets required)"
         required: false
         default: "smoke"
         type: choice
@@ -96,10 +96,66 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Require live edge secrets (fail-closed)
+        env:
+          EDGE_REGION_URLS: ${{ secrets.EDGE_REGION_URLS }}
+          EDGE_LOAD_API_TOKEN: ${{ secrets.EDGE_LOAD_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -z "${EDGE_REGION_URLS:-}" ] && missing+=("EDGE_REGION_URLS")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "error: edge-load mode=full invoked without secrets: ${missing[*]}" >&2
+            echo "fail-closed: set EDGE_REGION_URLS (comma-separated https://api.*.provability-fabric.org)" >&2
+            echo "optional: EDGE_LOAD_API_TOKEN for authenticated edge admin/purge paths" >&2
+            exit 1
+          fi
+          # Require at least two regions for multi-region claim honesty.
+          IFS=',' read -r -a regions <<< "$EDGE_REGION_URLS"
+          if [ "${#regions[@]}" -lt 2 ]; then
+            echo "error: EDGE_REGION_URLS must list >=2 region base URLs" >&2
+            exit 1
+          fi
+          echo "edge_load_mode=full regions=${#regions[@]}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install k6
         run: |
           curl -L "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" | tar xz
           sudo cp "k6-v${K6_VERSION}-linux-amd64/k6" /usr/local/bin/
+
       - name: Run full edge load (live endpoints)
+        env:
+          EDGE_REGION_URLS: ${{ secrets.EDGE_REGION_URLS }}
+          EDGE_LOAD_API_TOKEN: ${{ secrets.EDGE_LOAD_API_TOKEN }}
         run: |
-          k6 run --out json=load-test-results.json tests/load/edge_load.js
+          set -euo pipefail
+          k6 run \
+            --env REGION_URLS="$EDGE_REGION_URLS" \
+            --env EDGE_API_TOKEN="${EDGE_LOAD_API_TOKEN:-}" \
+            --out json=load-test-results.json \
+            tests/load/edge_load.js
+          test -f load-test-results.json
+          # Honesty marker for operators reviewing artifacts
+          python3 - <<'PY'
+          import json, os
+          marker = {
+              "mode": "full",
+              "live_edge": True,
+              "region_count": len([u for u in os.environ.get("EDGE_REGION_URLS", "").split(",") if u.strip()]),
+          }
+          open("edge-load-full-marker.json", "w", encoding="utf-8").write(json.dumps(marker, indent=2) + "\n")
+          print(json.dumps(marker, indent=2))
+          PY
+
+      - name: Upload live results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-load-full-results
+          path: |
+            load-test-results.json
+            edge-load-full-marker.json
+            trust-fire-phase1-results.json
+          if-no-files-found: ignore
+          retention-days: 30

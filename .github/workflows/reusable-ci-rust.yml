@@ -1,21 +1,124 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
+#
+# Parallel Rust CI: workspace-libs | sidecar-curated | clippy.
+# PR/push: impacted crates via tools/select_impacted_rust.py.
+# Weekly/dispatch: full_workspace=true.
+# TODO(E4): continue using .github/actions/cache-cargo; no Node/Go/Python setup actions needed here.
 
 on:
   workflow_call:
+    inputs:
+      full_workspace:
+        description: "Run full curated + workspace suite (weekly / lockfile / dispatch)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
-  test:
-    name: rust
+  resolve:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    outputs:
+      full_workspace: ${{ steps.crates.outputs.full_workspace }}
+      run_sidecar_curated: ${{ steps.crates.outputs.run_sidecar_curated }}
+      run_workspace_libs: ${{ steps.crates.outputs.run_workspace_libs }}
+      workspace_crates: ${{ steps.crates.outputs.workspace_crates }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve impacted crates
+        id: crates
+        env:
+          FULL: ${{ inputs.full_workspace }}
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref || 'main' }}"
+          if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+            BASE="origin/main"
+          fi
+          if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+            # Best-effort deepen history for fork/shallow checkouts; miss is non-fatal.
+            # ci-honesty: justified wave-e3-path-ci
+            git fetch --no-tags --depth=50 origin main 2>/dev/null || true
+            BASE="origin/main"
+          fi
+          EXTRA=()
+          if [ "$FULL" = "true" ]; then
+            EXTRA+=(--full-workspace)
+          fi
+          python tools/select_impacted_rust.py --root . --base-ref "$BASE" --github-output "${EXTRA[@]}"
+
+  workspace-libs:
+    name: rust-workspace-libs
+    needs: [resolve]
+    if: needs.resolve.outputs.run_workspace_libs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
       PF_SHADOW_MODE: "1"
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Cache Cargo registry and target
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-workspace-libs"
+
+      - name: Test workspace libraries
+        env:
+          FULL: ${{ needs.resolve.outputs.full_workspace }}
+          CRATES: ${{ needs.resolve.outputs.workspace_crates }}
+        run: |
+          set -euo pipefail
+          if [ "$FULL" = "true" ] || [ -z "${CRATES// }" ]; then
+            cargo nextest run --workspace \
+              --exclude provability-fabric-core-sdk-rust \
+              --exclude sidecar-watcher \
+              --exclude retrieval-gateway \
+              --exclude labeler \
+              --exclude tool-broker \
+              --exclude telemetry-service \
+              --exclude jwks-manager \
+              --exclude mpc-fintech \
+              --exclude egress-firewall \
+              --no-fail-fast
+          else
+            pkgs=()
+            for c in $CRATES; do
+              pkgs+=(-p "$c")
+            done
+            cargo nextest run "${pkgs[@]}" --no-fail-fast
+          fi
+
+  sidecar-curated:
+    name: rust-sidecar-curated
+    needs: [resolve]
+    if: needs.resolve.outputs.run_sidecar_curated == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      PF_SHADOW_MODE: "1"
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install protoc
         run: |
@@ -29,6 +132,8 @@ jobs:
 
       - name: Cache Cargo registry and target
         uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-sidecar-curated"
 
       - name: Sidecar unwrap regression gate (F16)
         run: python scripts/count_sidecar_unwraps.py --max 10
@@ -36,33 +141,28 @@ jobs:
       - name: Ledger any regression gate (F27)
         run: python scripts/count_ledger_any.py --max 20
 
-      - name: Build and test Rust workspace
+      - name: Curated sidecar and related crate tests
         run: |
-          # sidecar-watcher and retrieval-gateway: curated targets only (env/RUSTFLAGS).
-          # Do not include in workspace test — workspace would re-run them and pick up
-          # extra sidecar [[test]] binaries (dfa_equiv/proptest, etc.) that exceed CI budget.
+          set -euo pipefail
           # sidecar-watcher: curated [[test]] targets only — lib unit tests hang or flake
           # on shared runners (concurrency ring buffer, queue_manager async, perf benches).
           PF_SHADOW_MODE=1 RUSTFLAGS="-D dead_code" cargo test -p sidecar-watcher --test integration_tests -- --nocapture
           cargo test -p sidecar-watcher --test ni_monitor_egress --test safety_case_bundle --test events_plan_dsl --test hardened_adapters -- --nocapture
           cargo test -p retrieval-gateway -- --nocapture
-          cargo test --workspace \
-            --exclude provability-fabric-core-sdk-rust \
-            --exclude sidecar-watcher \
-            --exclude retrieval-gateway \
-            --exclude labeler \
-            --exclude tool-broker \
-            --no-fail-fast
+          # Wave 12.1: formerly orphaned crates (egress uses regex fallback, not Hyperscan).
+          cargo test -p telemetry-service -- --nocapture
+          cargo test -p jwks-manager -- --nocapture
+          cargo test -p mpc-fintech -- --nocapture
+          cargo test -p egress-firewall --no-default-features -- --nocapture
 
   clippy:
+    name: rust-clippy
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       CARGO_TERM_COLOR: always
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install protoc
         run: |
@@ -73,9 +173,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          components: clippy
 
       - name: Cache Cargo registry and target
         uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-clippy"
 
       - name: Clippy (workspace)
         run: cargo clippy --workspace --exclude provability-fabric-core-sdk-rust -- -D warnings

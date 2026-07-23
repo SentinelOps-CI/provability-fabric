@@ -20,7 +20,6 @@ How to run:
 Notes:
 - Ensure witness mode is enabled in the policy to require Merkle path proofs on reads/writes.
 - Bump epochs via the control endpoint to force policy transitions.
-
-See also: `examples/edge-middleware/perm/epoch.yaml` for a minimal policy aligned with the demo.
+- Policy / epoch fixtures live in the [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) repo (the in-repo edge-middleware stub was removed).
 
 

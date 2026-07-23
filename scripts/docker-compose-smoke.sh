@@ -15,6 +15,25 @@ fi
 
 echo "=== docker-compose smoke (profile=${PROFILE}) ==="
 
+python scripts/check_wiring.py
+
+# Optional: validate documented env keys exist in schema (structural presence).
+if [[ -f schemas/pf-env.schema.json ]]; then
+  python - <<'PY'
+import json, sys
+from pathlib import Path
+schema = json.loads(Path("schemas/pf-env.schema.json").read_text(encoding="utf-8"))
+required_keys = {
+    "PF_PROFILE", "PROFILE", "SIDECAR_URL", "LEDGER_URL", "KERNEL_URL", "PORT",
+}
+missing = required_keys - set(schema.get("properties", {}))
+if missing:
+    print(f"pf-env.schema.json missing properties: {sorted(missing)}", file=sys.stderr)
+    sys.exit(1)
+print("pf-env.schema.json: OK")
+PY
+fi
+
 # Rust service Dockerfiles expect Cargo.lock in their build context (workspace root lockfile).
 if [[ -f Cargo.lock ]]; then
   for ctx in runtime/sidecar-watcher runtime/egress-firewall runtime/attestor; do

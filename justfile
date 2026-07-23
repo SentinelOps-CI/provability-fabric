@@ -6,6 +6,56 @@ pcs_core := env_var_or_default('PCS_CORE_PATH', root / '../pcs-core')
 default:
     @just test-pcs
 
+# ---------- Local launch (thin wrappers over Make / compose contracts) ----------
+# See docs/dev/local-workflows.md for the canonical task → command → ports matrix.
+
+up target="platform":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{target}}" in
+      platform|plat)
+        make platform-up
+        ;;
+      ledger)
+        make ledger-up
+        ;;
+      full)
+        make full-up
+        ;;
+      enforcement|enforce)
+        make enforcement-up
+        ;;
+      sidecar)
+        echo "Local sidecar (compose-aligned port 8006):"
+        echo "  cd runtime/sidecar-watcher && PORT=8006 LEDGER_URL=http://localhost:4000 cargo run"
+        echo "Or: make platform-up  # includes runtime-sidecar"
+        ;;
+      broker|tool-broker)
+        echo "Local tool-broker (KERNEL_URL → sidecar :8006):"
+        echo "  cd runtime/tool-broker && KERNEL_URL=http://localhost:8006 cargo run"
+        echo "Or: make full-up  # starts tool-broker under profile full"
+        ;;
+      *)
+        echo "Usage: just up platform|ledger|sidecar|broker|enforcement|full" >&2
+        exit 1
+        ;;
+    esac
+
+platform-up:
+    make platform-up
+
+ledger-up:
+    make ledger-up
+
+full-up:
+    make full-up
+
+compose-smoke:
+    make compose-smoke
+
+check-wiring:
+    make check-wiring
+
 test-pcs:
     make test-pcs
 

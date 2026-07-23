@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PCSProjectionManifest.v0.schema.json",
+  "title": "PCSProjectionManifest.v0",
+  "description": "Binds proof-relevant Lean identifiers to artifact digests and JSON pointers extracted from a release envelope. Every entry must resolve to a concrete non-empty value; unknown/empty placeholders are forbidden.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "projection_id",
+    "release_id",
+    "workflow_id",
+    "entries",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PCSProjectionManifest.v0" },
+    "projection_id": { "type": "string", "minLength": 1 },
+    "release_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/projection_entry" }
+    },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "projection_entry": {
+      "type": "object",
+      "required": [
+        "artifact_path",
+        "artifact_digest",
+        "json_pointer",
+        "normalized_value",
+        "lean_identifier"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path of the source artifact within the release directory."
+        },
+        "artifact_digest": {
+          "$ref": "common.defs.json#/$defs/hex_digest"
+        },
+        "json_pointer": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^/",
+          "description": "RFC 6901 JSON Pointer into the artifact (or a synthetic pointer for resolved identity hashes)."
+        },
+        "normalized_value": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Normalized proof-relevant value; must never be empty or an unknown placeholder."
+        },
+        "lean_identifier": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+          "description": "Lean identifier or dotted field path receiving this value."
+        }
+      }
+    }
+  }
+}

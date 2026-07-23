@@ -89,15 +89,44 @@ def labelJsonValue (config : LabelerConfig) (state : LabelerState) (value : Json
     ) (state, [])
     (new_state, "object")
 
-/-- Generate Merkle witness for labeled paths -/
-def generateMerkleWitness (state : LabelerState) : String :=
-  -- TODO: generate actual Merkle tree hash from state
-  "merkle_witness_hash"
+/-- Deterministic string hash as hex (Lean `hash`, not cryptographic). -/
+def hexHash (s : String) : String :=
+  toString (hash s)
 
-/-- Generate Bloom filter witness -/
+/-- Pair consecutive leaf hashes (odd last leaf is doubled). -/
+def pairLeaves : List String → List String
+  | [] => []
+  | [x] => [hexHash (x ++ "|" ++ x)]
+  | x :: y :: rest => hexHash (x ++ "|" ++ y) :: pairLeaves rest
+
+/-- Pairwise-reduce leaf hashes into a Merkle root. -/
+partial def merkleRoot (leaves : List String) : String :=
+  match leaves with
+  | [] => hexHash "merkle:empty"
+  | [h] => h
+  | _ => merkleRoot (pairLeaves leaves)
+
+/-- Sorted (path, label) entries from labeler state. -/
+def sortedLabelEntries (state : LabelerState) : List (String × String) :=
+  let pairs := state.labels.fold (fun acc k v => (k, v) :: acc) []
+  (pairs.toArray.qsort (fun a b => decide (a.1 < b.1))).toList
+
+/-- Generate Merkle witness for labeled paths (deterministic over labels + prior witnesses). -/
+def generateMerkleWitness (state : LabelerState) : String :=
+  let leaves :=
+    (sortedLabelEntries state).map (fun (k, v) => hexHash (k ++ "=" ++ v)) ++
+    state.witnesses.map hexHash
+  "merkle:" ++ merkleRoot leaves
+
+/-- 64-bit bloom-style fingerprint over labeled paths (deterministic OR of hashes). -/
 def generateBloomWitness (state : LabelerState) : String :=
-  -- TODO: generate Bloom filter from state
-  "bloom_witness_hash"
+  let mix (acc : UInt64) (s : String) : UInt64 :=
+    acc ||| (hash s)
+  let fromLabels :=
+    (sortedLabelEntries state).foldl
+      (fun acc (k, v) => mix acc (k ++ ":" ++ v)) (0 : UInt64)
+  let bits := state.witnesses.foldl mix fromLabels
+  "bloom:" ++ toString bits
 
 /-- Export labeler to JSON -/
 def exportLabeler (config : LabelerConfig) : Json :=

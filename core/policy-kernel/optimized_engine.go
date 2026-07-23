@@ -335,22 +335,26 @@ func (k *OptimizedKernel) GetPerformanceProfile() *PerformanceProfile {
 	return k.profiler.GetProfile()
 }
 
-// OptimizedDecisionCache provides optimized caching for decisions
+// OptimizedDecisionCache provides in-memory caching with optional Redis L2 via DecisionCache.
+// When redisAddr is non-empty, Get/Set also use DecisionCache (same Redis wiring as NewKernel).
 type OptimizedDecisionCache struct {
-	cache    map[string]*Decision
-	mu       sync.RWMutex
-	maxSize  int
-	ttl      time.Duration
-	redisAddr string
+	cache   map[string]*Decision
+	mu      sync.RWMutex
+	maxSize int
+	ttl     time.Duration
+	l2      *DecisionCache
 }
 
-// NewOptimizedDecisionCache creates a new optimized decision cache
+// NewOptimizedDecisionCache creates a new optimized decision cache.
+// redisAddr enables Redis L2 through DecisionCache (Ping required; falls back to memory-only).
 func NewOptimizedDecisionCache(maxSize int, ttl time.Duration, redisAddr string) *OptimizedDecisionCache {
 	cache := &OptimizedDecisionCache{
-		cache:     make(map[string]*Decision),
-		maxSize:   maxSize,
-		ttl:       ttl,
-		redisAddr: redisAddr,
+		cache:   make(map[string]*Decision),
+		maxSize: maxSize,
+		ttl:     ttl,
+	}
+	if redisAddr != "" {
+		cache.l2 = NewDecisionCache(maxSize, ttl, redisAddr)
 	}
 
 	// Start cleanup goroutine
@@ -359,23 +363,43 @@ func NewOptimizedDecisionCache(maxSize int, ttl time.Duration, redisAddr string)
 	return cache
 }
 
-// Get retrieves a decision from cache
+func optimizedCacheKey(planID string) CacheKey {
+	return CacheKey{
+		PlanHash:    planID,
+		CapsTokenID: "optimized",
+		PolicyHash:  "optimized",
+	}
+}
+
+// RedisEnabled reports whether L2 Redis is active on this cache.
+func (c *OptimizedDecisionCache) RedisEnabled() bool {
+	return c.l2 != nil && c.l2.RedisEnabled()
+}
+
+// Get retrieves a decision from local memory, then Redis L2 when configured.
 func (c *OptimizedDecisionCache) Get(planID string) *Decision {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	if decision, exists := c.cache[planID]; exists {
+		c.mu.RUnlock()
 		return decision
+	}
+	c.mu.RUnlock()
+
+	if c.l2 != nil {
+		if decision, ok := c.l2.Get(optimizedCacheKey(planID)); ok {
+			c.mu.Lock()
+			c.cache[planID] = decision
+			c.mu.Unlock()
+			return decision
+		}
 	}
 
 	return nil
 }
 
-// Set stores a decision in cache
+// Set stores a decision in local memory and Redis L2 when configured.
 func (c *OptimizedDecisionCache) Set(planID string, decision *Decision) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Check cache size
 	if len(c.cache) >= c.maxSize {
 		// Remove oldest entry (simple FIFO for now)
@@ -384,8 +408,12 @@ func (c *OptimizedDecisionCache) Set(planID string, decision *Decision) {
 			break
 		}
 	}
-
 	c.cache[planID] = decision
+	c.mu.Unlock()
+
+	if c.l2 != nil && decision != nil {
+		_ = c.l2.Set(optimizedCacheKey(planID), *decision)
+	}
 }
 
 // cleanup removes expired entries from cache

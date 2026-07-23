@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use tracing::{info, debug, error, warn};
+use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
 
 use crate::{ComplianceLevel, MpcSignatureResult, FinancialTransaction};
@@ -269,6 +269,7 @@ struct MonitoringConfig {
 }
 
 /// Compliance validator trait
+#[async_trait::async_trait]
 trait ComplianceValidator: Send + Sync {
     async fn validate(&self, transaction: &FinancialTransaction, context: &SecurityContext) -> Result<CheckResult, AuditError>;
 }
@@ -472,7 +473,7 @@ impl AuditManager {
         };
         
         // Create compliance verification
-        let compliance_verification = self.verify_compliance(&signature_result, &event_data).await?;
+        let compliance_verification = self.verify_compliance(signature_result, &event_data).await?;
         
         // Calculate entry hash
         let previous_hash = self.audit_storage.last_hash.clone();
@@ -493,7 +494,7 @@ impl AuditManager {
     }
     
     /// Verify compliance for the operation
-    async fn verify_compliance(&self, signature_result: &MpcSignatureResult, event_data: &AuditEventData) -> Result<ComplianceVerificationResult, AuditError> {
+    async fn verify_compliance(&self, _signature_result: &MpcSignatureResult, event_data: &AuditEventData) -> Result<ComplianceVerificationResult, AuditError> {
         let mut check_results = HashMap::new();
         
         // Run all compliance validators
@@ -647,7 +648,7 @@ impl AuditManager {
 
 impl AuditStorage {
     async fn store_entry(&mut self, entry: &AuditEntry) -> Result<(), AuditError> {
-        let transaction_entries = self.entries.entry(entry.transaction_id.clone()).or_insert_with(Vec::new);
+        let transaction_entries = self.entries.entry(entry.transaction_id.clone()).or_default();
         transaction_entries.push(entry.clone());
         
         // Update last hash for chain integrity
@@ -764,7 +765,7 @@ impl ComplianceValidator for BaselValidator {
 #[async_trait::async_trait]
 impl ComplianceValidator for GDPRValidator {
     async fn validate(&self, _transaction: &FinancialTransaction, context: &SecurityContext) -> Result<CheckResult, AuditError> {
-        let privacy_compliant = context.encryption_details.algorithm.len() > 0;
+        let privacy_compliant = !context.encryption_details.algorithm.is_empty();
         
         Ok(CheckResult {
             check_name: "GDPR Compliance".to_string(),

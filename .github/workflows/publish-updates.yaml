@@ -1,7 +1,8 @@
 name: Publish Updates
 
 # CI dry-run: fixture metrics → packaged/signed artifact against mock registry.
-# Live publish remains workflow_dispatch with dry_run=false.
+# Live publish: workflow_dispatch with dry_run=false; fail-closed without registry secrets.
+# Live docs/updates.md lands via PR (protected-branch / review policy); no direct push to main.
 on:
   push:
     branches: [main, develop]
@@ -18,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry-run with fixture metrics (no push)"
+        description: "Dry-run with fixture metrics (no live registry / no PR)"
         required: false
         default: true
         type: boolean
@@ -26,10 +27,16 @@ on:
 jobs:
   publish-updates:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Needed so live path can open a PR from a bot branch.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Dry-run publish + package/sign
+      - name: Dry-run publish + package/sign (mock registry)
         if: github.event_name != 'workflow_dispatch' || inputs.dry_run == true
         env:
           PUBLISH_UPDATES_DRY_RUN: "1"
@@ -66,25 +73,106 @@ jobs:
           print("publish package assertions ok")
           PY
 
-      - name: Live publish
+      - name: Live publish (fail-closed without registry secrets)
+        id: live
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATES_REGISTRY_URL: ${{ secrets.UPDATES_REGISTRY_URL }}
+          UPDATES_REGISTRY_TOKEN: ${{ secrets.UPDATES_REGISTRY_TOKEN }}
+          PUBLISH_UPDATES_SIGNING_KEY: ${{ secrets.PUBLISH_UPDATES_SIGNING_KEY }}
+          PUBLISH_UPDATES_METRICS_JSON: ${{ secrets.PUBLISH_UPDATES_METRICS_JSON }}
+          PUBLISH_UPDATES_PACKAGE_DIR: artifacts/updates-package
+          PUBLISH_UPDATES_LIVE_REGISTRY: "1"
         run: |
+          set -euo pipefail
+          missing=()
+          [ -z "${UPDATES_REGISTRY_URL:-}" ] && missing+=("UPDATES_REGISTRY_URL")
+          [ -z "${PUBLISH_UPDATES_SIGNING_KEY:-}" ] && missing+=("PUBLISH_UPDATES_SIGNING_KEY")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "error: live publish invoked without secrets: ${missing[*]}" >&2
+            echo "fail-closed: configure registry secrets and re-dispatch dry_run=false" >&2
+            exit 1
+          fi
+
+          # Optional: write operator metrics blob from secret to a temp file.
+          if [ -n "${PUBLISH_UPDATES_METRICS_JSON:-}" ] && [ "${PUBLISH_UPDATES_METRICS_JSON:0:1}" = "{" ]; then
+            printf '%s\n' "$PUBLISH_UPDATES_METRICS_JSON" > /tmp/live-publish-metrics.json
+            export PUBLISH_UPDATES_METRICS_JSON=/tmp/live-publish-metrics.json
+          fi
+
           python tools/metrics/publish_updates.py
+          test -f docs/updates.md
+          grep -q "Recent Updates" docs/updates.md
+
+          python tools/metrics/package_updates_artifact.py \
+            --src docs/updates.md \
+            --out-dir artifacts/updates-package \
+            --live-registry \
+            --registry-url "$UPDATES_REGISTRY_URL" \
+            --registry-token "${UPDATES_REGISTRY_TOKEN:-}" \
+            --signing-key "$PUBLISH_UPDATES_SIGNING_KEY"
+
+          python3 - <<'PY'
+          import json
+          r = json.load(open("artifacts/updates-package/package-report.json", encoding="utf-8"))
+          assert r.get("live_registry") is True, r
+          assert r.get("sha256")
+          assert r.get("registry_url")
+          print("live_registry=true assertions ok")
+          PY
+
+          # Protected-branch policy: open PR instead of pushing to main.
+          BRANCH="chore/live-updates-$(date -u +%Y%m%d%H%M%S)"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git checkout -b "$BRANCH"
           git add docs/updates.md
-          git commit -m "Update metrics [skip ci]" || exit 0
-          git push
+          if git diff --cached --quiet; then
+            echo "docs/updates.md unchanged; skipping PR"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: refresh docs/updates.md from live metrics publish"
+            git push -u origin "$BRANCH"
+            PR_URL=$(gh pr create \
+              --title "chore: refresh docs/updates.md (live publish)" \
+              --body "$(cat <<'EOF'
+          ## Summary
+          - Live \`publish-updates\` run with \`dry_run=false\`
+          - Metrics regenerated into \`docs/updates.md\`
+          - Signed package uploaded to live registry (\`live_registry: true\`)
 
-      - name: Upload dry-run artifacts
+          ## Review notes
+          - Protected branch: merge via review (do not push \`docs/updates.md\` directly to main from CI)
+          - Confirm package-report artifact shows \`live_registry: true\`
+
+          EOF
+          )" --base main)
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "Opened PR: $PR_URL"
+          fi
+
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: updates-dry-run-package
+          name: updates-package
           path: |
             docs/updates.dry-run.md
+            docs/updates.md
             artifacts/updates-package/
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Summarize
+        if: always()
+        run: |
+          if [ -f artifacts/updates-package/package-report.json ]; then
+            echo "### publish-updates package-report" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat artifacts/updates-package/package-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "${{ steps.live.outputs.pr_url }}" ]; then
+            echo "Live docs PR: ${{ steps.live.outputs.pr_url }}" >> "$GITHUB_STEP_SUMMARY"
+          fi

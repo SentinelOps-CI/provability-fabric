@@ -1,10 +1,14 @@
-# ci_workflow_inventory.ps1 - PowerShell equivalent of ci_workflow_inventory.sh
+﻿# ci_workflow_inventory.ps1 - PowerShell equivalent of ci_workflow_inventory.sh
+#
+# Inventory honesty (Wave E3.5):
+#   "Gated" / inventory-gated means last main-branch run must be success.
+#   Path-filtered and schedule-only workflows need not run on every tip push.
 #
 # Usage:
 #   scripts/ci_workflow_inventory.ps1 [-ListOnly] [-Markdown [FILE]]
 #
 # Requires: gh CLI authenticated for GitHub API queries.
-# Exit 0 when all gated workflows have conclusion=success on the last main run.
+# Exit 0 when all inventory-gated workflows have conclusion=success on the last main run.
 
 param(
     [switch]$ListOnly,
@@ -37,6 +41,24 @@ function Test-WorkflowHasPushOrSchedule {
     return $false
 }
 
+function Get-WorkflowGateKind {
+    param([string]$FilePath)
+    $content = Get-Content -Raw -Path $FilePath
+    $hasPush = ($content -match '(?m)^\s*push:') -or ($content -match 'on:\s*\[.*\bpush\b')
+    $hasSchedule = ($content -match '(?m)^\s*schedule:') -or ($content -match 'on:\s*\[.*\bschedule\b')
+    $hasPaths = $content -match '(?m)^\s+paths(-ignore)?:'
+    if ($hasPush -and $hasSchedule) {
+        if ($hasPaths) { return "mixed-path" }
+        return "mixed"
+    }
+    if ($hasPush) {
+        if ($hasPaths) { return "path-push" }
+        return "always-push"
+    }
+    if ($hasSchedule) { return "schedule" }
+    return $MissingUrl
+}
+
 function Get-WorkflowTriggers {
     param([string]$FilePath)
     $content = Get-Content -Raw -Path $FilePath
@@ -67,6 +89,8 @@ function Get-LastMainRun {
 
 $total = 0
 $gated = 0
+$alwaysPush = 0
+$pathOrSchedule = 0
 $green = 0
 $red = 0
 $unknown = 0
@@ -74,8 +98,9 @@ $failures = @()
 $mdRows = @()
 
 Write-Host "CI workflow inventory - repo=$Repo branch=$Branch"
-Write-Host ("{0,-42} {1,-28} {2,-12} {3}" -f "WORKFLOW", "TRIGGERS", "STATUS", "URL")
-Write-Host ("-" * 110)
+Write-Host "Note: inventory-gated = last main run must be success; path/schedule workflows need not run every push."
+Write-Host ("{0,-42} {1,-28} {2,-14} {3,-12} {4}" -f "WORKFLOW", "TRIGGERS", "GATE_KIND", "STATUS", "URL")
+Write-Host ("-" * 120)
 
 $workflowFiles = @(
     Get-ChildItem -Path $WfDir -Filter *.yml -File -ErrorAction SilentlyContinue
@@ -86,6 +111,7 @@ foreach ($wf in $workflowFiles) {
     $fname = $wf.Name
     $total++
     $triggers = Get-WorkflowTriggers -FilePath $wf.FullName
+    $gateKind = Get-WorkflowGateKind -FilePath $wf.FullName
     $run = Get-LastMainRun -WorkflowFile $fname
     $status = $run.Status
     $url = $run.Url
@@ -103,23 +129,26 @@ foreach ($wf in $workflowFiles) {
         $gated++
         $gateSuffix = "*"
         $gatedFlag = "yes"
+        if ($gateKind -eq "always-push") { $alwaysPush++ } else { $pathOrSchedule++ }
         if ($status -ne "success") {
-            $failures += "$fname ($status)"
+            $failures += "$fname ($status) [$gateKind]"
         }
     }
 
-    Write-Host ("{0,-42} {1,-28} {2,-12} {3}" -f $fname, $triggers, "$status$gateSuffix", $url)
+    Write-Host ("{0,-42} {1,-28} {2,-14} {3,-12} {4}" -f $fname, $triggers, $gateKind, "$status$gateSuffix", $url)
     $mdRows += [PSCustomObject]@{
         Workflow = $fname
         Triggers = $triggers
         Status   = $status
         Gated    = $gatedFlag
+        GateKind = $gateKind
         Url      = $url
     }
 }
 
 Write-Host ""
-Write-Host "Summary: total=$total gated(push/schedule)=$gated green=$green red=$red unknown=$unknown"
+Write-Host "Summary: total=$total inventory-gated=$gated (always-push=$alwaysPush path/schedule/mixed=$pathOrSchedule) green=$green red=$red unknown=$unknown"
+Write-Host "Criterion: last main run success for inventory-gated workflows - not 'must run on every push'."
 
 if ($Markdown) {
     $generatedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -129,30 +158,35 @@ if ($Markdown) {
     [void]$sb.AppendLine("Generated: ${generatedAt} UTC")
     [void]$sb.AppendLine("Repository: ``$Repo`` branch ``$Branch``")
     [void]$sb.AppendLine("")
+    [void]$sb.AppendLine("**Inventory honesty:** gated = last main-branch run must be ``success``.")
+    [void]$sb.AppendLine("Path-filtered and schedule-only workflows are **not** required to run on every tip push.")
+    [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## Summary")
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("| Metric | Count |")
     [void]$sb.AppendLine("|--------|------:|")
     [void]$sb.AppendLine("| Total workflow files | $total |")
-    [void]$sb.AppendLine("| Gated (push/schedule on main) | $gated |")
+    [void]$sb.AppendLine("| Inventory-gated (push/schedule) | $gated |")
+    [void]$sb.AppendLine("| Always-push (no path filter) | $alwaysPush |")
+    [void]$sb.AppendLine("| Path-push / schedule / mixed | $pathOrSchedule |")
     [void]$sb.AppendLine("| Green (last run success) | $green |")
     [void]$sb.AppendLine("| Red (failure/cancelled/in progress) | $red |")
     [void]$sb.AppendLine("| No run / unknown | $unknown |")
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## Workflows")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| Workflow | Triggers | Last status | Gated | URL |")
-    [void]$sb.AppendLine("|----------|----------|-------------|-------|-----|")
+    [void]$sb.AppendLine("| Workflow | Triggers | Gate kind | Last status | Gated | URL |")
+    [void]$sb.AppendLine("|----------|----------|-----------|-------------|-------|-----|")
     foreach ($row in $mdRows) {
         $displayStatus = $row.Status
         if ($row.Gated -eq "yes" -and $row.Status -ne "success") {
             $displayStatus = "**$($row.Status)**"
         }
-        [void]$sb.AppendLine("| ``$($row.Workflow)`` | $($row.Triggers) | $displayStatus | $($row.Gated) | $($row.Url) |")
+        [void]$sb.AppendLine("| ``$($row.Workflow)`` | $($row.Triggers) | $($row.GateKind) | $displayStatus | $($row.Gated) | $($row.Url) |")
     }
     if ($failures.Count -gt 0) {
         [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("## Gated workflows not green")
+        [void]$sb.AppendLine("## Inventory-gated workflows not green")
         [void]$sb.AppendLine("")
         foreach ($f in $failures) {
             [void]$sb.AppendLine("- ``$f``")
@@ -168,7 +202,7 @@ if ($ListOnly) {
 
 if ($failures.Count -gt 0) {
     Write-Host ""
-    Write-Host "Gated workflows not green on last $Branch run:" -ForegroundColor Red
+    Write-Host "Inventory-gated workflows not green on last $Branch run:" -ForegroundColor Red
     foreach ($f in $failures) {
         Write-Host "  - $f"
     }

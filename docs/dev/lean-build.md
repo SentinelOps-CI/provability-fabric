@@ -120,8 +120,8 @@ When updating to a new mathlib version:
 
 The `.github/workflows/lean-offline.yaml` workflow has two jobs:
 
-1. **`lean-offline-smoke`** (push/PR/schedule) — compiles `Runtime.MicroInterp` without mathlib and runs the scoped sorry scan.
-2. **`lean-offline-full`** (Monday schedule + `workflow_dispatch` with `full=true`) — vendors mathlib, materializes Lake deps online (`lake update`, including std), blocks network via `iptables`/`ip6tables`, builds core/spec/bundle Lean projects offline, and uploads a short report.
+1. **`lean-offline-smoke`** (push/PR/schedule) — compiles `Runtime.MicroInterp` without mathlib and runs the scoped sorry scan (ENFORCED includes MicroInterp; does **not** pull full mathlib).
+2. **`lean-offline-full`** (Monday schedule + `workflow_dispatch` with `full=true`) — vendors mathlib, materializes Lake deps online (`lake update`, including std), blocks network via `iptables`/`ip6tables`, builds core/spec/bundle Lean projects offline (including `ActionDSL.Extended` + `Runtime.ExtendedAdapter`), and uploads a short report.
 
 Full-job cache paths include `vendor/mathlib/.git` and `.lake`, and the cache key matches `lean-style.yaml` so weekly runs restore a warm vendor tree. Historical tip cancels hung on cold `lake exe cache get` when `.git` was omitted from the cache. Offline builds require the Lake package graph (e.g. std) to be materialized before the network block.
 

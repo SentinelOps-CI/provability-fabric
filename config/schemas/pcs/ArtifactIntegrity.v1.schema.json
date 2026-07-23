@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ArtifactIntegrity.v1.schema.json",
+  "title": "ArtifactIntegrity.v1",
+  "description": "Normative v1 integrity envelope separating content digest from cryptographic signature. Domain-separated signing message: PCS:<artifact_type>:<schema_version>:<artifact_digest>.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "canonicalization_version",
+    "artifact_digest",
+    "signature"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version_v1" },
+    "artifact_type": { "type": "string", "minLength": 1 },
+    "canonicalization_version": {
+      "$ref": "common.defs.json#/$defs/canonicalization_version"
+    },
+    "artifact_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "signature": { "$ref": "common.defs.json#/$defs/ed25519_signature_envelope" },
+    "signature_or_digest": {
+      "description": "Forbidden on v1 integrity envelopes; retained only for documentation of v0 compatibility readers.",
+      "not": {}
+    }
+  }
+}

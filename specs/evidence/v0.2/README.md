@@ -48,8 +48,8 @@ Optional `replay_context` enables deep replay (`pf evidence replay --execute [--
 
 ## Related docs
 
-- [Evidence model v0.1](../../../docs/specs/evidence-model-v0.1.md) — shared artifact roles
-- [Evidence v0.2 integration](../../../docs/roadmap/evidence-v0.2.md) — definition of done
-- [Evidence v0.2 status](../../../docs/roadmap/evidence-v0.2-status.md) — delivery tracker
-- [Compatibility matrix](../../../docs/specs/evidence-compatibility.md) — v0.1 vs v0.2 vs PCS
-- [Evidence v0.1 schemas](../v0.1/README.md) — prior schema lane
+- [Evidence model v0.1](../../../docs/specs/evidence-model-v0.1.md) â€” shared artifact roles
+- [Evidence v0.2 integration](../../../docs/roadmap/evidence-v0.2.md) â€” definition of done
+- [Evidence v0.2 status](../../../docs/roadmap/evidence-v0.2-status.md) â€” delivery tracker
+- [Compatibility matrix](../../../docs/specs/evidence-compatibility.md) â€” v0.1 vs v0.2 vs PCS
+- [Evidence v0.1 schemas](../v0.1/README.md) â€” prior schema lane

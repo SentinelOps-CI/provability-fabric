@@ -18,9 +18,9 @@ limitations under the License.
 # Runtime micro-interpreter and ActionDSL↔DFA coupling (F33 / P4)
 
 Lands P4.1–P4.3 generator coupling that previously blocked `dfa_semantics_match`.
-Types are self-contained (string-keyed events/clauses) so this lake target builds
-without depending on the unfinished `ActionDSL.Extended` surface. A later thin
-adapter can map Extended clauses into `ActionClause` once that module compiles.
+Types are self-contained (string-keyed events/clauses) so this module builds
+without mathlib — required by lean-offline-smoke. The thin Extended adapter lives
+in `Runtime.ExtendedAdapter` (maps `PF.ActionDSL.Event` → string/`ActionClause`).
 -/
 
 namespace PF.Runtime
@@ -28,11 +28,11 @@ namespace PF.Runtime
 /-- Runtime event label (string-keyed; adapter target for Extended.Event). -/
 abbrev Event := String
 
-/-- Role / tool placeholders for semantics.Allowed. -/
+/-- Role / tool string aliases for semantics.Allowed (not unimplemented stubs). -/
 abbrev Role := String
 abbrev Tool := String
 
-/-- Interpreter state placeholder. -/
+/-- Interpreter state carrier (label field only in the mathlib-free smoke surface). -/
 structure State where
   label : String := ""
   deriving Repr, BEq, DecidableEq

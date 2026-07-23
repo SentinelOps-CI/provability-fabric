@@ -137,6 +137,9 @@
         "lean_environment_hash": {
           "$ref": "common.defs.json#/$defs/hex_digest"
         },
+        "pcs_projection_manifest_hash": {
+          "$ref": "common.defs.json#/$defs/hex_digest"
+        },
         "disclaimer": {
           "type": "string"
         },
@@ -221,7 +224,26 @@
           "items": {
             "type": "string",
             "minLength": 1
-          }
+          },
+          "description": "Legacy v0 compat field; prefer kernel_theorems_available / concrete_theorems_*."
+        },
+        "kernel_theorems_available": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "concrete_theorems_generated": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "concrete_theorems_compiled": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "semantic_projection_hash": {
+          "$ref": "common.defs.json#/$defs/hex_digest"
+        },
+        "theorem_manifest_hash": {
+          "$ref": "common.defs.json#/$defs/hex_digest"
         },
         "lean_build_status": {
           "type": "object",

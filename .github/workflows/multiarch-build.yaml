@@ -1,5 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
+#
+# Wave 11.1 CI cost:
+# - Path-filtered to Dockerfiles + related Rust sources.
+# - Push/PR: linux/amd64 only (native ubuntu-latest; no QEMU).
+# - Schedule / version tags / workflow_dispatch: dual-arch via native
+#   ubuntu-latest (amd64) + ubuntu-24.04-arm (arm64); no QEMU.
+# - Simulated canary / perf / cost jobs removed (were greenwashing).
 
 name: Multi-Architecture Build & Deploy
 
@@ -7,17 +14,42 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths:
+      - "runtime/sidecar-watcher/Dockerfile"
+      - "runtime/sidecar-watcher/**"
+      - "runtime/egress-firewall/Dockerfile"
+      - "runtime/egress-firewall/**"
+      - "runtime/attestor/Dockerfile"
+      - "runtime/attestor/**"
+      - "core/crypto/dsse-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/multiarch-build.yaml"
   pull_request:
     branches: [main]
+    paths:
+      - "runtime/sidecar-watcher/Dockerfile"
+      - "runtime/sidecar-watcher/**"
+      - "runtime/egress-firewall/Dockerfile"
+      - "runtime/egress-firewall/**"
+      - "runtime/attestor/Dockerfile"
+      - "runtime/attestor/**"
+      - "core/crypto/dsse-rs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/multiarch-build.yaml"
+  schedule:
+    # Weekly dual-arch rebuild (native amd64 + arm runners).
+    - cron: "0 4 * * 0"
   workflow_dispatch:
     inputs:
       platform:
-        description: "Target platform(s)"
+        description: "Target platform(s): linux/amd64, linux/arm64, or both"
         required: false
         default: "linux/amd64,linux/arm64"
         type: string
       service:
-        description: "Specific service to build"
+        description: "Specific service to build (or all)"
         required: false
         default: "all"
         type: string
@@ -31,24 +63,107 @@ permissions:
   packages: write
 
 jobs:
-  # Multi-architecture build job
-  build:
-    name: Build Multi-Arch Images
+  resolve-matrix:
+    name: Resolve build matrix
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      dual_arch: ${{ steps.set.outputs.dual_arch }}
+      services: ${{ steps.set.outputs.services }}
+    steps:
+      - name: Write matrix JSON
+        id: set
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          INPUT_PLATFORM: ${{ github.event.inputs.platform || 'linux/amd64,linux/arm64' }}
+          INPUT_SERVICE: ${{ github.event.inputs.service || 'all' }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+
+          event = os.environ["EVENT_NAME"]
+          ref = os.environ["REF"]
+          platforms = os.environ["INPUT_PLATFORM"]
+          service_filter = os.environ["INPUT_SERVICE"]
+
+          want_amd64 = True
+          want_arm64 = False
+          dual = False
+
+          if event == "pull_request":
+              pass
+          elif event == "push":
+              if ref.startswith("refs/tags/v"):
+                  want_arm64 = True
+                  dual = True
+          elif event == "schedule":
+              want_arm64 = True
+              dual = True
+          elif event == "workflow_dispatch":
+              want_amd64 = "amd64" in platforms
+              want_arm64 = "arm64" in platforms
+              if not want_amd64 and not want_arm64:
+                  want_amd64 = True
+                  want_arm64 = True
+              dual = want_amd64 and want_arm64
+
+          services = [
+              {
+                  "service": "sidecar-watcher",
+                  "dockerfile": "runtime/sidecar-watcher/Dockerfile",
+                  "context": ".",
+              },
+              {
+                  "service": "egress-firewall",
+                  "dockerfile": "runtime/egress-firewall/Dockerfile",
+                  "context": "runtime/egress-firewall",
+              },
+              {
+                  "service": "attestor",
+                  "dockerfile": "runtime/attestor/Dockerfile",
+                  "context": "runtime/attestor",
+              },
+          ]
+          if service_filter and service_filter != "all":
+              services = [s for s in services if s["service"] == service_filter]
+              if not services:
+                  raise SystemExit(f"unknown service filter: {service_filter!r}")
+
+          arches = []
+          if want_amd64:
+              arches.append(
+                  {"platform": "linux/amd64", "runner": "ubuntu-latest", "arch": "amd64"}
+              )
+          if want_arm64:
+              arches.append(
+                  {
+                      "platform": "linux/arm64",
+                      "runner": "ubuntu-24.04-arm",
+                      "arch": "arm64",
+                  }
+              )
+
+          matrix = {"include": [{**s, **a} for s in services for a in arches]}
+          service_names = [s["service"] for s in services]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={json.dumps(matrix, separators=(',', ':'))}\n")
+              fh.write(f"dual_arch={'true' if dual else 'false'}\n")
+              fh.write(f"services={json.dumps(service_names, separators=(',', ':'))}\n")
+          print(json.dumps(matrix, indent=2))
+          print(f"dual_arch={dual}")
+          print(f"services={service_names}")
+          PY
+
+  build:
+    name: Build (${{ matrix.service }} / ${{ matrix.arch }})
+    needs: resolve-matrix
+    runs-on: ${{ matrix.runner }}
     strategy:
-      # Let other matrix images finish push even if one job fails (e.g. cache backend).
       fail-fast: false
-      matrix:
-        include:
-          - service: sidecar-watcher
-            dockerfile: runtime/sidecar-watcher/Dockerfile
-            context: .
-          - service: egress-firewall
-            dockerfile: runtime/egress-firewall/Dockerfile
-            context: runtime/egress-firewall
-          - service: attestor
-            dockerfile: runtime/attestor/Dockerfile
-            context: runtime/attestor
+      matrix: ${{ fromJson(needs.resolve-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout repository
@@ -63,11 +178,6 @@ jobs:
           if [ "${{ matrix.context }}" != "." ]; then
             cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
           fi
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -88,6 +198,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          flavor: |
+            suffix=-${{ matrix.arch }},onlatest=true
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -101,48 +213,36 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
           load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }}
           # ignore-error: GHA cache export 400s must not fail the job after a successful
           # GHCR push (build+push is the gate; cache is best-effort).
-          cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || 'type=gha,mode=max,ignore-error=true' }}
+          cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || format('type=gha,mode=max,scope={0}-{1},ignore-error=true', matrix.service, matrix.arch) }}
 
       - name: Image size report
         if: github.event_name != 'pull_request'
         run: |
-          echo "## Image Size Report for ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
-          echo "| Platform | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "## Image Size Report for ${{ matrix.service }} (${{ matrix.platform }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Platform | Notes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ${{ matrix.platform }} | Native runner \`${{ matrix.runner }}\` (no QEMU) |" >> "$GITHUB_STEP_SUMMARY"
 
-          # Get image sizes for both platforms
-          for platform in amd64 arm64; do
-            size=$(docker images --format "table {{.Size}}" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ steps.meta.outputs.version }}-$platform 2>/dev/null | tail -n +2 || echo "N/A")
-            echo "| linux/$platform | $size |" >> $GITHUB_STEP_SUMMARY
-          done
-
-  # Performance testing job
-  performance-test:
-    name: Performance Testing
+  merge-manifests:
+    name: Merge multi-arch manifests
+    needs: [resolve-matrix, build]
+    if: >
+      needs.resolve-matrix.outputs.dual_arch == 'true'
+      && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name != 'pull_request'
-
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.resolve-matrix.outputs.services) }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -150,26 +250,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run performance tests
+      - name: Create multi-arch manifest (sha + latest on default branch)
+        env:
+          SERVICE: ${{ matrix.service }}
+          SHA_SHORT: ${{ github.sha }}
+          GIT_REF: ${{ github.ref }}
+          GIT_REF_NAME: ${{ github.ref_name }}
         run: |
-          echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Testing ARM vs x86 performance..." >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          repo="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
+          short="$(echo "${SHA_SHORT}" | cut -c1-7)"
+          base="${{ env.REGISTRY }}/${owner}/${repo}/${SERVICE}"
 
-          # This would run actual performance benchmarks
-          # For now, we'll simulate the testing
-          echo "| Metric | x86_64 | ARM64 | Difference |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|--------|-------|------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Startup Time | 150ms | 180ms | +20% |" >> $GITHUB_STEP_SUMMARY
-          echo "| Memory Usage | 45MB | 42MB | -7% |" >> $GITHUB_STEP_SUMMARY
-          echo "| CPU Usage | 15% | 18% | +20% |" >> $GITHUB_STEP_SUMMARY
+          amd="${base}:sha-${short}-amd64"
+          arm="${base}:sha-${short}-arm64"
+          echo "Merging ${amd} + ${arm} -> ${base}:sha-${short}"
+          docker buildx imagetools create -t "${base}:sha-${short}" "${amd}" "${arm}"
 
-          echo "✅ Performance testing completed"
+          if [ "${GIT_REF}" = "refs/heads/main" ] || [[ "${GIT_REF}" == refs/tags/v* ]]; then
+            docker buildx imagetools create -t "${base}:latest" \
+              "${base}:latest-amd64" "${base}:latest-arm64" || \
+              echo "::warning::latest-* tags missing; sha manifest created only"
+          fi
 
-  # Security scanning job
+          if [[ "${GIT_REF}" == refs/tags/v* ]]; then
+            tag="${GIT_REF_NAME}"
+            docker buildx imagetools create -t "${base}:${tag}" \
+              "${base}:${tag}-amd64" "${base}:${tag}-arm64" || \
+              echo "::warning::semver arch tags missing for ${tag}"
+          fi
+
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build]
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -181,15 +296,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Resolve GHCR image ref
+      - name: Resolve GHCR image ref (amd64)
         id: image
         run: |
           set -euo pipefail
-          # GHCR paths are lowercase; build job tags sha-<7> via docker/metadata-action.
+          # GHCR paths are lowercase; build job tags sha-<7>-amd64 via metadata flavor.
           owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           repo="$(echo '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')"
           short="$(echo '${{ github.sha }}' | cut -c1-7)"
-          echo "ref=${{ env.REGISTRY }}/${owner}/${repo}/sidecar-watcher:sha-${short}" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ env.REGISTRY }}/${owner}/${repo}/sidecar-watcher:sha-${short}-amd64" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -210,67 +325,3 @@ jobs:
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
-
-  # Deployment job (canary)
-  deploy-canary:
-    name: Deploy Canary
-    runs-on: ubuntu-latest
-    needs: [build, performance-test, security-scan]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Deploy to canary environment
-        run: |
-          echo "## Canary Deployment" >> $GITHUB_STEP_SUMMARY
-          echo "Deploying multi-architecture images to canary environment..." >> $GITHUB_STEP_SUMMARY
-
-          # This would deploy to a canary environment
-          # For now, we'll simulate the deployment
-          echo "✅ Canary deployment initiated"
-          echo "Monitoring deployment health..."
-
-          # Simulate health checks
-          sleep 30
-          echo "✅ Canary deployment healthy"
-
-      - name: Rollback plan
-        if: failure()
-        run: |
-          echo "## Rollback Plan" >> $GITHUB_STEP_SUMMARY
-          echo "🚨 Deployment failed, initiating rollback..." >> $GITHUB_STEP_SUMMARY
-          echo "1. Scale down canary deployment" >> $GITHUB_STEP_SUMMARY
-          echo "2. Restore previous stable version" >> $GITHUB_STEP_SUMMARY
-          echo "3. Verify system health" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Rollback completed"
-
-  # Cost analysis job
-  cost-analysis:
-    name: Cost Analysis
-    runs-on: ubuntu-latest
-    needs: [build, performance-test]
-    if: github.event_name != 'pull_request'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Calculate cost savings
-        run: |
-          echo "## Cost Analysis for ARM/Graviton Migration" >> $GITHUB_STEP_SUMMARY
-          echo "Based on performance test results:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Estimated Savings" >> $GITHUB_STEP_SUMMARY
-          echo "- **Compute Cost**: 20-35% reduction" >> $GITHUB_STEP_SUMMARY
-          echo "- **Memory Cost**: 7% reduction" >> $GITHUB_STEP_SUMMARY
-          echo "- **Storage Cost**: Similar (no change)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Migration Recommendations" >> $GITHUB_STEP_SUMMARY
-          echo "1. Start with non-critical workloads" >> $GITHUB_STEP_SUMMARY
-          echo "2. Monitor performance closely" >> $GITHUB_STEP_SUMMARY
-          echo "3. Gradual rollout with canary deployments" >> $GITHUB_STEP_SUMMARY
-          echo "4. Set up automated rollback triggers" >> $GITHUB_STEP_SUMMARY
-
-          echo "✅ Cost analysis completed"

@@ -71,32 +71,23 @@ def export_canonical_json (dfa : ActionDSL.ProductDFA) (config : ExportConfig) :
   else
     return json_obj.pretty
 
-/-- Generate SHA-256 hash of canonical JSON -/
-def generate_sha256 (json_content : String) : IO String := do
-  -- Deterministic hash-like value until SHA-256 library is wired in
-  let hash := "sha256:" ++ (toString (json_content.hash))
-  return hash
+/--
+Export DFA JSON to `config.output_path`.
 
-/-- Export DFA to file with hash -/
+Integrity hashing is **not** performed here: the advertised lake executable and CI
+path live under `core/lean-libs/ExportDFA.lean`, and hosts compute SHA-256 externally
+(e.g. `sha256sum` in `.github/workflows/dfa.yaml`). This module is a non-executable
+mirror kept for path-filter / inventory references only.
+-/
 def export_dfa (config : ExportConfig) : IO Unit := do
-  -- Parse bundle and compile to DFA
-  let dfa := Fabric.ActionDSL.compile_to_dfa [] -- Simplified for now
-
-  -- Export canonical JSON
+  let dfa := Fabric.ActionDSL.compile_to_dfa []
   let json_content ← export_canonical_json dfa config
-  let hash ← generate_sha256 json_content
-
-  -- Write JSON file
   IO.FS.writeFile config.output_path json_content
-
-  -- Write hash file
-  let hash_path := config.output_path.replace ".json" ".sha256.txt"
-  IO.FS.writeFile hash_path hash
-
   IO.println s!"DFA exported to: {config.output_path}"
-  IO.println s!"Hash: {hash}"
+  if config.include_hash then
+    IO.println "Note: SHA-256 is host-side (sha256sum); not emitted by this Lean module."
 
-/-- Main entry point -/
+/-- Main entry point (not registered as a lake exe; prefer core/lean-libs ExportDFA). -/
 def main (args : List String) : IO UInt32 := do
   match args with
   | ["--bundle", bundle_path, "--out", output_path] =>
@@ -105,6 +96,7 @@ def main (args : List String) : IO UInt32 := do
     return 0
   | _ =>
     IO.println "Usage: export-dfa --bundle <bundle_path> --out <output_path>"
+    IO.println "Canonical executable: cd core/lean-libs && lake exe ExportDFA ..."
     return 1
 
 end Fabric.ExportDFA

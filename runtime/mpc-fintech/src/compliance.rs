@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug};
 
 use crate::{ComplianceLevel, FinancialTransaction};
 
@@ -487,7 +487,7 @@ impl ComplianceValidator {
         debug!("Validating compliance for transaction: {}", transaction.transaction_id);
         
         let mut rule_results = Vec::new();
-        let mut risk_score = 0.0;
+        let mut risk_score: f64 = 0.0;
         let mut required_actions = Vec::new();
         
         // Validate against all applicable rules
@@ -525,15 +525,15 @@ impl ComplianceValidator {
         
         // Determine overall compliance status
         let has_critical_violations = rule_results.iter().any(|r| !r.passed && 
-            self.compliance_rules.get(&r.rule_id).map_or(false, |rule| 
+            self.compliance_rules.get(&r.rule_id).is_some_and(|rule| 
                 matches!(rule.severity, RuleSeverity::Critical) && rule.mandatory));
         
         let has_error_violations = rule_results.iter().any(|r| !r.passed && 
-            self.compliance_rules.get(&r.rule_id).map_or(false, |rule| 
+            self.compliance_rules.get(&r.rule_id).is_some_and(|rule| 
                 matches!(rule.severity, RuleSeverity::Error) && rule.mandatory));
         
         let has_warnings = rule_results.iter().any(|r| !r.passed && 
-            self.compliance_rules.get(&r.rule_id).map_or(false, |rule| 
+            self.compliance_rules.get(&r.rule_id).is_some_and(|rule| 
                 matches!(rule.severity, RuleSeverity::Warning)));
         
         let status = if has_critical_violations {

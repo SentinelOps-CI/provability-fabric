@@ -4,12 +4,21 @@ This page summarizes GitHub Actions for this repository: the **main CI entry**, 
 
 ## Main CI (`ci.yml`)
 
-- **Triggers:** `push` and `pull_request` to `main`.
-- **Protobuf:** Buf lint on `api/`.
-- **Path filter:** Pull requests that touch only `docs/**` or `figs/**` skip heavy jobs; **pushes to `main` always run the full matrix** (see workflow `paths-ignore` rules).
+- **Triggers:** `push` and `pull_request` to `main`, plus `workflow_dispatch`.
+- **Protobuf:** Buf lint on `api/` (always).
+- **CI honesty:** `scripts/audit_ci_honesty.py` (always).
+- **Path filter (push and PR):** `dorny/paths-filter` language slices (`rust`, `go_node`, `lean`, `extended`, plus finer Go/Node slices). Changes under only `docs/**` or `figs/**` skip prepare and language jobs. **Pushes to `main` are path-conditioned the same way as PRs** (Wave E3.1).
 - **Reusable workflows:** `.github/workflows/reusable-ci-prepare.yml`, `reusable-ci-lean.yml`, `reusable-ci-rust.yml`, `reusable-ci-go-node.yml`, `reusable-ci-extended.yml`.
-- **Rust (reusable-ci-rust):** Workspace `cargo build`, `cargo test`, `cargo clippy`. The `sidecar-watcher` crate uses `autotests = false`; CI runs `cargo test -p sidecar-watcher --lib` and `cargo test -p sidecar-watcher --tests` for explicit `[[test]]` targets only. See `runtime/sidecar-watcher/tests/README.md` for quarantined integration sources.
-- **Broader schedules:** `.github/workflows/ci-weekly-full.yml` (weekly full matrix + Buf), `.github/workflows/ci-nightly-pytest.yml` (nightly Python/integration sweep).
+- **Rust (`reusable-ci-rust`):** Parallel jobs `workspace-libs` (cargo-nextest), `sidecar-curated` (explicit `[[test]]` targets), and `clippy`, each with a distinct `.github/actions/cache-cargo` key suffix. Impacted crates via `tools/select_impacted_rust.py`; full suite when `Cargo.lock` / workspace root changes, on `workflow_dispatch`, or weekly full.
+- **Go/Node (`reusable-ci-go-node`):** Parallel `go-cli` | `ledger-node` | `sdk-node` | `pcs-spectral`; `console` only when those paths change. Root npm workspaces cover `runtime/ledger` + `core/sdk/typescript` (path-scoped `npm ci -w …`). Go CLI **90% coverage** gate runs on **main push / weekly / dispatch**, not on PRs. Platform Go services under `services/` build+test with the `go-cli` job.
+- **Broader schedules:** `.github/workflows/ci-weekly-full.yml` (weekly full matrix + Buf; ignores path slices), `.github/workflows/ci-nightly-pytest.yml` (nightly Python/integration sweep; offline red-team hard-fail).
+- **Windows smoke:** `.github/workflows/test-windows.yml` — optional path-filtered job for the documented native subset (`make test-windows`); no Lean. Full gates remain WSL/Linux (see CONTRIBUTING.md).
+
+## Inventory criterion (honesty)
+
+`scripts/ci_workflow_inventory.sh` (and `.ps1`) treat a workflow as **inventory-gated** when it declares `push` and/or `schedule`. Exit 0 requires the **last** run on `main` to be `success`.
+
+That is **not** the same as “every push workflow must run on every tip commit.” Path-filtered and schedule-only workflows (CodeQL, operational-excellence, Scorecard, schema check, multiarch dual-arch, Criterion compare, etc.) are expected to skip most pushes; inventory still requires their most recent main run to be green. Gate kinds in the inventory report: `always-push`, `path-push`, `schedule`, `mixed`.
 
 ## Supply chain and workflow hygiene
 
@@ -20,7 +29,10 @@ This page summarizes GitHub Actions for this repository: the **main CI entry**, 
 | `actionlint.yml` | When `.github/workflows/**` changes: lints workflow YAML via Docker image **`rhysd/actionlint:1.7.12`**. |
 | `sbom-diff.yaml` | SBOM generation/diff and Grype-style checks (pinned Syft/Grype installers). |
 | `release-sbom.yml` | On `release: published`, attaches CycloneDX JSON to the GitHub Release. |
-| `scorecards.yml` | [OpenSSF Scorecard](https://scorecard.dev/) on a schedule and on pushes to `main`. |
+| `scorecards.yml` | [OpenSSF Scorecard](https://scorecard.dev/) on a **weekly schedule** (+ `workflow_dispatch`); not every push (Wave E3.4). |
+| `codeql.yaml` | Language-by-path on push/PR; **full** language matrix on weekly schedule / dispatch. |
+| `operational-excellence.yaml` | Path-filtered push/PR + daily schedule (Wave E3.4). |
+| `pf-core-schema-check.yml` | Push paths aligned with PR paths (sidecar / pf-core vendor / parity scripts). |
 
 Contributor-oriented pointers: **[CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md)** (local commands, what not to commit) and **[.github/WORKFLOWS.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/WORKFLOWS.md)** (workflow inventory).
 
@@ -48,22 +60,24 @@ The sections below document the reusable PF CI workflow that runs TRUST-FIRE GA 
 
 ### Bench Nightly Criterion (`.github/workflows/bench-nightly-criterion.yaml`)
 
-- **Purpose**: Criterion performance baseline and regression check (aligned with `bench/README.md`). Smoke job runs on PRs; save/compare run on push or schedule.
-- **Triggers**: Push to `main`/`master` when `bench/`, `runtime/sidecar-watcher/`, or Cargo files change; pull_request when same paths change; schedule (cron 0 2 * * *); `workflow_dispatch`.
-- **Job `smoke-bench`**: On push or PR, runs `cargo criterion -p provability-fabric-bench -- --sample-size 5 --noplot` to ensure benches compile and run; no regression gate.
+- **Purpose**: Criterion performance baseline and regression check (aligned with `bench/README.md`). **Wave 11.2:** PR/push run smoke only; save/compare are schedule + dispatch (not every main push).
+- **Triggers**: Push to `main`/`master` when `bench/`, `runtime/sidecar-watcher/`, or Cargo files change; pull_request when same paths change; schedule (nightly compare + weekly baseline refresh); `workflow_dispatch` (`refresh_baseline` input).
+- **Job `smoke-bench`**: On push or PR only — runs a tiny Criterion sample so benches compile; **no regression gate**.
 - **Cargo cache**: Jobs use the shared `.github/actions/cache-cargo` composite (with `key-suffix: "-criterion-deps"`). Criterion baseline is cached separately in `target/criterion`.
-- **Job `save-baseline`**: On push to main, runs `cargo bench -p provability-fabric-bench -- --save-baseline main` and caches `target/criterion`.
-- **Job `compare-baseline`**: On schedule, restores cached baseline and runs `cargo bench -p provability-fabric-bench -- --baseline main`; fails if regression exceeds threshold.
+- **Job `save-baseline`**: Weekly schedule cron `0 3 * * 0` or `workflow_dispatch` with `refresh_baseline=true`. Saves baseline `main` and updates `bench/BASELINE.md`. **Not** on ordinary main pushes.
+- **Job `compare-baseline`**: Nightly schedule (and dispatch with `refresh_baseline=false`): restores cached baseline and fails if regression exceeds threshold.
 
 **Local baseline:** Run `make bench-save-baseline` to save the Criterion baseline and write `bench/BASELINE.md` (date, git_sha, machine). See `bench/README.md` for the notice that numeric thresholds are targets until baselines are recorded.
 
-**Rust perf policy:** Criterion save/compare run in nightly or `workflow_dispatch`; PRs run only the smoke-bench job. Baselines are stored as workflow cache (`target/criterion`). For local runs, use `cargo bench -p provability-fabric-bench -- --baseline main` to compare against the saved baseline; run `cargo bench` to regenerate HTML reports under `target/criterion/` (cargo-criterion does not support baseline or HTML options).
+**Rust perf policy:** Criterion save/compare run on **schedule or `workflow_dispatch` only**; PRs and ordinary pushes run only the smoke-bench job. Baselines are stored as workflow cache (`target/criterion`). For local runs, use `cargo bench -p provability-fabric-bench -- --baseline main` to compare against the saved baseline; run `cargo bench` to regenerate HTML reports under `target/criterion/` (cargo-criterion does not support baseline or HTML options).
 
 ### Bench SWE-bench stress scheduled (`.github/workflows/bench-swebench-stress-scheduled.yaml`)
 
-- **Purpose**: Weekly run of `exp-step2-lite-stress-large-repos` (heavy-repo slice). Not gated in CI; produces trend artifacts.
+- **Purpose**: Weekly honesty-split for `exp-step2-lite-stress-large-repos`. Mock pipeline smoke proves plumbing; real OpenHands stress (when secrets exist) produces trend artifacts and regression alerts. Not a PR gate.
 - **Triggers**: Schedule (cron 0 3 * * 0, Sunday 03:00); `workflow_dispatch`.
-- **Job `stress-run`**: Runs on `ubuntu-latest`, long timeout. Fills manifest, runs baseline and PF-guarded runs for the stress instance set, runs harness and compare, then **`experiments/scripts/summarize_stress_run.py`** to write **stress_summary.json** (schema_version, pf_commit, agent_commit, dataset_id, dataset_version, harness_id; timeout_rate_*, wall_clock_s_median/p95, guard_overhead_s_median, empty_patch_reasons_topN, solve rates). **Stress regression alerts** step runs **`experiments/scripts/check_stress_alerts.py`**; thresholds are read from **experiments/config/stress_alerts.yaml** (optional; script uses built-in defaults if missing). Fails the job when parity, timeout delta, empty_patch rate, or guard_overhead exceed thresholds. Uploads compare.json, stress_summary.json, compare.csv; uploads **stress_summary.json** as named artifact **stress-summary**.
+- **Job `mock-pipeline-smoke`** (`engine=mock`): Short timeout (~25m) on `ubuntu-latest`. Runs fixture instances (`instances_smoke.jsonl`, max 3, `--no-workspace`) with the mock engine only. Writes compare + `stress_summary.json` labeled `engine=mock`, `job_kind=pipeline_smoke`, `claims_stress_pass=false`. Job summary states pipeline smoke only. Does **not** run `check_stress_alerts.py` and must never be treated as a stress pass. Uploads artifact `swebench-mock-pipeline-smoke-<run_number>`.
+- **Job `check-openhands-secrets`**: Detects `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Outputs `has_llm` for the real stress gate (secrets cannot be used directly in job-level `if:`).
+- **Job `stress-openhands`** (`engine=openhands`): Runs only when `has_llm=true`; otherwise **skipped** (not success — no mock fallback). Long timeout (360m). Requires a working OpenHands CLI/package (fails closed if secrets are present but OpenHands is unavailable). Runs the stress instance set, harness/compare, then **`experiments/scripts/summarize_stress_run.py`** → **stress_summary.json** (`engine=openhands`, `job_kind=real_stress`; fields include schema_version, pf_commit, agent_commit, dataset_id/version, harness_id; timeout_rate_*, wall_clock_s_median/p95, guard_overhead_s_median, empty_patch_reasons_topN, solve rates). **Only this job** runs **`experiments/scripts/check_stress_alerts.py`** (thresholds from **experiments/config/stress_alerts.yaml**, or script defaults). Fails when parity, timeout delta, empty_patch rate, or guard_overhead exceed thresholds. Uploads compare/summary artifacts and named artifact **stress-summary**.
 
 ### Verify publish bundle (`.github/workflows/verify-publish-bundle.yaml`)
 
@@ -206,30 +220,3 @@ make pf-sign SERVICE_NAME=my-service
 ```bash
 make pf-verify SERVICE_NAME=my-service
 ```
-
----
-
-# Service Bootstrap Template
-
-**Path**: `templates/pf-bootstrap/pf.yaml`
-
-Example:
-
-```yaml
-service: <service-name>
-attestor:
-  endpoint: http://attestor-service:8080
-ledger:
-  endpoint: http://ledger-service:4000
-redis:
-  url: redis://redis-master:6379
-
-tools:
-  http_fetch:
-    allowlist:
-      - https://api.example.com
-      - https://*.trusted.com
-```
-
-Use as a starting point for new service repos.
-

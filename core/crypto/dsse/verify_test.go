@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,60 @@ func TestVerifyFixtureEnvelope(t *testing.T) {
 	result := VerifyEnvelope(env, AccessReceiptType)
 	if !result.Valid {
 		t.Fatalf("expected valid envelope, got %s", result.Reason)
+	}
+}
+
+func TestEnforceDSSEDefaultAndOptOut(t *testing.T) {
+	t.Setenv(EnvEnforceDSSE, "")
+	if !EnforceDSSE() {
+		t.Fatal("empty/unset PF_ENFORCE_DSSE must enforce (fail-closed default)")
+	}
+
+	t.Setenv(EnvEnforceDSSE, "1")
+	if !EnforceDSSE() {
+		t.Fatal("PF_ENFORCE_DSSE=1 must enforce")
+	}
+	t.Setenv(EnvEnforceDSSE, "true")
+	if !EnforceDSSE() {
+		t.Fatal("PF_ENFORCE_DSSE=true must enforce")
+	}
+
+	t.Setenv(EnvEnforceDSSE, "0")
+	if EnforceDSSE() {
+		t.Fatal("PF_ENFORCE_DSSE=0 must opt out")
+	}
+	t.Setenv(EnvEnforceDSSE, "false")
+	if EnforceDSSE() {
+		t.Fatal("PF_ENFORCE_DSSE=false must opt out")
+	}
+}
+
+func TestRejectUnsignedWhenUnset(t *testing.T) {
+	t.Setenv(EnvEnforceDSSE, "")
+	t.Setenv(EnvTrustRootPEM, "")
+	err := VerifyAccessReceipt(AccessReceiptPayload{
+		ReceiptID:  "rcpt-1",
+		Tenant:     "tenant-a",
+		IndexShard: "shard-0",
+	}, "ed25519", "deadbeef")
+	if err == nil {
+		t.Fatal("expected reject when enforcing without trust root")
+	}
+	if !strings.Contains(err.Error(), "trust root") {
+		t.Fatalf("expected trust root error, got: %v", err)
+	}
+}
+
+func TestStructuralPassWhenOptOut(t *testing.T) {
+	t.Setenv(EnvEnforceDSSE, "0")
+	t.Setenv(EnvTrustRootPEM, "")
+	err := VerifyAccessReceipt(AccessReceiptPayload{
+		ReceiptID:  "rcpt-1",
+		Tenant:     "tenant-a",
+		IndexShard: "shard-0",
+	}, "ed25519", "deadbeef")
+	if err != nil {
+		t.Fatalf("opt-out should skip crypto: %v", err)
 	}
 }
 

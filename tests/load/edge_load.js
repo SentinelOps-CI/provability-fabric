@@ -30,12 +30,24 @@ export const options = {
   },
 };
 
-// Test data for edge API endpoints
-const regions = [
-  'https://api.us-west.provability-fabric.org',
-  'https://api.us-east.provability-fabric.org',
-  'https://api.eu-west.provability-fabric.org'
-];
+// Live regions from EDGE_REGION_URLS / REGION_URLS (comma-separated); fail closed if unset in mode=full CI.
+const regions = (() => {
+  const raw = __ENV.REGION_URLS || __ENV.EDGE_REGION_URLS || '';
+  const parsed = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parsed.length >= 2) {
+    return parsed;
+  }
+  // Local/dev fallback only — CI mode=full requires secrets (workflow fail-closed before k6).
+  return [
+    'https://api.us-west.provability-fabric.org',
+    'https://api.us-east.provability-fabric.org',
+    'https://api.eu-west.provability-fabric.org',
+  ];
+})();
+const edgeApiToken = __ENV.EDGE_API_TOKEN || '';
 
 const testCapsules = [
   'sha256:abc123def4567890123456789012345678901234567890abcdef1234567890abcd',
@@ -203,8 +215,12 @@ export function cachePurgeTest() {
     const purgeUrl = `${region}/admin/purge`;
     const purgePayload = JSON.stringify({ capsule_hash: capsuleHash });
     
+    const purgeHeaders = { 'Content-Type': 'application/json' };
+    if (edgeApiToken) {
+      purgeHeaders['Authorization'] = `Bearer ${edgeApiToken}`;
+    }
     const response = http.post(purgeUrl, purgePayload, {
-      headers: { 'Content-Type': 'application/json' }
+      headers: purgeHeaders,
     });
     
     check(response, {

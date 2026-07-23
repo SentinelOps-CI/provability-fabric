@@ -162,7 +162,9 @@ func (c *DFACompiler) compileRule(dfa *DFA, rule *DFARule, currentState int, nex
 	return c.compileConditions(dfa, rule, currentState, nextStateID, rule.Conditions, 0)
 }
 
-// compileConditions compiles conditions into state transitions
+// compileConditions compiles conditions into state transitions.
+// Each condition is one input symbol; the final condition transitions directly
+// into an accepting state (no synthetic "condition_satisfied" hop).
 func (c *DFACompiler) compileConditions(
 	dfa *DFA,
 	rule *DFARule,
@@ -172,7 +174,25 @@ func (c *DFACompiler) compileConditions(
 	conditionIndex int,
 ) error {
 	if conditionIndex >= len(conditions) {
-		// All conditions satisfied, create accepting state
+		// No remaining conditions: mark current state accepting (prefix / empty tail).
+		c.markStateAccepting(dfa.States[currentState], rule)
+		return nil
+	}
+
+	condition := conditions[conditionIndex]
+	event := c.createConditionEvent(&condition)
+	isLast := conditionIndex == len(conditions)-1
+
+	// Check if transition already exists
+	if nextState, exists := dfa.States[currentState].Transitions[event]; exists {
+		if isLast {
+			c.markStateAccepting(dfa.States[nextState], rule)
+			return nil
+		}
+		return c.compileConditions(dfa, rule, nextState, nextStateID, conditions, conditionIndex+1)
+	}
+
+	if isLast {
 		acceptingState := &DFAState{
 			ID:          *nextStateID,
 			IsAccepting: true,
@@ -184,26 +204,13 @@ func (c *DFACompiler) compileConditions(
 			},
 		}
 		dfa.States[*nextStateID] = acceptingState
-
-		// Add transition from current state to accepting state
-		event := "condition_satisfied"
 		dfa.States[currentState].Transitions[event] = *nextStateID
 		dfa.EventSet[event] = true
-
 		*nextStateID++
 		return nil
 	}
 
-	condition := conditions[conditionIndex]
-	event := c.createConditionEvent(&condition)
-
-	// Check if transition already exists
-	if nextState, exists := dfa.States[currentState].Transitions[event]; exists {
-		// Follow existing transition
-		return c.compileConditions(dfa, rule, nextState, nextStateID, conditions, conditionIndex+1)
-	}
-
-	// Create new intermediate state
+	// Create new intermediate state for a non-final condition
 	intermediateState := &DFAState{
 		ID:          *nextStateID,
 		IsAccepting: false,
@@ -214,14 +221,31 @@ func (c *DFACompiler) compileConditions(
 		},
 	}
 	dfa.States[*nextStateID] = intermediateState
-
-	// Add transition from current state to intermediate state
 	dfa.States[currentState].Transitions[event] = *nextStateID
 	dfa.EventSet[event] = true
-
-	// Continue compiling conditions from intermediate state
 	*nextStateID++
 	return c.compileConditions(dfa, rule, *nextStateID-1, nextStateID, conditions, conditionIndex+1)
+}
+
+// markStateAccepting attaches rule actions to a state, keeping the higher priority
+// when two rules converge on the same state (rules are compiled high-priority first).
+func (c *DFACompiler) markStateAccepting(state *DFAState, rule *DFARule) {
+	if state == nil {
+		return
+	}
+	if state.Metadata == nil {
+		state.Metadata = make(map[string]interface{})
+	}
+	if state.IsAccepting {
+		existingPri, _ := state.Metadata["priority"].(int)
+		if rule.Priority <= existingPri {
+			return
+		}
+	}
+	state.IsAccepting = true
+	state.Metadata["rule_id"] = rule.ID
+	state.Metadata["actions"] = rule.Actions
+	state.Metadata["priority"] = rule.Priority
 }
 
 // createConditionEvent creates an event key for a condition
@@ -280,7 +304,32 @@ func (c *DFACompiler) markAcceptingStates(dfa *DFA) {
 	}
 }
 
-// Evaluate evaluates an event against the compiled DFA
+// actionsFromMetadata extracts action strings from state metadata.
+// Handles both native []string and JSON-roundtripped []interface{}.
+func actionsFromMetadata(metadata map[string]interface{}) ([]string, bool) {
+	if metadata == nil {
+		return nil, false
+	}
+	if actions, ok := metadata["actions"].([]string); ok {
+		return actions, true
+	}
+	raw, ok := metadata["actions"].([]interface{})
+	if !ok {
+		return nil, false
+	}
+	out := make([]string, 0, len(raw))
+	for _, a := range raw {
+		s, ok := a.(string)
+		if !ok {
+			return nil, false
+		}
+		out = append(out, s)
+	}
+	return out, true
+}
+
+// Evaluate evaluates an event against the compiled DFA.
+// Single-symbol rules accept after one transition into an accepting state.
 func (dfa *DFA) Evaluate(event string) ([]string, bool) {
 	dfa.mu.RLock()
 	defer dfa.mu.RUnlock()
@@ -293,18 +342,15 @@ func (dfa *DFA) Evaluate(event string) ([]string, bool) {
 			return nil, false
 		}
 
-		// Check if this is an accepting state
 		if state.IsAccepting {
-			if actions, ok := state.Metadata["actions"].([]string); ok {
+			if actions, ok := actionsFromMetadata(state.Metadata); ok {
 				return actions, true
 			}
 			return nil, true
 		}
 
-		// Follow transition
 		nextState, exists := state.Transitions[event]
 		if !exists {
-			// No transition found, check for default transitions
 			if defaultState, exists := state.Transitions["default"]; exists {
 				currentState = defaultState
 				continue
@@ -316,7 +362,9 @@ func (dfa *DFA) Evaluate(event string) ([]string, bool) {
 	}
 }
 
-// EvaluatePath evaluates a sequence of events against the DFA
+// EvaluatePath evaluates a sequence of events against the DFA.
+// Acceptance is decided at the state reached after consuming the full path
+// (prefix-accepting intermediates only short-circuit when no further events remain).
 func (dfa *DFA) EvaluatePath(events []string) ([]string, bool) {
 	dfa.mu.RLock()
 	defer dfa.mu.RUnlock()
@@ -329,18 +377,8 @@ func (dfa *DFA) EvaluatePath(events []string) ([]string, bool) {
 			return nil, false
 		}
 
-		// Check if this is an accepting state
-		if state.IsAccepting {
-			if actions, ok := state.Metadata["actions"].([]string); ok {
-				return actions, true
-			}
-			return nil, true
-		}
-
-		// Follow transition
 		nextState, exists := state.Transitions[event]
 		if !exists {
-			// No transition found, check for default transitions
 			if defaultState, exists := state.Transitions["default"]; exists {
 				currentState = defaultState
 				continue
@@ -351,9 +389,8 @@ func (dfa *DFA) EvaluatePath(events []string) ([]string, bool) {
 		currentState = nextState
 	}
 
-	// Check final state
 	if finalState, exists := dfa.States[currentState]; exists && finalState.IsAccepting {
-		if actions, ok := finalState.Metadata["actions"].([]string); ok {
+		if actions, ok := actionsFromMetadata(finalState.Metadata); ok {
 			return actions, true
 		}
 		return nil, true

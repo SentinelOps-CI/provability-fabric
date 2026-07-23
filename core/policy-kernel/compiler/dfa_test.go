@@ -135,8 +135,12 @@ func TestCompileMultipleRules(t *testing.T) {
 	}
 
 	stats := dfa.GetStats()
-	if stats["total_states"].(int) < 4 {
-		t.Errorf("Expected at least 4 states for multiple rules, got %d", stats["total_states"])
+	// Initial + one accepting state per single-condition rule (no phantom hops).
+	if stats["total_states"].(int) < 3 {
+		t.Errorf("Expected at least 3 states for multiple rules, got %d", stats["total_states"])
+	}
+	if stats["accepting_states"].(int) != 2 {
+		t.Errorf("Expected 2 accepting states, got %d", stats["accepting_states"])
 	}
 }
 
@@ -387,8 +391,9 @@ func TestDFAStats(t *testing.T) {
 		}
 	}
 
-	if stats["total_states"].(int) < 3 {
-		t.Errorf("Expected at least 3 states, got %d", stats["total_states"])
+	// Single condition: initial → accepting (2 states).
+	if stats["total_states"].(int) < 2 {
+		t.Errorf("Expected at least 2 states, got %d", stats["total_states"])
 	}
 
 	if stats["accepting_states"].(int) != 1 {

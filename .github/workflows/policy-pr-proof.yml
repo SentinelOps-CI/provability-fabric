@@ -61,9 +61,15 @@ jobs:
         run: |
           set -euo pipefail
           cd core/cli/pf
-          # ci-honesty: justified wave7-remediation
-          ./so policy prove --build build/ --json > prove.json || true
-          cat prove.json
+          # Fail closed when proof API is up; skip cleanly when absent (not soft-pass).
+          if ! curl -fsS --connect-timeout 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            echo "Proof service API not available; prove skipped (compile still required)."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "proof_hash=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ./so policy prove --build build/ --json | tee prove.json
           PROOF_HASH=$(jq -r '.proof_hash // empty' prove.json)
           STATUS=$(jq -r '.status // "failed"' prove.json)
           echo "proof_hash=$PROOF_HASH" >> $GITHUB_OUTPUT
@@ -97,9 +103,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const proveStatus = process.env.PROVE_STATUS || 'unknown';
             const body = `Policy Hashes\n\n` +
               `- policy_hash: ${process.env.POLICY_HASH}\n` +
-              `- proof_hash: ${process.env.PROOF_HASH}\n` +
+              `- proof_hash: ${process.env.PROOF_HASH || 'n/a'}\n` +
+              `- prove_status: ${proveStatus}\n` +
               `- automata_hash: ${process.env.AUTOMATA_HASH}\n` +
               `- epoch: ${process.env.EPOCH}`;
             await github.rest.issues.createComment({
@@ -111,6 +119,7 @@ jobs:
         env:
           POLICY_HASH: ${{ steps.compile.outputs.policy_hash }}
           PROOF_HASH: ${{ steps.prove.outputs.proof_hash }}
+          PROVE_STATUS: ${{ steps.prove.outputs.status }}
           AUTOMATA_HASH: ${{ steps.build.outputs.automata_hash }}
           EPOCH: ${{ steps.epoch.outputs.epoch }}
 
@@ -141,14 +150,23 @@ jobs:
           set -euo pipefail
           cd core/cli/pf
           DECISION_ID="pr-${{ github.event.pull_request.number }}-${{ github.run_id }}"
-          # ci-honesty: justified wave7-remediation
-          ./so replay run "$DECISION_ID" --open --json > replay.json || true
-          # ci-honesty: justified wave7-remediation
-          cat replay.json || true
+          # Fail closed when console API is up; skip cleanly when absent (not soft-pass).
+          if ! curl -fsS --connect-timeout 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            echo "Console API not available; sample replay skipped (not soft-passed)."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "lowview=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          ./so replay run "$DECISION_ID" --open --json | tee replay.json
           LOWVIEW=$(jq -r '.low_view_match_pct // empty' replay.json)
           STATUS=$(jq -r '.status // empty' replay.json)
           echo "lowview=$LOWVIEW" >> $GITHUB_OUTPUT
           echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "completed" ] && [ "$STATUS" != "success" ]; then
+            echo "Replay failed with status=${STATUS:-empty}"
+            exit 1
+          fi
 
       - name: Comment on PR with replay result
         if: ${{ github.event_name == 'pull_request' }}

@@ -6,15 +6,15 @@ Single-page sign-off for the Evidence v0.1 + v0.2 vision and the repo-wide CI gr
 
 | Program | Status | Reference |
 |---------|--------|-----------|
-| Evidence v0.1 | Complete on `main` | [evidence-v0.1-status.md](evidence-v0.1-status.md) |
-| Evidence v0.2 | Complete on `main` | [evidence-v0.2.md](evidence-v0.2.md), [evidence-v0.2-status.md](evidence-v0.2-status.md) |
+| Evidence v0.1 | Complete on `main` | [evidence-v0.1-status.md](evidence-v0.1-status.md) (stub → archive) |
+| Evidence v0.2 | Complete on `main` | [evidence-v0.2.md](evidence-v0.2.md), [evidence-v0.2-status.md](evidence-v0.2-status.md) (stub → archive) |
 | CI hardening (#118) | Merged `3f150b15` | [ci-health-matrix](../internal/ci-health-matrix.md) |
-| Post-merge smoke | Dispatched | [run 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) (post-#118), [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777) — **success** (Phase 6 ceremony) |
-| Core CI dispatch | Dispatched | [run 27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) — **success** (Phase 6 ceremony) |
+| Post-merge smoke | Dispatched | [run 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) (post-#118), [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777) â€” **success** (Phase 6 ceremony) |
+| Core CI dispatch | Dispatched | [run 27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) â€” **success** (Phase 6 ceremony) |
 
 ## Full-green CI criterion
 
-Every workflow under `.github/workflows/` that triggers on **`push` to `main`** or **`schedule`** must have a latest `main` run with conclusion **success**. Track progress in [ci-health-matrix.md](../internal/ci-health-matrix.md) and via:
+Every workflow under `.github/workflows/` that triggers on **`push` to `main`** or **`schedule`** must have a latest `main` run with conclusion **success**. Live counts live in this page and [remediation-tracker.md](../internal/remediation-tracker.md); historical triage in [ci-health-matrix.md](../internal/ci-health-matrix.md) and via:
 
 ```bash
 scripts/ci_workflow_inventory.sh
@@ -22,26 +22,26 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-18 — CI-local proofs @ `bae36f642`):** **PR #223** merged. F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Gated CI-local proofs: `dr-cross` (moto), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Inventory exit **0 ×2** — **69** gated. Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Runbook: [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Current posture (2026-07-18 â€” CI-local proofs @ `bae36f642`):** **PR #223** merged. F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Gated CI-local proofs: `dr-cross` (moto), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Inventory exit **0 Ã—2** â€” **69** gated. Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Live ops: [live-ops-secrets.md](../runbooks/live-ops-secrets.md); Wave 7 archive: [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 ×2 claimed** at **69** gated (tip `bae36f642`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
+**Inventory exit 0 Ã—2 claimed** at **69** gated (tip `bae36f642`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
 
-### Path to 67/67 (Wave 7 — closed 2026-07-16)
+### Path to 67/67 (Wave 7 â€” closed 2026-07-16)
 
 | Milestone | Target green | Clusters | Depends on |
 |-----------|-------------:|----------|------------|
-| M1 (post-Phase 0–1 merge) | ~20/67 | Replay + Security | Linux replay contract test on `main`; submodule bump |
+| M1 (post-Phase 0â€“1 merge) | ~20/67 | Replay + Security | Linux replay contract test on `main`; submodule bump |
 | M2 | ~25/68 | + Lean (paper-conformance) partial | F24 rate-limit + integration_tests in CI with `PF_SHADOW_MODE=1`; Invariants.lean sorry-free; lean-style mathlib cache; merge to main |
 | M3 | ~35/67 | + Platform | `integration.yaml` F06 smokes; operational-excellence real paths |
 | M4 | ~50/67 | + Bench + Docs | Criterion baseline on main; `docs-build.yaml` green |
-| M5 | 60/60 (exit 0) | Honest ungates + tip green | **DONE** 2026-07-16 @ `7d48b3d4` / tip `b8b78b94` (PR #206/#207); historical label was 67/67 — not claimed |
+| M5 | 60/60 (exit 0) | Honest ungates + tip green | **DONE** 2026-07-16 @ `7d48b3d4` / tip `b8b78b94` (PR #206/#207); historical label was 67/67 â€” not claimed |
 
-1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows after Linux validation.
-2. **Security cluster** — CodeQL artifact chain (F20 done locally); cargo-deny all-features; wasm-scan empty-registry skip.
-3. **Lean cluster** — vendor mathlib cache without stale `.git`; Invariants.lean **sorry-free** (2026-07-03); Policy tree sorry burn-down continues per [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md); paper-conformance rate-limits + `integration_tests` with `PF_SHADOW_MODE=1`.
-4. **Platform cluster** — SLO lockfiles (F19 done); `integration.yaml` F06 smoke scope; billing/operational-excellence.
-5. **Bench cluster** — Criterion baseline refresh (F23 workflow ready); performance-gate thresholds.
-6. **Remaining ~30** — triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+1. **Replay cluster** â€” fix Docker replay runner CLI (F10); unlock 5 workflows after Linux validation.
+2. **Security cluster** â€” CodeQL artifact chain (F20 done locally); cargo-deny all-features; wasm-scan empty-registry skip.
+3. **Lean cluster** â€” vendor mathlib cache without stale `.git`; Invariants.lean **sorry-free** (2026-07-03); Policy tree sorry burn-down continues per [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md); paper-conformance rate-limits + `integration_tests` with `PF_SHADOW_MODE=1`.
+4. **Platform cluster** â€” SLO lockfiles (F19 done); `integration.yaml` F06 smoke scope; billing/operational-excellence.
+5. **Bench cluster** â€” Criterion baseline refresh (F23 workflow ready); performance-gate thresholds.
+6. **Remaining ~30** â€” triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
 Reusable-only workflows (`workflow_call`) are tracked but not gating until invoked.
 
@@ -56,18 +56,18 @@ Reusable-only workflows (`workflow_call`) are tracked but not gating until invok
 | #126 | `ci/lean-research` | lean-offline, lean-morph, morph-replay, paper-conformance |
 | #125 | `ci/nightly-batch` | nightly-replay, ci-nightly-pytest, redteam, chaos smoke |
 | #127 | `docs/evidence-program-closure` | Closure sign-off page, CHANGELOG entry |
-| #128 | `ci/post-closure-hotfixes` | actionlint/docs-build/cert-validate hotfixes — **merged** `de104223` (2026-06-16) |
+| #128 | `ci/post-closure-hotfixes` | actionlint/docs-build/cert-validate hotfixes â€” **merged** `de104223` (2026-06-16) |
 
 ## Org prerequisites (remaining blockers)
 
 | Item | Owner | Verification |
 |------|-------|----------------|
-| `STANDARDS_GITHUB_TOKEN` | Org admin | **Configured** (2026-06-14). Re-verify: `workflow_dispatch` Evidence v0.1 smoke — `make submodules` passes |
+| `STANDARDS_GITHUB_TOKEN` | Org admin | **Configured** (2026-06-14). Re-verify: `workflow_dispatch` Evidence v0.1 smoke â€” `make submodules` passes |
 | `MORPH_API_KEY` (optional) | Org admin | Morph lean/replay jobs run instead of skip |
 | `AWS_ROLE_ARN` + `EVIDENCE_BUCKET` (optional) | Org admin | `evidence.yaml` runs `collect-evidence` instead of offline report |
 | Branch protection required checks | Org admin | **Applied** via `gh api` (2026-06-16): CI required checks, smoke, evidence-schema-only, Documentation Build |
 
-Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md) and [ci-health-matrix — Required secrets](../internal/ci-health-matrix.md#required-secrets-org-prerequisites).
+Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fabric/blob/main/CONTRIBUTING.md) and [ci-health-matrix â€” Required secrets](../internal/ci-health-matrix.md#required-secrets-org-prerequisites).
 
 ## Verification ceremony (Phase 6)
 
@@ -96,27 +96,27 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 | Audit snapshot (2026-07-02) | 67 | 13 | 53 | 19 |
 | Phase 0 refresh + F33/F24 (2026-07-02 local) | 67 | 13 | 53 | 19 |
 | Wave 7 post-merge (2026-07-03, `95bcd563`) | 68 | 5 | 63 | 18 queued |
-| Wave 7 inventory gate (2026-07-16, `7d48b3d4` → tip `b8b78b94`) | **60** | **60** | 11 (ungated) | 16 |
+| Wave 7 inventory gate (2026-07-16, `7d48b3d4` â†’ tip `b8b78b94`) | **60** | **60** | 11 (ungated) | 16 |
 | Wave 8 final verification (2026-07-18, tip `6b99ef300`) | **69** | **69** | 0 | 16 |
 
 ### Path to 67/67 (Wave 7)
 
-1. **Replay cluster** — fix Docker replay runner CLI (F10); unlock 5 workflows.
-2. **Security cluster** — CodeQL artifact chain (F20); cargo-deny all-features; wasm-scan empty-registry skip.
-3. **Lean cluster** — vendor mathlib cache; scoped sorry aligned with [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md).
-4. **Platform cluster** — SLO lockfiles (F19 done); operational-excellence ghost tests (F06 done); billing/integration smoke.
-5. **Bench cluster** — Criterion baseline refresh (F23); performance-gate thresholds.
-6. **Remaining ~30** — triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-health-matrix.md](../internal/ci-health-matrix.md).
+1. **Replay cluster** â€” fix Docker replay runner CLI (F10); unlock 5 workflows.
+2. **Security cluster** â€” CodeQL artifact chain (F20); cargo-deny all-features; wasm-scan empty-registry skip.
+3. **Lean cluster** â€” vendor mathlib cache; scoped sorry aligned with [lean-sorry-burn-down.md](../internal/lean-sorry-burn-down.md).
+4. **Platform cluster** â€” SLO lockfiles (F19 done); operational-excellence ghost tests (F06 done); billing/integration smoke.
+5. **Bench cluster** â€” Criterion baseline refresh (F23); performance-gate thresholds.
+6. **Remaining ~30** â€” triage via weekly `ci_workflow_inventory.sh --markdown` diff in [ci-health-matrix.md](../internal/ci-health-matrix.md).
 
 _Superseded by milestone table above (2026-07-02 refresh)._
 
-Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** ×2 on `main` (**69** gated @ tip `6b99ef300`; historical Wave 7 **60/60** @ `b8b78b94`); F23/F24/F33 **DONE**; `lean-offline-full` proven; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/wave7-post-merge-runbook.md).
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** Ã—2 on `main` (**69** gated @ tip `6b99ef300`; historical Wave 7 **60/60** @ `b8b78b94`); F23/F24/F33 **DONE**; `lean-offline-full` proven; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md).
 
-Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` — all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
+Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` â€” all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 
-Deep replay acceptance archive (private, local): `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` — excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
+Deep replay acceptance archive (private, local): `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json` â€” excerpt `status: pass`, `execute_status: pass`, `low_view_result: pass` (regenerated on maintainer host 2026-06-16; gitignored).
 
-Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) — WSL `bash` may not see `gh`.
+Use Git Bash on Windows (`export PATH="/c/Program Files/GitHub CLI:$PATH"`) â€” WSL `bash` may not see `gh`.
 
 ## Forward items (out of closure scope)
 

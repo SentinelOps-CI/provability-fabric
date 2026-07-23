@@ -6,12 +6,23 @@ This guide provides comprehensive information for developers working with Provab
 
 ### Prerequisites
 
-- **Go 1.23+** - Core services and CLI tools
-- **Rust (stable)** - Performance-critical components; see root `rust-toolchain.toml`
-- **Lean 4** - Formal proof development
-- **Docker** - Container management
-- **Kubernetes** - Local development cluster
-- **Node.js 20+** - UI and TypeScript components
+Install only what your task needs (you do **not** need the full stack for most loops):
+
+| Need | Tools |
+|------|--------|
+| CLI / Go services | **Go 1.23+** |
+| Sidecar / Rust crates | **Rust (stable)** — see root `rust-toolchain.toml` |
+| Ledger / TypeScript SDK | **Node.js 20+** |
+| Formal proofs | **Lean 4** — see [docs/dev/lean-build.md](../dev/lean-build.md) |
+| Compose / local services | **Docker** (optional; only when bringing up platform/ledger profiles) |
+| Admission / Helm / Kind | **Kubernetes + Kind** (optional; only for admission-controller and Kind integration paths) |
+
+Path-aware bootstrap:
+
+```bash
+make install-dev              # auto-detect changed areas
+make install-dev SCOPE=go     # CLI + go.work only
+```
 
 ### Installation
 
@@ -20,30 +31,32 @@ This guide provides comprehensive information for developers working with Provab
 git clone https://github.com/SentinelOps-CI/provability-fabric.git
 cd provability-fabric
 
-# Install Go dependencies (run from each Go module you use, e.g. core/cli/pf)
+# Go workspace (recommended for multi-module work)
+./scripts/go-work-init.sh
 cd core/cli/pf && go mod download && cd ../../..
 
-# Install Rust dependencies
+# Install Rust dependencies (when working on Rust crates)
 cargo fetch
 
-# Install Lean dependencies (from the Lake project you are building)
-lake update
+# Lean (only when working on proofs — see lean-build.md)
+# lake update
 
-# Node.js: install per package (there is no root package.json). Examples:
+# Node.js: install per package you touch. Examples:
 #   cd runtime/ledger && npm ci && npx prisma generate && cd ../..
 #   cd console && npm ci && cd ../..
+# Or: make install-dev SCOPE=node
 ```
 
 ### Development Tools
 
 ```bash
-# Install development tools
-make install-dev-tools
+# Path-aware install (preferred over install-full for day-to-day work)
+make install-dev
 
-# Verify installation
-pf --version
-lake --version
-cargo --version
+# Verify toolchain pieces you actually use
+./core/cli/pf/pf --version   # or: pf --version if on PATH
+cargo --version              # if using Rust
+# lake --version             # only if doing Lean work
 ```
 
 ## Project Structure
@@ -213,8 +226,8 @@ make lean-gate
 # Check build time budgets
 make lean-time-budget
 
-# Run proofbench
-make proofbench
+# Build Lean libs
+cd core/lean-libs && lake build
 ```
 
 ## Go Development

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.org/schemas/pf-env.schema.json",
+  "title": "Provability Fabric local/runtime environment",
+  "description": "Documented PF_* and service URL variables for local compose and SDK clients. See docs/dev/local-workflows.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "PF_PROFILE": {
+      "type": "string",
+      "enum": ["dev", "production"],
+      "description": "Runtime posture. production enables MCP fail-closed and stricter auth paths."
+    },
+    "PROFILE": {
+      "type": "string",
+      "enum": ["dev", "production"],
+      "description": "Ledger bootstrap profile (alias consumed alongside PF_PROFILE)."
+    },
+    "PORT": {
+      "type": "string",
+      "description": "Service listen port (ledger default 4000, sidecar default 8006)."
+    },
+    "SIDECAR_URL": {
+      "type": "string",
+      "format": "uri",
+      "description": "Ledger MCP → sidecar. Local default http://localhost:8006; compose http://runtime-sidecar:8006."
+    },
+    "LEDGER_URL": {
+      "type": "string",
+      "format": "uri",
+      "description": "Sidecar → ledger. Local default http://localhost:4000; compose http://ledger:4000."
+    },
+    "KERNEL_URL": {
+      "type": "string",
+      "format": "uri",
+      "description": "Tool-broker → policy kernel/sidecar. Local default http://localhost:8006."
+    },
+    "DATABASE_URL": {
+      "type": "string",
+      "description": "Postgres connection string for ledger / evidence services."
+    },
+    "PF_ENFORCE_DSSE": {
+      "type": "string",
+      "enum": ["0", "1"],
+      "description": "When 1, enforce DSSE verification on receipt paths."
+    },
+    "PF_ENABLED_TOOLS": {
+      "type": "string",
+      "description": "Comma-separated MCP tool allow-list (empty = deny-by-default policy source)."
+    },
+    "TENANT_ID": {
+      "type": "string",
+      "description": "Default demo tenant for local sidecar."
+    },
+    "ENFORCEMENT_MODE": {
+      "type": "string",
+      "enum": ["observe", "enforce"],
+      "description": "Sidecar enforcement mode."
+    },
+    "SPEC_SERVICE_URL": { "type": "string", "format": "uri" },
+    "PROOF_SERVICE_URL": { "type": "string", "format": "uri" },
+    "BUILD_SERVICE_URL": { "type": "string", "format": "uri" },
+    "EVIDENCE_SERVICE_URL": { "type": "string", "format": "uri" },
+    "REPLAY_SERVICE_URL": { "type": "string", "format": "uri" },
+    "RUNTIME_SERVICE_URL": {
+      "type": "string",
+      "format": "uri",
+      "description": "API gateway → sidecar (compose http://runtime-sidecar:8006)."
+    },
+    "LEDGER_ENDPOINT": {
+      "type": "string",
+      "format": "uri",
+      "description": "Retrieval gateway → ledger."
+    }
+  },
+  "examples": [
+    {
+      "PF_PROFILE": "dev",
+      "PROFILE": "dev",
+      "PORT": "4000",
+      "SIDECAR_URL": "http://localhost:8006",
+      "LEDGER_URL": "http://localhost:4000",
+      "KERNEL_URL": "http://localhost:8006"
+    }
+  ]
+}

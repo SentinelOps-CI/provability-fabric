@@ -3,6 +3,13 @@ name: PF-Core Schema Check
 on:
   push:
     branches: [main, "phase7/**"]
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "vendor/pf-core/**"
+      - "scripts/init_pf_core_vendor.sh"
+      - "scripts/test_admission_parity.sh"
+      - "tests/pf_core_admission_parity/**"
+      - ".github/workflows/pf-core-schema-check.yml"
   pull_request:
     paths:
       - "runtime/sidecar-watcher/**"

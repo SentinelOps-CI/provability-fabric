@@ -69,7 +69,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: guides/getting-started.md
+  - Getting Started: getting-started.md
   - Proof-Carrying Science:
       - Overview: pcs/README.md
       - Quickstart: pcs/quickstart.md
@@ -81,15 +81,16 @@ nav:
       - Glossary: pcs/glossary.md
   - Guides:
       - Deployment: guides/deployment-guide.md
-      - Production deployment: guides/deployment/production-deployment.md
       - Developer guide: guides/developer-guide.md
+      - Concepts walkthrough: guides/getting-started.md
       - Testing: guides/testing-guide.md
       - Examples: guides/examples.md
       - Demos: guides/demos.md
-      - Quickstarts: guides/quickstarts.md
       - Platform: guides/platform.md
       - Reuse and extend: guides/reuse-and-extend.md
       - Extension points: guides/extension-points.md
+      - Morph: guides/morph.md
+      - Spec Assistant: guides/specassistant.md
   - Architecture:
       - Overview: architecture/overview.md
       - Decision path: architecture/decision-path.md
@@ -119,9 +120,6 @@ nav:
       - Evidence v0.1:
           - Roadmap: roadmap/evidence-v0.1.md
           - v0.2 integration: roadmap/evidence-v0.2.md
-          - Status: roadmap/evidence-v0.1-status.md
-          - v0.2 status: roadmap/evidence-v0.2-status.md
-          - v0.2 delivery: roadmap/evidence-v0.2-delivery.md
           - Quickstart: guides/evidence-v0.1-quickstart.md
           - Model: specs/evidence-model-v0.1.md
           - Bundle format: specs/evidence-bundle-v0.1.md
@@ -133,9 +131,11 @@ nav:
           - Runtime basic: guides/runtime-evidence-basic.md
           - Runtime boundaries: guides/runtime-evidence-boundaries.md
           - Forensic replay: guides/forensic-replay-basic.md
+          - Non-claims: roadmap/evidence-v0.2-status.md
           - Changelog: CHANGELOG.md
   - Roadmap:
       - Evidence v0.2 integration: roadmap/evidence-v0.2.md
+      - Evidence program closure: roadmap/evidence-program-closure.md
   - Security:
       - Overview: security/overview.md
       - Threat model: security/threat_model.md
@@ -146,6 +146,7 @@ nav:
       - Attestation: runtime/attestation.md
       - Performance: runtime/perf.md
       - SLOs: runtime/slo.md
+      - Dev Mode (E4): features/dev-mode-e4.md
   - Adapters:
       - Overview: adapters/overview.md
       - Alpha-Beta-CROWN: adapters/alpha-beta-crown.md
@@ -159,18 +160,12 @@ nav:
   - Runbooks:
       - Index: runbooks/README.md
       - Deployment: runbooks/deployment.md
-      - Rollback: runbooks/rollback.md
       - Incident response: runbooks/incident-response.md
       - Break glass: runbooks/break-glass.md
       - Operations: runbooks/operations.md
       - Surge: runbooks/surge.md
       - Approvals: runbooks/approvals.md
-      - GuardTrip triage: runbooks/guardtrip-triage.md
-  - Features:
-      - Real-time communication: features/real-time-communication.md
-      - Dev mode: features/dev-mode-e4.md
-      - Authentication: features/authentication.md
-      - Advanced search: features/advanced-search.md
+      - Live ops secrets: runbooks/live-ops-secrets.md
   - Compliance:
       - SOC2: compliance/soc2.md
       - Safety case: compliance/safety_case.md
@@ -178,6 +173,7 @@ nav:
   - Community:
       - Governance: community/governance.md
   - Dev:
+      - Local workflows: dev/local-workflows.md
       - Lean build: dev/lean-build.md
   - Glossary: glossary.md
 

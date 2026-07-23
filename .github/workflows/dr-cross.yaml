@@ -3,8 +3,8 @@
 
 name: Cross-Region Disaster Recovery Test
 
-# Gated: moto/local AWS surface + blue/green dry-run when secrets absent.
-# Live AWS path runs when AWS secrets are present (no continue-on-error).
+# Gated floor: moto/local AWS surface on push/PR/schedule (inventory-safe).
+# Live AWS: workflow_dispatch mode=live only; fail-closed without secrets.
 # CI-local proof does not claim production multi-region DR.
 on:
   push:
@@ -13,20 +13,25 @@ on:
       - ".github/workflows/dr-cross.yaml"
       - "scripts/db/blue_green_migrate.sh"
       - "scripts/dr/**"
-      - "ops/terraform/regions/**"
   pull_request:
     branches: [main, develop]
     paths:
       - ".github/workflows/dr-cross.yaml"
       - "scripts/db/blue_green_migrate.sh"
       - "scripts/dr/**"
-      - "ops/terraform/regions/**"
   schedule:
+    # Monday moto gate only — does not auto-run live AWS when secrets appear.
     - cron: "0 9 * * 1"
   workflow_dispatch:
     inputs:
+      mode:
+        description: "moto (CI-local) or live (real AWS; secrets required)"
+        required: false
+        default: "moto"
+        type: choice
+        options: [moto, live]
       simulate_failover:
-        description: "Simulate primary region failover"
+        description: "Live mode: disable primary health check to exercise failover"
         required: false
         default: true
         type: boolean
@@ -45,66 +50,15 @@ env:
   HEALTH_CHECK_ID: ${{ secrets.HEALTH_CHECK_ID }}
 
 jobs:
-  setup:
-    name: Setup Test Environment
-    runs-on: ubuntu-latest
-    outputs:
-      primary_endpoint: ${{ steps.get_endpoints.outputs.primary_endpoint }}
-      secondary_endpoint: ${{ steps.get_endpoints.outputs.secondary_endpoint }}
-      sidecar_url: ${{ steps.get_endpoints.outputs.sidecar_url }}
-      aws_available: ${{ steps.aws.outputs.available }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Check AWS credentials availability
-        id: aws
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::AWS secrets absent; will run moto CI-local DR proof"
-          else
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Configure AWS credentials
-        if: steps.aws.outputs.available == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Get database endpoints
-        id: get_endpoints
-        if: steps.aws.outputs.available == 'true'
-        run: |
-          PRIMARY_ENDPOINT=$(aws rds describe-db-instances \
-            --region ${{ env.PRIMARY_REGION }} \
-            --db-instance-identifier provability-fabric-primary \
-            --query 'DBInstances[0].Endpoint.Address' \
-            --output text)
-          echo "primary_endpoint=$PRIMARY_ENDPOINT" >> "$GITHUB_OUTPUT"
-
-          SECONDARY_ENDPOINT=$(aws rds describe-db-instances \
-            --region ${{ env.SECONDARY_REGION }} \
-            --db-instance-identifier provability-fabric-secondary \
-            --query 'DBInstances[0].Endpoint.Address' \
-            --output text)
-          echo "secondary_endpoint=$SECONDARY_ENDPOINT" >> "$GITHUB_OUTPUT"
-
-          SIDECAR_URL="https://sidecar.provability-fabric.org"
-          echo "sidecar_url=$SIDECAR_URL" >> "$GITHUB_OUTPUT"
-
+  # ---------------------------------------------------------------------------
+  # Gated CI-local floor (push / PR / schedule / dispatch mode=moto)
+  # ---------------------------------------------------------------------------
   local-dr-proof:
     name: CI-local DR proof (moto)
     runs-on: ubuntu-latest
-    needs: setup
-    if: needs.setup.outputs.aws_available != 'true'
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.mode == 'moto'
     timeout-minutes: 15
     steps:
       - name: Checkout code
@@ -141,11 +95,82 @@ jobs:
           path: reports/dr/
           retention-days: 30
 
-  test-failover:
-    name: Test Region Failover
+  # ---------------------------------------------------------------------------
+  # Live AWS path (dispatch mode=live only; fail-closed without secrets)
+  # Required secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+  #   DNS_ZONE_ID, HEALTH_CHECK_ID
+  # RDS endpoints resolved via describe-db-instances (primary/secondary).
+  # ---------------------------------------------------------------------------
+  live-setup:
+    name: Live DR setup (fail-closed)
     runs-on: ubuntu-latest
-    needs: setup
-    if: needs.setup.outputs.aws_available == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
+    outputs:
+      primary_endpoint: ${{ steps.get_endpoints.outputs.primary_endpoint }}
+      secondary_endpoint: ${{ steps.get_endpoints.outputs.secondary_endpoint }}
+      sidecar_url: ${{ steps.get_endpoints.outputs.sidecar_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Live DR preflight (secrets required)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DNS_ZONE_ID: ${{ secrets.DNS_ZONE_ID }}
+          HEALTH_CHECK_ID: ${{ secrets.HEALTH_CHECK_ID }}
+          DR_LIVE_PREFLIGHT_REPORT: reports/dr/live-dr-preflight.json
+        run: |
+          python3 scripts/dr/live_dr_preflight.py
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get database endpoints
+        id: get_endpoints
+        run: |
+          set -euo pipefail
+          PRIMARY_ENDPOINT=$(aws rds describe-db-instances \
+            --region ${{ env.PRIMARY_REGION }} \
+            --db-instance-identifier provability-fabric-primary \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text)
+          if [ -z "$PRIMARY_ENDPOINT" ] || [ "$PRIMARY_ENDPOINT" = "None" ]; then
+            echo "error: could not resolve primary RDS endpoint" >&2
+            exit 1
+          fi
+          echo "primary_endpoint=$PRIMARY_ENDPOINT" >> "$GITHUB_OUTPUT"
+
+          SECONDARY_ENDPOINT=$(aws rds describe-db-instances \
+            --region ${{ env.SECONDARY_REGION }} \
+            --db-instance-identifier provability-fabric-secondary \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text)
+          if [ -z "$SECONDARY_ENDPOINT" ] || [ "$SECONDARY_ENDPOINT" = "None" ]; then
+            echo "error: could not resolve secondary RDS endpoint" >&2
+            exit 1
+          fi
+          echo "secondary_endpoint=$SECONDARY_ENDPOINT" >> "$GITHUB_OUTPUT"
+
+          SIDECAR_URL="https://sidecar.provability-fabric.org"
+          echo "sidecar_url=$SIDECAR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Upload live preflight
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-dr-preflight
+          path: reports/dr/
+          retention-days: 30
+
+  test-failover:
+    name: Test Region Failover (live)
+    runs-on: ubuntu-latest
+    needs: live-setup
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
     strategy:
       matrix:
         test_scenario: [normal, failover, recovery]
@@ -164,18 +189,27 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl jq postgresql-client
+          sudo apt-get install -y curl jq postgresql-client dnsutils
+
+      - name: Require live endpoints
+        run: |
+          set -euo pipefail
+          test -n "${{ needs.live-setup.outputs.primary_endpoint }}"
+          test -n "${{ needs.live-setup.outputs.secondary_endpoint }}"
+          test -n "${{ env.DNS_ZONE_ID }}"
+          test -n "${{ env.HEALTH_CHECK_ID }}"
 
       - name: Test normal operation
         if: matrix.test_scenario == 'normal'
         run: |
-          echo "Testing normal operation..."
-          if ! pg_isready -h ${{ needs.setup.outputs.primary_endpoint }} -p 5432; then
+          set -euo pipefail
+          echo "Testing normal operation against live primary..."
+          if ! pg_isready -h ${{ needs.live-setup.outputs.primary_endpoint }} -p 5432; then
             echo "Primary database is not accessible"
             exit 1
           fi
           for i in {1..10}; do
-            if curl -f -s "${{ needs.setup.outputs.sidecar_url }}/health" > /dev/null; then
+            if curl -f -s "${{ needs.live-setup.outputs.sidecar_url }}/health" > /dev/null; then
               echo "Sidecar heartbeat successful"
               break
             else
@@ -192,17 +226,18 @@ jobs:
             exit 1
           fi
 
-      - name: Simulate failover
+      - name: Live failover (disable primary health check)
         if: matrix.test_scenario == 'failover' && github.event.inputs.simulate_failover == 'true'
         run: |
+          set -euo pipefail
           aws route53 update-health-check \
             --health-check-id ${{ env.HEALTH_CHECK_ID }} \
             --disabled
           sleep 60
           for i in {1..30}; do
             RESOLVED_IP=$(dig +short ${{ env.DNS_RECORD }} | head -1)
-            SECONDARY_IP=$(dig +short ${{ needs.setup.outputs.secondary_endpoint }} | head -1)
-            if [ "$RESOLVED_IP" = "$SECONDARY_IP" ]; then
+            SECONDARY_IP=$(dig +short ${{ needs.live-setup.outputs.secondary_endpoint }} | head -1)
+            if [ -n "$RESOLVED_IP" ] && [ -n "$SECONDARY_IP" ] && [ "$RESOLVED_IP" = "$SECONDARY_IP" ]; then
               echo "DNS failover successful: $RESOLVED_IP"
               break
             fi
@@ -216,7 +251,8 @@ jobs:
       - name: Test failover operation
         if: matrix.test_scenario == 'failover'
         run: |
-          if ! pg_isready -h ${{ needs.setup.outputs.secondary_endpoint }} -p 5432; then
+          set -euo pipefail
+          if ! pg_isready -h ${{ needs.live-setup.outputs.secondary_endpoint }} -p 5432; then
             echo "Secondary database is not accessible"
             exit 1
           fi
@@ -224,14 +260,15 @@ jobs:
       - name: Test recovery
         if: matrix.test_scenario == 'recovery'
         run: |
+          set -euo pipefail
           aws route53 update-health-check \
             --health-check-id ${{ env.HEALTH_CHECK_ID }} \
             --no-disabled
           sleep 60
           for i in {1..30}; do
             RESOLVED_IP=$(dig +short ${{ env.DNS_RECORD }} | head -1)
-            PRIMARY_IP=$(dig +short ${{ needs.setup.outputs.primary_endpoint }} | head -1)
-            if [ "$RESOLVED_IP" = "$PRIMARY_IP" ]; then
+            PRIMARY_IP=$(dig +short ${{ needs.live-setup.outputs.primary_endpoint }} | head -1)
+            if [ -n "$RESOLVED_IP" ] && [ -n "$PRIMARY_IP" ] && [ "$RESOLVED_IP" = "$PRIMARY_IP" ]; then
               echo "DNS recovery successful: $RESOLVED_IP"
               break
             fi
@@ -243,10 +280,10 @@ jobs:
           done
 
   verify-replication:
-    name: Verify Cross-Region Replication
+    name: Verify Cross-Region Replication (live)
     runs-on: ubuntu-latest
-    needs: setup
-    if: needs.setup.outputs.aws_available == 'true'
+    needs: live-setup
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -258,13 +295,18 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Test S3 replication
         run: |
+          set -euo pipefail
           PRIMARY_BUCKET=$(aws s3api list-buckets \
             --query "Buckets[?contains(Name, \`provability-fabric-dumps\`) && !contains(Name, \`secondary\`)].Name" \
-            --output text)
+            --output text | awk '{print $1}')
           SECONDARY_BUCKET=$(aws s3api list-buckets \
             --region ${{ env.SECONDARY_REGION }} \
             --query "Buckets[?contains(Name, \`provability-fabric-dumps\`) && contains(Name, \`secondary\`)].Name" \
-            --output text)
+            --output text | awk '{print $1}')
+          if [ -z "$PRIMARY_BUCKET" ] || [ -z "$SECONDARY_BUCKET" ]; then
+            echo "error: could not resolve primary/secondary dump buckets" >&2
+            exit 1
+          fi
           echo "test-content-$(date +%s)" > test-file.txt
           aws s3 cp test-file.txt "s3://$PRIMARY_BUCKET/test-file.txt"
           sleep 60
@@ -276,10 +318,10 @@ jobs:
           aws s3 rm "s3://$SECONDARY_BUCKET/test-file.txt" --region ${{ env.SECONDARY_REGION }}
 
   test-blue-green-migration:
-    name: Test Blue-Green Migration
+    name: Test Blue-Green Migration (live verify)
     runs-on: ubuntu-latest
-    needs: setup
-    if: needs.setup.outputs.aws_available == 'true'
+    needs: live-setup
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -289,21 +331,30 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Test blue-green migration script
+      - name: Install postgresql client
         run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Live blue-green verify (non-simulated connectivity)
+        run: |
+          set -euo pipefail
           chmod +x ./scripts/db/blue_green_migrate.sh
           ./scripts/db/blue_green_migrate.sh \
-            --dry-run \
-            --blue-db-url "postgresql://test:test@${{ needs.setup.outputs.primary_endpoint }}:5432/test" \
-            --green-db-url "postgresql://test:test@${{ needs.setup.outputs.secondary_endpoint }}:5432/test" \
+            --verify-only \
+            --blue-db-url "postgresql://probe@${{ needs.live-setup.outputs.primary_endpoint }}:5432/postgres" \
+            --green-db-url "postgresql://probe@${{ needs.live-setup.outputs.secondary_endpoint }}:5432/postgres" \
             --dns-zone "${{ env.DNS_ZONE_ID }}" \
-            --dns-record "${{ env.DNS_RECORD }}"
+            --dns-record "${{ env.DNS_RECORD }}" \
+            --smoke-test-url "${{ needs.live-setup.outputs.sidecar_url }}/health"
 
   generate-report:
-    name: Generate DR Test Report
+    name: Generate Live DR Test Report
     runs-on: ubuntu-latest
-    needs: [setup, test-failover, verify-replication, test-blue-green-migration]
-    if: always() && needs.setup.outputs.aws_available == 'true'
+    needs: [live-setup, test-failover, verify-replication, test-blue-green-migration]
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -312,8 +363,9 @@ jobs:
           mkdir -p reports/dr
           report_file="reports/dr/dr-test-report-$(date +%Y%m%d).md"
           cat > "${report_file}" << EOF
-          # Cross-Region Disaster Recovery Test Report
+          # Cross-Region Disaster Recovery Test Report (live_aws=true)
           **Date:** $(date)
+          **Mode:** live
           ### Failover: ${{ needs.test-failover.result }}
           ### Replication: ${{ needs.verify-replication.result }}
           ### Migration: ${{ needs.test-blue-green-migration.result }}
@@ -321,16 +373,16 @@ jobs:
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: dr-test-report
+          name: dr-test-report-live
           path: reports/dr/
           retention-days: 30
 
   notify:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [setup, local-dr-proof, test-failover, verify-replication, test-blue-green-migration]
+    needs: [local-dr-proof, live-setup, test-failover, verify-replication, test-blue-green-migration]
     if: failure()
     steps:
       - name: Send notification
         run: |
-          echo "Cross-region DR workflow failed (local moto or live AWS path)."
+          echo "Cross-region DR workflow failed (moto gate or live AWS path)."

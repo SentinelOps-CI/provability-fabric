@@ -7,7 +7,7 @@ FROM rust:1.88-bookworm AS builder
 WORKDIR /app
 
 # Cache deps: copy manifests first
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create a dummy src to resolve deps and prime cache
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs

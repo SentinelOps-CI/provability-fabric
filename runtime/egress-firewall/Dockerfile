@@ -4,18 +4,17 @@
 # Multi-stage build for optimal image size and security
 FROM rust:1.88-alpine AS builder
 
-# Install build dependencies
+# Install build dependencies (no openssl: reqwest uses rustls-tls)
 RUN apk add --no-cache \
     musl-dev \
-    openssl-dev \
     pkgconfig \
     && rm -rf /var/cache/apk/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY Cargo.toml Cargo.lock ./
+# Workspace member: lockfile lives at repo root; build this crate standalone in image context.
+COPY Cargo.toml ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -23,19 +22,20 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Build dependencies (this layer will be cached)
 RUN cargo build --release --no-default-features --features mimalloc
 
-# Copy source code
+# Copy source code and force a real binary rebuild (Cargo can keep the dummy
+# binary when mtimes do not invalidate the release artifact).
 COPY src/ ./src/
-
-# Build the application
-RUN cargo build --release --no-default-features --features mimalloc
+RUN touch src/main.rs \
+    && cargo build --release --no-default-features --features mimalloc
 
 # Runtime stage
 FROM alpine:3.19
 
-# Install runtime dependencies
+# Install runtime dependencies (wget for compose/Dockerfile healthchecks)
 RUN apk add --no-cache \
     ca-certificates \
     libc6-compat \
+    wget \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user
@@ -57,12 +57,12 @@ RUN chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-# Expose port (if needed)
-EXPOSE 8080
+# Expose port (matches compose mapping and actix bind)
+EXPOSE 8081
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Health check uses GET (not wget --spider/HEAD) so /health must respond to GET.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=12 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8081/health || exit 1
 
 # Run the application
 CMD ["./egress-firewall"]

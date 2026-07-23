@@ -1,7 +1,7 @@
 {
   "version": "3.0",
   "generated_from": "lean_proofs",
-  "generation_timestamp": "2026-06-19T04:27:59.049984",
+  "generation_timestamp": "2026-07-23T06:33:03.576499",
   "source_files": [
     "core/lean-libs/ActionDSL.lean",
     "core/lean-libs/Budget.lean",
@@ -22,6 +22,7 @@
     "core/lean-libs/ActionDSL/Safety.lean",
     "core/lean-libs/ActionDSL/Windows.lean",
     "core/lean-libs/Delta/Typing.lean",
+    "core/lean-libs/Runtime/ExtendedAdapter.lean",
     "core/lean-libs/Runtime/MicroInterp.lean",
     "core/lean-libs/Runtime/Refinement.lean",
     "core/lean-libs/Runtime/Schedule.lean",
@@ -59,9 +60,9 @@
   "lean_environment": {
     "lean_version": "Lean (version 4.7.0, x86_64-w64-windows-gnu, commit 6fce8f7d5cd1, Release)",
     "lake_version": "Lake version 5.0.0-6fce8f7 (Lean version 4.7.0)",
-    "workspace_hash": "c5353aabdcd0e52f534ac15adc23dab13e4bdd5949fe141544391cd964945394"
+    "workspace_hash": "cf08de4c9b4175750197d18652e37d890d5353106290d5494014bd971cc2b9ad"
   },
-  "workspace_hash": "c5353aabdcd0e52f534ac15adc23dab13e4bdd5949fe141544391cd964945394",
+  "workspace_hash": "cf08de4c9b4175750197d18652e37d890d5353106290d5494014bd971cc2b9ad",
   "tools": {
     "CanUse": {
       "can_use": false,
@@ -136,6 +137,15 @@
       "lean_definition": false
     },
     "forbidden_tool": {
+      "can_use": false,
+      "conditions": [
+        "requires_explicit_lean_proof"
+      ],
+      "source_file": "generated",
+      "capability_type": "default_deny",
+      "lean_definition": false
+    },
+    "toolLabel": {
       "can_use": false,
       "conditions": [
         "requires_explicit_lean_proof"
@@ -1076,9 +1086,9 @@
     }
   },
   "metadata": {
-    "total_tools_found": 9,
+    "total_tools_found": 10,
     "total_capabilities": 0,
     "explicit_capabilities": 0,
-    "default_capabilities": 9
+    "default_capabilities": 10
   }
 }

@@ -46,15 +46,6 @@ updates:
           - "*"
 
   - package-ecosystem: npm
-    directory: /marketplace/ui
-    schedule:
-      interval: weekly
-    groups:
-      marketplace-npm:
-        patterns:
-          - "*"
-
-  - package-ecosystem: npm
     directory: /console
     schedule:
       interval: weekly
@@ -113,10 +104,5 @@ updates:
 
   - package-ecosystem: gomod
     directory: /services/build-orchestrator
-    schedule:
-      interval: weekly
-
-  - package-ecosystem: gomod
-    directory: /services/policy-diff-service
     schedule:
       interval: weekly

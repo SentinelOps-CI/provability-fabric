@@ -264,7 +264,7 @@ impl Watcher {
             .unwrap_or(0.8);
         let tenant_id = env::var("TENANT_ID").unwrap_or_default();
         let ledger_url =
-            env::var("LEDGER_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+            env::var("LEDGER_URL").unwrap_or_else(|_| "http://localhost:4000".to_string());
         let kms_proxy_url =
             env::var("KMS_PROXY_URL").unwrap_or_else(|_| "http://kms-proxy:8082".to_string());
         let signing_key_id = env::var("SIGNING_KEY_ID")

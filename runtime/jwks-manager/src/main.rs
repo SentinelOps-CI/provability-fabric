@@ -2,7 +2,6 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
@@ -12,11 +11,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
-use tracing::{error, info, warn};
+use tokio::time::interval;
+use tracing::{error, info};
 use uuid::Uuid;
 use reqwest::Client;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use base64::{Engine as _, engine::general_purpose};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -308,7 +306,7 @@ impl JwksManager {
 
         // Check certificate pinning
         let pins = self.certificate_pins.read().await;
-        if let Some(pin) = pins.get(kid) {
+        if let Some(_pin) = pins.get(kid) {
             // In production, this would verify the actual certificate fingerprint
             // For now, we'll just check that the pin exists
             info!("Certificate pin validated for kid: {}", kid);
@@ -318,7 +316,7 @@ impl JwksManager {
 
         // Validate token with JWKS
         let jwks = self.get_jwks().await;
-        if let Some(key) = jwks.keys.iter().find(|k| k.kid == kid) {
+        if let Some(_key) = jwks.keys.iter().find(|k| k.kid == kid) {
             // In production, this would perform actual JWT validation
             info!("Token validated with JWKS for kid: {}", kid);
             Ok(true)
@@ -422,7 +420,7 @@ async fn handle_request(
         ("POST", "/validate-token") => {
             let body_bytes = hyper::body::to_bytes(req.into_body()).await?;
             let request: serde_json::Value = serde_json::from_slice(&body_bytes)
-                .unwrap_or_else(|_| serde_json::Value::Null);
+                .unwrap_or(serde_json::Value::Null);
 
             if let Some(token) = request.get("token").and_then(|t| t.as_str()) {
                 match manager.validate_token_with_pinning(token).await {

@@ -41,14 +41,30 @@ Optional: build the specdoc CLI if present:
 
 #### Go workspace (local dev)
 
-The repo has many `go.mod` files. For local multi-module work, copy the workspace template:
+The repo has many `go.mod` files. For local multi-module work, **initialize a Go workspace** from the template (preferred over treating each module as an island):
+
+```bash
+./scripts/go-work-init.sh          # copies go.work.example -> go.work (gitignored)
+# or: make go-work
+./scripts/go-work-init.sh --sync   # optional: align sums after module changes
+```
+
+Equivalent manual step:
 
 ```bash
 cp go.work.example go.work   # go.work is gitignored for local overrides
-go work sync                 # optional: align sums after module changes
+go work sync                 # optional
 ```
 
 Primary CLI entrypoint remains `core/cli/pf`; `go.work` wires replace paths across modules without manual `replace` edits in each module.
+
+For path-aware local deps (Go/Node/Python/Rust only where needed):
+
+```bash
+make install-dev                 # auto-detect from git changes
+make install-dev SCOPE=node      # ledger/SDK/dsse-ts npm installs
+make install-dev SCOPE=all       # full bootstrap (same as install-full)
+```
 
 ### Standard (CLI + Rust workspace)
 
@@ -69,37 +85,60 @@ Run the installation script for your platform:
 
 See [Reuse and extend](docs/guides/reuse-and-extend.md) for install modes (minimal, standard, full) and tiered setup.
 
+## Local Docker / ledger loops
+
+Prefer profile-scoped Make targets (health-wait, no fixed sleep). Full matrix: [docs/dev/local-workflows.md](docs/dev/local-workflows.md).
+
+```bash
+make platform-up     # default profile: platform + sidecar (:8000 / :8006)
+make ledger-up       # + ledger GraphQL (:4000), PROFILE=dev
+make check-wiring    # compose â†” code port defaults
+# Console UI (:3000) requires: make full-up
+```
+
+`make dev` is an alias for `platform-up` and does **not** start the Console.
+
 ## Running tests
 
-### Windows development (WSL required)
+### Windows development (WSL-first)
 
-Native Windows (PowerShell/cmd) supports a **subset** of the dev workflow. Linux CI remains authoritative.
+**Primary path:** develop inside [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) (Ubuntu recommended). Clone the repo on the Linux filesystem (`~/provability-fabric`), and run bash/`make` targets from WSL. Linux CI remains authoritative for Lean/Lake, evidence replay, and full integration.
+
+Native Windows (PowerShell/cmd) is an **optional smoke subset only** â€” do not chase native Lean, OpenHands, or full `make test` parity on Windows.
 
 | Task | Windows native | WSL / Linux |
 |------|----------------|-------------|
-| Go CLI (`core/cli/pf`) | Pass — `go test ./...` | Pass |
-| Rust workspace (non-excluded crates) | Pass | Pass |
+| Go CLI (`core/cli/pf`) | Pass â€” `go test ./...` | Pass |
+| Rust workspace (non-excluded crates) | Pass (see smoke below) | Pass |
 | Evidence validate/pack (`pf evidence`) | Pass (static paths) | Pass |
-| Evidence replay execute, bash testbeds | **Skip** — needs bash + submodules | Pass |
-| `make evidence-verify`, `make test` | **Use WSL or Git Bash** | Pass |
-| SWE-bench real engine | **Skip** | Pass with OpenHands |
-| Lean / Lake builds | **Use WSL** | Pass |
+| Evidence replay execute, bash testbeds | **Skip** â€” needs bash + submodules | Pass |
+| `make evidence-verify`, `make test` | **Use WSL** (Git Bash is partial) | Pass |
+| SWE-bench real engine (OpenHands) | **Skip** | Pass |
+| Lean / Lake builds | **Use WSL** â€” no native Lean in CI | Pass |
 | Full platform docker compose | Partial | Pass |
 
-**Recommendation:** Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu, clone the repo inside the Linux filesystem (`~/provability-fabric`), and run bash/Makefile targets from WSL. Git Bash works for light gates (`make evidence-verify` subset) but not for Lean/Lake or full integration tests.
+**WSL setup (recommended):**
 
-Quick Windows smoke (no WSL):
+1. Install WSL2 + Ubuntu; enable Docker Desktop WSL integration if you use Docker.
+2. Clone into `~/provability-fabric` (not under `/mnt/c/...`) for filesystem performance.
+3. Run `make dev-standards`, then `make evidence-verify` / `make test` from WSL.
+
+Git Bash can cover light gates (`make evidence-verify` subset) but not Lean/Lake or full integration tests.
+
+Optional native Windows smoke (no WSL, no Lean):
 
 ```powershell
 cd core\cli\pf; go test ./...
-cargo test --workspace --exclude sidecar-watcher --exclude labeler --exclude tool-broker
+cargo test --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher --exclude labeler --exclude tool-broker
 ```
 
-Full parity subset via Makefile:
+Same subset via Makefile (from Git Bash/WSL/`make` on Windows):
 
 ```bash
 make test-windows   # CLI + Rust smoke; skips Linux-only paths
 ```
+
+CI: optional path-filtered job `.github/workflows/test-windows.yml` runs that same subset on `windows-latest` (no Lean toolchain).
 
 ### Minimal checks
 
@@ -148,14 +187,14 @@ make docs-strict     # mkdocs build --strict (docs-only PRs)
 CI workflows that call `make submodules` need a repository secret so GitHub Actions can clone private standards repos (`verifiable-ai-ci/CERT-V1`, `verifiable-ai-ci/TRACE-REPLAY-KIT`). **Org admin** must add the secret; contributors cannot self-serve it on the upstream org repo.
 
 1. Create a fine-grained PAT (or classic PAT) owned by a bot/service account with **read** access to `verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT`.
-2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
+2. In GitHub: **Settings â†’ Secrets and variables â†’ Actions â†’ New repository secret**.
 3. Name: `STANDARDS_GITHUB_TOKEN`, value: the PAT.
 4. Verify locally (with the same token exported): `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards`.
 5. Verify in CI: re-run **Standards Pin Drift Check** or **Evidence v0.1 smoke** via `workflow_dispatch`; the `make submodules` step should succeed in the log.
 
-Workflows using this secret are listed in [CI health matrix — Required secrets](docs/internal/ci-health-matrix.md#required-secrets-org-prerequisites). Forks without the secret can still run most gates; standards/replay jobs fail until the secret is configured or submodules are vendored locally.
+Workflows using this secret are listed in [CI health matrix â€” Required secrets](docs/internal/ci-health-matrix.md#required-secrets-org-prerequisites). Forks without the secret can still run most gates; standards/replay jobs fail until the secret is configured or submodules are vendored locally.
 
-See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for the fresh-clone checklist and [Evidence v0.2 status](docs/roadmap/evidence-v0.2-status.md) for current delivery gates.
+See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for the fresh-clone checklist and [Evidence program closure](docs/roadmap/evidence-program-closure.md) for live gated CI posture (historical v0.2 status is archived).
 
 ### CI expectations
 
@@ -165,7 +204,7 @@ See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for t
 | Docs only | `make docs-strict` | `docs-build.yaml`, `docs-deploy.yaml` |
 | Code (general) | `go test`, `cargo test`, targeted pytest | `ci.yml` reusable jobs |
 
-Repo-wide triage and known failures: [CI health matrix](docs/internal/ci-health-matrix.md). Do not admin-merge while required checks are red (see **CI policy** below).
+Repo-wide triage: [remediation tracker](docs/internal/remediation-tracker.md); secrets stub: [CI health matrix](docs/internal/ci-health-matrix.md). Do not admin-merge while required checks are red (see **CI policy** below).
 
 ### CI policy
 
@@ -196,7 +235,7 @@ If you are forking the repo to build your own product or variant, see the [Reuse
 
 ## Documentation
 
-- [Getting started](docs/guides/getting-started.md)
+- [Getting started](docs/getting-started.md)
 - [Developer guide](docs/guides/developer-guide.md)
 - [CI and supply-chain reference](docs/reference/ci-reference.md) (workflows, local commands, artifacts not to commit)
 - [Extension points](docs/guides/extension-points.md) (adapters, bundles, runtime)

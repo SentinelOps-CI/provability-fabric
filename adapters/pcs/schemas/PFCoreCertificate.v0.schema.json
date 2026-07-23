@@ -48,6 +48,34 @@
         "ContractCheckedCertificate"
       ]
     },
+    "theorem_inventory": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "theorem_inventory_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "theorem_manifest_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "semantic_projection_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "kernel_theorems_available": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "concrete_theorems_generated": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "concrete_theorems_compiled": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "certificate_mode_witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["theorem", "proposition"],
+      "properties": {
+        "theorem": { "type": "string", "minLength": 1 },
+        "proposition": { "type": "string", "minLength": 1 }
+      }
+    },
     "obligations": {
       "type": "array",
       "items": { "$ref": "pf_core.defs.json#/$defs/lean_obligation" }
@@ -55,7 +83,8 @@
     "assumption_refs": { "$ref": "common.defs.json#/$defs/ref_list" },
     "theorems_checked": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Legacy v0 compat field; prefer kernel_theorems_available / concrete_theorems_*."
     },
     "lean_build_status": {
       "type": "object",

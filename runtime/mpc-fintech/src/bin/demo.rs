@@ -59,15 +59,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 /// Create optimized configuration for financial workloads
 fn create_financial_config() -> MpcFinancialConfig {
-    let mut config = MpcFinancialConfig::default();
-    
-    // Optimize for financial requirements
-    config.threshold = 3; // 3-of-5 threshold for security
-    config.party_count = 5;
-    config.max_latency_us = 5_000; // 5ms for trading applications
-    config.target_tps = 2_000; // High-frequency trading target
-    config.enable_hsm = true; // Hardware security modules
-    config.compliance_level = ComplianceLevel::FullRegulatory;
+    let mut config = MpcFinancialConfig {
+        threshold: 3, // 3-of-5 threshold for security
+        party_count: 5,
+        max_latency_us: 5_000, // 5ms for trading applications
+        target_tps: 2_000, // High-frequency trading target
+        enable_hsm: true, // Hardware security modules
+        compliance_level: ComplianceLevel::FullRegulatory,
+        ..Default::default()
+    };
     
     // Add party addresses for demonstration
     config.network_config.party_addresses.insert(0, "fintech-node-1.example.com:8001".to_string());
@@ -307,7 +307,7 @@ async fn run_compliance_analysis(mpc_service: &MpcFinancialService) -> Result<()
                 info!("   Audit Entries: {}", audit_entries.len());
                 
                 for entry in audit_entries.iter().take(3) { // Show first 3 entries
-                    info!("   - {}: {} at {}", 
+                    info!("   - {:?}: {:?} at {}", 
                           entry.event_type, 
                           entry.compliance_verification.status,
                           entry.timestamp.format("%H:%M:%S%.3f"));

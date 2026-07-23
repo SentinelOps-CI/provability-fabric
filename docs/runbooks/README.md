@@ -6,7 +6,6 @@ This directory contains operational procedures and runbooks for managing Provabi
 
 ### Core Operations
 - **[Deployment](deployment.md)** - Standard deployment procedures and best practices
-- **[Rollback](rollback.md)** - Emergency rollback procedures for failed deployments
 - **[Incident Response](incident-response.md)** - Incident management and resolution procedures
 - **[Break Glass](break-glass.md)** - Emergency access procedures for critical situations
 - **[Operations](operations.md)** - General operations, triage, and escalation
@@ -14,7 +13,9 @@ This directory contains operational procedures and runbooks for managing Provabi
 ### Specialized
 - **[Surge](surge.md)** - Surge and backpressure handling
 - **[Approvals](approvals.md)** - Human approval workflows
-- **[GuardTrip Triage](guardtrip-triage.md)** - GuardTrip event triage and false-positive handling
+- **[Live ops secrets](live-ops-secrets.md)** - Secret-gated DR / publish / revocation / edge-load dispatch
+
+Historical rollback / GuardTrip-bot procedures (removed in-tree controller and ops CRDs): [runbook-rollback.md](../internal/archive/runbook-rollback.md), [runbook-guardtrip-triage.md](../internal/archive/runbook-guardtrip-triage.md).
 
 ## Runbook Structure
 

@@ -106,6 +106,12 @@ jobs:
                     value: "postgresql://postgres:testpass@postgres-postgresql:5432/provability_fabric"
                   - name: PORT
                     value: "4000"
+                  - name: PROFILE
+                    value: "dev"
+                  - name: PF_PROFILE
+                    value: "dev"
+                  - name: NODE_ENV
+                    value: "development"
                   - name: AUTH0_DOMAIN
                     value: "test.auth0.com"
                   - name: AUTH0_AUDIENCE

@@ -3,12 +3,19 @@
 #
 # Profiles: default (no profile) = platform + sidecar
 #   docker compose up
-# Ledger stack (postgres, redis, ledger GraphQL/MCP):
+#   make platform-up
+# Ledger stack (postgres + platform + sidecar + ledger GraphQL):
 #   docker compose --profile ledger up
+#   make ledger-up
 # Runtime enforcement (egress-firewall):
 #   docker compose --profile enforcement up
+#   make enforcement-up
 # Full stack (adds console, demos, monitoring, ledger, enforcement):
 #   docker compose --profile full up
+#   make full-up
+#
+# Canonical ports / workflows: docs/dev/local-workflows.md
+# Wiring check: make check-wiring
 
 services:
   # Database services
@@ -30,6 +37,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # Kept for future shared-cache consumers; ledger/sidecar do not depend on it today.
   redis:
     image: redis:7-alpine
     # ports:
@@ -59,11 +67,18 @@ services:
       - REPLAY_SERVICE_URL=http://replay-service:8005
       - RUNTIME_SERVICE_URL=http://runtime-sidecar:8006
     depends_on:
-      - spec-service
-      - proof-service
-      - build-orchestrator
-      - evidence-service
-      - replay-service
+      spec-service:
+        condition: service_healthy
+      proof-service:
+        condition: service_healthy
+      build-orchestrator:
+        condition: service_healthy
+      evidence-service:
+        condition: service_healthy
+      replay-service:
+        condition: service_healthy
+      runtime-sidecar:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -172,23 +187,19 @@ services:
     environment:
       - PORT=8006
       - METRICS_PORT=9090
-      - REDIS_URL=redis://redis:6379
       - ENFORCEMENT_MODE=enforce
       - PF_PROFILE=production
       - PF_ENFORCE_DSSE=1
       - PF_ENABLED_TOOLS=
       - TENANT_ID=demo-tenant
       - LEDGER_URL=http://ledger:4000
-    depends_on:
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Ledger GraphQL + MCP (ledger / full profiles)
+  # Ledger GraphQL + MCP (ledger / full profiles). Local default is PROFILE=dev.
   ledger:
     profiles: ["ledger", "full"]
     build:
@@ -197,7 +208,8 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - PROFILE=production
+      - PROFILE=dev
+      - PF_PROFILE=dev
       - PORT=4000
       - PF_ENFORCE_DSSE=1
       - PF_ENABLED_TOOLS=
@@ -206,7 +218,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      runtime-sidecar:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
@@ -225,10 +237,14 @@ services:
     environment:
       - RUST_LOG=info
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      # Prefer 127.0.0.1 over localhost (Alpine may resolve localhost to ::1).
+      # Use GET (-O /dev/null), not --spider: spider sends HEAD and actix returns 404
+      # when only GET is registered.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   # Retrieval gateway (full profile)
   retrieval-gateway:
@@ -251,7 +267,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # Tool broker demo (full profile; batch-style binary)
+  # Tool broker demo (full profile; warm restart under full stack)
   tool-broker:
     profiles: ["full"]
     build:
@@ -263,18 +279,20 @@ services:
     depends_on:
       runtime-sidecar:
         condition: service_healthy
-    restart: "no"
+    restart: unless-stopped
 
-  # WASM adapter sandbox CLI (full profile; invoke with module args via compose run)
+  # WASM adapter sandbox CLI — not a long-running service. Keep off `full` so
+  # `docker compose --profile full up --wait` (demo-up) does not fail when the
+  # process exits after --help. Invoke via: docker compose --profile tools run --rm wasm-sandbox ...
   wasm-sandbox:
-    profiles: ["full"]
+    profiles: ["tools"]
     build:
       context: .
       dockerfile: runtime/wasm-sandbox/Dockerfile
     entrypoint: ["wasm-sandbox", "--help"]
     restart: "no"
 
-  # Console Web UI (full stack only)
+  # Console Web UI (full stack only). Browser uses same-origin /api → nginx → api-gateway.
   console:
     profiles: ["full"]
     build:
@@ -282,10 +300,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - REACT_APP_API_BASE_URL=http://localhost:8000
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s

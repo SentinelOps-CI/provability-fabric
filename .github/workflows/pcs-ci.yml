@@ -104,6 +104,8 @@ jobs:
           sparse-checkout: |
             schemas
             python
+            catalog
+            test_vectors/hash
             examples/labtrust-release
             examples/computation-release
             examples/workflow_profiles

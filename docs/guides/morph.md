@@ -12,7 +12,7 @@ Workflow: `.github/workflows/lean-morph.yml`
 Configuration:
 - Secret `MORPH_API_KEY` enables Morph. Without it, a local sharded fallback runs.
 - The workflow first attempts the reusable action `SentinelOps-CI/morph-lean-ci@main`; if unavailable or secret missing, it falls back to local sharded `lake build`.
-- Targets: `proofs`, `spec-templates/v1/proofs`, `Fabric.lean`, `Policy.lean`, `ProofBench.lean`.
+- Targets: `proofs`, `spec-templates/v1/proofs`, `Fabric.lean` (root Lake marker). Canonical Policy is `proofs/Policy.lean`.
 
 Snapshot & Repro:
 - Morph produces snapshot IDs that allow instant repro of failures from a pre-warmed environment. Snapshot IDs are printed in job logs.

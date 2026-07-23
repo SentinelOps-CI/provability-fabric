@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
+use anyhow::Result;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
-use tracing::{error, info, warn};
+use tokio::time::interval;
+use tracing::{error, info};
 use reqwest::Client;
 use prometheus_client::{
     encoding::text::encode,
-    metrics::{counter::Counter, gauge::Gauge, histogram::Histogram},
     registry::Registry,
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct TelemetryData {
     // Time-to-first-cert metrics
     time_to_first_cert_samples: Vec<f64>,
@@ -50,7 +47,7 @@ struct TelemetryResponse {
     aggregated_data: Option<AggregatedTelemetry>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct AggregatedTelemetry {
     avg_time_to_first_cert: f64,
     replay_pass_rate: f64,
@@ -81,7 +78,7 @@ struct TelemetryService {
 
 impl TelemetryService {
     fn new() -> Self {
-        let mut registry = Registry::default();
+        let registry = Registry::default();
         
         // Initialize aggregated metrics
         let aggregated_metrics = Arc::new(RwLock::new(AggregatedTelemetry {
@@ -136,7 +133,7 @@ impl TelemetryService {
         }
 
         // Get current aggregated metrics
-        let aggregated = self.aggregated_metrics.read().await.clone();
+        let aggregated = (*self.aggregated_metrics.read().await).clone();
 
         Ok(TelemetryResponse {
             success: true,
@@ -152,11 +149,11 @@ impl TelemetryService {
         }
 
         // Validate data ranges
-        if data.time_to_first_cert_samples.iter().any(|&x| x < 0.0 || x > 3600.0) {
+        if data.time_to_first_cert_samples.iter().any(|&x| !(0.0..=3600.0).contains(&x)) {
             return Err(anyhow::anyhow!("Invalid time-to-first-cert samples"));
         }
 
-        if data.latency_samples.iter().any(|&x| x < 0.0 || x > 3600.0) {
+        if data.latency_samples.iter().any(|&x| !(0.0..=3600.0).contains(&x)) {
             return Err(anyhow::anyhow!("Invalid latency samples"));
         }
 
@@ -174,7 +171,7 @@ impl TelemetryService {
     }
 
     async fn aggregate_telemetry(&self) -> Result<()> {
-        let raw_data = self.raw_telemetry.read().await.clone();
+        let raw_data = (*self.raw_telemetry.read().await).clone();
         
         if raw_data.is_empty() {
             return Ok(());
@@ -187,7 +184,7 @@ impl TelemetryService {
         let mut total_passed_tests = 0;
         let mut total_cert_issuance = 0;
         let mut total_cert_failures = 0;
-        let mut all_latency_samples = Vec::new();
+        let mut all_latency_samples: Vec<f64> = Vec::new();
 
         for data in &raw_data {
             // Aggregate time-to-first-cert
@@ -273,9 +270,10 @@ impl TelemetryService {
     }
 
     async fn get_aggregated_metrics(&self) -> AggregatedTelemetry {
-        self.aggregated_metrics.read().await.clone()
+        (*self.aggregated_metrics.read().await).clone()
     }
 
+    #[allow(dead_code)] // Public helper for callers hashing tenant IDs before ingest
     fn hash_tenant_id(tenant_id: &str) -> String {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();

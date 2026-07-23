@@ -5,8 +5,8 @@ import WebSocket, { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { URL } from 'url';
 
-// WebSocket server configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'provability-fabric-dev-secret-2025';
+// Demo JWT material — must match minimal-server when used together. Not a real secret.
+const JWT_SECRET = process.env.JWT_SECRET || 'DEMO-ONLY-not-a-real-secret';
 const WS_PORT = process.env.WS_PORT || 8081;
 
 class ProvabilityWebSocketServer {
@@ -30,9 +30,7 @@ class ProvabilityWebSocketServer {
     this.wss.on('connection', this.handleConnection.bind(this));
     this.setupHeartbeat();
     
-    console.log(`🔗 WebSocket server running on port ${WS_PORT}`);
-    console.log(`🔐 Authentication: JWT-based`);
-    console.log(`📊 Metrics endpoint: ws://localhost:${WS_PORT}/metrics`);
+    console.log(`[demo] WebSocket server on port ${WS_PORT} (JWT demo signing key)`);
   }
 
   // Verify client authentication during connection

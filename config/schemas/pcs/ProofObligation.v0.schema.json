@@ -39,6 +39,12 @@
         }
       }
     },
+    "pcs_projection_manifest": {
+      "$ref": "PCSProjectionManifest.v0.schema.json"
+    },
+    "pcs_projection_manifest_hash": {
+      "$ref": "common.defs.json#/$defs/hex_digest"
+    },
     "lean_module": { "type": "string", "minLength": 1 },
     "source_repo": { "type": "string", "format": "uri" },
     "source_commit": { "$ref": "common.defs.json#/$defs/git_commit" },

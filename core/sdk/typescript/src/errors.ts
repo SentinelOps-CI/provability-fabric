@@ -2,9 +2,14 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 export class ProvabilityFabricError extends Error {
-  constructor(message: string, public code?: string) {
+  statusCode?: number;
+
+  constructor(message: string, public code?: string, statusCode?: number) {
     super(message);
     this.name = 'ProvabilityFabricError';
+    if (statusCode !== undefined) {
+      this.statusCode = statusCode;
+    }
   }
 }
 

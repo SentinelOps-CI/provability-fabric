@@ -1,19 +1,19 @@
-# Placeholders and Stubs — v1 Burn-Down Tracker
+# Placeholders and Stubs â€” v1 Burn-Down Tracker
 
 This document tracks every placeholder value, stub implementation, and TODO-as-behavior that must be removed for v1. It maps each item to:
 
 - **Removal prompt(s):** the exact prompt in the prompt series that owns the fix
 - **Proof tests:** concrete tests / CI gates that prove the placeholder is gone and behavior is real
-- **Status:** OPEN → IN PROGRESS → DONE, plus PR link(s)
+- **Status:** OPEN â†’ IN PROGRESS â†’ DONE, plus PR link(s)
 - **Policy exceptions (v1):** Sanitized placeholders are allowed only in explicitly allowlisted docs/scripts examples (e.g., Slack webhook example, `ghp_xxx`) as long as they are variable-style and clearly labeled as examples. Everything else must be eradicated.
 
 See [inventory.md](inventory.md) for the full inventory and [decisions-v1.md](decisions-v1.md) for scope decisions.
 
-**Last updated:** Wave 0 audit reconciliation (2026-07-01). Reset falsely-DONE trust-chain rows per [full-repo-audit-2026-07-01.md](../full-repo-audit-2026-07-01.md) and [remediation-tracker.md](../remediation-tracker.md). Gate `make no-runtime-placeholders` still fails on `build/` artifacts and embedded binary strings; runtime trust stubs remain OPEN.
+**Last updated:** Wave 9+ completion pass (2026-07-22) â€” TD-001â€“002/006/007/010/011 closed in code; tenant enforce fail-closed by default. Aligned with remediation-tracker Wave 9+. Live CI posture: [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) (**69** gated, inventory exit **0**).
 
 ---
 
-## Prompt → Scope index (quick reference)
+## Prompt â†’ Scope index (quick reference)
 
 | Prompt | Scope / What it removes | Primary proof |
 |--------|------------------------|---------------|
@@ -44,7 +44,7 @@ See [inventory.md](inventory.md) for the full inventory and [decisions-v1.md](de
 | P4.2 | CLI revoke: revoked_by auth context (real, tested) |
 | P7.1 | MPC fintech compliance validators: real validation or typed deny (no placeholder acceptance) |
 | P9.1 | Ledger migrations: remove rollback_checksum_placeholder (derive or remove) |
-| P11.1 | TypeScript SDK: gRPC client, trace verify, connection lifecycle, retry (removes SDK TODOs) |
+| P11.1 | TypeScript SDK: HTTP client lifecycle + idempotent retry (gRPC deferred); verify already real |
 | P13.1 | core/crypto wasm_pool: eliminate placeholder return path + deterministic tests |
 | P17 | VSCode extension: real webview comms |
 | P18 | DryVR adapter: real parsing + tests |
@@ -64,18 +64,18 @@ Every item marked DONE must satisfy:
 ## 1. Explicit placeholders (literal values)
 
 **Status legend:** OPEN | IN PROGRESS | DONE | ALLOWED (EXAMPLE)  
-**Audit:** finding ID(s) from [full-repo-audit-2026-07-01.md](../full-repo-audit-2026-07-01.md) when OPEN due to reconciliation  
+**Audit:** finding ID(s) from [full-repo-audit-2026-07-01.md](../archive/full-repo-audit-2026-07-01.md) when OPEN due to reconciliation  
 **PR:** link or TBD  
 **Owner:** team/area (runtime, core, services, adapters, tools, lean, bench)
 
 | ID | Location | Placeholder | Removal prompt(s) | Proof tests (must exist) | Owner | Status | Audit | PR |
 |----|----------|-------------|-------------------|--------------------------|-------|--------|-------|-----|
-| PH-001 | core/cli/pf/main.go | BundleHash: "placeholder-hash" | P4 | go test ./core/cli/pf/... -run TestBundleDigestFromBytes + make no-runtime-placeholders | core/cli | DONE | — | TBD |
-| PH-002 | runtime/sidecar-watcher/src/main.rs | *_hash_placeholder, attestation_*_placeholder in test/example data | P6 (+ P3.5 manifest wiring) | cargo test -p sidecar-watcher (fixture-based plan + manifest load) + gate | runtime/sidecar | DONE | — | TBD |
-| PH-003 | runtime/sidecar-watcher/src/revocation.rs | policy_hash_placeholder, dfa_hash_placeholder, labeler_hash_placeholder | P6 | cargo test -p sidecar-watcher -- revocation + gate | runtime/sidecar | DONE | — | TBD |
-| PH-004 | runtime/sidecar-watcher/src/permit_enforcement.rs | CERT_SIG unconfigured fallback; no real DSSE verify | P6 (+ P2 trust root/DSSE) | cargo test -p sidecar-watcher -- dsse_verification + gate | runtime/sidecar | OPEN | F01, F02 | TBD |
-| PH-005 | runtime/sidecar-watcher/src/policy_adapter.rs + permit_enforcement.rs | Shadow mode always allows; `is_tool_enabled` default true | P6 | cargo test -p sidecar-watcher -- policy_checks_deny_by_default + gate | runtime/sidecar | OPEN | F02, F25 | TBD |
-| PH-006 | runtime/retrieval-gateway/src/receipt.rs | env signing key; crate unbuildable (no Cargo.toml) | P8 (+ P2/P3 fixtures) | cargo test -p retrieval-gateway -- receipt_dsse + gate | runtime/retrieval | OPEN | F05 | TBD |
+| PH-001 | core/cli/pf/main.go | BundleHash: "placeholder-hash" | P4 | go test ./core/cli/pf/... -run TestBundleDigestFromBytes + make no-runtime-placeholders | core/cli | DONE | â€” | TBD |
+| PH-002 | runtime/sidecar-watcher/src/main.rs | *_hash_placeholder, attestation_*_placeholder in test/example data | P6 (+ P3.5 manifest wiring) | cargo test -p sidecar-watcher (fixture-based plan + manifest load) + gate | runtime/sidecar | DONE | â€” | TBD |
+| PH-003 | runtime/sidecar-watcher/src/revocation.rs | policy_hash_placeholder, dfa_hash_placeholder, labeler_hash_placeholder | P6 | cargo test -p sidecar-watcher -- revocation + gate | runtime/sidecar | DONE | â€” | TBD |
+| PH-004 | runtime/sidecar-watcher/src/permit_enforcement.rs | CERT_SIG unconfigured fallback; no real DSSE verify | P6 (+ P2 trust root/DSSE) | cargo test -p sidecar-watcher -- dsse_verification + gate | runtime/sidecar | DONE | F01, F02 | â€” |
+| PH-005 | runtime/sidecar-watcher/src/policy_adapter.rs + permit_enforcement.rs | Shadow mode always allows; `is_tool_enabled` default true | P6 | cargo test -p sidecar-watcher -- policy_checks_deny_by_default + gate | runtime/sidecar | DONE | F02, F25 | â€” |
+| PH-006 | runtime/retrieval-gateway/src/receipt.rs | Real DSSE receipts via `pf-dsse`; crate buildable (`Cargo.toml` + CI) | P8 (+ P2/P3 fixtures) | cargo test -p retrieval-gateway + `retrieval-gateway.yml` | runtime/retrieval | DONE | F05 | â€” |
 | PH-007 | runtime/mpc-fintech/src/compliance.rs | placeholder validation branches | P7.1 | cargo test -p mpc-fintech -- compliance_validation + gate | runtime/mpc | DONE | TBD |
 | PH-008 | runtime/ledger/prisma/migrations/.../rollback.sql | rollback_checksum_placeholder | P9.1 | migration snapshot test or schema lint + gate | runtime/ledger | DONE | TBD |
 | PH-009 | services/evidence-service/main.go | kms/vault "not implemented"; placeholder compliance files | P5 | go test ./services/evidence-service/... + artifact content test + gate | services/evidence | DONE | TBD |
@@ -95,10 +95,10 @@ Every item marked DONE must satisfy:
 | ST-002 | runtime/wasm-sandbox/README.md + impl | scan_for_prohibited_ops documented as stub | P13 | cargo test -p wasm-sandbox -- scan_prohibited_ops + gate | runtime/wasm | DONE | TBD |
 | ST-003 | runtime/sidecar-watcher/src/concurrency.rs | placeholder event processing | P6 | cargo test -p sidecar-watcher -- concurrency_pipeline + gate | runtime/sidecar | DONE | TBD |
 | ST-004 | core/policy-kernel/cache.go | Redis sync + ops placeholder/TODO | P10 | go test ./core/policy-kernel/... -run TestRedisCache* + gate | core/policy | DONE | TBD |
-| ST-005 | core/policy-kernel/engine.go | signature verification structural-only (`verifyReceipt` returns nil) | P10 | go test ./core/policy-kernel/... -run TestSignatureVerification* + gate | core/policy | OPEN | F01 | TBD |
+| ST-005 | core/policy-kernel/engine.go | `verifyReceipt` wired to `dsse.VerifyAccessReceipt` | P10 | go test ./core/policy-kernel/... + cross-lang DSSE | core/policy | DONE | F01 | â€” |
 | ST-006 | core/cli/pf/platform_commands.go | aggregation stub | P4 | go test ./core/cli/pf/... -run TestPlatformAggregationReport + gate | core/cli | DONE | TBD |
 | ST-007 | core/crypto/wasm_pool.rs | one path returns placeholder | P13.1 | cargo test -p core-crypto -- wasm_pool + gate | core/crypto | DONE | TBD |
-| ST-008 | tools/ci/impacted_only.py | `--build-impacted` logs only; no lake build execution | P14 | pytest tools/ci/test_impacted_only.py + gate | tools/ci | OPEN | F12 | TBD |
+| ST-008 | tools/ci/impacted_only.py | `--build-impacted` emits lake build commands (F12 selector fixed) | P14 | `tools/test_select_impacted.py` + gate | tools/ci | DONE | F12 | â€” |
 
 ---
 
@@ -106,20 +106,20 @@ Every item marked DONE must satisfy:
 
 | ID | Location | TODO behavior | Removal prompt(s) | Proof tests | Owner | Status | Audit | PR |
 |----|----------|---------------|-------------------|-------------|-------|--------|-------|-----|
-| TD-001 | runtime/tool-broker/src/main.rs | tenant/risk/throttling/sig verify (structural-only receipt check) | P7 | cargo test -p tool-broker (tenant + throttle + sig) + gate | runtime/broker | OPEN | F01 | TBD |
-| TD-002 | runtime/tool-broker/src/ratelimit.rs | budget tracking TODO | P7 | cargo test -p tool-broker -- ratelimit + gate | runtime/broker | OPEN | F01 | TBD |
-| TD-003 | runtime/sidecar-watcher/src/broker.rs | sig verification structural-only | P6 | cargo test -p sidecar-watcher -- plan_sig_strict + gate | runtime/sidecar | OPEN | F01 | TBD |
-| TD-004 | runtime/sidecar-watcher/src/plan.rs | sig verification structural-only | P6 | same as above + "CI forbids insecure" test | runtime/sidecar | OPEN | F01 | TBD |
-| TD-005 | runtime/ledger/src/receipts.ts | Ed25519 verify TODO (length/alg check only) | P9 | pnpm -w test runtime/ledger -- receipts_verify + gate | runtime/ledger | OPEN | F01, F11 | TBD |
-| TD-006 | runtime/ledger/src/mcp/mcp-proxy.ts | proper rate limiting + counters TODO | P9 | TS tests w/ fake timers + gate | runtime/ledger | OPEN | F04, F11 | TBD |
-| TD-007 | runtime/ledger/src/mcp/jcs-validator.ts | hit-rate tracking TODO | P9 | TS tests + gate | runtime/ledger | OPEN | F11 | TBD |
-| TD-008 | runtime/ledger/src/egress.ts | signature verification TODO | P9 | TS tests + gate | runtime/ledger | OPEN | F01 | TBD |
-| TD-009 | core/sdk/typescript/src/index.ts | gRPC client null; trace verify returns `{ valid: true }` | P11.1 | pnpm -w test core/sdk/typescript + gate | core/sdk | OPEN | F17, F18 | TBD |
-| TD-010 | core/sdk/typescript/src/client.ts | connection logic TODO | P11.1 | same | core/sdk | OPEN | F17 | TBD |
-| TD-011 | core/sdk/typescript/src/middleware/express.ts | retry logic TODO | P11.1 | same | core/sdk | OPEN | F17 | TBD |
+| TD-001 | runtime/tool-broker/src/main.rs | Tenant resolve fail-closed by default; deny missing tenant; no unverified JWT spoof; risk from allow-list; throttle sleep applied | P7 | cargo test -p tool-broker (tenant + throttle) + gate | runtime/broker | DONE | Wave 10.1 + completion | â€” |
+| TD-002 | runtime/tool-broker/src/ratelimit.rs | Real `budget_consumed_*` sliding windows | P7 | cargo test -p tool-broker -- ratelimit + gate | runtime/broker | DONE | Wave 10.1 | â€” |
+| TD-003 | runtime/sidecar-watcher/src/broker.rs | plan/receipt sig verify via `pf_dsse` | P6 | cargo test -p sidecar-watcher -- plan_sig_strict + gate | runtime/sidecar | DONE | F01 | â€” |
+| TD-004 | runtime/sidecar-watcher/src/plan.rs | plan/receipt sig verify via `pf_dsse` | P6 | same + cross-lang DSSE | runtime/sidecar | DONE | F01 | â€” |
+| TD-005 | runtime/ledger/src/receipts.ts | Ed25519/DSSE verify via `crypto/dsse` | P9 | `cd runtime/ledger && npm test` + gate | runtime/ledger | DONE | F01, F11 | â€” |
+| TD-006 | runtime/ledger/src/mcp/mcp-proxy.ts | Sliding-window rate limit + request counters | P9 | `mcp-rate-limit.test.ts` + gate | runtime/ledger | DONE | Wave 10.2 | â€” |
+| TD-007 | runtime/ledger/src/mcp/jcs-validator.ts | Cache hit-rate tracking | P9 | `mcp-rate-limit.test.ts` + gate | runtime/ledger | DONE | Wave 10.2 | â€” |
+| TD-008 | runtime/ledger/src/egress.ts | certificate signature verify via `crypto/dsse` | P9 | `cd runtime/ledger && npm test` + gate | runtime/ledger | DONE | F01 | â€” |
+| TD-009 | core/sdk/typescript/src/verifyTrace.ts | `verifyTrace` real (DSSE fail-closed by default); client/retry closed under TD-010/011 | P11.1 | `verifyTrace.test.ts` + gate | core/sdk | DONE | F17, F18 | â€” |
+| TD-010 | core/sdk/typescript/src/client.ts | HTTP connect/disconnect against ledger `/health` + `/api/status` (gRPC deferred) | P11.1 | `client.test.ts` + gate | core/sdk | DONE | Wave 10.3 | â€” |
+| TD-011 | core/sdk/typescript/src/middleware/express.ts + retry.ts | Idempotent outbound retry (not Express `next()` retry) | P11.1 | `client.test.ts` retry cases + gate | core/sdk | DONE | Wave 10.3 | â€” |
 | TD-012 | core/cli/pf/src/revoke.rs | revoked_by auth context TODO | P4.2 | go test ./core/cli/pf/... -run TestRevokeAuthContext + gate | core/cli | DONE | TBD |
-| TD-013 | vscode-extension/src/extension.ts | webview comms TODO | P17 | pnpm test vscode-extension (or npm) + gate | tooling/vscode | DONE | TBD |
-| TD-014 | tools/create-sentinel-app/index.js | replay is echo "todo" | P15 | node smoke test for generated app + gate | tools/scaffold | DONE | TBD |
+| TD-013 | ~~vscode-extension/src/extension.ts~~ | removed (no CI) | P17 | — | tooling/vscode | CANCELLED | n/a |
+| TD-014 | ~~tools/create-sentinel-app/index.js~~ | removed (obsolete scaffold) | P15 | — | tools/scaffold | CANCELLED | n/a |
 | TD-015 | core/sdk/README.md | example // TODO | (doc-only; allow if clearly example) | n/a (doc allowlist) | docs | ALLOWED (EXAMPLE) | n/a |
 
 ---
@@ -149,7 +149,7 @@ Mostly example placeholders. v1 policy: allowed if variable-style and clearly la
 |----|----------|-------------|-------------------|-------------|-------|--------|-----|
 | SC-001 | adapters/dryvr/adapter.sh | placeholder parsing | P18 | shell test harness or integration test with fixture output + gate | adapters/dryvr | DONE | TBD |
 | SC-002 | scripts/db/blue_green_migrate.sh | Slack webhook xxx/yyy/zzz | Allowlisted example | make no-runtime-placeholders must allow this file | scripts | ALLOWED (EXAMPLE) | n/a |
-| SC-003 | tools/pr-bot/README.md | example token | Allowlisted example | same | docs/tools | ALLOWED (EXAMPLE) | n/a |
+| SC-003 | ~~tools/pr-bot/README.md~~ | removed with orphan tool | — | — | docs/tools | CANCELLED | n/a |
 
 ---
 
@@ -168,7 +168,7 @@ These are not unimplemented behavior and should remain as-is unless they trip ga
 
 | ID | Location | Note | Action |
 |----|----------|------|--------|
-| EX-001 | runtime/sidecar-watcher/src/main.rs | comment: "Synchronous unit test stub…" | Ensure gate does not flag benign comments unless policy says so |
+| EX-001 | runtime/sidecar-watcher/src/main.rs | comment: "Synchronous unit test stubâ€¦" | Ensure gate does not flag benign comments unless policy says so |
 | EX-002 | runtime/sidecar-watcher/src/break_glass.rs | PostMortemStub is a real type used in tests | Not a placeholder; keep |
 
 ---
@@ -183,7 +183,7 @@ To ensure "no placeholders remain" is actually true, the following add-on prompt
 | P4.2 | CLI revoke: implement revoked_by auth context (even if v1 is "local identity", make it real and test it) |
 | P7.1 | MPC fintech compliance validators: implement real validation branches or explicit deny with typed reasons (no placeholder acceptance) |
 | P9.1 | Ledger migrations: remove rollback_checksum_placeholder by generating/deriving the correct value or removing dependency |
-| P11.1 | TypeScript SDK completion: gRPC client, trace verification, connection lifecycle, retry logic (removes all SDK TODOs) |
+| P11.1 | TypeScript SDK completion: HTTP client lifecycle + idempotent outbound retry (gRPC deferred; verify already real) |
 | P13.1 | core/crypto wasm_pool: eliminate placeholder return path; add deterministic tests |
 | P17 | VSCode extension webview comms: implement real message passing + tests |
 | P18 | DryVR adapter parsing: implement real parsing + tests |

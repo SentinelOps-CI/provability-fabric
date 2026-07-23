@@ -26,6 +26,8 @@ on:
       - 'Makefile'
       - 'scripts/check_cert_write_paths.sh'
       - '.github/workflows/evidence-v01-smoke.yml'
+      - '.github/actions/setup-python-tests/**'
+      - '.github/actions/setup-go-cli/**'
   push:
     branches: [main]
     paths:
@@ -51,6 +53,8 @@ on:
       - 'scripts/check_cert_write_paths.sh'
       - 'Makefile'
       - '.github/workflows/evidence-v01-smoke.yml'
+      - '.github/actions/setup-python-tests/**'
+      - '.github/actions/setup-go-cli/**'
 
   workflow_dispatch:
 
@@ -67,12 +71,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
         with:
-          python-version: '3.11'
-
-      - name: Install Python deps
-        run: pip install jsonschema pytest
+          python-version: "3.11"
+          packages: jsonschema pytest
 
       - name: Pytest evidence schema
         run: pytest tests/evidence_schema -q
@@ -83,16 +86,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go CLI
+        uses: ./.github/actions/setup-go-cli
         with:
-          go-version: '1.23'
+          go-version-file: core/evidence/go.mod
+          build-cli: "false"
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
         with:
-          python-version: '3.11'
-
-      - name: Install Python deps
-        run: pip install jsonschema pytest
+          python-version: "3.11"
+          packages: jsonschema pytest
 
       - name: Go tests (core/evidence)
         run: go test ./...
@@ -109,16 +113,18 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go CLI
+        uses: ./.github/actions/setup-go-cli
         with:
-          go-version: '1.23'
+          go-version-file: core/cli/pf/go.mod
+          build-cli: "true"
+          binary-name: pf
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
         with:
-          python-version: '3.11'
-
-      - name: Install Python deps
-        run: pip install jsonschema pytest
+          python-version: "3.11"
+          packages: jsonschema pytest
 
       - name: Init external standards
         env:
@@ -141,10 +147,6 @@ jobs:
       - name: Go tests (core/evidence)
         run: go test ./...
         working-directory: core/evidence
-
-      - name: Build pf CLI
-        run: go build -o pf .
-        working-directory: core/cli/pf
 
       - name: Validate fixture bundle (strict)
         run: |

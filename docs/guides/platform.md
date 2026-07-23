@@ -12,26 +12,23 @@ make demo-up
 
 This starts the complete platform with the Verifiable MCP Fraud demo.
 
-### Option 2: Quick Demo Script
+### Option 2: Compose Profiles
 
 ```bash
-./scripts/quick-demo.sh
-```
+# Default platform + sidecar
+make platform-up
 
-Runs a guided demo showcasing all platform capabilities.
-
-### Option 3: Manual Setup
-
-```bash
-# Start platform services
-./scripts/start-platform.sh
+# Full stack (ledger, console, enforcement, demo)
+make full-up
 
 # Setup demo data
 make demo-setup
 
-# Run demo
+# Run demo agent
 cd demos/verifiable-mcp-fraud && npm run dev:agent
 ```
+
+See [local workflows](../dev/local-workflows.md) for the Make / Just launch matrix.
 
 ## Platform Architecture
 

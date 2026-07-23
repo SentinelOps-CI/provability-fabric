@@ -23,23 +23,16 @@ graph TD
 
 ## Infrastructure Components
 
-### Terraform Configuration
-
-The infrastructure is defined in `ops/terraform/regions/main.tf` and includes:
-
-- **VPCs and Subnets**: Separate VPCs in each region with private subnets
-- **RDS Instances**: Primary in us-west-2, read replica in us-east-1
-- **Security Groups**: Database access controls
-- **S3 Buckets**: Cross-region replication for database dumps
-- **Route 53**: Failover DNS with health checks
-- **IAM Roles**: S3 replication permissions
+In-repo Terraform under `ops/terraform/` was removed. CI-local DR proof is
+`scripts/dr/` plus [`dr-cross.yaml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/dr-cross.yaml)
+(moto by default; live AWS only via `workflow_dispatch`). Production multi-region
+layout remains an operator concern outside this repository.
 
 ### Key Features
 
-- **Automatic Failover**: Route 53 health checks trigger DNS failover
-- **Data Replication**: Real-time replication from primary to secondary
-- **Backup Replication**: S3 cross-region replication for database dumps
-- **Zero-Downtime Migrations**: Blue-green deployment strategy
+- **CI-local proof**: moto/boto3 smoke for cross-region S3 / Route 53 shapes
+- **Blue-green migrations**: `scripts/db/blue_green_migrate.sh`
+- **Zero-downtime upgrades**: `scripts/zero-downtime-upgrade.sh` (when wired to real ALBs)
 
 ## Blue-Green Migration Script
 
@@ -56,13 +49,16 @@ The `scripts/db/blue_green_migrate.sh` script enables zero-downtime database mig
   --dns-zone Z1234567890ABC \
   --dns-record db.provability-fabric.org
 
-# Execute migration
+# Execute migration (requires --confirm; applies green schema + Route53 UPSERT)
 ./scripts/db/blue_green_migrate.sh \
+  --confirm \
   --blue-db-url postgresql://user:pass@blue-db:5432/db \
   --green-db-url postgresql://user:pass@green-db:5432/db \
   --dns-zone Z1234567890ABC \
   --dns-record db.provability-fabric.org \
   --smoke-test-url https://api.provability-fabric.org/health
+
+# Live DR CI uses --verify-only (connectivity + Route53 read; no mutations)
 ```
 
 ### Migration Process
@@ -76,15 +72,22 @@ The `scripts/db/blue_green_migrate.sh` script enables zero-downtime database mig
 
 ## Automated Testing
 
-The `.github/workflows/dr-cross.yaml` workflow provides comprehensive DR testing:
+The `.github/workflows/dr-cross.yaml` workflow provides DR testing with a hard split between CI-local and live AWS:
 
-### Test Scenarios
+| Path | Trigger | Behavior |
+|------|---------|----------|
+| **Moto gate** | push / PR / Monday schedule / `workflow_dispatch` `mode=moto` | Local moto S3 + Route53 + `blue_green_migrate.sh --dry-run`. Report sets `live_aws: false`. Inventory-safe. |
+| **Live AWS** | `workflow_dispatch` `mode=live` only | Real RDS/Route53/S3. Fail-closed without secrets. Report sets `live_aws: true`. |
+
+Adding AWS secrets must **not** convert the Monday schedule into live DR.
+
+### Live test scenarios (`mode=live`)
 
 1. **Normal Operation**: Verify primary database and sidecar are healthy
-2. **Failover Simulation**: Simulate primary failure and verify automatic failover
-3. **Recovery Test**: Verify automatic recovery when primary is restored
-4. **Replication Verification**: Test S3 cross-region replication
-5. **Migration Script Test**: Verify blue-green migration script functionality
+2. **Failover**: Disable primary health check and verify DNS flips to secondary
+3. **Recovery**: Re-enable health check and verify DNS returns to primary
+4. **Replication Verification**: Put object in primary dumps bucket; assert secondary replica
+5. **Blue-green verify**: `blue_green_migrate.sh --verify-only` against live endpoints (connectivity + Route53 read; no DNS flip)
 
 ### Test Metrics
 
@@ -92,9 +95,10 @@ The `.github/workflows/dr-cross.yaml` workflow provides comprehensive DR testing
 - **DNS Failover Time**: < 60 seconds
 - **S3 Replication Latency**: < 60 seconds
 
-### Weekly Schedule
+### Schedule vs dispatch
 
-The workflow runs automatically every Sunday at 2 AM UTC and can be triggered manually.
+- **Schedule (Monday 09:00 UTC):** moto gate only.
+- **Live:** `gh workflow run dr-cross.yaml -f mode=live` (see [live-ops-secrets.md](../runbooks/live-ops-secrets.md)).
 
 ## Monitoring and Alerts
 
@@ -113,14 +117,16 @@ The workflow runs automatically every Sunday at 2 AM UTC and can be triggered ma
 
 ## Configuration
 
-### Required Secrets
+### Required Secrets (live `mode=live` only)
 
-The following GitHub secrets must be configured:
+These are **not** required for the moto gate. Live dispatch hard-fails if any are missing:
 
 - `AWS_ACCESS_KEY_ID`: AWS access key for infrastructure management
 - `AWS_SECRET_ACCESS_KEY`: AWS secret key for infrastructure management
 - `DNS_ZONE_ID`: Route 53 hosted zone ID
 - `HEALTH_CHECK_ID`: Route 53 health check ID
+
+RDS endpoints are discovered at runtime (`provability-fabric-primary` in `PRIMARY_REGION`, `provability-fabric-secondary` in `SECONDARY_REGION`).
 
 ### Environment Variables
 

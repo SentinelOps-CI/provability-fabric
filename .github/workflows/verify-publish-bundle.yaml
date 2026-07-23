@@ -21,6 +21,7 @@ on:
       - "tests/test_publish_docs.py"
       - "tests/test_verify_publish_bundle_fixture.py"
       - ".github/workflows/verify-publish-bundle.yaml"
+      - ".github/actions/setup-python-tests/**"
   pull_request:
     paths:
       - "experiments/scripts/verify_publish_bundle.py"
@@ -34,6 +35,7 @@ on:
       - "tests/test_publish_docs.py"
       - "tests/test_verify_publish_bundle_fixture.py"
       - ".github/workflows/verify-publish-bundle.yaml"
+      - ".github/actions/setup-python-tests/**"
   workflow_dispatch:
 
 jobs:
@@ -45,13 +47,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-
-      - name: Install pytest
-        run: pip install pytest
+          packages: pytest
 
       - name: Run publish_docs and verifier tests
         run: |

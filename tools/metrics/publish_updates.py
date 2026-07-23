@@ -275,15 +275,36 @@ def dry_run_fixture_metrics() -> Dict[str, Dict]:
     }
 
 
+def load_metrics_json(path: Path) -> Dict[str, Dict]:
+    """Load operator-supplied metrics JSON for live publish without Prometheus."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not data:
+        raise SystemExit(f"metrics JSON empty or invalid: {path}")
+    return data
+
+
 def main():
     """Main function."""
     dry_run = "--dry-run" in sys.argv or os.getenv("PUBLISH_UPDATES_DRY_RUN") == "1"
     print("Collecting metrics..." + (" (dry-run)" if dry_run else ""))
 
-    metrics = dry_run_fixture_metrics() if dry_run else collect_metrics()
+    metrics_json = os.getenv("PUBLISH_UPDATES_METRICS_JSON", "").strip()
+    if dry_run:
+        metrics = dry_run_fixture_metrics()
+    elif metrics_json:
+        metrics = load_metrics_json(Path(metrics_json))
+        print(f"Loaded metrics from {metrics_json}")
+    else:
+        metrics = collect_metrics()
 
     if not metrics:
         print("No metrics collected")
+        if not dry_run:
+            print(
+                "fail-closed: live publish requires Prometheus/GitHub metrics "
+                "or PUBLISH_UPDATES_METRICS_JSON",
+                file=sys.stderr,
+            )
         return 1
 
     print(f"Collected {len(metrics)} metrics")

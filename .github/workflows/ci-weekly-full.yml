@@ -37,11 +37,16 @@ jobs:
   ci-rust:
     needs: [prepare]
     uses: ./.github/workflows/reusable-ci-rust.yml
+    with:
+      full_workspace: true
     secrets: inherit
 
   ci-go-node:
     needs: [prepare]
     uses: ./.github/workflows/reusable-ci-go-node.yml
+    with:
+      full_suite: true
+      enforce_go_coverage: true
     secrets: inherit
 
   ci-extended:

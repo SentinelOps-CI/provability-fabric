@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/ExternalAttestation.v0.schema.json",
+  "title": "ExternalAttestation.v0",
+  "description": "Live or staged external checker attestation bound to an exact PF-Core release bundle. Distinguishes content digests from authenticated signatures.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "attestation_id",
+    "release_bundle_digest",
+    "trace_digest",
+    "property_id",
+    "property_version",
+    "checker",
+    "checker_version",
+    "checker_binary_digest",
+    "policy_digest",
+    "executed_at",
+    "result",
+    "attestation_class",
+    "issuer_identity",
+    "attestation_signature",
+    "authentication_mode",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "ExternalAttestation.v0" },
+    "canonicalization_version": {
+      "$ref": "common.defs.json#/$defs/canonicalization_version"
+    },
+    "attestation_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "release_bundle_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "trace_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "property_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "property_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "checker": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "checker_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "checker_binary_digest": {
+      "description": "sha256 digest of the checker binary bytes. Use the empty-content digest sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 only for mock/stub when no binary exists.",
+      "$ref": "common.defs.json#/$defs/hex_digest"
+    },
+    "policy_digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "executed_at": { "$ref": "common.defs.json#/$defs/iso8601_datetime" },
+    "result": {
+      "type": "string",
+      "enum": ["CertificateChecked", "Rejected"]
+    },
+    "attestation_class": {
+      "type": "string",
+      "enum": ["live", "stub", "mock"]
+    },
+    "attestation_ref": { "type": "string", "minLength": 1 },
+    "issuer_identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Checker issuer identity (tool name, image digest, or signing key id)."
+    },
+    "authentication_mode": {
+      "type": "string",
+      "enum": ["digest_bound", "ed25519_signed"],
+      "description": "digest_bound = content-addressed integrity only; ed25519_signed = cryptographic signature over the domain-separated message."
+    },
+    "attestation_signature": {
+      "description": "Authenticated signature envelope when authentication_mode=ed25519_signed; otherwise a digest-bound integrity marker object.",
+      "oneOf": [
+        { "$ref": "common.defs.json#/$defs/ed25519_signature_envelope" },
+        {
+          "type": "object",
+          "required": ["algorithm", "digest"],
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": { "const": "sha256-digest-bound" },
+            "digest": { "$ref": "common.defs.json#/$defs/hex_digest" },
+            "note": {
+              "type": "string",
+              "description": "Honest note that org signing keys were unavailable."
+            }
+          }
+        }
+      ]
+    },
+    "certificate_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "bundle_trace_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["authentication_mode"],
+        "properties": { "authentication_mode": { "const": "ed25519_signed" } }
+      },
+      "then": {
+        "properties": {
+          "attestation_signature": {
+            "$ref": "common.defs.json#/$defs/ed25519_signature_envelope"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["attestation_class"],
+        "properties": { "attestation_class": { "const": "live" } }
+      },
+      "then": {
+        "properties": {
+          "result": { "const": "CertificateChecked" }
+        }
+      }
+    }
+  ]
+}

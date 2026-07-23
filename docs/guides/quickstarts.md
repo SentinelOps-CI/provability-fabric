@@ -1,33 +1,10 @@
-# Quickstarts (5 minutes)
+# Quickstarts (redirect)
 
-Three lanes:
+> The old `so` / `create-sentinel-app` lane sketch is obsolete.
 
-- Standards lane (CERT emission only)
-- Replay lane (deterministic replay)
-- Full lane (compile→prove→build→deploy→replay)
+Use:
 
-## Standards Lane
-
-```
-npx create-sentinel-app my-standards-app
-cd my-standards-app
-make dev-up
-# simulate middleware emitting a CERT
-```
-
-## Replay Lane
-
-```
-so replay run <decision-id> --open --json
-```
-
-## Full Lane
-
-```
-so policy compile --in policy.md --out build/
-so policy prove --build build/
-so policy build --build build/
-so deploy --build build/ --epoch rotate
-so replay run <decision-id> --open
-so packet make <decision-id> --out artifacts/
-```
+1. [Getting started (15 min)](../getting-started.md) — CLI, wiring, Compose
+2. [Local workflows](../dev/local-workflows.md) — Make / Just matrix
+3. [Evidence v0.1 quickstart](evidence-v0.1-quickstart.md) — Evidence lane
+4. [PCS quickstart](../pcs/quickstart.md) — science claim bundles

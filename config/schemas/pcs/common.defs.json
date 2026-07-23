@@ -15,6 +15,62 @@
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$"
     },
+    "relative_posix_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "description": "Relative POSIX path: no absolute roots, drive letters, UNC, empty segments, or parent (..) traversal.",
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!\\\\\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "canonicalization_version": {
+      "type": "string",
+      "const": "v1",
+      "description": "PCS Canonical JSON algorithm version used for artifact_digest / signature_or_digest."
+    },
+    "schema_version_v1": {
+      "type": "string",
+      "pattern": "^v1$"
+    },
+    "ed25519_signature_envelope": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "signed_at", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "const": "ed25519" },
+        "key_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "signed_at": { "$ref": "#/$defs/iso8601_datetime" },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base64url or hex encoding of the ed25519 signature over the domain-separated message."
+        }
+      }
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "duration": {
+      "type": "string",
+      "format": "duration"
+    },
+    "hostname": {
+      "type": "string",
+      "format": "hostname"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "kernel_file_entry": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/relative_posix_path" },
+        "sha256": { "$ref": "#/$defs/hex_digest" }
+      }
+    },
     "artifact_status": {
       "type": "string",
       "enum": [

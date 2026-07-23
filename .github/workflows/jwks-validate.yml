@@ -25,5 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           cd core/cli/pf
-          # ci-honesty: justified wave7-remediation
-          ./so cert verify ../../evidence/certs --json --jwks "$JWKS_URL" || true
+          if [ -z "${JWKS_URL:-}" ]; then
+            echo "TEST_JWKS_URL secret unset; JWKS validation skipped (not soft-passed)."
+            exit 0
+          fi
+          # Fail closed when TEST_JWKS_URL is configured.
+          ./so cert verify ../../evidence/certs --json --jwks "$JWKS_URL"

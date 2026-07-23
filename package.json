@@ -1,0 +1,12 @@
+{
+  "name": "provability-fabric",
+  "private": true,
+  "description": "Root npm workspaces for ledger + TypeScript SDK (Wave E3.3)",
+  "workspaces": [
+    "runtime/ledger",
+    "core/sdk/typescript"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

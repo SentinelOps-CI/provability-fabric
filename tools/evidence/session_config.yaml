@@ -1,0 +1,13 @@
+# Session Safety-Case Bundle Generator — default local/dev endpoints.
+# Used by tools/evidence/session_bundle.py and .github/workflows/evidence.yaml.
+# Override paths/ports for deployed environments as needed.
+
+ledger_endpoint: "http://localhost:4000"
+retrieval_gateway: "http://localhost:8080"
+egress_firewall: "http://localhost:8081"
+attestor_endpoint: "http://localhost:8082"
+evidence_dir: "./evidence/sessions"
+signing_key_path: "./evidence/signing_key.pem"
+glacier_bucket: "provability-evidence"
+retention_days: 90
+bundle_format: "avro"

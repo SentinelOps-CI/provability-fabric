@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Wave E5: lean schedule guard for engineering latency budgets.
+# Times wiring check + compose-smoke; fails with a clear over-budget message.
+# Cache-warm: GHA runners often start cold — compose CI budget absorbs image
+# pull/build. Local warm budgets (&lt;60s ledger-up, &lt;3 min compose-smoke) are
+# documented in docs/internal/engineering-latency-budget.md and are not claimed
+# by this job's wall-clock.
+#
+# Keep lean: weekly + dispatch only; no push trigger (does not re-expand Wave 11).
+
+name: Engineering budget smoke
+
+on:
+  schedule:
+    # Weekly Monday 06:40 UTC — offset from scorecards / nightly clusters
+    - cron: "40 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Seconds — see docs/internal/engineering-latency-budget.md
+  WIRING_BUDGET_SEC: "30"
+  COMPOSE_SMOKE_BUDGET_SEC: "900"
+
+jobs:
+  budget-smoke:
+    name: wiring + compose-smoke budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Time wiring check (budget ${{ env.WIRING_BUDGET_SEC }}s)
+        run: |
+          set -euo pipefail
+          echo "=== Cache-warm note ==="
+          echo "Wiring is CPU-only (no Docker). Budget=${WIRING_BUDGET_SEC}s."
+          echo "======================"
+          START=$(date +%s)
+          python scripts/check_wiring.py
+          END=$(date +%s)
+          ELAPSED=$((END - START))
+          echo "wiring_check_seconds=${ELAPSED}"
+          if [ "${ELAPSED}" -gt "${WIRING_BUDGET_SEC}" ]; then
+            echo "::error::Engineering budget exceeded: wiring check took ${ELAPSED}s (budget ${WIRING_BUDGET_SEC}s). See docs/internal/engineering-latency-budget.md"
+            exit 1
+          fi
+          echo "Wiring check within budget (${ELAPSED}s ≤ ${WIRING_BUDGET_SEC}s)."
+
+      - name: Time compose-smoke (budget ${{ env.COMPOSE_SMOKE_BUDGET_SEC }}s)
+        run: |
+          set -euo pipefail
+          echo "=== Cache-warm note ==="
+          echo "GHA image cache may be cold. CI compose-smoke budget=${COMPOSE_SMOKE_BUDGET_SEC}s"
+          echo "absorbs first-time pulls/builds. This is NOT the local warm budget (<3 min)."
+          echo "Local warm: make compose-smoke after images exist — see engineering-latency-budget.md"
+          echo "======================"
+          START=$(date +%s)
+          bash scripts/docker-compose-smoke.sh
+          END=$(date +%s)
+          ELAPSED=$((END - START))
+          echo "compose_smoke_seconds=${ELAPSED}"
+          if [ "${ELAPSED}" -gt "${COMPOSE_SMOKE_BUDGET_SEC}" ]; then
+            echo "::error::Engineering budget exceeded: compose-smoke took ${ELAPSED}s (budget ${COMPOSE_SMOKE_BUDGET_SEC}s / 15 min). Cold cache? Re-run after images warm, or investigate compose health. See docs/internal/engineering-latency-budget.md"
+            exit 1
+          fi
+          echo "Compose-smoke within CI budget (${ELAPSED}s ≤ ${COMPOSE_SMOKE_BUDGET_SEC}s)."

@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreSemanticProjection.v0.schema.json",
+  "title": "PFCoreSemanticProjection.v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "trace_id",
+    "certificate_mode",
+    "events",
+    "projection_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreSemanticProjection.v0" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "certificate_mode": {
+      "type": "string",
+      "enum": [
+        "TraceSafeCertificate",
+        "TraceSafeRCertificate",
+        "FramePreservedCertificate",
+        "EffectFrameCertificate",
+        "HandoffSafeCertificate",
+        "CompositionalExtensionCertificate",
+        "ContractCheckedCertificate"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sequence", "event_id", "decision", "principal", "action"],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 0 },
+          "event_id": { "type": "string", "minLength": 1 },
+          "decision": { "type": "string", "enum": ["allow", "deny"] },
+          "principal": {
+            "type": "object",
+            "required": ["principal_id", "tenant", "roles", "capabilities"],
+            "additionalProperties": false,
+            "properties": {
+              "principal_id": { "type": "string" },
+              "tenant": { "type": "string" },
+              "roles": { "type": "array", "items": { "type": "string" } },
+              "capabilities": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "action": {
+            "type": "object",
+            "required": [
+              "action_id",
+              "tool_name",
+              "capability_id",
+              "capability_effect_kind",
+              "effects",
+              "reads",
+              "writes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "action_id": { "type": "string" },
+              "tool_name": { "type": "string" },
+              "capability_id": { "type": "string" },
+              "capability_effect_kind": { "type": "string" },
+              "resource_pattern": { "type": "string" },
+              "effects": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "reads": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/resource" }
+              },
+              "writes": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/resource" }
+              }
+            }
+          },
+          "contract_refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "handoffs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["handoff_id", "from_principal", "to_principal"],
+        "additionalProperties": false,
+        "properties": {
+          "handoff_id": { "type": "string", "minLength": 1 },
+          "from_principal": { "$ref": "#/$defs/principal" },
+          "to_principal": { "$ref": "#/$defs/principal" }
+        }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["contract_id"],
+        "additionalProperties": false,
+        "properties": {
+          "contract_id": { "type": "string", "minLength": 1 },
+          "pre": { "type": "object", "additionalProperties": true },
+          "post": { "type": "object", "additionalProperties": true },
+          "invariant": { "type": "object", "additionalProperties": true },
+          "field_semantics": { "type": "object", "additionalProperties": true }
+        }
+      }
+    },
+    "projection_hash": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "required": ["principal_id", "tenant", "roles", "capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "principal_id": { "type": "string" },
+        "tenant": { "type": "string" },
+        "roles": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["uri", "tenant"],
+      "additionalProperties": false,
+      "properties": {
+        "uri": { "type": "string" },
+        "tenant": { "type": "string" }
+      }
+    }
+  }
+}
