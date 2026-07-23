@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags="-s -w" -o main .
 
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates python3 py3-pip
+RUN apk --no-cache add ca-certificates curl python3 py3-pip
 WORKDIR /root/
 
 COPY --from=builder /app/main .
