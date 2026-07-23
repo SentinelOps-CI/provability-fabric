@@ -1,70 +1,77 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
+#
+# Parallel Go/Node CI: go-cli | ledger-node | sdk-node | pcs-spectral
+# (+ optional console on its paths).
+# Go 90% coverage gate: main push / weekly / dispatch only (not PR).
+# Uses .github/actions/setup-go-cli and setup-node-workspace (Wave E4).
 
 on:
   workflow_call:
+    inputs:
+      run_go:
+        type: boolean
+        required: false
+        default: true
+      run_ledger:
+        type: boolean
+        required: false
+        default: true
+      run_sdk:
+        type: boolean
+        required: false
+        default: true
+      run_pcs:
+        type: boolean
+        required: false
+        default: true
+      run_console:
+        type: boolean
+        required: false
+        default: false
+      enforce_go_coverage:
+        description: "Enforce Go CLI 90% coverage (main/weekly); PRs run tests without gate"
+        type: boolean
+        required: false
+        default: false
+      full_suite:
+        description: "Force all jobs (weekly full)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
-  go-node:
+  go-cli:
+    name: go-cli
+    if: inputs.full_suite || inputs.run_go
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    timeout-minutes: 30
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Set up Go CLI
+        uses: ./.github/actions/setup-go-cli
         with:
-          go-version: "1.23"
-          cache: true
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Cache Node.js dependencies
-        id: cache-node
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            runtime/ledger/node_modules
-            marketplace/ui/node_modules
-            core/sdk/typescript/node_modules
-          key: node-${{ hashFiles('runtime/ledger/package-lock.json', 'marketplace/ui/package-lock.json', 'core/sdk/typescript/package-lock.json') }}
-          restore-keys: |
-            node-
-
-      - name: Install Node.js tools
-        run: npm install -g @stoplight/spectral-cli
-
-      - name: Install Node.js dependencies
-        run: |
-          set -euo pipefail
-          (cd runtime/ledger && npm ci && npm run prisma:generate)
-          (cd marketplace/ui && npm ci)
-          (cd core/sdk/typescript && npm ci)
-
-      - name: Run spectral lint
-        run: |
-          mapfile -t specs < <(find . -name spec.yaml ! -path './bundles/art/*')
-          spectral lint "${specs[@]}" --ruleset config/schemas/aispec-schema.json
-
-      - name: Test PCS science-claim
-        run: make test-pcs validate-pcs-fixtures
+          go-version-file: core/cli/pf/go.mod
+          build-cli: "false"
 
       - name: Test Go CLI
+        env:
+          ENFORCE_COVERAGE: ${{ inputs.enforce_go_coverage || inputs.full_suite }}
         run: |
+          set -euo pipefail
           cd core/cli/pf
           if ls *_test.go >/dev/null 2>&1; then
             go test -v -coverprofile=coverage.out ./...
             COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
             echo "Coverage: $COVERAGE%"
-            if awk "BEGIN {exit !($COVERAGE < 90)}"; then
-              echo "Coverage below 90% threshold"
-              exit 1
+            if [ "$ENFORCE_COVERAGE" = "true" ]; then
+              if awk "BEGIN {exit !($COVERAGE < 90)}"; then
+                echo "Coverage below 90% threshold"
+                exit 1
+              fi
+            else
+              echo "Coverage gate skipped on PR (enforced on main push / weekly)."
             fi
           else
             go build -v ./...
@@ -72,6 +79,7 @@ jobs:
 
       - name: Test Go admission controller
         run: |
+          set -euo pipefail
           cd runtime/admission-controller
           if ls *_test.go >/dev/null 2>&1; then
             go test -v ./...
@@ -79,27 +87,118 @@ jobs:
             go build -v ./...
           fi
 
+      - name: Verify Go platform services build and test
+        run: |
+          set -euo pipefail
+          for d in services/*; do
+            if [ -f "$d/go.mod" ]; then
+              echo "==> $d"
+              (cd "$d" && go mod tidy && go build ./... && go test ./...)
+            fi
+          done
+
+  ledger-node:
+    name: ledger-node
+    if: inputs.full_suite || inputs.run_ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ledger workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          node-version: "20"
+          working-directory: .
+          install-command: >-
+            if grep -q '"workspaces"' package.json; then
+            npm ci -w provability-fabric-ledger --include-workspace-root=false;
+            else
+            (cd runtime/ledger && npm ci);
+            fi
+
+      - name: Generate Prisma client
+        run: |
+          set -euo pipefail
+          (cd runtime/ledger && npm run prisma:generate)
+
       - name: Test Node.js ledger
         run: |
+          set -euo pipefail
           cd runtime/ledger
           python ../../scripts/count_ledger_any.py --max 20
           npm run typecheck:server
           npm run test
 
+  sdk-node:
+    name: sdk-node
+    if: inputs.full_suite || inputs.run_sdk
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js SDK workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          node-version: "20"
+          working-directory: .
+          install-command: >-
+            if grep -q '"workspaces"' package.json; then
+            npm ci -w @provability-fabric/core-sdk-typescript --include-workspace-root=false;
+            else
+            (cd core/sdk/typescript && npm ci);
+            fi
+
       - name: Test Node.js core SDK (TypeScript)
         run: |
+          set -euo pipefail
           cd core/sdk/typescript
           npm run test
 
-      - name: Verify Go services build
-        run: |
-          for d in services/*; do
-            if [ -f "$d/go.mod" ]; then
-              (cd "$d" && go mod tidy && go build ./...)
-            fi
-          done
+  pcs-spectral:
+    name: pcs-spectral
+    if: inputs.full_suite || inputs.run_pcs || (inputs.run_go == false && inputs.run_ledger == false && inputs.run_sdk == false && inputs.run_console == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Verify console build
+      # Global spectral CLI only — no package-dir npm ci; setup-node-workspace does not fit.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install spectral
+        run: npm install -g @stoplight/spectral-cli
+
+      - name: Run spectral lint
         run: |
-          # npm ci requires lock sync; console ESLint 9 migration may lag lockfile on main
-          (cd console && npm install --no-audit --no-fund && DISABLE_ESLINT_PLUGIN=true npm run build)
+          set -euo pipefail
+          mapfile -t specs < <(find . -name spec.yaml ! -path './bundles/art/*')
+          spectral lint "${specs[@]}" --ruleset config/schemas/aispec-schema.json
+
+      - name: Test PCS science-claim
+        run: make test-pcs validate-pcs-fixtures
+
+  console:
+    name: console-build
+    if: inputs.full_suite || inputs.run_console
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js console
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          node-version: "20"
+          working-directory: console
+          # Prefer lockfile when in sync; fall back if ESLint 9 / CRA drift blocks npm ci
+          install-command: >-
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Verify console production build
+        working-directory: console
+        run: DISABLE_ESLINT_PLUGIN=true npm run build

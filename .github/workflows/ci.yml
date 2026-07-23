@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 #
-# Single CI entry: protobuf lint always; full matrix runs on push to main or when non-doc paths change.
+# Single CI entry: protobuf lint + honesty always; language jobs path-conditioned
+# on push and PR (docs/figs skip). Weekly full matrix: ci-weekly-full.yml.
 
 name: CI
 
@@ -17,6 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      rust: ${{ steps.filter.outputs.rust }}
+      go_node: ${{ steps.filter.outputs.go_node }}
+      lean: ${{ steps.filter.outputs.lean }}
+      extended: ${{ steps.filter.outputs.extended }}
+      docker: ${{ steps.filter.outputs.docker }}
+      rust_full: ${{ steps.filter.outputs.rust_full }}
+      console: ${{ steps.filter.outputs.console }}
+      ledger: ${{ steps.filter.outputs.ledger }}
+      sdk_ts: ${{ steps.filter.outputs.sdk_ts }}
+      go: ${{ steps.filter.outputs.go }}
+      pcs: ${{ steps.filter.outputs.pcs }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -27,6 +39,101 @@ jobs:
               - '**'
               - '!docs/**'
               - '!figs/**'
+            rust:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - 'runtime/**/Cargo.toml'
+              - 'adapters/**'
+              - 'bench/**'
+              - 'scripts/count_sidecar_unwraps.py'
+              - 'scripts/count_ledger_any.py'
+              - '.github/workflows/reusable-ci-rust.yml'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/cache-cargo/**'
+            rust_full:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/reusable-ci-rust.yml'
+              - '.github/workflows/ci.yml'
+            go_node:
+              - '**/*.go'
+              - '**/go.mod'
+              - '**/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'core/cli/**'
+              - 'runtime/admission-controller/**'
+              - 'runtime/ledger/**'
+              - 'core/sdk/typescript/**'
+              - 'console/**'
+              - 'services/**'
+              - 'pcs/**'
+              - 'config/schemas/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '**/package.json'
+              - '**/package-lock.json'
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.js'
+              - '**/*.jsx'
+              - 'Makefile'
+              - '.github/workflows/reusable-ci-go-node.yml'
+              - '.github/workflows/ci.yml'
+            go:
+              - '**/*.go'
+              - '**/go.mod'
+              - '**/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'core/cli/**'
+              - 'runtime/admission-controller/**'
+              - 'services/**'
+              - '.github/workflows/reusable-ci-go-node.yml'
+            ledger:
+              - 'runtime/ledger/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/reusable-ci-go-node.yml'
+            sdk_ts:
+              - 'core/sdk/typescript/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/reusable-ci-go-node.yml'
+            console:
+              - 'console/**'
+              - '.github/workflows/reusable-ci-go-node.yml'
+            pcs:
+              - 'pcs/**'
+              - 'config/schemas/**'
+              - '**/spec.yaml'
+              - 'Makefile'
+              - '.github/workflows/reusable-ci-go-node.yml'
+            lean:
+              - '**/*.lean'
+              - '**/lakefile.lean'
+              - '**/lake-manifest.json'
+              - 'lean-toolchain'
+              - 'core/lean-*/**'
+              - 'bundles/**'
+              - '.github/workflows/reusable-ci-lean.yml'
+              - '.github/workflows/ci.yml'
+            extended:
+              - 'tests/**'
+              - 'scripts/**'
+              - 'tools/**'
+              - 'docker-compose*.yml'
+              - 'charts/**'
+              - 'ops/**'
+              - 'bench/**'
+              - '.github/workflows/reusable-ci-extended.yml'
+              - '.github/workflows/reusable-ci-prepare.yml'
+              - '.github/workflows/ci.yml'
+            docker:
+              - '**/Dockerfile*'
+              - 'docker-compose*.yml'
+              - '.dockerignore'
 
   protobuf-lint:
     runs-on: ubuntu-latest
@@ -47,12 +154,18 @@ jobs:
 
   prepare:
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/reusable-ci-prepare.yml
     secrets: inherit
 
   ci-lean:
-    needs: [prepare]
+    needs: [prepare, changes]
+    if: >
+      always() &&
+      needs.prepare.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.lean == 'true')
     uses: ./.github/workflows/reusable-ci-lean.yml
     with:
       impacted_targets: ${{ needs.prepare.outputs.impacted_targets }}
@@ -61,17 +174,38 @@ jobs:
     secrets: inherit
 
   ci-rust:
-    needs: [prepare]
+    needs: [prepare, changes]
+    if: >
+      always() &&
+      needs.prepare.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true')
     uses: ./.github/workflows/reusable-ci-rust.yml
+    with:
+      full_workspace: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust_full == 'true' }}
     secrets: inherit
 
   ci-go-node:
-    needs: [prepare]
+    needs: [prepare, changes]
+    if: >
+      always() &&
+      needs.prepare.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.go_node == 'true')
     uses: ./.github/workflows/reusable-ci-go-node.yml
+    with:
+      run_go: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true' }}
+      run_ledger: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.ledger == 'true' }}
+      run_sdk: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.sdk_ts == 'true' }}
+      run_pcs: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.pcs == 'true' }}
+      run_console: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.console == 'true' }}
+      enforce_go_coverage: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     secrets: inherit
 
   ci-extended:
-    needs: [prepare]
+    needs: [prepare, changes]
+    if: >
+      always() &&
+      needs.prepare.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.extended == 'true')
     uses: ./.github/workflows/reusable-ci-extended.yml
     with:
       impacted_tests: ${{ needs.prepare.outputs.impacted_tests }}
@@ -93,7 +227,7 @@ jobs:
     steps:
       - name: Verify outcomes
         run: |
-          set -e
+          set -euo pipefail
           if [ "${{ needs.protobuf-lint.result }}" != "success" ]; then
             echo "protobuf-lint did not succeed: ${{ needs.protobuf-lint.result }}"
             exit 1
@@ -102,22 +236,49 @@ jobs:
             echo "ci-honesty did not succeed: ${{ needs.ci-honesty.result }}"
             exit 1
           fi
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.changes.outputs.code }}" != "true" ]; then
-            echo "Documentation-only PR: full CI skipped intentionally."
+          # Docs/figs-only: heavy jobs skipped intentionally (push and PR).
+          if [ "${{ needs.changes.outputs.code }}" != "true" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Documentation-only change: language CI skipped intentionally."
             exit 0
           fi
           fail=0
-          for j in prepare ci-lean ci-rust ci-go-node ci-extended; do
-            case "$j" in
-              prepare) r="${{ needs.prepare.result }}" ;;
-              ci-lean) r="${{ needs.ci-lean.result }}" ;;
-              ci-rust) r="${{ needs.ci-rust.result }}" ;;
-              ci-go-node) r="${{ needs.ci-go-node.result }}" ;;
-              ci-extended) r="${{ needs.ci-extended.result }}" ;;
-            esac
-            if [ "$r" != "success" ]; then
-              echo "Job $j result: $r (expected success)"
-              fail=1
+          check_job() {
+            local name="$1"
+            local result="$2"
+            local required="$3"
+            if [ "$required" != "true" ]; then
+              if [ "$result" = "skipped" ] || [ "$result" = "success" ]; then
+                echo "Job $name: $result (slice not required)"
+                return 0
+              fi
             fi
-          done
+            if [ "$result" = "skipped" ] && [ "$required" != "true" ]; then
+              echo "Job $name: skipped (ok)"
+              return 0
+            fi
+            if [ "$result" != "success" ]; then
+              echo "Job $name result: $result (expected success)"
+              fail=1
+            else
+              echo "Job $name: success"
+            fi
+          }
+          # prepare always required when code changed
+          if [ "${{ needs.prepare.result }}" != "success" ]; then
+            echo "prepare result: ${{ needs.prepare.result }} (expected success)"
+            fail=1
+          fi
+          # Language jobs: required when their slice is impacted (or dispatch).
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            lean_req=true; rust_req=true; go_req=true; ext_req=true
+          else
+            lean_req="${{ needs.changes.outputs.lean }}"
+            rust_req="${{ needs.changes.outputs.rust }}"
+            go_req="${{ needs.changes.outputs.go_node }}"
+            ext_req="${{ needs.changes.outputs.extended }}"
+          fi
+          check_job ci-lean "${{ needs.ci-lean.result }}" "$lean_req"
+          check_job ci-rust "${{ needs.ci-rust.result }}" "$rust_req"
+          check_job ci-go-node "${{ needs.ci-go-node.result }}" "$go_req"
+          check_job ci-extended "${{ needs.ci-extended.result }}" "$ext_req"
           exit "$fail"

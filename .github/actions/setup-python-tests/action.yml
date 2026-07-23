@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Shared Python setup for pytest / schema / cert validation jobs.
+
+name: Setup Python tests
+description: Install Python, upgrade pip, and install packages or a requirements file.
+
+inputs:
+  python-version:
+    description: Python version
+    required: false
+    default: "3.11"
+  packages:
+    description: Space-separated pip packages (used when requirements-file is empty)
+    required: false
+    default: "pytest"
+  requirements-file:
+    description: Optional path to a requirements.txt (takes precedence over packages)
+    required: false
+    default: ""
+  cache:
+    description: Enable pip cache via setup-python (requires requirements-file)
+    required: false
+    default: "true"
+  upgrade-pip:
+    description: Run pip install --upgrade pip before deps
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python (pip cache)
+      if: inputs.cache == 'true' && inputs.requirements-file != ''
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: ${{ inputs.requirements-file }}
+
+    - name: Set up Python (no cache)
+      if: inputs.cache != 'true' || inputs.requirements-file == ''
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Python dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.upgrade-pip }}" = "true" ]; then
+          python -m pip install --upgrade pip
+        fi
+        if [ -n "${{ inputs.requirements-file }}" ]; then
+          pip install -r "${{ inputs.requirements-file }}"
+        else
+          # shellcheck disable=SC2086
+          pip install ${{ inputs.packages }}
+        fi

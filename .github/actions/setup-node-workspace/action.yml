@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Shared Node setup for package islands (ledger, SDK, demos, dsse-ts, …).
+# Prefer this over copy-pasted setup-node + npm ci blocks.
+
+name: Setup Node workspace
+description: Install Node.js with npm cache and install dependencies in one package directory.
+
+inputs:
+  node-version:
+    description: Node.js major/minor version
+    required: false
+    default: "20"
+  working-directory:
+    description: Package directory containing package.json / package-lock.json
+    required: true
+  install-command:
+    description: Install command (npm ci preferred when lockfile is present)
+    required: false
+    default: "npm ci --no-fund --no-audit"
+  cache:
+    description: setup-node cache backend (npm | yarn | pnpm | none)
+    required: false
+    default: "npm"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js (cached)
+      if: inputs.cache != 'none' && inputs.cache != ''
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ inputs.cache }}
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+    - name: Set up Node.js (no cache)
+      if: inputs.cache == 'none' || inputs.cache == ''
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install Node dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -f package-lock.json ]; then
+          ${{ inputs.install-command }}
+        else
+          npm install --no-fund --no-audit
+        fi

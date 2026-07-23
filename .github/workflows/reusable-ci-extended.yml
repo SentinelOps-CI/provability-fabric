@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
+#
+# Extended CI (red-team / perf inspect / non-Kind integration / DSSE).
+# Kind admission paths are owned by integration.yaml (path-gated).
+# E3 owns reusable-ci-rust / reusable-ci-go-node / ci.yml — do not fold those here.
 
 on:
   workflow_call:
@@ -18,15 +22,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python tests
+        uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
+          packages: pytest
 
       - name: Run red-team tests (impacted only)
         env:
@@ -63,12 +63,12 @@ jobs:
             k6 inspect tests/perf/latency_k6.js
           fi
 
-      - name: Run integration tests (impacted only)
+      # Pytest shard: non-Kind integration only. Kind/admission stays in integration.yaml.
+      - name: Run integration tests (impacted only; skip Kind admission)
         env:
           IMPACTED_TESTS: ${{ inputs.impacted_tests }}
         run: |
           pip install -r tests/integration/requirements.txt
-          # Kind/Helm admission tests run in integration.yaml; ci-extended covers red-team + perf only.
           if [ -n "$IMPACTED_TESTS" ]; then
             k8s_tests=""
             for test in $IMPACTED_TESTS; do
@@ -92,20 +92,11 @@ jobs:
               --ignore=tests/integration/test_violation_path.py
           fi
 
-      - name: Set up Node.js (DSSE TypeScript toolchain)
-        uses: actions/setup-node@v4
+      - name: Set up Node workspace (DSSE TypeScript)
+        uses: ./.github/actions/setup-node-workspace
         with:
           node-version: "20"
-
-      - name: Install DSSE TypeScript dependencies
-        run: |
-          set -euo pipefail
-          cd core/crypto/dsse-ts
-          if [ -f package-lock.json ]; then
-            npm ci --no-fund --no-audit
-          else
-            npm install --no-fund --no-audit
-          fi
+          working-directory: core/crypto/dsse-ts
 
       - name: Run cross-language DSSE tests (F01)
         run: python tests/crypto/test_cross_lang_dsse.py
