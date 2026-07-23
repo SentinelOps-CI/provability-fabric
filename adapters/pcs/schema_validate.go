@@ -26,17 +26,29 @@ func pcsBenchIngestSchemaAliases(name string) []string {
 
 func readSchemaBody(repoRoot, name string) (string, bool) {
 	if body, ok := readEmbeddedSchema(name); ok {
-		return body, true
+		return sanitizeSchemaBodyForGoRegexp(body), true
 	}
 	if repoRoot == "" {
 		return "", false
 	}
 	for _, alias := range pcsBenchIngestSchemaAliases(name) {
 		if b, err := os.ReadFile(ResolveSchemaPath(repoRoot, alias)); err == nil {
-			return string(b), true
+			return sanitizeSchemaBodyForGoRegexp(string(b)), true
 		}
 	}
 	return "", false
+}
+
+// pcs-core uses ECMAScript lookarounds in relative_posix_path; Go's regexp (RE2)
+// cannot compile them. Keep on-disk schemas identical to pcs-core for schema-diff,
+// but rewrite this one pattern at compile time so PF CLI validation stays usable.
+const relativePosixPathECMAPattern = `"pattern": "^(?!/)(?![A-Za-z]:)(?!\\\\\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"`
+
+// RE2-safe equivalent: dotted identifier segments, no empty/absolute/parent segments.
+const relativePosixPathRE2Pattern = `"pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)*$"`
+
+func sanitizeSchemaBodyForGoRegexp(body string) string {
+	return strings.ReplaceAll(body, relativePosixPathECMAPattern, relativePosixPathRE2Pattern)
 }
 
 func loadCompiledSchema(repoRoot, schemaFile string) (*jsonschema.Schema, error) {
@@ -132,7 +144,7 @@ func loadCompiledPCSCoreSchema(pcsCoreRoot, schemaFile string) (*jsonschema.Sche
 		if err != nil {
 			return nil, err
 		}
-		if err := registerSchemaResource(compiler, e.Name(), string(body)); err != nil {
+		if err := registerSchemaResource(compiler, e.Name(), sanitizeSchemaBodyForGoRegexp(string(body))); err != nil {
 			return nil, fmt.Errorf("register pcs-core schema %s: %w", e.Name(), err)
 		}
 	}
