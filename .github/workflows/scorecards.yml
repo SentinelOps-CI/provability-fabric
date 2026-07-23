@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # OpenSSF Scorecard: supply-chain best practices (https://scorecard.dev/)
+#
+# Wave E3.4: weekly schedule (+ dispatch) — not every push to main.
 name: OpenSSF Scorecard
 
 on:
   schedule:
     - cron: "25 4 * * 1"
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions: read-all

@@ -1,3 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+#
+# Wave 11.3 CI cost:
+# - Push: path-tightened (sidecar / labeler only; lean-libs dropped — unused here).
+# - Push shard: core unit/integration gates only (no 1k/10k stress, scheduler, bench).
+# - Schedule + workflow_dispatch: full suite (stress, scheduler, perf, audit, docs).
+
 name: Paper Conformance CI
 
 on:
@@ -6,10 +14,9 @@ on:
     paths:
       - "runtime/sidecar-watcher/**"
       - "runtime/labeler/**"
-      - "core/lean-libs/**"
       - ".github/workflows/paper-conformance.yaml"
   schedule:
-    # Run daily at 2 AM UTC
+    # Nightly full suite at 2 AM UTC
     - cron: "0 2 * * *"
   workflow_dispatch:
 
@@ -18,10 +25,51 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  resolve-suite:
+    name: Resolve suite shard
+    runs-on: ubuntu-latest
+    outputs:
+      full_suite: ${{ steps.set.outputs.full_suite }}
+      run_sidecar: ${{ steps.set.outputs.run_sidecar }}
+      run_labeler: ${{ steps.set.outputs.run_labeler }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'push'
+
+      - name: Paths filter (push)
+        id: filter
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            sidecar:
+              - 'runtime/sidecar-watcher/**'
+              - '.github/workflows/paper-conformance.yaml'
+            labeler:
+              - 'runtime/labeler/**'
+              - '.github/workflows/paper-conformance.yaml'
+
+      - name: Set suite flags
+        id: set
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "full_suite=false" >> "$GITHUB_OUTPUT"
+            echo "run_sidecar=${{ steps.filter.outputs.sidecar }}" >> "$GITHUB_OUTPUT"
+            echo "run_labeler=${{ steps.filter.outputs.labeler }}" >> "$GITHUB_OUTPUT"
+          else
+            # schedule / workflow_dispatch — full suite
+            echo "full_suite=true" >> "$GITHUB_OUTPUT"
+            echo "run_sidecar=true" >> "$GITHUB_OUTPUT"
+            echo "run_labeler=true" >> "$GITHUB_OUTPUT"
+          fi
+
   # Prompt 73: DFA Round-trip Equivalence
   dfa-equivalence:
     name: DFA Round-trip Equivalence
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -40,9 +88,33 @@ jobs:
           echo "DFA round-trip equivalence passed: 0 mismatches across 5k seeded traces"
 
   # Prompt 74: Proof-Carrying Labeler
+  # Push: light smoke when labeler paths change. Full 1k stress: schedule/dispatch only.
+  labeler-smoke:
+    name: Proof-Carrying Labeler (push smoke)
+    runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: >
+      needs.resolve-suite.outputs.run_labeler == 'true'
+      && needs.resolve-suite.outputs.full_suite != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Run Labeler Smoke Tests
+        run: |
+          cd runtime/labeler
+          cargo test test_labeler_polyglot_handling -- --nocapture
+          cargo test test_labeler_deep_nesting -- --nocapture
+
   labeler-stress:
     name: Proof-Carrying Labeler Stress Test
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +139,8 @@ jobs:
   events-plan-dsl:
     name: Events & Plan-DSL Integration
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -90,6 +164,8 @@ jobs:
   declassify-engine:
     name: Declassification Engine
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -110,10 +186,12 @@ jobs:
           cargo test test_declassify_engine_approval_workflow -- --nocapture
           cargo test test_declassify_engine_justification_validation -- --nocapture
 
-  # Prompt 77: Rate Limits
+  # Prompt 77: Rate Limits (full suite only — includes p99 perf gate)
   rate-limits:
     name: Rate Limits Performance
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.full_suite == 'true'
     env:
       PF_SHADOW_MODE: "1"
     steps:
@@ -138,10 +216,12 @@ jobs:
           cd runtime/sidecar-watcher
           cargo test test_99th_percentile_performance -- --nocapture | grep -q "99th percentile check cost.*< 1ms" || exit 1
 
-  # Prompt 78: Hardened Adapters + OS Enforcement
+  # Prompt 78: Hardened Adapters + OS Enforcement (full suite only)
   hardened-adapters:
     name: Hardened Adapters & OS Enforcement
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -164,10 +244,12 @@ jobs:
           cargo test test_fixed_dns_enforcement -- --nocapture
           cargo test test_readonly_filesystem_enforcement -- --nocapture
 
-  # Prompt 79: Local NI Monitor + Egress Certificate
+  # Prompt 79: Local NI Monitor + Egress Certificate (full suite — 10k prefixes)
   ni-monitor-egress:
     name: NI Monitor & Egress Certificate
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -195,6 +277,8 @@ jobs:
   crypto-envelope-break-glass:
     name: Cryptographic Envelope & Break-Glass
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -214,10 +298,12 @@ jobs:
           cargo test test_break_glass_audit_logging -- --nocapture
           cargo test test_break_glass_statistics -- --nocapture
 
-  # Prompt 81: Scheduler & Clock Model
+  # Prompt 81: Scheduler & Clock Model (full suite only — long concurrency stress)
   scheduler-clock:
     name: Scheduler & Clock Model
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.full_suite == 'true'
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -251,6 +337,8 @@ jobs:
   replay-determinism:
     name: Replay Determinism & Drift Detection
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -270,6 +358,8 @@ jobs:
   safety-case-bundle:
     name: Safety Case Bundle
     runs-on: ubuntu-latest
+    needs: resolve-suite
+    if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -295,7 +385,7 @@ jobs:
           cd runtime/sidecar-watcher
           cargo test --lib test_safety_case_bundle_storage -- --nocapture 2>&1 | grep -q "100% sessions have bundles" || exit 1
 
-  # Integration Tests
+  # Integration Tests — push runs after core shard; nightly after full suite.
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -304,7 +394,9 @@ jobs:
       PF_SHADOW_MODE: "1"
     needs:
       [
+        resolve-suite,
         dfa-equivalence,
+        labeler-smoke,
         labeler-stress,
         events-plan-dsl,
         declassify-engine,
@@ -316,6 +408,25 @@ jobs:
         replay-determinism,
         safety-case-bundle,
       ]
+    # Sidecar integration only when sidecar paths changed (or full suite).
+    # Skipped heavy deps must not block; ran deps must succeed.
+    if: |
+      always()
+      && needs.resolve-suite.result == 'success'
+      && needs.resolve-suite.outputs.run_sidecar == 'true'
+      && (needs.dfa-equivalence.result == 'success' || needs.dfa-equivalence.result == 'skipped')
+      && (needs.labeler-smoke.result == 'success' || needs.labeler-smoke.result == 'skipped')
+      && (needs.labeler-stress.result == 'success' || needs.labeler-stress.result == 'skipped')
+      && (needs.events-plan-dsl.result == 'success' || needs.events-plan-dsl.result == 'skipped')
+      && (needs.declassify-engine.result == 'success' || needs.declassify-engine.result == 'skipped')
+      && (needs.rate-limits.result == 'success' || needs.rate-limits.result == 'skipped')
+      && (needs.hardened-adapters.result == 'success' || needs.hardened-adapters.result == 'skipped')
+      && (needs.ni-monitor-egress.result == 'success' || needs.ni-monitor-egress.result == 'skipped')
+      && (needs.crypto-envelope-break-glass.result == 'success' || needs.crypto-envelope-break-glass.result == 'skipped')
+      && (needs.scheduler-clock.result == 'success' || needs.scheduler-clock.result == 'skipped')
+      && (needs.replay-determinism.result == 'success' || needs.replay-determinism.result == 'skipped')
+      && (needs.safety-case-bundle.result == 'success' || needs.safety-case-bundle.result == 'skipped')
+      && needs.dfa-equivalence.result == 'success'
     steps:
       - uses: actions/checkout@v4
 
@@ -334,11 +445,15 @@ jobs:
           cd runtime/sidecar-watcher
           cargo test --test integration_tests -- --nocapture | grep -q "test result: ok" || exit 1
 
-  # Performance Benchmarks
+  # Performance Benchmarks (full suite only)
   performance:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
-    needs: [integration]
+    needs: [resolve-suite, integration]
+    if: >
+      always()
+      && needs.resolve-suite.outputs.full_suite == 'true'
+      && needs.integration.result == 'success'
     steps:
       - uses: actions/checkout@v4
 
@@ -361,11 +476,15 @@ jobs:
           name: performance-report
           path: performance_report.json
 
-  # Security Audit
+  # Security Audit (full suite only)
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    needs: [integration]
+    needs: [resolve-suite, integration]
+    if: >
+      always()
+      && needs.resolve-suite.outputs.full_suite == 'true'
+      && needs.integration.result == 'success'
     steps:
       - uses: actions/checkout@v4
 
@@ -394,11 +513,15 @@ jobs:
           name: security-report
           path: security_report.json
 
-  # Documentation Generation
+  # Documentation Generation (full suite only)
   documentation:
     name: Documentation Generation
     runs-on: ubuntu-latest
-    needs: [integration]
+    needs: [resolve-suite, integration]
+    if: >
+      always()
+      && needs.resolve-suite.outputs.full_suite == 'true'
+      && needs.integration.result == 'success'
     steps:
       - uses: actions/checkout@v4
 
@@ -423,21 +546,40 @@ jobs:
   final-status:
     name: Final Status Check
     runs-on: ubuntu-latest
-    needs: [integration, performance, security-audit, documentation]
+    needs:
+      [
+        resolve-suite,
+        labeler-smoke,
+        labeler-stress,
+        integration,
+        performance,
+        security-audit,
+        documentation,
+      ]
+    if: |
+      always()
+      && needs.resolve-suite.result == 'success'
+      && (needs.labeler-smoke.result == 'success' || needs.labeler-smoke.result == 'skipped')
+      && (needs.labeler-stress.result == 'success' || needs.labeler-stress.result == 'skipped')
+      && (needs.integration.result == 'success' || needs.integration.result == 'skipped')
+      && (
+        needs.integration.result == 'success'
+        || needs.labeler-smoke.result == 'success'
+        || needs.labeler-stress.result == 'success'
+      )
+      && (
+        needs.resolve-suite.outputs.full_suite != 'true'
+        || (
+          needs.performance.result == 'success'
+          && needs.security-audit.result == 'success'
+          && needs.documentation.result == 'success'
+        )
+      )
     steps:
       - name: All Gates Passed
         run: |
-          echo "🎉 All CI gates have passed successfully!"
-          echo "✅ DFA Round-trip Equivalence: 0 mismatches across 5k seeded traces"
-          echo "✅ Proof-Carrying Labeler: 1k randomized payloads processed"
-          echo "✅ Events & Plan-DSL Integration: All mediated operations pre-authorized"
-          echo "✅ Declassification Engine: Cycles detected, silent label widening prevented"
-          echo "✅ Rate Limits: 99th percentile < 1ms, clock wraparound safe"
-          echo "✅ Hardened Adapters: Seccomp/netns enforced, redirects blocked"
-          echo "✅ NI Monitor: Verdict consistency across 10k prefixes"
-          echo "✅ Egress Certificate: Schema validation + DSSE signature verified"
-          echo "✅ Break-Glass: M-of-N signatures, post-mortem stubs generated"
-          echo "✅ Scheduler: 0 reorder violations in concurrency stress tests"
-          echo "✅ Replay Determinism: Byte-identical replay, drift detection"
-          echo "✅ Safety Case Bundle: 100% sessions have bundles, 90-day retention"
-          echo "🚀 Provability-Fabric is ready for production deployment!"
+          echo "Paper Conformance CI gates passed (suite=${{ needs.resolve-suite.outputs.full_suite == 'true' && 'full' || 'push-shard' }})."
+          echo "DFA Round-trip Equivalence: core gate"
+          echo "Labeler: push smoke or full 1k stress (nightly)"
+          echo "Events & Plan-DSL / Declassify / Break-Glass / Replay / Safety Case: push shard"
+          echo "Rate Limits / Hardened Adapters / NI 10k / Scheduler / Perf / Audit / Docs: full suite only"

@@ -6,7 +6,7 @@ paths:
   - "runtime/sidecar-watcher"
   - "runtime/attestor"
   - "runtime/ledger"
-  - "marketplace/ui"
+  - "console"
   - "tools/specgraph"
 
 paths-ignore:

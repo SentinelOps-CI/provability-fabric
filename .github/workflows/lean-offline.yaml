@@ -2,11 +2,12 @@ name: Lean Offline Build
 
 # Two tracks:
 # 1) lean-offline-smoke (gated on push/PR/schedule): builds Runtime.MicroInterp
-#    (no mathlib imports) and checks F33 / enforced sorry policy.
+#    (no mathlib imports) and checks F33 / ENFORCED sorry policy (includes MicroInterp).
 # 2) lean-offline-full (schedule + dispatch full=true): vendored-mathlib offline
-#    path. Cache keys/paths intentionally share lean-style's mathlib cache so
-#    weekly schedule hits a warm vendor tree instead of hanging on cold
-#    `lake exe cache get` (historical tip cancels).
+#    path (ActionDSL.Extended + Runtime.ExtendedAdapter). Cache keys/paths
+#    intentionally share lean-style's mathlib cache so weekly schedule hits a warm
+#    vendor tree instead of hanging on cold `lake exe cache get` (historical tip
+#    cancels). Do not put full mathlib on every PR.
 on:
   push:
     branches: [main, develop]
@@ -86,7 +87,7 @@ jobs:
       - name: Scoped sorry scan (enforced + Runtime)
         run: |
           set -euo pipefail
-          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/Budget.lean core/lean-libs/Invariants.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean core/lean-libs/Runtime/MicroInterp.lean"
+          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/ActionDSL/Extended.lean core/lean-libs/Budget.lean core/lean-libs/Invariants.lean core/lean-libs/Runtime/MicroInterp.lean core/lean-libs/Runtime/ExtendedAdapter.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
           FOUND=""
           for target in $ENFORCED; do
             if [ -f "$target" ]; then
@@ -105,7 +106,7 @@ jobs:
             echo "Found sorry/by admit in scoped targets:$FOUND"
             exit 1
           fi
-          echo "No sorry/by admit in enforced targets or Runtime.MicroInterp"
+          echo "No sorry/by admit in lean-style/lean-offline ENFORCED targets (includes Runtime.MicroInterp)"
 
   # Full offline path: schedule (Monday) + explicit dispatch. Not on every lean
   # push — cold vendor can exceed runner patience; smoke covers push/PR gates.
@@ -222,6 +223,8 @@ jobs:
           set -euo pipefail
           echo "offline build start $(date -u +%H:%M:%S)"
           (cd core/lean-libs && lake build)
+          # Explicit Extended path (mathlib-backed; T13) — already in package roots.
+          (cd core/lean-libs && lake build ActionDSL.Extended Runtime.ExtendedAdapter)
           (cd spec-templates/v1/proofs && lake build)
           (cd bundles/my-agent/proofs && lake build)
           (cd bundles/test-new-user-agent/proofs && lake build)

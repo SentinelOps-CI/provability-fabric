@@ -112,7 +112,7 @@ jobs:
       - name: Check for 'sorry' or 'by admit' in CI-enforced Lean targets
         run: |
           echo "Checking for placeholder proofs in CI-enforced targets only..."
-          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/Budget.lean core/lean-libs/Invariants.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
+          ENFORCED="core/lean-libs/ActionDSL.lean core/lean-libs/ActionDSL/Extended.lean core/lean-libs/Budget.lean core/lean-libs/Invariants.lean core/lean-libs/Runtime/MicroInterp.lean core/lean-libs/Runtime/ExtendedAdapter.lean spec-templates/v1/proofs bundles/my-agent/proofs/Spec.lean bundles/test-new-user-agent/proofs/Spec.lean"
           FOUND=""
           for target in $ENFORCED; do
             if [ -f "$target" ]; then
@@ -188,6 +188,9 @@ jobs:
           echo "Checked files:" >> lean-style-report.md
           echo "- core/lean-libs/ActionDSL.lean" >> lean-style-report.md
           echo "- core/lean-libs/Invariants.lean" >> lean-style-report.md
+          echo "- core/lean-libs/Runtime/MicroInterp.lean" >> lean-style-report.md
+          echo "- core/lean-libs/ActionDSL/Extended.lean" >> lean-style-report.md
+          echo "- core/lean-libs/Runtime/ExtendedAdapter.lean" >> lean-style-report.md
           echo "- bundles/my-agent/proofs/Spec.lean" >> lean-style-report.md
           echo "- bundles/test-new-user-agent/proofs/Spec.lean" >> lean-style-report.md
           echo "- spec-templates/v1/proofs/Spec.lean" >> lean-style-report.md

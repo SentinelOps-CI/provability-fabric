@@ -23,18 +23,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+    - name: Set up Node workspace (demo)
+      uses: ./.github/actions/setup-node-workspace
       with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: demos/verifiable-mcp-fraud/package-lock.json
-    
-    - name: Install demo dependencies
-      run: |
-        cd demos/verifiable-mcp-fraud
-        npm ci
-    
+        node-version: "20"
+        working-directory: demos/verifiable-mcp-fraud
+        install-command: npm ci
+
     - name: Start platform
       run: |
         echo "Starting complete platform for E2E testing..."

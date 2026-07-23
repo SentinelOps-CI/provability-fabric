@@ -49,7 +49,7 @@ jobs:
           bash run.sh \
             --api-key "$MORPH_API_KEY" \
             --shards "${{ inputs.shards || 8 }}" \
-            --targets "proofs,spec-templates/v1/proofs,Fabric.lean,Policy.lean,ProofBench.lean"
+            --targets "proofs,spec-templates/v1/proofs,Fabric.lean"
       - name: Skip (no MORPH_API_KEY)
         if: steps.keycheck.outputs.missing == 'true'
         run: |
@@ -123,14 +123,10 @@ jobs:
 
       - name: Root Lean targets
         run: |
-          set -e
-          # Compile top-level Lean entry points (non-sharded, cheap)
-          # ci-honesty: justified wave7-remediation
-          lean --make Fabric.lean || true
-          # ci-honesty: justified wave7-remediation
-          lean --make Policy.lean || true
-          # ci-honesty: justified wave7-remediation
-          lean --make ProofBench.lean || true
+          set -euo pipefail
+          # Fail closed: root lake package (Fabric marker) — no soft-pass.
+          # Canonical Policy is built via the proofs/ package (sharded / prewarm steps).
+          lake build Fabric
 
       - name: Print snapshot info (if available)
         run: |

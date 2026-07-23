@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 #
-# Nightly Criterion benchmarks (aligned with bench/README.md):
-# - On push to main: save baseline so next run can compare.
-# - On schedule: compare against saved baseline; fail if regression exceeds threshold.
+# Wave 11.2 CI cost (aligned with bench/README.md + ci-reference policy):
+# - PR/push: smoke only (compile + tiny sample; no regression gate).
+# - Compare: schedule (nightly) + workflow_dispatch (refresh_baseline=false).
+# - Baseline refresh: weekly schedule + workflow_dispatch (refresh_baseline=true).
+#   No save-baseline on every main sidecar touch.
 #
 # Bench groups in bench/performance_benchmarks.rs hard-code large sample sizes and
 # measurement windows (up to 10k samples / 60s). CI always passes CLI overrides so
@@ -28,7 +30,10 @@ on:
       - "Cargo.lock"
       - ".github/workflows/bench-nightly-criterion.yaml"
   schedule:
+    # Nightly compare against saved baseline.
     - cron: "0 2 * * *"
+    # Weekly baseline refresh (Sunday 03:00 UTC).
+    - cron: "0 3 * * 0"
   workflow_dispatch:
     inputs:
       refresh_baseline:
@@ -45,6 +50,8 @@ jobs:
   smoke-bench:
     name: Smoke (compile + run benches)
     runs-on: ubuntu-latest
+    # Push/PR only — schedule and dispatch own compare / baseline refresh.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -60,10 +67,11 @@ jobs:
         run: cargo bench -p provability-fabric-bench -- --sample-size 10 --measurement-time 1 --noplot --test
 
   save-baseline:
-    name: Save baseline (main)
+    name: Save baseline (schedule / dispatch)
     runs-on: ubuntu-latest
+    # Weekly cron or explicit dispatch — never on ordinary main push.
     if: >
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0')
       || (github.event_name == 'workflow_dispatch' && inputs.refresh_baseline == true)
     timeout-minutes: 90
     steps:
@@ -153,10 +161,10 @@ jobs:
   compare-baseline:
     name: Compare to baseline (nightly)
     runs-on: ubuntu-latest
-    # Skip on refresh_baseline dispatch: save-baseline owns that path; a parallel
-    # compare with a cold/missing cache only re-seeds and historically timed out.
+    # Nightly cron, or dispatch without refresh. Skip weekly refresh cron and
+    # refresh_baseline dispatch (save-baseline owns those paths).
     if: >
-      github.event_name == 'schedule'
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *')
       || (github.event_name == 'workflow_dispatch' && inputs.refresh_baseline != true)
     timeout-minutes: 90
     steps:
