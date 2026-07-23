@@ -67,6 +67,12 @@
     "lean_check_result": {
       "$ref": "common.defs.json#/$defs/manifest_path_ref"
     },
+    "pcs_projection_manifest": {
+      "$ref": "common.defs.json#/$defs/manifest_path_ref"
+    },
+    "pcs_projection_manifest_hash": {
+      "$ref": "common.defs.json#/$defs/hex_digest"
+    },
     "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
   }
 }

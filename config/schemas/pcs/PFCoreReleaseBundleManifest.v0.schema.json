@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/PFCoreReleaseBundleManifest.v0.schema.json",
+  "title": "PFCoreReleaseBundleManifest.v0",
+  "description": "Closed release-bundle root manifest. Validate this schema before resolving any referenced path.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "trace_path",
+    "certificate_path",
+    "trace_hash",
+    "kernel_manifest_path",
+    "pfcore_kernel_hash",
+    "lean_environment_hash",
+    "certificate_mode",
+    "signature_or_digest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "common.defs.json#/$defs/schema_version" },
+    "artifact_type": { "const": "PFCoreReleaseBundleManifest.v0" },
+    "canonicalization_version": {
+      "$ref": "common.defs.json#/$defs/canonicalization_version"
+    },
+    "claim_class": {
+      "$ref": "pf_core.defs.json#/$defs/certificate_claim_class"
+    },
+    "trace_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "certificate_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "kernel_manifest_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "lean_check_result_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "proof_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+    "trace_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "proof_term_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "pfcore_kernel_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "lean_environment_hash": { "$ref": "common.defs.json#/$defs/hex_digest" },
+    "certificate_mode": { "$ref": "pf_core.defs.json#/$defs/certificate_mode" },
+    "signature_or_digest": { "$ref": "common.defs.json#/$defs/hex_digest" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["claim_class"],
+        "properties": {
+          "claim_class": { "const": "LeanKernelChecked" }
+        }
+      },
+      "then": {
+        "required": [
+          "proof_path",
+          "lean_check_result_path",
+          "proof_term_hash"
+        ],
+        "properties": {
+          "proof_path": { "$ref": "common.defs.json#/$defs/relative_posix_path" },
+          "lean_check_result_path": {
+            "$ref": "common.defs.json#/$defs/relative_posix_path"
+          },
+          "proof_term_hash": { "$ref": "common.defs.json#/$defs/hex_digest" }
+        }
+      }
+    }
+  ]
+}

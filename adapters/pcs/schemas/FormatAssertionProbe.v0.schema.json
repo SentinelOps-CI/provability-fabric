@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcs.sentinelops.ci/schemas/FormatAssertionProbe.v0.schema.json",
+  "title": "FormatAssertionProbe.v0",
+  "description": "Negative-fixture probe for asserted JSON Schema formats that are not yet bound to production artifact fields.",
+  "type": "object",
+  "required": ["schema_version", "artifact_type"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "v0" },
+    "artifact_type": { "const": "FormatAssertionProbe.v0" },
+    "uuid_value": { "$ref": "common.defs.json#/$defs/uuid" },
+    "duration_value": { "$ref": "common.defs.json#/$defs/duration" },
+    "hostname_value": { "$ref": "common.defs.json#/$defs/hostname" },
+    "email_value": { "$ref": "common.defs.json#/$defs/email" }
+  }
+}
