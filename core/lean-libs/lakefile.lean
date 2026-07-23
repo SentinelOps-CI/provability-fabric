@@ -7,12 +7,14 @@ package Fabric {
 
 @[default_target]
 lean_lib ActionDSL {
-  roots := #[`ActionDSL, `ActionDSL.Safety]
+  roots := #[`ActionDSL, `ActionDSL.Safety, `ActionDSL.Extended]
 }
 
 /-- Runtime micro-interpreter + ActionDSL↔DFA coupling (F33 / P4). -/
 lean_lib Runtime {
-  roots := #[`Runtime.MicroInterp]
+  -- ExtendedAdapter imports mathlib via ActionDSL.Extended; keep MicroInterp
+  -- first so lean-offline-smoke can still compile it without a vendor tree.
+  roots := #[`Runtime.MicroInterp, `Runtime.ExtendedAdapter]
 }
 
 lean_lib Budget {

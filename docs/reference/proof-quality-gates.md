@@ -104,8 +104,8 @@ Generates and shrinks Action traces for fuzz testing.
 
 **Usage:**
 ```bash
-# Run proofbench
-lake exe proofbench
+# Build core Lean libs (property harness lives under core/lean-libs when wired)
+cd core/lean-libs && lake build
 
 # Run tests
 cd tests/lean
@@ -133,13 +133,11 @@ The quality gates are integrated into the CI workflow (`.github/workflows/ci.yam
     echo "Checking time-to-fail for first failing lemma..."
     # ... timeout checks ...
 
-- name: Run proofbench
+- name: Build Lean libs
   run: |
-    echo "Running property-based testing with proofbench..."
+    echo "Building Lean libraries..."
     cd core/lean-libs
     lake build
-    cd ../..
-    lake exe proofbench
 ```
 
 ## Policies

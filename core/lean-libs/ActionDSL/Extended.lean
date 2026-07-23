@@ -28,6 +28,7 @@ inductive Role where
   | System (level : Nat)
   | Tenant (name : String)
   | Group (name : String)
+  deriving Repr, BEq, DecidableEq
 
 /-- Extended Tool type for capabilities -/
 inductive Tool where
@@ -35,15 +36,16 @@ inductive Tool where
   | File (path : String) (mode : String)
   | Database (query : String)
   | Custom (name : String) (params : List String)
-  | Email (to : String) (subject : String)
+  | Email (recipient : String) (subject : String)
   | Log (level : String) (message : String)
+  deriving Repr, BEq, DecidableEq
 
 /-- Document identifier for read/write operations -/
 structure Document where
   id : String
   path : List String
   version : Nat
-  deriving Repr, BEq
+  deriving Repr, BEq, DecidableEq
 
 /-- Extended Event type including read/write operations -/
 inductive Event where
@@ -54,6 +56,7 @@ inductive Event where
   | Declassify (from_label : String) (to_label : String)
   | Emit (event_type : String) (payload : String)
   | Retrieve (path : String) (hash : String)
+  deriving Repr, BEq, DecidableEq
 
 /-- ABAC attribute types -/
 inductive Attribute where
@@ -61,6 +64,7 @@ inductive Attribute where
   | Number (key : String) (value : Nat)
   | Boolean (key : String) (value : Bool)
   | List (key : String) (values : List String)
+  deriving Repr, BEq, DecidableEq
 
 /-- Session information for ABAC -/
 structure Session where
@@ -70,20 +74,20 @@ structure Session where
   created_at : Nat
   expires_at : Nat
   attributes : List Attribute
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
-/-- Epoch range for temporal ABAC -/
+/-- Epoch range for temporal ABAC (`stop` avoids Lean reserved `end`). -/
 structure EpochRange where
   start : Nat
-  end : Nat
-  deriving Repr
+  stop : Nat
+  deriving Repr, BEq, DecidableEq
 
 /-- Scope for multi-tenant isolation -/
 structure Scope where
   tenant : String
   project : String
   environment : String
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
 /-- ABAC guard predicates with specific primitives as required -/
 inductive Guard where
@@ -104,9 +108,10 @@ inductive Guard where
   | NumberGreaterThan (left : Nat) (right : Nat)
   -- New ABAC primitives as specified
   | Attr (key : String)  -- attr("k") primitive
-  | Session (key : String)  -- session("k") primitive
-  | EpochInRange (start : Nat) (end : Nat)  -- epoch_in [s,e] primitive
+  | SessionKey (key : String)  -- session("k") primitive
+  | EpochInRange (start : Nat) (stop : Nat)  -- epoch_in [s,e] primitive
   | Scope (tenant : String)  -- scope("tenantA") primitive
+  deriving Repr, BEq, DecidableEq
 
 /-- Extended Action clause with ABAC guards for read/write -/
 structure ActionClause where
@@ -114,7 +119,7 @@ structure ActionClause where
   role : Role
   operation : Event
   guard : Guard
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
 /-- DSL Grammar extensions for read/write events -/
 structure DSLRule where
@@ -137,7 +142,7 @@ structure PolicyRule where
   description : String
   clauses : List ActionClause
   priority : Nat
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
 /-- State type for interpreter state -/
 structure State where
@@ -147,14 +152,14 @@ structure State where
   labels : List String
   attributes : List Attribute
   scope : Scope
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
 /-- Step type for trace elements -/
 structure Step where
   st : State
   evt : Event
   st' : State
-  deriving Repr
+  deriving Repr, BEq, DecidableEq
 
 /-- Trace type for execution sequences -/
 def Trace := List Step
@@ -171,7 +176,7 @@ def evalGuard (guard : Guard) (state : State) : Bool :=
     match state.user with
     | Role.User id => role == id
     | Role.Service name => role == name
-    | Role.System level => role == "system"
+    | Role.System _level => role == "system"
     | Role.Tenant name => role == name
     | Role.Group name => role == name
   | Guard.HasAttribute key value =>
@@ -185,13 +190,13 @@ def evalGuard (guard : Guard) (state : State) : Bool :=
       | Attribute.String k v => k == key && v == value
       | _ => false)
   | Guard.EpochIn range =>
-    state.timestamp >= range.start && state.timestamp <= range.end
+    state.timestamp >= range.start && state.timestamp <= range.stop
   | Guard.ScopeMatch scope =>
     state.scope.tenant == scope.tenant &&
     state.scope.project == scope.project &&
     state.scope.environment == scope.environment
   | Guard.StringEquals left right => left == right
-  | Guard.StringContains haystack needle => haystack.contains needle
+  | Guard.StringContains haystack needle => (haystack.splitOn needle).length > 1
   | Guard.NumberEquals left right => left == right
   | Guard.NumberLessThan left right => left < right
   | Guard.NumberGreaterThan left right => left > right
@@ -201,15 +206,35 @@ def evalGuard (guard : Guard) (state : State) : Bool :=
       match attr with
       | Attribute.String k _ => k == key
       | _ => false)
-  | Guard.Session key =>
+  | Guard.SessionKey key =>
     state.session.attributes.any (fun attr =>
       match attr with
       | Attribute.String k _ => k == key
       | _ => false)
-  | Guard.EpochInRange start end =>
-    state.timestamp >= start && state.timestamp <= end
+  | Guard.EpochInRange start stop =>
+    state.timestamp >= start && state.timestamp <= stop
   | Guard.Scope tenant =>
     state.scope.tenant == tenant
+
+/-- Check if events match (simplified matching). Uses `decide (_ = _)` so
+bridge lemmas can recover propositional equality from a `true` result. -/
+def eventMatches (expected : Event) (actual : Event) : Bool :=
+  match expected, actual with
+  | Event.Call role1 tool1, Event.Call role2 tool2 =>
+    decide (role1 = role2) && decide (tool1 = tool2)
+  | Event.Read role1 doc1 path1, Event.Read role2 doc2 path2 =>
+    decide (role1 = role2) && decide (doc1 = doc2) && decide (path1 = path2)
+  | Event.Write role1 doc1 path1, Event.Write role2 doc2 path2 =>
+    decide (role1 = role2) && decide (doc1 = doc2) && decide (path1 = path2)
+  | Event.Log msg1 level1, Event.Log msg2 level2 =>
+    decide (msg1 = msg2) && decide (level1 = level2)
+  | Event.Declassify from1 to1, Event.Declassify from2 to2 =>
+    decide (from1 = from2) && decide (to1 = to2)
+  | Event.Emit type1 payload1, Event.Emit type2 payload2 =>
+    decide (type1 = type2) && decide (payload1 = payload2)
+  | Event.Retrieve path1 hash1, Event.Retrieve path2 hash2 =>
+    decide (path1 = path2) && decide (hash1 = hash2)
+  | _, _ => false
 
 /-- Check if an action is allowed by a policy -/
 def isAllowed (policy : PolicyRule) (state : State) (event : Event) : Bool :=
@@ -223,33 +248,14 @@ def isAllowed (policy : PolicyRule) (state : State) (event : Event) : Bool :=
       evalGuard clause.guard state
     | _ => false)
 
-/-- Check if events match (simplified matching) -/
-def eventMatches (expected : Event) (actual : Event) : Bool :=
-  match expected, actual with
-  | Event.Call role1 tool1, Event.Call role2 tool2 =>
-    role1 == role2 && tool1 == tool2
-  | Event.Read role1 doc1 path1, Event.Read role2 doc2 path2 =>
-    role1 == role2 && doc1 == doc2 && path1 == path2
-  | Event.Write role1 doc1 path1, Event.Write role2 doc2 path2 =>
-    role1 == role2 && doc1 == doc2 && path1 == path2
-  | Event.Log msg1 level1, Event.Log msg2 level2 =>
-    msg1 == msg2 && level1 == level2
-  | Event.Declassify from1 to1, Event.Declassify from2 to2 =>
-    from1 == from2 && to1 == to2
-  | Event.Emit type1 payload1, Event.Emit type2 payload2 =>
-    type1 == type2 && payload1 == payload2
-  | Event.Retrieve path1 hash1, Event.Retrieve path2 hash2 =>
-    path1 == path2 && hash1 == hash2
-  | _, _ => false
-
 /-- Safety predicate for traces -/
-def SafeTrace (τ : Trace) : Prop :=
+def SafeTrace (_τ : Trace) : Prop :=
   -- Implementation would define specific safety conditions
   -- For now, we assume all traces are safe
   True
 
 /-- Non-interference predicate -/
-def NonInterference (τ : Trace) : Prop :=
+def NonInterference (_τ : Trace) : Prop :=
   -- Implementation would define specific non-interference conditions
   -- For now, we assume all traces satisfy non-interference
   True
@@ -279,7 +285,7 @@ def readPolicy : PolicyRule :=
         operation := Event.Read (Role.User "reader") { id := "doc1", path := ["field1"], version := 1 } ["field1"]
         guard := Guard.And
           (Guard.HasRole "reader")
-          (Guard.EpochIn { start := 0, end := 9999999999 })
+          (Guard.EpochIn { start := 0, stop := 9999999999 })
       }
     ]
     priority := 2
@@ -314,7 +320,7 @@ def abacReadPolicy : DSLRule :=
       Guard.And
         (Guard.Attr "project")
         (Guard.And
-          (Guard.Session "approved")
+          (Guard.SessionKey "approved")
           (Guard.And
             (Guard.EpochInRange 1000 2000)
             (Guard.Scope "tenantA"))))

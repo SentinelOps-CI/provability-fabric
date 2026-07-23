@@ -4,7 +4,7 @@ This directory contains the formal specifications and proofs for the Provability
 
 ## Overview
 
-The Policy.lean file implements a unified permissions system that combines:
+The `Policy.lean` file in this directory is the **canonical** Policy module (root Lake package no longer mirrors it). It implements a unified permissions system that combines:
 
 1. **Unified Action Space**: Single `Action` type covering tools, documents, and grants
 2. **Executable Decider**: `permitD` function that returns `Bool` for runtime decisions

@@ -7,14 +7,9 @@ package provability_fabric {
 
 @[default_target]
 lean_lib Fabric {
-  -- add library configuration options here
-  roots := #[`Fabric, `Policy]
+  -- Root package marker. Canonical Policy lives in proofs/Policy.lean (proofs lake package).
+  roots := #[`Fabric]
 }
 
 -- Use vendored mathlib instead of fetching from git
 require mathlib from "vendor/mathlib"
-
-@[default_target]
-lean_exe proofbench {
-  root := `ProofBench
-}

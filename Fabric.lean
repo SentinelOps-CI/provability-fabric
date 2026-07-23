@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 
-import Policy
+namespace Fabric
 
-/-- Re-export the main Policy module -/
-export Policy
+/-- Root Lake package marker. Canonical policy proofs: `proofs/Policy.lean`. -/
+def packageName : String := "provability_fabric"
+
+end Fabric
