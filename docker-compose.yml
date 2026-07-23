@@ -281,9 +281,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # WASM adapter sandbox CLI (full profile; invoke with module args via compose run)
+  # WASM adapter sandbox CLI — not a long-running service. Keep off `full` so
+  # `docker compose --profile full up --wait` (demo-up) does not fail when the
+  # process exits after --help. Invoke via: docker compose --profile tools run --rm wasm-sandbox ...
   wasm-sandbox:
-    profiles: ["full"]
+    profiles: ["tools"]
     build:
       context: .
       dockerfile: runtime/wasm-sandbox/Dockerfile
