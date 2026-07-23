@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Package and HMAC-sign a publish-updates markdown artifact for CI dry-run.
+"""Package and HMAC-sign a publish-updates markdown artifact.
 
-Validates packaging (tar + manifest) and signature round-trip against a local
-mock registry directory. Live registry publish remains secret/dispatch-gated.
+CI dry-run: validates packaging against a local mock registry directory.
+Live: uploads the signed tarball to UPDATES_REGISTRY_URL and records
+live_registry=true in package-report.json. Fail-closed without registry URL/key.
 """
 
 from __future__ import annotations
@@ -13,7 +14,10 @@ import hashlib
 import hmac
 import json
 import os
+import sys
 import tarfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 
@@ -39,13 +43,21 @@ def build_package(src: Path, out_dir: Path, key: bytes) -> dict:
         tar.add(blob, arcname="updates.md")
         tar.add(out_dir / "manifest.json", arcname="manifest.json")
 
-    # Mock registry "publish": copy tarball into registry root and verify
+    return {
+        "package": str(tarball),
+        "sha256": digest,
+        "signature": sig,
+        "signature_prefix": sig[:16],
+        "bytes": len(raw),
+    }
+
+
+def publish_mock(tarball: Path, out_dir: Path, key: bytes) -> dict:
     registry = out_dir / "mock-registry"
     registry.mkdir(exist_ok=True)
     published = registry / "updates-package.tar.gz"
     published.write_bytes(tarball.read_bytes())
 
-    # Verify round-trip
     with tarfile.open(published, "r:gz") as tar:
         members = {m.name for m in tar.getmembers()}
         assert "updates.md" in members and "manifest.json" in members
@@ -60,11 +72,54 @@ def build_package(src: Path, out_dir: Path, key: bytes) -> dict:
     assert b"Recent Updates" in md_bytes
 
     return {
-        "package": str(tarball),
         "registry_object": str(published),
-        "sha256": digest,
-        "signature_prefix": sig[:16],
         "live_registry": False,
+    }
+
+
+def publish_live(
+    tarball: Path,
+    registry_url: str,
+    token: str | None,
+    key: bytes,
+) -> dict:
+    raw = tarball.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    sig = hmac.new(key, raw, hashlib.sha256).hexdigest()
+    headers = {
+        "Content-Type": "application/gzip",
+        "User-Agent": "provability-fabric-publish-updates/1.0",
+        "X-Content-SHA256": digest,
+        "X-Content-Signature": sig,
+        "X-Signature-Algorithm": "HMAC-SHA256",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    req = urllib.request.Request(
+        registry_url,
+        data=raw,
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 — ops-gated URL
+            status = resp.status
+            body = resp.read()[:512]
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(f"live registry HTTP {exc.code}: {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"live registry unreachable: {exc.reason}") from exc
+
+    if status not in (200, 201, 202, 204):
+        raise SystemExit(f"live registry unexpected status {status}: {body!r}")
+
+    return {
+        "registry_url": registry_url,
+        "http_status": status,
+        "live_registry": True,
+        "uploaded_sha256": digest,
+        "uploaded_signature_prefix": sig[:16],
     }
 
 
@@ -84,10 +139,57 @@ def main() -> int:
         "--signing-key",
         default=os.environ.get("PUBLISH_UPDATES_SIGNING_KEY", "ci-local-publish-key"),
     )
+    parser.add_argument(
+        "--live-registry",
+        action="store_true",
+        default=os.environ.get("PUBLISH_UPDATES_LIVE_REGISTRY") == "1",
+        help="Upload to UPDATES_REGISTRY_URL (fail-closed if unset)",
+    )
+    parser.add_argument(
+        "--registry-url",
+        default=os.environ.get("UPDATES_REGISTRY_URL", ""),
+    )
+    parser.add_argument(
+        "--registry-token",
+        default=os.environ.get("UPDATES_REGISTRY_TOKEN", ""),
+    )
     args = parser.parse_args()
     if not args.src.is_file():
         raise SystemExit(f"missing source artifact: {args.src}")
-    report = build_package(args.src, args.out_dir, args.signing_key.encode("utf-8"))
+
+    key = args.signing_key.encode("utf-8")
+    base = build_package(args.src, args.out_dir, key)
+    tarball = Path(base["package"])
+
+    if args.live_registry:
+        if not str(args.registry_url).strip():
+            print(
+                "error: live registry publish requires UPDATES_REGISTRY_URL",
+                file=sys.stderr,
+            )
+            print("fail-closed: configure secrets and re-dispatch dry_run=false", file=sys.stderr)
+            return 1
+        if not str(args.signing_key).strip() or args.signing_key == "ci-local-publish-key":
+            print(
+                "error: live registry publish requires PUBLISH_UPDATES_SIGNING_KEY "
+                "(not the CI-local default)",
+                file=sys.stderr,
+            )
+            return 1
+        live = publish_live(
+            tarball,
+            str(args.registry_url).strip(),
+            str(args.registry_token).strip() or None,
+            key,
+        )
+        report = {**base, **live}
+    else:
+        mock = publish_mock(tarball, args.out_dir, key)
+        report = {**base, **mock}
+
+    # Do not leak full signature in artifacts beyond prefix for mock path.
+    report.pop("signature", None)
+
     report_path = args.out_dir / "package-report.json"
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
