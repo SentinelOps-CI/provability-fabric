@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use tracing::{info, debug, error, warn};
+use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
 
 use crate::{ComplianceLevel, MpcSignatureResult, FinancialTransaction};
