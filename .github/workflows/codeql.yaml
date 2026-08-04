@@ -49,10 +49,10 @@ jobs:
       matrix: ${{ steps.set.outputs.matrix }}
       any: ${{ steps.set.outputs.any }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         with:
@@ -118,7 +118,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Free disk space
         if: matrix.language == 'javascript'
@@ -139,14 +139,14 @@ jobs:
           df -h
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4.37.4
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Set up Go
         if: matrix.language == 'go'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.23"
 
@@ -158,7 +158,7 @@ jobs:
 
       - name: Set up Node.js
         if: matrix.language == 'javascript'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
@@ -241,7 +241,7 @@ jobs:
           df -h
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4.37.4
         with:
           category: "/language:${{matrix.language}}"
 
@@ -273,7 +273,7 @@ jobs:
     if: github.event_name == 'schedule'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Generate security trends
         run: |

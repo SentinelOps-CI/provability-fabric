@@ -21,7 +21,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     
     - name: Set up Node workspace (demo)
       uses: ./.github/actions/setup-node-workspace
@@ -111,7 +111,7 @@ jobs:
         fi
 
     - name: Store demo artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: demo-e2e-artifacts
