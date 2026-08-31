@@ -53,11 +53,21 @@ if ! docker run --name "$fmt_name" --entrypoint python \
   echo "Error: failed to install fail-closed date-time extras into $IMAGE_TAG" >&2
   exit 1
 fi
-docker commit "$fmt_name" "$IMAGE_TAG" >/dev/null
+# docker commit would otherwise inherit `python -m pip ...` as ENTRYPOINT/CMD
+# and later `docker run --bundle` would become `python --bundle`.
+docker commit \
+  --change 'ENTRYPOINT ["python", "replay_run.py"]' \
+  --change 'CMD []' \
+  "$fmt_name" "$IMAGE_TAG" >/dev/null
 docker rm -f "$fmt_name" >/dev/null 2>&1 || true
 if ! docker run --rm --entrypoint python "$IMAGE_TAG" -c \
   "import rfc3339_validator, jsonschema"; then
   echo "Error: $IMAGE_TAG cannot import rfc3339_validator after install" >&2
+  exit 1
+fi
+entrypoint="$(docker image inspect --format '{{json .Config.Entrypoint}}' "$IMAGE_TAG")"
+if [[ "$entrypoint" != '["python","replay_run.py"]' ]]; then
+  echo "Error: $IMAGE_TAG ENTRYPOINT is $entrypoint; expected [\"python\",\"replay_run.py\"]" >&2
   exit 1
 fi
 
