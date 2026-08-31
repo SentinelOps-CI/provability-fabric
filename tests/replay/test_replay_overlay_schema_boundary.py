@@ -9,9 +9,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker
-
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools" / "cert-validate"))
+from format_check import compile_trace_replay_validator  # noqa: E402
 OVERLAY = REPO / "tests" / "replay" / "overlays" / "replay_run.py"
 TRACE_SCHEMA = (
     REPO
@@ -95,7 +95,7 @@ def test_runtime_schema_environment_cannot_hijack_trace_schema(tmp_path: Path) -
     assert proc.returncode == 0, proc.stderr + proc.stdout
     cert = json.loads(cert_out.read_text(encoding="utf-8"))
     schema = json.loads(TRACE_SCHEMA.read_text(encoding="utf-8"))
-    Draft202012Validator(schema, format_checker=FormatChecker()).validate(cert)
+    compile_trace_replay_validator(schema).validate(cert)
     assert "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json" in proc.stdout
 
 

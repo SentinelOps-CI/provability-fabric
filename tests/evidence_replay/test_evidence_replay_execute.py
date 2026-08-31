@@ -7,12 +7,14 @@ from __future__ import annotations
 import json
 import platform
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator, FormatChecker
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools" / "cert-validate"))
+from format_check import compile_trace_replay_validator  # noqa: E402
 PF = REPO / "core" / "cli" / "pf" / "pf"
 BUNDLE = REPO / "specs" / "evidence" / "v0.2" / "examples" / "valid" / "deep-replay-bundle.json"
 KIT_RUNNER = REPO / "external" / "TRACE-REPLAY-KIT" / "runner" / "replay_run.py"
@@ -80,7 +82,7 @@ def test_evidence_replay_execute_low_view(pf_bin: Path, tmp_path: Path) -> None:
     ]
 
     schema = json.loads(TRACE_REPLAY_SCHEMA.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    validator = compile_trace_replay_validator(schema)
 
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     bundle_base = BUNDLE.parent.resolve()

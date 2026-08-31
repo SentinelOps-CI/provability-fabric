@@ -16,6 +16,13 @@ from datetime import datetime, timezone
 import jsonschema
 from typing import Dict, Any, List
 
+_FORMAT_CHECK_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "tools", "cert-validate")
+)
+if _FORMAT_CHECK_DIR not in sys.path:
+    sys.path.insert(0, _FORMAT_CHECK_DIR)
+from format_check import compile_trace_replay_validator  # noqa: E402
+
 
 LOCAL_SCHEMA_CANDIDATES = [
     "/work/specs/evidence/v0.2/schemas/trace-replay-cert.schema.json",
@@ -236,9 +243,7 @@ class ReplayRunner:
 
         if self.cert_schema:
             try:
-                validator = jsonschema.Draft202012Validator(
-                    self.cert_schema, format_checker=jsonschema.FormatChecker()
-                )
+                validator = compile_trace_replay_validator(self.cert_schema)
                 validator.validate(cert)
             except jsonschema.ValidationError as e:
                 print(

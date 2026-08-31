@@ -13,6 +13,8 @@ The trace-replay schema is resolved from the repository containing this tool, so
 pip install -r requirements.txt
 ```
 
+Trace-replay `timestamp` format checking requires `rfc3339-validator`. If that extra is missing, validation fails closed as an operational error rather than accepting structurally invalid date-time values.
+
 ## Usage
 
 ```bash

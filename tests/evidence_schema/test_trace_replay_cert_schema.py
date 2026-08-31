@@ -5,12 +5,20 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "tools" / "cert-validate"))
+from format_check import (  # noqa: E402
+    FormatCheckUnavailable,
+    compile_trace_replay_validator,
+    require_date_time_format_checker,
+)
+
 SCHEMA_PATH = (
     REPO
     / "specs"
@@ -24,8 +32,7 @@ REPLAY_OUT = REPO / "specs" / "evidence" / "v0.2" / "examples" / "valid" / "repl
 
 def _validator() -> Draft202012Validator:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    return compile_trace_replay_validator(schema)
 
 
 @pytest.mark.parametrize("name", ["replay.cert.json", "replay2.cert.json"])
@@ -60,6 +67,16 @@ def test_trace_replay_certificate_schema_rejects_invalid_timestamp() -> None:
     cert["timestamp"] = "not-a-timestamp"
     errors = list(_validator().iter_errors(cert))
     assert errors
+
+
+def test_date_time_format_checker_fails_closed_when_backend_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "format_check.importlib.util.find_spec", lambda name: None
+    )
+    with pytest.raises(FormatCheckUnavailable, match="rfc3339-validator"):
+        require_date_time_format_checker()
 
 
 def test_trace_replay_certificate_schema_rejects_result_without_event_id() -> None:

@@ -15,7 +15,12 @@ import json
 import sys
 from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker, ValidationError, validate
+from jsonschema import Draft202012Validator, ValidationError, validate
+
+_TOOL_DIR = Path(__file__).resolve().parent
+if str(_TOOL_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOOL_DIR))
+from format_check import FormatCheckUnavailable, compile_trace_replay_validator  # noqa: E402
 
 VALID = 0
 INVALID = 1
@@ -53,10 +58,10 @@ def trace_replay_validator() -> Draft202012Validator:
     schema = load_schema(TRACE_REPLAY_SCHEMA_PATH)
     if schema is None:
         raise RuntimeError(f"trace replay schema missing at {TRACE_REPLAY_SCHEMA_PATH}")
-    Draft202012Validator.check_schema(schema)
-    _TRACE_REPLAY_VALIDATOR = Draft202012Validator(
-        schema, format_checker=FormatChecker()
-    )
+    try:
+        _TRACE_REPLAY_VALIDATOR = compile_trace_replay_validator(schema)
+    except FormatCheckUnavailable as exc:
+        raise RuntimeError(str(exc)) from exc
     return _TRACE_REPLAY_VALIDATOR
 
 
