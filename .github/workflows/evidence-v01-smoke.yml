@@ -77,10 +77,12 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest
+          packages: jsonschema pytest rfc3339-validator
 
       - name: Pytest evidence schema
-        run: pytest tests/evidence_schema -q
+        run: |
+          python -c "import jsonschema, pytest, rfc3339_validator"
+          python -m pytest tests/evidence_schema -q
 
   evidence-validator:
     runs-on: ubuntu-latest
@@ -100,7 +102,7 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest
+          packages: jsonschema pytest rfc3339-validator
 
       - name: Go tests (core/evidence)
         run: go test ./...
@@ -130,7 +132,7 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest
+          packages: jsonschema pytest rfc3339-validator
 
       - name: Init external standards
         env:
@@ -236,7 +238,9 @@ jobs:
           import json
           from importlib.metadata import version
           from pathlib import Path
-          from jsonschema import Draft202012Validator, FormatChecker
+          import sys
+          sys.path.insert(0, "tools/cert-validate")
+          from format_check import compile_trace_replay_validator
 
           root = Path("artifacts/evidence-v0.2")
           report = json.loads((root / "replay-report.json").read_text(encoding="utf-8"))
@@ -260,7 +264,7 @@ jobs:
                   encoding="utf-8"
               )
           )
-          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator = compile_trace_replay_validator(schema)
 
           bundle_path = Path(
               "specs/evidence/v0.2/examples/valid/deep-replay-bundle.json"
@@ -311,11 +315,16 @@ jobs:
           )
           PY
 
+          sums="$(mktemp)"
           (
             cd artifacts/evidence-v0.2
             find . -type f ! -name SHA256SUMS -print0 \
               | sort -z \
-              | xargs -0 sha256sum > SHA256SUMS
+              | xargs -0 sha256sum > "$sums"
+          )
+          mv "$sums" artifacts/evidence-v0.2/SHA256SUMS
+          (
+            cd artifacts/evidence-v0.2
             sha256sum -c SHA256SUMS
           )
 
