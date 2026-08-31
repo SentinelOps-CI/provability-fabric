@@ -36,6 +36,37 @@ fi
 echo "== Step 3: execute + low-view =="
 # Windows consoles default to a legacy code page; KIT oracles may emit Unicode.
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
-OUT="$(mktemp -d)"
-"$PF" evidence replay --bundle "$BUNDLE" --base-dir "$EXAMPLE" --execute --low-view --out-dir "$OUT/replay"
+OUT="${EVIDENCE_REPLAY_OUT_DIR:-$(mktemp -d)}"
+REPORT="${EVIDENCE_REPLAY_REPORT:-$OUT/replay-report.json}"
+mkdir -p "$OUT/replay" "$(dirname "$REPORT")"
+REPLAY_CMD=(
+  "$PF" evidence replay
+  --bundle "$BUNDLE"
+  --base-dir "$EXAMPLE"
+  --execute
+  --low-view
+  --out "$REPORT"
+  --out-dir "$OUT/replay"
+)
+printf '%q ' "${REPLAY_CMD[@]}" > "$OUT/replay-command.txt"
+printf '\n' >> "$OUT/replay-command.txt"
+"${REPLAY_CMD[@]}" 2>&1 | tee "$OUT/deep-replay.log"
+
+python - "$REPORT" <<'PY'
+import json
+import sys
+
+report = json.load(open(sys.argv[1], encoding="utf-8"))
+assert report["status"] == "pass", report
+assert report.get("execute_status") == "pass", report
+assert report.get("kit_exit_code") == 0, report
+assert report.get("kit_second_exit_code") == 0, report
+assert report.get("low_view_result") == "pass", report
+assert report.get("replay_cert_validation") == "pass", report
+PY
+
+test -f "$OUT/replay/replay.cert.json"
+test -f "$OUT/replay/replay2.cert.json"
 echo "Deep replay execute complete."
+echo "Replay report: $REPORT"
+echo "Replay artifacts: $OUT/replay"

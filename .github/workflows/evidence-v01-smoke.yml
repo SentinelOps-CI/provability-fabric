@@ -70,6 +70,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python tests
         uses: ./.github/actions/setup-python-tests
@@ -85,6 +87,8 @@ jobs:
     needs: evidence-schema-only
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go CLI
         uses: ./.github/actions/setup-go-cli
@@ -110,6 +114,8 @@ jobs:
     needs: evidence-validator
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -175,7 +181,152 @@ jobs:
         run: bash testbed/evidence-v0.2/run_deep_replay.sh
 
       - name: Testbed v0.2 deep replay (execute + low-view)
+        env:
+          EVIDENCE_REPLAY_OUT_DIR: artifacts/evidence-v0.2
         run: bash testbed/evidence-v0.2/run_deep_replay.sh --execute
+
+      - name: Record deep replay acceptance metadata
+        if: always()
+        env:
+          META_RUN_ID: ${{ github.run_id }}
+          META_RUN_ATTEMPT: ${{ github.run_attempt }}
+          META_EVENT_NAME: ${{ github.event_name }}
+          META_REPOSITORY: ${{ github.repository }}
+          META_WORKFLOW_REF: ${{ github.workflow_ref }}
+          META_GITHUB_SHA: ${{ github.sha }}
+          META_ACCEPTANCE_TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          META_REF: ${{ github.ref }}
+          META_REF_NAME: ${{ github.ref_name }}
+          META_HEAD_REF: ${{ github.head_ref }}
+          META_BASE_REF: ${{ github.base_ref }}
+          META_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          META_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mkdir -p artifacts/evidence-v0.2
+          git rev-parse HEAD > artifacts/evidence-v0.2/repository-sha.txt
+          git submodule status --recursive > artifacts/evidence-v0.2/submodules.txt
+          {
+            printf 'run_id=%s\n' "$META_RUN_ID"
+            printf 'run_attempt=%s\n' "$META_RUN_ATTEMPT"
+            printf 'event_name=%s\n' "$META_EVENT_NAME"
+            printf 'repository=%s\n' "$META_REPOSITORY"
+            printf 'workflow_ref=%s\n' "$META_WORKFLOW_REF"
+            printf 'github_sha=%s\n' "$META_GITHUB_SHA"
+            printf 'acceptance_target_sha=%s\n' "$META_ACCEPTANCE_TARGET_SHA"
+            printf 'ref=%s\n' "$META_REF"
+            printf 'ref_name=%s\n' "$META_REF_NAME"
+            printf 'head_ref=%s\n' "$META_HEAD_REF"
+            printf 'base_ref=%s\n' "$META_BASE_REF"
+            printf 'pull_request_head_sha=%s\n' "$META_PR_HEAD_SHA"
+            printf 'pull_request_base_sha=%s\n' "$META_PR_BASE_SHA"
+            printf 'checked_out_sha=%s\n' "$(git rev-parse HEAD)"
+          } > artifacts/evidence-v0.2/workflow-context.txt
+          test "$(git rev-parse HEAD)" = "$META_ACCEPTANCE_TARGET_SHA"
+          {
+            uname -a
+            python --version
+            go version
+            rustc --version
+          } > artifacts/evidence-v0.2/environment.txt 2>&1
+
+          test -f artifacts/evidence-v0.2/replay-report.json
+          test -f artifacts/evidence-v0.2/replay/replay.cert.json
+          test -f artifacts/evidence-v0.2/replay/replay2.cert.json
+          python - <<'PY'
+          import json
+          from importlib.metadata import version
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          root = Path("artifacts/evidence-v0.2")
+          report = json.loads((root / "replay-report.json").read_text(encoding="utf-8"))
+          assert report["status"] == "pass", report
+          assert report.get("execute_status") == "pass", report
+          assert report.get("kit_exit_code") == 0, report
+          assert report.get("kit_second_exit_code") == 0, report
+          assert report.get("trace_found") is True, report
+          assert report.get("low_view_result") == "pass", report
+          assert report.get("replay_cert_validation") == "pass", report
+          assert report.get("replay_cert_schema") == (
+              "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+          ), report
+          assert report.get("replay_artifacts") == [
+              "replay.cert.json",
+              "replay2.cert.json",
+          ], report
+
+          schema = json.loads(
+              Path("specs/evidence/v0.2/schemas/trace-replay-cert.schema.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+
+          bundle_path = Path(
+              "specs/evidence/v0.2/examples/valid/deep-replay-bundle.json"
+          ).resolve()
+          bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+          bundle_base = bundle_path.parent.resolve()
+          trace_path = (
+              bundle_base / bundle["replay_context"]["kit_trace_path"]
+          ).resolve()
+          fixtures_path = (
+              bundle_base / bundle["replay_context"]["fixtures_path"]
+          ).resolve()
+          assert trace_path.is_relative_to(bundle_base), trace_path
+          assert fixtures_path.is_relative_to(bundle_base), fixtures_path
+          env_path = (fixtures_path / "env.json").resolve()
+          assert env_path.is_relative_to(fixtures_path), env_path
+          trace = json.loads(trace_path.read_text(encoding="utf-8"))
+          environment = json.loads(env_path.read_text(encoding="utf-8"))
+          expected_event_ids = [event["id"] for event in trace.get("events", [])]
+
+          artifacts = ["replay.cert.json", "replay2.cert.json"]
+          for name in artifacts:
+              cert = json.loads((root / "replay" / name).read_text(encoding="utf-8"))
+              validator.validate(cert)
+              assert cert["trace_metadata"] == trace.get("metadata", {}), name
+              assert cert["environment"] == environment, name
+              assert [result["event_id"] for result in cert["results"]] == expected_event_ids, name
+              statuses = [result["status"] for result in cert["results"]]
+              assert statuses == ["success"] * len(expected_event_ids), name
+              assert cert["summary"] == {
+                  "total_events": len(expected_event_ids),
+                  "successful_events": len(expected_event_ids),
+                  "failed_events": 0,
+              }, name
+
+          validation = {
+              "status": "pass",
+              "schema": "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json",
+              "artifacts": artifacts,
+              "validator": "jsonschema.Draft202012Validator+FormatChecker",
+              "jsonschema_version": version("jsonschema"),
+              "input_binding": "pass",
+              "result_consistency": "pass",
+              "all_events_successful": True,
+          }
+          (root / "retained-certificate-validation.json").write_text(
+              json.dumps(validation, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+          (
+            cd artifacts/evidence-v0.2
+            find . -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Upload deep replay acceptance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-v02-replay-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence-v0.2
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Pytest deep replay execute
         run: pytest tests/evidence_replay/test_evidence_replay_execute.py -q
