@@ -11,6 +11,7 @@ on:
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - ".github/workflows/platform-cert-validate.yml"
   pull_request:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - ".github/workflows/platform-cert-validate.yml"
   schedule:
     - cron: "0 2 * * *"

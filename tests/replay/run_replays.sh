@@ -8,12 +8,19 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)
 KIT_DIR="$ROOT_DIR/external/TRACE-REPLAY-KIT/runner"
 OUT_DIR="$ROOT_DIR/tests/replay/out"
 CERT_DIR="$OUT_DIR/certs"
-ENV_JSON="$ROOT_DIR/tests/replay/env.json"
 OVERLAY_RUNNER="$ROOT_DIR/tests/replay/overlays/replay_run.py"
-# Local fixture: upstream CERT-V1 raw URL 404s (private + wrong filename)
-DEFAULT_SCHEMA="/work/tests/replay/schema/trace-replay-cert.schema.json"
-CERT_V1_SCHEMA_PATH="${CERT_V1_SCHEMA_PATH:-$DEFAULT_SCHEMA}"
+# Replay certificates use the Evidence v0.2 trace-replay schema, not the runtime CERT-V1 shape.
+DEFAULT_SCHEMA="/work/specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+HOST_DEFAULT_SCHEMA="$ROOT_DIR/specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+TRACE_REPLAY_SCHEMA_PATH="${TRACE_REPLAY_SCHEMA_PATH:-$DEFAULT_SCHEMA}"
+TRACE_REPLAY_SCHEMA_REQUIRED="${TRACE_REPLAY_SCHEMA_REQUIRED:-1}"
 
+if [[ "$TRACE_REPLAY_SCHEMA_PATH" == "$DEFAULT_SCHEMA" && ! -f "$HOST_DEFAULT_SCHEMA" ]]; then
+  echo "Error: trace replay schema missing at $HOST_DEFAULT_SCHEMA" >&2
+  exit 1
+fi
+
+rm -rf "$CERT_DIR"
 mkdir -p "$CERT_DIR"
 
 echo "Using TRACE-REPLAY-KIT at: $KIT_DIR"
@@ -35,20 +42,15 @@ LV_THRESHOLD="${LOWVIEW_THRESHOLD:-0.999}"
 for b in "$ROOT_DIR/tests/replay/bundles"/*; do
   [ -d "$b" ] || continue
   name=$(basename "$b")
-  trace="$b/trace.json"
-  fixtures="$b/fixtures"
-
   echo "Running replay for bundle: $name (runs=$REPLAY_RUNS)"
   for i in $(seq 1 "$REPLAY_RUNS"); do
-    cert_out_host="$CERT_DIR/${name}_run${i}.cert.json"
-
     # Invoke runner inside container with mounted repo for deterministic env.
     # ENTRYPOINT is `python replay_run.py` with -w set to the KIT runner dir, so the
     # overlay must replace that path (not /app/replay_run.py alone).
     docker run --rm \
       -e TZ=UTC -e LC_ALL=C.UTF-8 \
-      -e CERT_V1_SCHEMA_PATH="$CERT_V1_SCHEMA_PATH" \
-      -e CERT_V1_SCHEMA_REQUIRED="${CERT_V1_SCHEMA_REQUIRED:-0}" \
+      -e TRACE_REPLAY_SCHEMA_PATH="$TRACE_REPLAY_SCHEMA_PATH" \
+      -e TRACE_REPLAY_SCHEMA_REQUIRED="$TRACE_REPLAY_SCHEMA_REQUIRED" \
       -v "$ROOT_DIR":/work \
       -v "$OVERLAY_RUNNER":/work/external/TRACE-REPLAY-KIT/runner/replay_run.py:ro \
       -w /work/external/TRACE-REPLAY-KIT/runner \

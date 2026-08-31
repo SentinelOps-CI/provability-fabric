@@ -11,6 +11,4 @@
   "epoch": 1,
   "sidecar_build": "dev",
   "egress_profile": "EGRESS-DET-P1@1.0"
-  /* missing required field: sig */
 }
-

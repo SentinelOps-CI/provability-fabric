@@ -8,6 +8,7 @@ on:
       - ".github/workflows/egress.yml"
       - "external/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
   pull_request:
     branches: [main, develop]
     paths:
@@ -15,6 +16,7 @@ on:
       - ".github/workflows/egress.yml"
       - "external/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
   workflow_dispatch:
 
 jobs:
@@ -34,8 +36,8 @@ jobs:
           chmod +x tests/replay/run_replays.sh
           # Pairwise low-view needs >=2 CERT runs per bundle
           export REPLAY_RUNS=2
-          export CERT_V1_SCHEMA_REQUIRED=1
-          export CERT_V1_SCHEMA_PATH=/work/tests/replay/schema/trace-replay-cert.schema.json
+          export TRACE_REPLAY_SCHEMA_REQUIRED=1
+          export TRACE_REPLAY_SCHEMA_PATH=/work/specs/evidence/v0.2/schemas/trace-replay-cert.schema.json
           bash tests/replay/run_replays.sh
 
       - name: Run EGRESS-DET-P1 harness
