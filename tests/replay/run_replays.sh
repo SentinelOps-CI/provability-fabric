@@ -34,6 +34,33 @@ fi
 IMAGE_TAG="trace-replay-runner:kit"
 docker build -t "$IMAGE_TAG" "$KIT_DIR"
 
+# Overlay replay_run.py fail-closes date-time format checks. The KIT image only
+# installs KIT runner requirements (jsonschema without rfc3339-validator).
+# Layer the checked-in cert-validate extras into the same runtime image used
+# by docker run. Fail closed if the extra cannot be imported.
+CERT_VALIDATE_REQ="$ROOT_DIR/tools/cert-validate/requirements.txt"
+if [[ ! -f "$CERT_VALIDATE_REQ" ]]; then
+  echo "Error: missing $CERT_VALIDATE_REQ" >&2
+  exit 1
+fi
+fmt_name="pf-kit-fmt-$$"
+docker rm -f "$fmt_name" >/dev/null 2>&1 || true
+if ! docker run --name "$fmt_name" --entrypoint python \
+  -v "$CERT_VALIDATE_REQ":/tmp/cert-validate-requirements.txt:ro \
+  "$IMAGE_TAG" \
+  -m pip install --no-cache-dir -r /tmp/cert-validate-requirements.txt; then
+  docker rm -f "$fmt_name" >/dev/null 2>&1 || true
+  echo "Error: failed to install fail-closed date-time extras into $IMAGE_TAG" >&2
+  exit 1
+fi
+docker commit "$fmt_name" "$IMAGE_TAG" >/dev/null
+docker rm -f "$fmt_name" >/dev/null 2>&1 || true
+if ! docker run --rm --entrypoint python "$IMAGE_TAG" -c \
+  "import rfc3339_validator, jsonschema"; then
+  echo "Error: $IMAGE_TAG cannot import rfc3339_validator after install" >&2
+  exit 1
+fi
+
 # Number of repeated runs per bundle (higher on scheduled CI)
 REPLAY_RUNS="${REPLAY_RUNS:-3}"
 LV_THRESHOLD="${LOWVIEW_THRESHOLD:-0.999}"
