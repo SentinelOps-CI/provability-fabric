@@ -57,10 +57,12 @@ jobs:
           bash tests/replay/run_replays.sh
 
       - name: Install cert validation deps
-        run: python -m pip install -r tools/cert-validate/requirements.txt
+        run: |
+          python -m pip install -r tools/cert-validate/requirements.txt pytest
+          python -c "import jsonschema, pytest, rfc3339_validator"
 
       - name: Test replay validation failure classes
-        run: pytest tests/replay/test_cert_validate_cli.py tests/replay/test_replay_overlay_schema_boundary.py -q
+        run: python -m pytest tests/replay/test_cert_validate_cli.py tests/replay/test_replay_overlay_schema_boundary.py -q
 
       - name: Validate CERTs
         run: make validate-certs

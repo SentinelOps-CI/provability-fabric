@@ -75,11 +75,11 @@ jobs:
 
       - name: Install cert validation deps
         run: |
-          python -m pip install -r tools/cert-validate/requirements.txt
-          python -c "import jsonschema; print(jsonschema.__version__)"
+          python -m pip install -r tools/cert-validate/requirements.txt pytest
+          python -c "import jsonschema, pytest, rfc3339_validator; print(jsonschema.__version__)"
 
       - name: Test replay validation failure classes
-        run: pytest tests/replay/test_cert_validate_cli.py tests/replay/test_replay_overlay_schema_boundary.py -q
+        run: python -m pytest tests/replay/test_cert_validate_cli.py tests/replay/test_replay_overlay_schema_boundary.py -q
 
       - name: Enforce invalid trace replay certificate fails
         shell: bash
