@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provability-fabric.org/schemas/evidence/v0.2/trace-replay-cert.schema.json",
+  "title": "TRACE-REPLAY-KIT trace replay certificate",
+  "description": "Provability Fabric schema for TRACE-REPLAY-KIT cert_type=trace_replay outputs. This schema is distinct from the runtime CERT-V1 schema used by sidecar evidence emission.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "cert_type",
+    "version",
+    "timestamp",
+    "replay_id",
+    "trace_metadata",
+    "environment",
+    "results",
+    "summary",
+    "signature"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cert_type": {
+      "const": "trace_replay"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "replay_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_metadata": {
+      "type": "object"
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "locale",
+        "timezone",
+        "seed",
+        "versions"
+      ],
+      "properties": {
+        "locale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {},
+        "versions": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "status"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "success",
+              "failed",
+              "skipped"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total_events",
+        "successful_events",
+        "failed_events"
+      ],
+      "properties": {
+        "total_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "successful_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_events": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "signature": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "hash"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
