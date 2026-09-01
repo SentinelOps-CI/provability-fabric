@@ -191,6 +191,19 @@ func runExecuteReplay(opts *ReplayOptions, bundle *EvidenceBundle, report *Repla
 		report.ExecuteStatus = "fail"
 		return err
 	}
+	if err := verifyExecuteInputDigests(opts.BaseDir, bundle, tracePath, fixturesPath); err != nil {
+		report.ExecuteStatus = "fail"
+		return err
+	}
+	eventCount, err := countRequestedReplayEvents(tracePath)
+	if err != nil {
+		report.ExecuteStatus = "fail"
+		return err
+	}
+	if eventCount == 0 {
+		report.ExecuteStatus = "fail"
+		return fmt.Errorf("requested replay trace has no events")
+	}
 
 	certOut := filepath.Join(outDir, "replay.cert.json")
 	code, err := runner.Run(tracePath, fixturesPath, certOut)
@@ -222,16 +235,19 @@ func runExecuteReplay(opts *ReplayOptions, bundle *EvidenceBundle, report *Repla
 		code2, err2 := runner.Run(tracePath, fixturesPath, certOut2)
 		report.KitSecondExitCode = &code2
 		if err2 != nil {
+			report.ExecuteStatus = "fail"
 			report.LowViewResult = "fail"
 			report.ReplayCertValidation = "fail"
 			return err2
 		}
 		if code2 != 0 {
+			report.ExecuteStatus = "fail"
 			report.LowViewResult = "fail"
 			report.ReplayCertValidation = "fail"
 			return fmt.Errorf("KIT second run exited with code %d", code2)
 		}
 		if err := validateTraceReplayCert(opts.RepoRoot, certOut2, tracePath, fixturesPath); err != nil {
+			report.ExecuteStatus = "fail"
 			report.LowViewResult = "fail"
 			report.ReplayCertValidation = "fail"
 			return err
@@ -239,10 +255,12 @@ func runExecuteReplay(opts *ReplayOptions, bundle *EvidenceBundle, report *Repla
 		report.ReplayArtifacts = append(report.ReplayArtifacts, filepath.Base(certOut2))
 		lvCode, lvErr := runner.CompareLowView([]string{certOut, certOut2}, 99.9)
 		if lvErr != nil {
+			report.ExecuteStatus = "fail"
 			report.LowViewResult = "fail"
 			return lvErr
 		}
 		if lvCode != 0 {
+			report.ExecuteStatus = "fail"
 			report.LowViewResult = "fail"
 			return fmt.Errorf("low-view oracle exited with code %d", lvCode)
 		}
@@ -272,6 +290,7 @@ func validateTraceReplayCert(repoRoot, certPath, tracePath, fixturesPath string)
 	}
 
 	var cert struct {
+		Schema        string `json:"$schema"`
 		Timestamp     string `json:"timestamp"`
 		TraceMetadata any    `json:"trace_metadata"`
 		Environment   any    `json:"environment"`
@@ -287,6 +306,13 @@ func validateTraceReplayCert(repoRoot, certPath, tracePath, fixturesPath string)
 	}
 	if err := json.Unmarshal(body, &cert); err != nil {
 		return fmt.Errorf("parse trace replay certificate %s: %w", filepath.Base(certPath), err)
+	}
+	const localTraceReplaySchema = "https://provability-fabric.org/schemas/evidence/v0.2/trace-replay-cert.schema.json"
+	if cert.Schema != localTraceReplaySchema {
+		return fmt.Errorf(
+			"trace replay certificate %s $schema must be %s, got %q",
+			filepath.Base(certPath), localTraceReplaySchema, cert.Schema,
+		)
 	}
 	if _, err := time.Parse(time.RFC3339Nano, cert.Timestamp); err != nil {
 		return fmt.Errorf("trace replay certificate %s has invalid timestamp: %w", filepath.Base(certPath), err)
@@ -304,6 +330,9 @@ func validateTraceReplayCert(repoRoot, certPath, tracePath, fixturesPath string)
 	}
 	if err := json.Unmarshal(traceBody, &trace); err != nil {
 		return fmt.Errorf("parse replay trace for certificate binding: %w", err)
+	}
+	if len(trace.Events) == 0 {
+		return fmt.Errorf("requested replay trace has no events")
 	}
 	if trace.Metadata == nil {
 		trace.Metadata = map[string]any{}
@@ -328,6 +357,9 @@ func validateTraceReplayCert(repoRoot, certPath, tracePath, fixturesPath string)
 		return fmt.Errorf("trace replay certificate %s environment does not match requested fixtures", filepath.Base(certPath))
 	}
 
+	if len(cert.Results) == 0 {
+		return fmt.Errorf("trace replay certificate %s has no results", filepath.Base(certPath))
+	}
 	if len(cert.Results) != len(trace.Events) {
 		return fmt.Errorf(
 			"trace replay certificate %s result count mismatch: expected %d got %d",
@@ -428,6 +460,52 @@ func resolveReplayPaths(opts *ReplayOptions, bundle *EvidenceBundle) (tracePath,
 		return "", "", fmt.Errorf("replay fixture env.json invalid: %w", err)
 	}
 	return tracePath, fixturesPath, nil
+}
+
+func verifyExecuteInputDigests(baseDir string, bundle *EvidenceBundle, tracePath, fixturesPath string) error {
+	envPath, err := resolveContainedExistingPath(fixturesPath, "env.json")
+	if err != nil {
+		return fmt.Errorf("resolve execute fixture env for digest binding: %w", err)
+	}
+	if err := requireDigestBoundExecuteInput(baseDir, bundle, tracePath, "kit trace"); err != nil {
+		return err
+	}
+	return requireDigestBoundExecuteInput(baseDir, bundle, envPath, "kit fixture env")
+}
+
+func requireDigestBoundExecuteInput(baseDir string, bundle *EvidenceBundle, resolvedPath, label string) error {
+	actual, err := FileDigest(resolvedPath)
+	if err != nil {
+		return fmt.Errorf("digest %s: %w", label, err)
+	}
+	for _, ref := range bundle.Artifacts {
+		artifactPath, pathErr := resolveContainedExistingPath(baseDir, ref.Path)
+		if pathErr != nil {
+			continue
+		}
+		if artifactPath != resolvedPath {
+			continue
+		}
+		if actual != ref.Digest {
+			return fmt.Errorf("%s digest mismatch: expected %s got %s", label, ref.Digest, actual)
+		}
+		return nil
+	}
+	return fmt.Errorf("%s is not digest-bound in the bundle artifacts", label)
+}
+
+func countRequestedReplayEvents(tracePath string) (int, error) {
+	body, err := os.ReadFile(tracePath)
+	if err != nil {
+		return 0, fmt.Errorf("read replay trace events: %w", err)
+	}
+	var trace struct {
+		Events []json.RawMessage `json:"events"`
+	}
+	if err := json.Unmarshal(body, &trace); err != nil {
+		return 0, fmt.Errorf("parse replay trace events: %w", err)
+	}
+	return len(trace.Events), nil
 }
 
 // WriteReplayReport writes replay report JSON.

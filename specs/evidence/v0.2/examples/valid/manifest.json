@@ -12,6 +12,8 @@
     { "role": "claim", "path": "artifacts/claim.json" },
     { "role": "proof", "path": "artifacts/proof.json" },
     { "role": "attestation", "path": "artifacts/attestation.json" },
-    { "role": "execution-trace", "path": "artifacts/execution-trace.json" }
+    { "role": "execution-trace", "path": "artifacts/execution-trace.json" },
+    { "role": "kit-trace", "path": "kit/trace.json", "media_type": "application/json" },
+    { "role": "kit-fixture-env", "path": "kit/fixtures/env.json", "media_type": "application/json" }
   ]
 }

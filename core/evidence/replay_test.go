@@ -4,6 +4,7 @@
 package evidence
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -68,9 +69,7 @@ const validTraceReplayCert = `{
   "results": [
     {
       "event_id": "event_001",
-      "status": "success",
-      "type": "function_call",
-      "result": "Executed add_numbers"
+      "status": "success"
     }
   ],
   "summary": {
@@ -151,6 +150,9 @@ func TestReplayExecuteValidatesGeneratedCertificates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute replay: %v (%v)", err, report.Errors)
 	}
+	if report.ExecuteStatus != "pass" {
+		t.Fatalf("expected execute_status pass, got %q", report.ExecuteStatus)
+	}
 	if report.ReplayCertValidation != "pass" {
 		t.Fatalf("expected replay certificate validation pass, got %q", report.ReplayCertValidation)
 	}
@@ -184,7 +186,7 @@ func TestReplayExecuteRejectsInvalidTimestamp(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected invalid replay timestamp to fail closed")
 	}
-	if report.ReplayCertValidation != "fail" || report.Status != "fail" {
+	if report.ReplayCertValidation != "fail" || report.Status != "fail" || report.ExecuteStatus != "fail" {
 		t.Fatalf("unexpected invalid-timestamp report: %+v", report)
 	}
 }
@@ -235,7 +237,7 @@ func TestReplayExecuteRejectsInvalidSecondGeneratedCertificateBeforeLowView(t *t
 	if err == nil {
 		t.Fatal("expected invalid second generated replay certificate to fail closed")
 	}
-	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" {
+	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" || report.ExecuteStatus != "fail" {
 		t.Fatalf("unexpected failure report: %+v", report)
 	}
 	if len(report.ReplayArtifacts) != 1 || report.ReplayArtifacts[0] != "replay.cert.json" {
@@ -244,8 +246,16 @@ func TestReplayExecuteRejectsInvalidSecondGeneratedCertificateBeforeLowView(t *t
 	if runner.runCount != 2 || runner.compareCalled {
 		t.Fatalf("low-view compare must not run after invalid second cert, runs=%d compare=%v", runner.runCount, runner.compareCalled)
 	}
-	if _, statErr := os.Stat(reportPath); statErr != nil {
-		t.Fatalf("expected failure replay report to be persisted: %v", statErr)
+	raw, readErr := os.ReadFile(reportPath)
+	if readErr != nil {
+		t.Fatalf("expected failure replay report to be persisted: %v", readErr)
+	}
+	var persisted ReplayReport
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("parse persisted replay report: %v", err)
+	}
+	if persisted.ExecuteStatus != "fail" || persisted.Status != "fail" || persisted.ReplayCertValidation != "fail" {
+		t.Fatalf("persisted report must record execute_status fail, got %+v", persisted)
 	}
 }
 
@@ -287,7 +297,7 @@ func TestReplayExecuteRejectsMissingSecondCertificateBeforeLowView(t *testing.T)
 	if err == nil {
 		t.Fatal("expected missing second certificate to fail closed despite zero runner exit")
 	}
-	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" {
+	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" || report.ExecuteStatus != "fail" {
 		t.Fatalf("unexpected missing-second-cert report: %+v", report)
 	}
 	if len(report.ReplayArtifacts) != 1 || report.ReplayArtifacts[0] != "replay.cert.json" {
@@ -313,7 +323,7 @@ func TestReplayExecuteSecondRunnerNonzeroDoesNotReportCertificateValidationPass(
 	if err == nil {
 		t.Fatal("expected second runner nonzero exit to fail replay")
 	}
-	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" {
+	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" || report.ExecuteStatus != "fail" {
 		t.Fatalf("second-run failure must not retain a certificate-validation pass: %+v", report)
 	}
 	if len(report.ReplayArtifacts) != 1 || report.ReplayArtifacts[0] != "replay.cert.json" {
@@ -342,7 +352,7 @@ func TestReplayExecuteSecondRunnerErrorDoesNotReportCertificateValidationPass(t 
 	if err == nil {
 		t.Fatal("expected second runner error to fail replay")
 	}
-	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" {
+	if report.ReplayCertValidation != "fail" || report.LowViewResult != "fail" || report.Status != "fail" || report.ExecuteStatus != "fail" {
 		t.Fatalf("second-run error must not retain a certificate-validation pass: %+v", report)
 	}
 	if len(report.ReplayArtifacts) != 1 || report.ReplayArtifacts[0] != "replay.cert.json" {
@@ -430,16 +440,169 @@ func TestTraceReplayCertificateRejectsResultCountMismatch(t *testing.T) {
 	body := strings.Replace(validTraceReplayCert, `"results": [
     {
       "event_id": "event_001",
-      "status": "success",
-      "type": "function_call",
-      "result": "Executed add_numbers"
+      "status": "success"
     }
-  ]`, `"results": []`, 1)
-	body = strings.Replace(body, `"total_events": 1`, `"total_events": 0`, 1)
-	body = strings.Replace(body, `"successful_events": 1`, `"successful_events": 0`, 1)
+  ]`, `"results": [
+    {
+      "event_id": "event_001",
+      "status": "success"
+    },
+    {
+      "event_id": "event_002",
+      "status": "success"
+    }
+  ]`, 1)
+	body = strings.Replace(body, `"total_events": 1`, `"total_events": 2`, 1)
+	body = strings.Replace(body, `"successful_events": 1`, `"successful_events": 2`, 1)
 	certPath := writeReplayCertFixture(t, body)
 	if err := validateTraceReplayCert(root, certPath, tracePath, fixturesPath); err == nil || !strings.Contains(err.Error(), "result count mismatch") {
 		t.Fatalf("expected result count mismatch, got %v", err)
+	}
+}
+
+func TestTraceReplayCertificateRejectsEmptyRequestedTrace(t *testing.T) {
+	root := repoRoot(t)
+	tmp := t.TempDir()
+	tracePath := filepath.Join(tmp, "trace.json")
+	if err := os.WriteFile(tracePath, []byte(`{"metadata":{"version":"1.0.0"},"events":[]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fixturesPath := filepath.Join(tmp, "fixtures")
+	if err := os.MkdirAll(fixturesPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	envSrc := filepath.Join(root, "specs", "evidence", "v0.2", "examples", "valid", "kit", "fixtures", "env.json")
+	envBody, err := os.ReadFile(envSrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fixturesPath, "env.json"), envBody, 0644); err != nil {
+		t.Fatal(err)
+	}
+	certPath := writeReplayCertFixture(t, validTraceReplayCert)
+	if err := validateTraceReplayCert(root, certPath, tracePath, fixturesPath); err == nil || !strings.Contains(err.Error(), "no events") {
+		t.Fatalf("expected empty requested trace to fail, got %v", err)
+	}
+}
+
+func TestTraceReplayCertificateRejectsAdditionalProperties(t *testing.T) {
+	root, tracePath, fixturesPath := deepReplayInputPaths(t)
+	body := strings.Replace(validTraceReplayCert, `"cert_type": "trace_replay",`, `"cert_type": "trace_replay",
+  "unexpected_field": true,`, 1)
+	certPath := writeReplayCertFixture(t, body)
+	if err := validateTraceReplayCert(root, certPath, tracePath, fixturesPath); err == nil || !strings.Contains(err.Error(), "schema validation") {
+		t.Fatalf("expected additional property rejection, got %v", err)
+	}
+}
+
+func TestTraceReplayCertificateRejectsCertV1SchemaAuthority(t *testing.T) {
+	root, tracePath, fixturesPath := deepReplayInputPaths(t)
+	body := strings.Replace(
+		validTraceReplayCert,
+		"https://provability-fabric.org/schemas/evidence/v0.2/trace-replay-cert.schema.json",
+		"https://raw.githubusercontent.com/verifiable-ai-ci/CERT-V1/v1.0.0/schema/cert-v1.json",
+		1,
+	)
+	certPath := writeReplayCertFixture(t, body)
+	if err := validateTraceReplayCert(root, certPath, tracePath, fixturesPath); err == nil {
+		t.Fatal("expected CERT-V1 schema authority to fail")
+	}
+}
+
+func TestReplayExecuteRejectsTamperedKitTraceBytes(t *testing.T) {
+	root := repoRoot(t)
+	src := filepath.Join(root, "specs", "evidence", "v0.2", "examples", "valid")
+	dst := t.TempDir()
+	copyDir(t, src, dst)
+	trace := filepath.Join(dst, "kit", "trace.json")
+	data, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(trace, append(data, []byte("\n")...), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = ReplayBundle(ReplayOptions{
+		BundlePath: filepath.Join(dst, "deep-replay-bundle.json"),
+		RepoRoot:   root,
+		BaseDir:    dst,
+		Execute:    true,
+		OutDir:     t.TempDir(),
+		Runner:     &fixtureKITRunner{},
+	})
+	if err == nil {
+		t.Fatal("expected swapped kit trace bytes without digest update to fail")
+	}
+	if !strings.Contains(err.Error(), "digest") {
+		t.Fatalf("expected digest-binding failure, got %v", err)
+	}
+}
+
+func TestReplayExecuteRejectsEmptyKitTrace(t *testing.T) {
+	root := repoRoot(t)
+	src := filepath.Join(root, "specs", "evidence", "v0.2", "examples", "valid")
+	dst := t.TempDir()
+	copyDir(t, src, dst)
+	emptyTrace := []byte(`{
+  "metadata": {
+    "version": "1.0.0",
+    "created_at": "2024-01-01T00:00:00Z",
+    "system_info": {"name": "simple_call_test", "version": "1.0.0"}
+  },
+  "events": []
+}
+`)
+	if err := os.WriteFile(filepath.Join(dst, "kit", "trace.json"), emptyTrace, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Pack(PackOptions{
+		ManifestPath: filepath.Join(dst, "manifest.json"),
+		OutPath:      filepath.Join(dst, "deep-replay-bundle.json"),
+		BaseDir:      dst,
+	}); err != nil {
+		t.Fatalf("pack empty-trace bundle: %v", err)
+	}
+	report, err := ReplayBundle(ReplayOptions{
+		BundlePath: filepath.Join(dst, "deep-replay-bundle.json"),
+		RepoRoot:   root,
+		BaseDir:    dst,
+		Execute:    true,
+		OutDir:     t.TempDir(),
+		Runner:     &fixtureKITRunner{},
+	})
+	if err == nil {
+		t.Fatal("expected empty kit trace execute to fail closed")
+	}
+	if report.ExecuteStatus != "fail" || report.Status != "fail" {
+		t.Fatalf("expected execute_status fail for empty trace, got %+v", report)
+	}
+	if !strings.Contains(err.Error(), "no events") {
+		t.Fatalf("expected empty-events failure, got %v", err)
+	}
+}
+
+func copyDir(t *testing.T, src, dst string) {
+	t.Helper()
+	err := filepath.Walk(src, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, 0755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0644)
+	})
+	if err != nil {
+		t.Fatalf("copy dir: %v", err)
 	}
 }
 

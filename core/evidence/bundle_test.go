@@ -19,6 +19,30 @@ func repoRoot(t *testing.T) string {
 	return root
 }
 
+func TestPackDeepReplayFixtureMatchesCheckedIn(t *testing.T) {
+	root := repoRoot(t)
+	exampleDir := filepath.Join(root, "specs", "evidence", "v0.2", "examples", "valid")
+	out := filepath.Join(t.TempDir(), "deep-replay-bundle.json")
+	if _, err := Pack(PackOptions{
+		ManifestPath: filepath.Join(exampleDir, "manifest.json"),
+		OutPath:      out,
+		BaseDir:      exampleDir,
+	}); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join(exampleDir, "deep-replay-bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("checked-in deep-replay-bundle.json is stale\n--- packed ---\n%s", got)
+	}
+}
+
 func TestPackValidFixture(t *testing.T) {
 	root := repoRoot(t)
 	exampleDir := filepath.Join(root, "specs", "evidence", "v0.1", "examples", "valid")

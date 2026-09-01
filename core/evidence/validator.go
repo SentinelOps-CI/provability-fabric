@@ -290,6 +290,7 @@ func validateAgainstSchema(schemaPath string, document []byte) error {
 		return fmt.Errorf("schema missing at %s", schemaPath)
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.AssertFormat = true
 	schemaDir := filepath.Dir(schemaPath)
 	entries, err := os.ReadDir(schemaDir)
 	if err != nil {
