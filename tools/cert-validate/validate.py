@@ -82,13 +82,13 @@ def validate_trace_replay(file_path: str, data: object) -> int:
     """Validate a trace replay certificate against the Evidence v0.2 schema."""
     try:
         trace_replay_validator().validate(data)
-        print(f"✓ {file_path} (trace_replay)")
+        print(f"OK {file_path} (trace_replay)")
         return VALID
     except ValidationError as exc:
-        print(f"✗ {file_path}: {exc.message}")
+        print(f"FAIL {file_path}: {exc.message}")
         return INVALID
     except Exception as exc:
-        print(f"✗ {file_path}: trace replay schema error - {exc}")
+        print(f"FAIL {file_path}: trace replay schema error - {exc}")
         return OPERATIONAL_ERROR
 
 
@@ -97,10 +97,10 @@ def validate_file(file_path: str, schema_path: str, allow_missing_schema: bool) 
     try:
         data = json.loads(Path(file_path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        print(f"✗ {file_path}: Invalid JSON - {exc}")
+        print(f"FAIL {file_path}: Invalid JSON - {exc}")
         return INVALID
     except (OSError, UnicodeError) as exc:
-        print(f"✗ {file_path}: file error - {exc}")
+        print(f"FAIL {file_path}: file error - {exc}")
         return OPERATIONAL_ERROR
 
     if isinstance(data, dict) and data.get("cert_type") == "trace_replay":
@@ -109,25 +109,25 @@ def validate_file(file_path: str, schema_path: str, allow_missing_schema: bool) 
     try:
         schema = runtime_schema(schema_path)
     except Exception as exc:
-        print(f"✗ {file_path}: runtime schema error - {exc}")
+        print(f"FAIL {file_path}: runtime schema error - {exc}")
         return OPERATIONAL_ERROR
 
     if schema is None:
         if allow_missing_schema:
-            print(f"↷ {file_path}: runtime schema unavailable; skipped by explicit option")
+            print(f"SKIP {file_path}: runtime schema unavailable; skipped by explicit option")
             return SKIPPED
-        print(f"✗ {file_path}: runtime certificate schema unavailable")
+        print(f"FAIL {file_path}: runtime certificate schema unavailable")
         return OPERATIONAL_ERROR
 
     try:
         validate(instance=data, schema=schema)
-        print(f"✓ {file_path}")
+        print(f"OK {file_path}")
         return VALID
     except ValidationError as exc:
-        print(f"✗ {file_path}: {exc.message}")
+        print(f"FAIL {file_path}: {exc.message}")
         return INVALID
     except Exception as exc:
-        print(f"✗ {file_path}: runtime schema validation error - {exc}")
+        print(f"FAIL {file_path}: runtime schema validation error - {exc}")
         return OPERATIONAL_ERROR
 
 
@@ -172,7 +172,7 @@ def main() -> int:
     skipped_count = 0
     for file_path in json_files:
         if not Path(file_path).exists():
-            print(f"✗ {file_path}: file does not exist")
+            print(f"FAIL {file_path}: file does not exist")
             operational_count += 1
             continue
         status = validate_file(file_path, args.schema, args.allow_missing_schema)

@@ -19,7 +19,7 @@ on:
       - 'tests/runtime_evidence/**'
       - 'tests/forensic_replay/**'
       - 'tests/testbed/**'
-      - 'tools/cert-validate/validate.py'
+      - 'tools/cert-validate/**'
       - 'tools/standards/**'
       - 'external/**'
       - '.gitmodules'
@@ -46,7 +46,7 @@ on:
       - 'tests/runtime_evidence/**'
       - 'tests/forensic_replay/**'
       - 'tests/testbed/**'
-      - 'tools/cert-validate/validate.py'
+      - 'tools/cert-validate/**'
       - 'tools/standards/**'
       - 'external/**'
       - 'scripts/init_external_standards.sh'
@@ -77,7 +77,7 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest rfc3339-validator
+          requirements-file: tools/cert-validate/requirements-test.txt
 
       - name: Pytest evidence schema
         run: |
@@ -102,14 +102,14 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest rfc3339-validator
+          requirements-file: tools/cert-validate/requirements-test.txt
 
       - name: Go tests (core/evidence)
         run: go test ./...
         working-directory: core/evidence
 
       - name: Pytest evidence validation
-        run: pytest tests/evidence_validation -q
+        run: python -m pytest tests/evidence_validation -q
 
   smoke:
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
         uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.11"
-          packages: jsonschema pytest rfc3339-validator
+          requirements-file: tools/cert-validate/requirements-test.txt
 
       - name: Init external standards
         env:
@@ -165,13 +165,13 @@ jobs:
 
       - name: Pytest evidence suites
         run: |
-          pytest tests/evidence_schema -q
-          pytest tests/evidence_validation -q
-          pytest tests/evidence_replay -q
-          pytest tests/evidence_trace -q
-          pytest tests/e2e/test_evidence_bundle_basic.py -q
-          pytest tests/runtime_evidence -q
-          pytest tests/forensic_replay -q
+          python -m pytest tests/evidence_schema -q
+          python -m pytest tests/evidence_validation -q
+          python -m pytest tests/evidence_replay -q
+          python -m pytest tests/evidence_trace -q
+          python -m pytest tests/e2e/test_evidence_bundle_basic.py -q
+          python -m pytest tests/runtime_evidence -q
+          python -m pytest tests/forensic_replay -q
 
       - name: Testbed happy path
         run: bash testbed/evidence-v0.1/run_happy_path.sh
@@ -304,7 +304,7 @@ jobs:
               "status": "pass",
               "schema": "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json",
               "artifacts": artifacts,
-              "validator": "jsonschema.Draft202012Validator+FormatChecker",
+              "validator": "compile_trace_replay_validator",
               "jsonschema_version": version("jsonschema"),
               "input_binding": "pass",
               "result_consistency": "pass",
@@ -338,12 +338,12 @@ jobs:
           retention-days: 90
 
       - name: Pytest deep replay execute
-        run: pytest tests/evidence_replay/test_evidence_replay_execute.py -q
+        run: python -m pytest tests/evidence_replay/test_evidence_replay_execute.py -q
 
       - name: Pytest testbed wrapper
-        run: pytest tests/testbed -q
+        run: python -m pytest tests/testbed -q
 
       - name: Runtime sidecar emit (Linux + CERT-V1 required)
         env:
           CI: true
-        run: pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q
+        run: python -m pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q

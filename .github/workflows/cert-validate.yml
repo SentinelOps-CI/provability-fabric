@@ -39,6 +39,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert pull-request head checkout
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Init external standards
         env:
@@ -66,6 +71,16 @@ jobs:
         with:
           python-version: "3.11"
           requirements-file: tools/cert-validate/requirements.txt
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate replay CERTs
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=2
+          export TRACE_REPLAY_SCHEMA_REQUIRED=1
+          bash tests/replay/run_replays.sh
 
       - name: Validate CERT files (fail-closed)
         run: make validate-certs

@@ -1,2 +1,5 @@
-jsonschema>=4.0.0
-rfc3339-validator>=0.1.4
+# Exact pins for fail-closed date-time extras. jsonschema 4.23.0 is a known-stable
+# Draft 2020-12 release compatible with compile_trace_replay_validator; 4.26.0 is
+# newer but was not the version previously proven in hosted evidence smoke.
+jsonschema==4.23.0
+rfc3339-validator==0.1.4
