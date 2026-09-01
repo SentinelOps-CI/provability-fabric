@@ -36,8 +36,10 @@ def _trace_cert(path: Path, timestamp: str = "2026-01-01T00:00:00Z") -> Path:
             "seed": 1,
             "versions": {"python": "3.11"},
         },
-        "results": [],
-        "summary": {"total_events": 0, "successful_events": 0, "failed_events": 0},
+        "results": [
+            {"event_id": "event_001", "status": "success"}
+        ],
+        "summary": {"total_events": 1, "successful_events": 1, "failed_events": 0},
         "signature": {"algorithm": "sha256", "hash": "a" * 64},
     }
     path.write_text(json.dumps(cert), encoding="utf-8")
@@ -121,6 +123,45 @@ def test_trace_replay_result_missing_event_id_is_validation_failure(tmp_path: Pa
     proc = _run(str(cert_path))
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert "event_id" in proc.stdout
+
+
+def test_trace_replay_empty_results_is_validation_failure(tmp_path: Path) -> None:
+    cert_path = _trace_cert(tmp_path / "trace.cert.json")
+    cert = json.loads(cert_path.read_text(encoding="utf-8"))
+    cert["results"] = []
+    cert["summary"] = {"total_events": 0, "successful_events": 0, "failed_events": 0}
+    cert_path.write_text(json.dumps(cert), encoding="utf-8")
+    proc = _run(str(cert_path))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+
+
+def test_trace_replay_additional_property_is_validation_failure(tmp_path: Path) -> None:
+    cert_path = _trace_cert(tmp_path / "trace.cert.json")
+    cert = json.loads(cert_path.read_text(encoding="utf-8"))
+    cert["unexpected_field"] = True
+    cert_path.write_text(json.dumps(cert), encoding="utf-8")
+    proc = _run(str(cert_path))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+
+
+def test_trace_replay_cert_v1_schema_authority_is_validation_failure(tmp_path: Path) -> None:
+    cert_path = _trace_cert(tmp_path / "trace.cert.json")
+    cert = json.loads(cert_path.read_text(encoding="utf-8"))
+    cert["$schema"] = (
+        "https://raw.githubusercontent.com/verifiable-ai-ci/CERT-V1/v1.0.0/schema/cert-v1.json"
+    )
+    cert_path.write_text(json.dumps(cert), encoding="utf-8")
+    proc = _run(str(cert_path))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+
+
+def test_trace_replay_result_extra_property_is_validation_failure(tmp_path: Path) -> None:
+    cert_path = _trace_cert(tmp_path / "trace.cert.json")
+    cert = json.loads(cert_path.read_text(encoding="utf-8"))
+    cert["results"][0]["type"] = "function_call"
+    cert_path.write_text(json.dumps(cert), encoding="utf-8")
+    proc = _run(str(cert_path))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
 
 
 def test_trace_replay_unknown_result_status_is_validation_failure(tmp_path: Path) -> None:

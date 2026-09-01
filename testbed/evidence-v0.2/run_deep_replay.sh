@@ -28,7 +28,12 @@ if [[ "${1:-}" != "--execute" ]]; then
   exit 0
 fi
 
-if [[ ! -f external/TRACE-REPLAY-KIT/runner/replay_run.py ]]; then
+if [[ ! -f tests/replay/overlays/replay_run.py ]]; then
+  echo "trace replay overlay missing — tests/replay/overlays/replay_run.py" >&2
+  exit 1
+fi
+
+if [[ ! -f external/TRACE-REPLAY-KIT/oracles/lowview_equal.py ]]; then
   echo "TRACE-REPLAY-KIT missing — run: make submodules" >&2
   exit 1
 fi

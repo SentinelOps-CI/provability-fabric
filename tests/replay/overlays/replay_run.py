@@ -92,6 +92,10 @@ class ReplayRunner:
             if "events" not in trace_data:
                 raise ValueError("Trace must contain 'events' array")
 
+            events = trace_data["events"]
+            if not isinstance(events, list) or len(events) == 0:
+                raise ValueError("Trace events must be a non-empty array")
+
             if "metadata" not in trace_data:
                 raise ValueError("Trace must contain 'metadata'")
 
@@ -223,6 +227,10 @@ class ReplayRunner:
             "https://provability-fabric.org/schemas/evidence/v0.2/"
             "trace-replay-cert.schema.json"
         )
+        results = [
+            {"event_id": item["event_id"], "status": item["status"]}
+            for item in replay_result["results"]
+        ]
         cert = {
             "$schema": schema_ref,
             "cert_type": "trace_replay",
@@ -231,7 +239,7 @@ class ReplayRunner:
             "replay_id": replay_result["replay_id"],
             "trace_metadata": trace_data.get("metadata", {}),
             "environment": replay_result["environment"],
-            "results": replay_result["results"],
+            "results": results,
             "summary": replay_result["summary"],
             "signature": {
                 "algorithm": "sha256",
@@ -272,7 +280,8 @@ class ReplayRunner:
             else:
                 print(json.dumps(cert, indent=2))
 
-            if replay_result["summary"]["failed_events"] > 0:
+            statuses = [item.get("status") for item in replay_result["results"]]
+            if not statuses or any(status != "success" for status in statuses):
                 sys.exit(1)
 
         except Exception as e:

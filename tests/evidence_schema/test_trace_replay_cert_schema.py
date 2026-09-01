@@ -91,3 +91,34 @@ def test_trace_replay_certificate_schema_rejects_unknown_result_status() -> None
     cert["results"][0]["status"] = "unknown"
     errors = list(_validator().iter_errors(cert))
     assert errors
+
+
+def test_trace_replay_certificate_schema_rejects_empty_results() -> None:
+    cert = json.loads((REPLAY_OUT / "replay.cert.json").read_text(encoding="utf-8"))
+    cert["results"] = []
+    cert["summary"]["total_events"] = 0
+    errors = list(_validator().iter_errors(cert))
+    assert errors
+
+
+def test_trace_replay_certificate_schema_rejects_additional_root_property() -> None:
+    cert = json.loads((REPLAY_OUT / "replay.cert.json").read_text(encoding="utf-8"))
+    cert["unexpected_field"] = True
+    errors = list(_validator().iter_errors(cert))
+    assert errors
+
+
+def test_trace_replay_certificate_schema_rejects_result_extra_property() -> None:
+    cert = json.loads((REPLAY_OUT / "replay.cert.json").read_text(encoding="utf-8"))
+    cert["results"][0]["type"] = "function_call"
+    errors = list(_validator().iter_errors(cert))
+    assert errors
+
+
+def test_trace_replay_certificate_schema_rejects_cert_v1_schema_authority() -> None:
+    cert = json.loads((REPLAY_OUT / "replay.cert.json").read_text(encoding="utf-8"))
+    cert["$schema"] = (
+        "https://raw.githubusercontent.com/verifiable-ai-ci/CERT-V1/v1.0.0/schema/cert-v1.json"
+    )
+    errors = list(_validator().iter_errors(cert))
+    assert errors

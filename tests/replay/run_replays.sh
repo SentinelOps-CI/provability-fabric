@@ -75,6 +75,11 @@ fi
 REPLAY_RUNS="${REPLAY_RUNS:-3}"
 LV_THRESHOLD="${LOWVIEW_THRESHOLD:-0.999}"
 
+if ! [[ "$REPLAY_RUNS" =~ ^[0-9]+$ ]] || [ "$REPLAY_RUNS" -lt 2 ]; then
+  echo "Error: REPLAY_RUNS must be an integer >= 2 for pairwise low-view (got ${REPLAY_RUNS})" >&2
+  exit 1
+fi
+
 # Iterate bundles
 for b in "$ROOT_DIR/tests/replay/bundles"/*; do
   [ -d "$b" ] || continue
@@ -115,8 +120,8 @@ for b in "$ROOT_DIR/tests/replay/bundles"/*; do
   shopt -s nullglob
   BUNDLE_CERTS=("$CERT_DIR/${name}_run"*.cert.json)
   if [ ${#BUNDLE_CERTS[@]} -lt 2 ]; then
-    echo "Bundle $name: ${#BUNDLE_CERTS[@]} cert(s), skipping pairwise determinism"
-    continue
+    echo "Error: bundle $name produced ${#BUNDLE_CERTS[@]} cert(s); pairwise low-view requires REPLAY_RUNS>=2" >&2
+    exit 1
   fi
   echo "Low-view determinism for bundle: $name"
   python3 "$ROOT_DIR/external/TRACE-REPLAY-KIT/oracles/lowview_equal.py" \

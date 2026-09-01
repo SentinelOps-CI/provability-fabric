@@ -19,7 +19,7 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "minLength": 1
+      "const": "https://provability-fabric.org/schemas/evidence/v0.2/trace-replay-cert.schema.json"
     },
     "cert_type": {
       "const": "trace_replay"
@@ -61,10 +61,11 @@
           "type": "object"
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "results": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": [
@@ -84,7 +85,7 @@
             ]
           }
         },
-        "additionalProperties": true
+        "additionalProperties": false
       }
     },
     "summary": {
@@ -97,7 +98,7 @@
       "properties": {
         "total_events": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 1
         },
         "successful_events": {
           "type": "integer",
@@ -108,7 +109,7 @@
           "minimum": 0
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "signature": {
       "type": "object",
@@ -125,8 +126,8 @@
           "pattern": "^[0-9a-fA-F]{64}$"
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }
