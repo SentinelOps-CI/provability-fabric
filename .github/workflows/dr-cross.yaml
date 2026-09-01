@@ -62,10 +62,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -89,7 +89,7 @@ jobs:
           PY
 
       - name: Upload moto DR report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: moto-dr-smoke-report
           path: reports/dr/
@@ -111,7 +111,7 @@ jobs:
       sidecar_url: ${{ steps.get_endpoints.outputs.sidecar_url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Live DR preflight (secrets required)
         env:
@@ -124,7 +124,7 @@ jobs:
           python3 scripts/dr/live_dr_preflight.py
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -160,7 +160,7 @@ jobs:
           echo "sidecar_url=$SIDECAR_URL" >> "$GITHUB_OUTPUT"
 
       - name: Upload live preflight
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: live-dr-preflight
           path: reports/dr/
@@ -177,10 +177,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -286,9 +286,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -324,9 +324,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -357,7 +357,7 @@ jobs:
       github.event.inputs.mode == 'live'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Generate test report
         run: |
           mkdir -p reports/dr
@@ -371,7 +371,7 @@ jobs:
           ### Migration: ${{ needs.test-blue-green-migration.result }}
           EOF
       - name: Upload report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dr-test-report-live
           path: reports/dr/

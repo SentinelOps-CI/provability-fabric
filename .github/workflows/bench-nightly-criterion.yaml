@@ -54,7 +54,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -144,14 +144,14 @@ jobs:
           PY
 
       - name: Upload updated BASELINE.md
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: criterion-baseline-md-${{ github.sha }}
           path: bench/BASELINE.md
           if-no-files-found: error
 
       - name: Cache Criterion baseline
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: target/criterion
           key: criterion-main-${{ github.sha }}
@@ -169,7 +169,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -182,7 +182,7 @@ jobs:
           key-suffix: "-criterion-deps"
 
       - name: Restore Criterion baseline (from last main)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: criterion-cache
         with:
           path: target/criterion
