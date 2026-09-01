@@ -118,9 +118,9 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 	}
 
 	for _, ref := range bundle.Artifacts {
-		artifactPath := filepath.Join(opts.BaseDir, filepath.FromSlash(ref.Path))
-		if _, err := os.Stat(artifactPath); err != nil {
-			msg := fmt.Errorf("missing artifact %s: %w", ref.Path, err)
+		artifactPath, pathErr := resolveContainedExistingPath(opts.BaseDir, ref.Path)
+		if pathErr != nil {
+			msg := fmt.Errorf("invalid artifact path %s: %w", ref.Path, pathErr)
 			report.Status = "fail"
 			report.Errors = append(report.Errors, msg.Error())
 			if opts.Strict {
@@ -184,18 +184,88 @@ func schemaVersionDir(version string) string {
 
 func validateReplayContext(baseDir string, ctx *ReplayContext) error {
 	if ctx.KitTracePath != "" {
-		p := filepath.Join(baseDir, filepath.FromSlash(ctx.KitTracePath))
-		if _, err := os.Stat(p); err != nil {
+		p, err := resolveContainedExistingPath(baseDir, ctx.KitTracePath)
+		if err != nil {
+			return fmt.Errorf("replay_context.kit_trace_path invalid: %w", err)
+		}
+		if st, err := os.Stat(p); err != nil {
 			return fmt.Errorf("replay_context.kit_trace_path missing: %w", err)
+		} else if st.IsDir() {
+			return fmt.Errorf("replay_context.kit_trace_path is not a file: %s", ctx.KitTracePath)
 		}
 	}
 	if ctx.FixturesPath != "" {
-		p := filepath.Join(baseDir, filepath.FromSlash(ctx.FixturesPath))
+		p, err := resolveContainedExistingPath(baseDir, ctx.FixturesPath)
+		if err != nil {
+			return fmt.Errorf("replay_context.fixtures_path invalid: %w", err)
+		}
 		if st, err := os.Stat(p); err != nil {
 			return fmt.Errorf("replay_context.fixtures_path missing: %w", err)
 		} else if !st.IsDir() {
 			return fmt.Errorf("replay_context.fixtures_path is not a directory: %s", ctx.FixturesPath)
 		}
+		if _, err := resolveContainedExistingPath(p, "env.json"); err != nil {
+			return fmt.Errorf("replay_context.fixtures_path env.json invalid: %w", err)
+		}
+	}
+	return nil
+}
+
+// resolveContainedExistingPath resolves an existing path and proves that both
+// its lexical location and its symlink-resolved target remain inside baseDir.
+// The returned path is absolute and symlink-resolved.
+func resolveContainedExistingPath(baseDir, candidate string) (string, error) {
+	if candidate == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+
+	baseAbs, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve base directory: %w", err)
+	}
+	baseReal, err := filepath.EvalSymlinks(baseAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve base directory symlinks: %w", err)
+	}
+	baseReal, err = filepath.Abs(baseReal)
+	if err != nil {
+		return "", fmt.Errorf("normalize base directory: %w", err)
+	}
+
+	pathValue := filepath.FromSlash(candidate)
+	joined := pathValue
+	if !filepath.IsAbs(pathValue) {
+		joined = filepath.Join(baseAbs, pathValue)
+	}
+	joinedAbs, err := filepath.Abs(joined)
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+	if err := ensurePathWithin(baseAbs, joinedAbs); err != nil {
+		return "", fmt.Errorf("path escapes base directory: %w", err)
+	}
+
+	resolved, err := filepath.EvalSymlinks(joinedAbs)
+	if err != nil {
+		return "", fmt.Errorf("resolve path symlinks: %w", err)
+	}
+	resolvedAbs, err := filepath.Abs(resolved)
+	if err != nil {
+		return "", fmt.Errorf("normalize resolved path: %w", err)
+	}
+	if err := ensurePathWithin(baseReal, resolvedAbs); err != nil {
+		return "", fmt.Errorf("resolved path escapes base directory: %w", err)
+	}
+	return resolvedAbs, nil
+}
+
+func ensurePathWithin(baseDir, candidate string) error {
+	rel, err := filepath.Rel(baseDir, candidate)
+	if err != nil {
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("%s is outside %s", candidate, baseDir)
 	}
 	return nil
 }
@@ -220,6 +290,7 @@ func validateAgainstSchema(schemaPath string, document []byte) error {
 		return fmt.Errorf("schema missing at %s", schemaPath)
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.AssertFormat = true
 	schemaDir := filepath.Dir(schemaPath)
 	entries, err := os.ReadDir(schemaDir)
 	if err != nil {

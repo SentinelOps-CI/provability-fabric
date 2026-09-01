@@ -11,6 +11,7 @@ on:
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - ".github/workflows/platform-cert-validate.yml"
   pull_request:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "tools/cert-validate/**"
       - "external/CERT-V1/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - ".github/workflows/platform-cert-validate.yml"
   schedule:
     - cron: "0 2 * * *"
@@ -31,6 +33,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert pull-request head checkout
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Init external standards
         env:
@@ -48,7 +55,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install jsonschema pyyaml
+          python -m pip install -r tools/cert-validate/requirements.txt pyyaml
+          python -c "import jsonschema, rfc3339_validator, yaml"
 
       - name: Run replay docker contract test (F10)
         run: |
@@ -58,7 +66,7 @@ jobs:
       - name: Generate replay CERTs
         run: |
           chmod +x tests/replay/run_replays.sh
-          export REPLAY_RUNS=1
+          export REPLAY_RUNS=2
           bash tests/replay/run_replays.sh
 
       - name: Validate replay CERTs

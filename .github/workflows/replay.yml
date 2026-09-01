@@ -4,12 +4,16 @@ on:
   pull_request:
     paths:
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+      - "tools/cert-validate/**"
       - "external/TRACE-REPLAY-KIT/**"
       - ".github/workflows/replay.yml"
   push:
     branches: [main, develop]
     paths:
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+      - "tools/cert-validate/**"
       - "external/TRACE-REPLAY-KIT/**"
       - ".github/workflows/replay.yml"
 
@@ -22,6 +26,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert pull-request head checkout
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -35,6 +44,11 @@ jobs:
         env:
           STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
         run: make submodules
+
+      - name: Require certificate schemas
+        run: |
+          test -f external/CERT-V1/schema/cert-v1.schema.json
+          test -f specs/evidence/v0.2/schemas/trace-replay-cert.schema.json
 
       - name: Run replay docker contract test (F10)
         run: |
@@ -64,19 +78,71 @@ jobs:
           done
           ls -l artifact/replay_zips
 
-      - name: Enforce negative CERT tests fail
-        run: |
-          set +e
-          # Expect validation to fail when including invalid samples
-          if python tools/cert-validate/validate.py tests/replay/invalid_*.cert.json tests/privacy/invalid_*.cert.json; then
-            echo "Unexpected pass: invalid CERTs validated" >&2
-            exit 1
-          else
-            echo "Negative CERT tests correctly failed validation"
-          fi
-
       - name: Install cert validation deps
-        run: python -m pip install jsonschema
+        run: |
+          python -m pip install -r tools/cert-validate/requirements.txt pytest
+          python -c "import jsonschema, pytest, rfc3339_validator; print(jsonschema.__version__)"
+
+      - name: Test replay validation failure classes
+        run: python -m pytest tests/replay/test_cert_validate_cli.py tests/replay/test_replay_overlay_schema_boundary.py -q
+
+      - name: Enforce invalid trace replay certificate fails
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert="$(find tests/replay/out/certs -type f -name '*.cert.json' -print -quit)"
+          test -n "$cert"
+          tmp="$(mktemp --suffix=.cert.json)"
+          trap 'rm -f "$tmp"' EXIT
+          cp "$cert" "$tmp"
+          python - "$tmp" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          cert = json.loads(path.read_text(encoding="utf-8"))
+          cert["timestamp"] = "not-a-timestamp"
+          path.write_text(json.dumps(cert, indent=2) + "\n", encoding="utf-8")
+          PY
+          set +e
+          output="$(python tools/cert-validate/validate.py "$tmp" 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          if [[ $rc -ne 1 ]]; then
+            echo "Expected validation-failure exit 1, got $rc" >&2
+            exit 1
+          fi
+          grep -F "date-time" <<<"$output" >/dev/null
+          echo "Invalid trace replay certificate correctly rejected"
+
+      - name: Enforce every negative certificate fails validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          certs=(tests/replay/invalid_*.cert.json tests/privacy/invalid_*.cert.json)
+          if [[ ${#certs[@]} -eq 0 ]]; then
+            echo "No negative certificate fixtures found" >&2
+            exit 1
+          fi
+          for cert in "${certs[@]}"; do
+            set +e
+            output="$(python tools/cert-validate/validate.py "$cert" 2>&1)"
+            rc=$?
+            set -e
+            printf '%s\n' "$output"
+            if [[ $rc -ne 1 ]]; then
+              echo "Expected validation-failure exit 1 for $cert, got $rc" >&2
+              exit 1
+            fi
+            if grep -F "Invalid JSON" <<<"$output" >/dev/null; then
+              echo "Negative schema fixture must be valid JSON: $cert" >&2
+              exit 1
+            fi
+            echo "Negative certificate correctly rejected: $cert"
+          done
 
       - name: Validate CERTs
         run: make validate-certs

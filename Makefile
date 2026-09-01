@@ -370,6 +370,7 @@ validate-certs:
 	done; \
 	if [ $$found -eq 0 ]; then \
 		echo "No CERT-V1 *.cert.json fixtures found (egress_certs/ uses a separate schema)."; \
+		exit 1; \
 	fi
 	@$(ECHOOK) "✅ Certificate validation completed"
 

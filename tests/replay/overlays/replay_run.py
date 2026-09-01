@@ -2,9 +2,9 @@
 """
 TRACE-REPLAY-KIT Replay Runner (PF overlay)
 
-Identical to external/TRACE-REPLAY-KIT/runner/replay_run.py except schema
-loading prefers CERT_V1_SCHEMA_PATH / the in-repo fixture. The upstream
-raw.githubusercontent.com CERT-V1 URL 404s (private repo + wrong filename).
+Adapted from the replay runner so certificate validation is deterministic and
+uses the checked-in Evidence v0.2 trace-replay schema. Runtime CERT-V1 has a
+different shape and is not used for trace_replay outputs.
 """
 
 import argparse
@@ -12,31 +12,33 @@ import json
 import os
 import sys
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import jsonschema
-import requests
 from typing import Dict, Any, List
 
-
-# Upstream URL (kept as last-resort fallback; currently 404 for private CERT-V1)
-CERT_V1_SCHEMA_URL = (
-    "https://raw.githubusercontent.com/verifiable-ai-ci/"
-    "CERT-V1/v1.0.0/schema/cert-v1.json"
+_FORMAT_CHECK_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "tools", "cert-validate")
 )
+if _FORMAT_CHECK_DIR not in sys.path:
+    sys.path.insert(0, _FORMAT_CHECK_DIR)
+from format_check import compile_trace_replay_validator  # noqa: E402
+
 
 LOCAL_SCHEMA_CANDIDATES = [
-    "/work/tests/replay/schema/trace-replay-cert.schema.json",
+    "/work/specs/evidence/v0.2/schemas/trace-replay-cert.schema.json",
     os.path.join(
         os.path.dirname(__file__),
         "..",
         "..",
         "..",
-        "tests",
-        "replay",
-        "schema",
+        "specs",
+        "evidence",
+        "v0.2",
+        "schemas",
         "trace-replay-cert.schema.json",
     ),
 ]
+
 
 
 class ReplayRunner:
@@ -47,39 +49,39 @@ class ReplayRunner:
         self.load_cert_schema()
 
     def load_cert_schema(self):
-        """Load schema: env/local fixture first, then pinned URL."""
-        candidates: List[str] = []
-        env_path = os.environ.get("CERT_V1_SCHEMA_PATH")
-        if env_path:
-            candidates.append(env_path)
-        candidates.extend(LOCAL_SCHEMA_CANDIDATES)
+        """Load the configured schema, or the checked-in schema when unset."""
+        required = os.environ.get("TRACE_REPLAY_SCHEMA_REQUIRED", "1")
+        env_path = os.environ.get("TRACE_REPLAY_SCHEMA_PATH")
 
-        for path in candidates:
-            if not path:
-                continue
+        if env_path:
+            try:
+                if not os.path.isfile(env_path):
+                    raise FileNotFoundError(env_path)
+                with open(env_path, "r", encoding="utf-8") as f:
+                    self.cert_schema = json.load(f)
+                print(f"Loaded trace replay schema from: {env_path}")
+                return
+            except Exception as exc:
+                message = f"Configured trace replay schema unavailable: {env_path}: {exc}"
+                if required == "1":
+                    raise RuntimeError(message) from exc
+                print(f"Warning: {message}")
+
+        for path in LOCAL_SCHEMA_CANDIDATES:
             try:
                 if os.path.isfile(path):
                     with open(path, "r", encoding="utf-8") as f:
                         self.cert_schema = json.load(f)
-                    print(f"Loaded CERT schema from: {path}")
+                    print(f"Loaded trace replay schema from: {path}")
                     return
-            except Exception as e:
-                print(f"Warning: Could not load CERT schema from {path}: {e}")
+            except Exception as exc:
+                print(f"Warning: Could not load trace replay schema from {path}: {exc}")
 
-        try:
-            response = requests.get(CERT_V1_SCHEMA_URL, timeout=30)
-            response.raise_for_status()
-            self.cert_schema = response.json()
-            print(f"Loaded CERT schema from URL: {CERT_V1_SCHEMA_URL}")
-            return
-        except Exception as e:
-            print(f"Warning: Could not load CERT-V1 schema: {e}")
-            self.cert_schema = None
-
-        if os.environ.get("CERT_V1_SCHEMA_REQUIRED") == "1":
-            raise RuntimeError(
-                "CERT schema required (CERT_V1_SCHEMA_REQUIRED=1) but none loaded"
-            )
+        self.cert_schema = None
+        message = "Trace replay schema not found in checked-in locations"
+        if required == "1":
+            raise RuntimeError(message)
+        print(f"Warning: {message}")
 
     def validate_trace(self, trace_path: str) -> Dict[str, Any]:
         """Validate and load trace file."""
@@ -89,6 +91,10 @@ class ReplayRunner:
 
             if "events" not in trace_data:
                 raise ValueError("Trace must contain 'events' array")
+
+            events = trace_data["events"]
+            if not isinstance(events, list) or len(events) == 0:
+                raise ValueError("Trace events must be a non-empty array")
 
             if "metadata" not in trace_data:
                 raise ValueError("Trace must contain 'metadata'")
@@ -129,7 +135,7 @@ class ReplayRunner:
             "replay_id": hashlib.sha256(
                 json.dumps(trace_data, sort_keys=True).encode()
             ).hexdigest()[:16],
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "environment": env_data,
             "results": results,
             "summary": {
@@ -213,14 +219,18 @@ class ReplayRunner:
             "result": "Epoch access revoked",
         }
 
-    def generate_cert_v1(
+    def generate_trace_replay_cert(
         self, replay_result: Dict[str, Any], trace_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Generate a CERT-V1 certificate."""
-        schema_ref = os.environ.get(
-            "CERT_V1_SCHEMA_PATH",
-            "https://provability-fabric.local/schemas/trace-replay-cert.schema.json",
+        """Generate a trace_replay certificate."""
+        schema_ref = (
+            "https://provability-fabric.org/schemas/evidence/v0.2/"
+            "trace-replay-cert.schema.json"
         )
+        results = [
+            {"event_id": item["event_id"], "status": item["status"]}
+            for item in replay_result["results"]
+        ]
         cert = {
             "$schema": schema_ref,
             "cert_type": "trace_replay",
@@ -229,7 +239,7 @@ class ReplayRunner:
             "replay_id": replay_result["replay_id"],
             "trace_metadata": trace_data.get("metadata", {}),
             "environment": replay_result["environment"],
-            "results": replay_result["results"],
+            "results": results,
             "summary": replay_result["summary"],
             "signature": {
                 "algorithm": "sha256",
@@ -241,12 +251,14 @@ class ReplayRunner:
 
         if self.cert_schema:
             try:
-                jsonschema.validate(cert, self.cert_schema)
+                validator = compile_trace_replay_validator(self.cert_schema)
+                validator.validate(cert)
             except jsonschema.ValidationError as e:
                 print(
                     f"Warning: Generated certificate does not validate against schema: {e}"
                 )
-                if os.environ.get("CERT_V1_SCHEMA_REQUIRED") == "1":
+                required = os.environ.get("TRACE_REPLAY_SCHEMA_REQUIRED", "1")
+                if required == "1":
                     raise
 
         return cert
@@ -259,7 +271,7 @@ class ReplayRunner:
 
             replay_result = self.execute_replay(trace_data, env_data)
 
-            cert = self.generate_cert_v1(replay_result, trace_data)
+            cert = self.generate_trace_replay_cert(replay_result, trace_data)
 
             if args.cert_out:
                 with open(args.cert_out, "w") as f:
@@ -268,7 +280,8 @@ class ReplayRunner:
             else:
                 print(json.dumps(cert, indent=2))
 
-            if replay_result["summary"]["failed_events"] > 0:
+            statuses = [item.get("status") for item in replay_result["results"]]
+            if not statuses or any(status != "success" for status in statuses):
                 sys.exit(1)
 
         except Exception as e:
@@ -282,7 +295,7 @@ def main():
     parser.add_argument("--bundle", help="Path to bundle directory")
     parser.add_argument("--trace", required=True, help="Path to trace.json file")
     parser.add_argument("--fixtures", required=True, help="Path to fixtures directory")
-    parser.add_argument("--cert-out", help="Output path for CERT-V1 certificate")
+    parser.add_argument("--cert-out", help="Output path for trace replay certificate")
     parser.add_argument(
         "--validate-env", help="Validate environment configuration file"
     )

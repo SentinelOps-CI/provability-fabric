@@ -6,6 +6,7 @@ on:
     paths:
       - "evidence/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - "external/**"
       - "tools/cert-validate/**"
       - "Makefile"
@@ -15,6 +16,7 @@ on:
     paths:
       - "evidence/**"
       - "tests/replay/**"
+      - "specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
       - "external/**"
       - "tools/cert-validate/**"
       - "Makefile"
@@ -37,20 +39,30 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert pull-request head checkout
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Init external standards
         env:
           STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
         run: make submodules
 
-      - name: Require CERT-V1 schema
+      - name: Require certificate schemas
         shell: bash
         run: |
           set -euo pipefail
-          schema="external/CERT-V1/schema/cert-v1.schema.json"
-          if [ ! -f "$schema" ]; then
-            echo "CERT-V1 schema missing at $schema"
+          runtime_schema="external/CERT-V1/schema/cert-v1.schema.json"
+          replay_schema="specs/evidence/v0.2/schemas/trace-replay-cert.schema.json"
+          if [ ! -f "$runtime_schema" ]; then
+            echo "CERT-V1 schema missing at $runtime_schema"
             echo "Clone per external/README.md (make submodules)."
+            exit 1
+          fi
+          if [ ! -f "$replay_schema" ]; then
+            echo "Trace replay schema missing at $replay_schema"
             exit 1
           fi
 
@@ -59,6 +71,16 @@ jobs:
         with:
           python-version: "3.11"
           requirements-file: tools/cert-validate/requirements.txt
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate replay CERTs
+        run: |
+          chmod +x tests/replay/run_replays.sh
+          export REPLAY_RUNS=2
+          export TRACE_REPLAY_SCHEMA_REQUIRED=1
+          bash tests/replay/run_replays.sh
 
       - name: Validate CERT files (fail-closed)
         run: make validate-certs
@@ -83,5 +105,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'CERT-V1 validation failed. Check workflow logs and ensure JSON files conform to the schema at external/CERT-V1/schema/cert-v1.schema.json.',
+              body: 'Certificate validation failed. Check workflow logs and ensure runtime certificates conform to external/CERT-V1/schema/cert-v1.schema.json and trace replay certificates conform to specs/evidence/v0.2/schemas/trace-replay-cert.schema.json.',
             });

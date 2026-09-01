@@ -27,6 +27,18 @@
       "path": "artifacts/execution-trace.json",
       "media_type": "application/vnd.provability-fabric.evidence.execution-trace+json",
       "digest": "sha256:aff1f74ac2eee62de1170c25de7bfa233285e8698c5f3d4b4c45d1b7bca26b3c"
+    },
+    {
+      "role": "kit-trace",
+      "path": "kit/trace.json",
+      "media_type": "application/json",
+      "digest": "sha256:11a284f2d54ba0188b33f8696fc10921eec0d24ac96348c9441c3b49fb0559eb"
+    },
+    {
+      "role": "kit-fixture-env",
+      "path": "kit/fixtures/env.json",
+      "media_type": "application/json",
+      "digest": "sha256:910eb6e2d22452c01e967df534cbecf0d44af1dde3cfe7996e0ae770cde3c657"
     }
   ],
   "replay_context": {
@@ -34,5 +46,5 @@
     "fixtures_path": "kit/fixtures",
     "low_view_oracle": true
   },
-  "bundle_digest": "sha256:51efd84fcce1e575711add87d596fa42d54c90c57e825f6de9ca7eae14e0b02e"
+  "bundle_digest": "sha256:958a18da6225e4f6d44068341ef0c05a3bf21ebdb2a2cdfd52f27c2467e4d3f8"
 }

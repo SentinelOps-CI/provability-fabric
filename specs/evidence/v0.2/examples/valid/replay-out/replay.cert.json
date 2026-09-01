@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/verifiable-ai-ci/CERT-V1/v1.0.0/schema/cert-v1.json",
+  "$schema": "https://provability-fabric.org/schemas/evidence/v0.2/trace-replay-cert.schema.json",
   "cert_type": "trace_replay",
   "version": "1.0.0",
   "timestamp": "2026-06-17T05:58:29.511852Z",
@@ -24,9 +24,7 @@
   "results": [
     {
       "event_id": "event_001",
-      "status": "success",
-      "type": "function_call",
-      "result": "Executed add_numbers"
+      "status": "success"
     }
   ],
   "summary": {

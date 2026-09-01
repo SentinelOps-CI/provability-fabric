@@ -7,6 +7,7 @@ Machine-readable JSON Schema (draft 2020-12) artifacts for the Evidence v0.2 lan
 | Path | Purpose |
 |------|---------|
 | `schemas/evidence-bundle.schema.json` | Bundle manifest with `replay_context` and digest-bound artifact refs |
+| `schemas/trace-replay-cert.schema.json` | Local fail-closed schema for TRACE-REPLAY-KIT `cert_type: "trace_replay"` outputs |
 | `examples/valid/manifest.json` | Valid v0.2 bundle fixture |
 | `examples/valid/deep-replay-bundle.json` | Fixture with KIT trace paths for deep replay |
 | `examples/valid/artifacts/` | Claim, proof, attestation, execution-trace samples |
@@ -32,10 +33,18 @@ Optional `replay_context` enables deep replay (`pf evidence replay --execute [--
 ```json
 {
   "kit_trace_path": "kit/trace.json",
-  "fixtures_path": "kit/fixtures/env.json",
+  "fixtures_path": "kit/fixtures",
   "low_view_oracle": true
 }
 ```
+
+## Replay certificate validation boundary
+
+TRACE-REPLAY-KIT emits `cert_type: "trace_replay"` certificates. These are validated fail-closed by Provability Fabric against `schemas/trace-replay-cert.schema.json` after each executed replay and before a low-view result can pass. Acceptance additionally binds each certificate to the exact requested trace metadata and `fixtures/env.json`, requires result event IDs to match the trace event sequence, requires summary counts to agree with the results, and requires every requested event to report `status: "success"`.
+
+Bundle-controlled artifact and replay-context paths are constrained to the declared bundle base directory using both lexical containment and symlink-resolved containment. The replay runner receives the resolved contained trace and fixtures paths, and `fixtures/env.json` is checked separately so a child symlink cannot escape the fixture root.
+
+The trace-replay certificate schema is distinct from `external/CERT-V1/schema/cert-v1.schema.json`, which describes the runtime-sidecar CERT shape. The pinned KIT release may emit a legacy `$schema` URI that is not fetchable; Provability Fabric does not treat that URI as the acceptance authority. The checked-in v0.2 trace-replay schema is the local validation authority for these KIT outputs. The `signature.hash` field is checked only for its declared `sha256` algorithm and digest shape; no stable canonicalization contract is assumed here, so this is not a claim that the self-reported digest or an arbitrary cryptographic signature has been independently authenticated.
 
 ## Tests and verification
 

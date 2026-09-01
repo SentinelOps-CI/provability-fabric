@@ -48,7 +48,10 @@ func (r *defaultKITRunner) python() string {
 }
 
 func (r *defaultKITRunner) runnerScript() string {
-	return filepath.Join(r.repoRoot, "external", "TRACE-REPLAY-KIT", "runner", "replay_run.py")
+	// Evidence execute uses the in-tree overlay so generated certificates bind
+	// to the checked-in v0.2 schema. Upstream KIT still 404s CERT-V1 schema
+	// and advertises that URL as $schema; we do not treat that as success.
+	return filepath.Join(r.repoRoot, "tests", "replay", "overlays", "replay_run.py")
 }
 
 func (r *defaultKITRunner) lowViewOracle() string {
@@ -71,7 +74,7 @@ func RunKITTrace(tracePath, fixturesPath, outDir, repoRoot string) (int, error) 
 func (r *defaultKITRunner) Run(tracePath, fixturesPath, certOut string) (int, error) {
 	script := r.runnerScript()
 	if _, err := os.Stat(script); err != nil {
-		return 1, fmt.Errorf("KIT runner missing at %s (run make submodules)", script)
+		return 1, fmt.Errorf("trace replay overlay missing at %s", script)
 	}
 	args := []string{script, "--trace", tracePath, "--fixtures", fixturesPath}
 	if certOut != "" {
@@ -80,7 +83,7 @@ func (r *defaultKITRunner) Run(tracePath, fixturesPath, certOut string) (int, er
 	cmd := exec.Command(r.python(), args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = kitPythonEnv()
+	cmd.Env = r.overlayPythonEnv()
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode(), nil
@@ -122,4 +125,25 @@ func kitPythonEnv() []string {
 		}
 	}
 	return append(os.Environ(), key+"utf-8")
+}
+
+func (r *defaultKITRunner) overlayPythonEnv() []string {
+	env := kitPythonEnv()
+	schema := filepath.Join(r.repoRoot, "specs", "evidence", "v0.2", "schemas", "trace-replay-cert.schema.json")
+	hasSchema, hasRequired := false, false
+	for _, item := range env {
+		if strings.HasPrefix(item, "TRACE_REPLAY_SCHEMA_PATH=") {
+			hasSchema = true
+		}
+		if strings.HasPrefix(item, "TRACE_REPLAY_SCHEMA_REQUIRED=") {
+			hasRequired = true
+		}
+	}
+	if !hasSchema {
+		env = append(env, "TRACE_REPLAY_SCHEMA_PATH="+schema)
+	}
+	if !hasRequired {
+		env = append(env, "TRACE_REPLAY_SCHEMA_REQUIRED=1")
+	}
+	return env
 }
