@@ -7,7 +7,9 @@ PROTO_V1_DIR := api/v1
 PROTO_FILES := $(wildcard $(PROTO_V1_DIR)/*.proto)
 GO_PROTO_OUT := core/sdk/go/generated
 TS_SDK_DIR := core/sdk/typescript
-TS_PROTO_PLUGIN := $(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin/protoc-gen-ts_proto
+# npm workspaces may install ts-proto either under the SDK or hoist it to the
+# repository root. Prefer the SDK-local plugin and fall back to the root.
+TS_PROTO_PLUGIN := $(firstword $(wildcard $(CURDIR)/$(TS_SDK_DIR)/node_modules/.bin/protoc-gen-ts_proto $(CURDIR)/node_modules/.bin/protoc-gen-ts_proto))
 RUST_SDK_DIR := core/sdk/rust
 GOLDEN_DIR := tests/fixtures/golden
 API_DOCS := docs/api/api.md

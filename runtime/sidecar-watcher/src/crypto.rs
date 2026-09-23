@@ -128,10 +128,10 @@ impl AsyncSigningPipeline {
     pub async fn submit_request(
         &self,
         request: SigningRequest,
-    ) -> Result<(), mpsc::error::SendError<SigningRequest>> {
+    ) -> Result<(), Box<mpsc::error::SendError<SigningRequest>>> {
         self.metrics.total_requests.fetch_add(1, Ordering::Relaxed);
         self.metrics.queue_size.fetch_add(1, Ordering::Relaxed);
-        self.request_tx.send(request).await
+        self.request_tx.send(request).await.map_err(Box::new)
     }
 
     /// Get signing result
@@ -421,7 +421,7 @@ impl BatchVerifier {
         signature: Signature,
         public_key: VerifyingKey,
         request_id: String,
-    ) -> Result<(), mpsc::error::SendError<VerificationRequest>> {
+    ) -> Result<(), Box<mpsc::error::SendError<VerificationRequest>>> {
         let request = VerificationRequest {
             message,
             signature,
@@ -431,7 +431,7 @@ impl BatchVerifier {
         let _ = self.batch_timeout;
         let _ = self.batch_size;
 
-        self.tx.send(request).await
+        self.tx.send(request).await.map_err(Box::new)
     }
 
     /// Wait for verification results
