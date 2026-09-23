@@ -1,21 +1,10 @@
 <div align="center">
 
 <!-- readme-banner: Provability Fabric spine (94 cols; regen: .github/assets/_build_banner.py) -->
-<pre>
-##############################################################################################
-#                                                                                            #
-#              ___                  _    _ _ _ _          ___     _        _                 #
-#             | _ \_ _ _____ ____ _| |__(_) (_) |_ _  _  | __|_ _| |__ _ _(_)__              #
-#             |  _/ '_/ _ \ V / _` | '_ \ | | |  _| || | | _/ _` | '_ \ '_| / _|             #
-#             |_| |_| \___/\_/\__,_|_.__/_|_|_|\__|\_, | |_|\__,_|_.__/_| |_\__|             #
-#                                                   |__/                                     #
-#                                                                                            #
-##############################################################################################
-</pre>
 
 # Provability Fabric
 
-**Formal specs, runtime policy, and evidence trails** â€” Lean specifications and proofs where present, fail-closed crypto by default, and auditable evidence in one open stack.
+**Formal specs, runtime policy, and evidence trails** 
 
 <sub>Guarantees are conditional on configured trust roots and deployment policy. Lean in-repo does not mean every production path is proven end-to-end. See [Evidence non-claims](docs/roadmap/evidence-v0.2-status.md#explicit-non-claims) and [deployment trust](docs/guides/deployment-guide.md#production-trust-chain-environment-f01--f02).</sub>
 
