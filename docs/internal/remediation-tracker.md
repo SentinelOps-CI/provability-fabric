@@ -10,7 +10,7 @@ Maps findings **F01â€“F39** from [full-repo-audit-2026-07-01.md](full-repo-
 
 ## CI baseline (Wave 0 inventory)
 
-Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-16; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
+Counts in this section are the June–July 2026 inventory records. They are not the current `main` inventory. Re-run the script below, or check [current Actions runs](https://github.com/SentinelOps-CI/provability-fabric/actions). Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (2026-07-16; requires `gh` CLI authenticated to repo). Full table: [ci-inventory-latest.md](ci-inventory-latest.md).
 
 | Metric | Count |
 |--------|------:|
@@ -20,9 +20,9 @@ Captured via `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown` (202
 | Latest run **failure / cancelled** (ungated / PR-only) | 0 |
 | No run / unknown | 16 |
 
-**Green snapshot (tip `bae36f642`, 2026-07-18):** inventory exit **0 Ã—2** â€” **69** gated (push/schedule), **0** red after **PR #223** CI-local proofs. Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67.
+**Historical green snapshot (tip `bae36f642`, 2026-07-18):** inventory exit **0 Ã—2** â€” **69** gated (push/schedule), **0** red after **PR #223** CI-local proofs. Wave 7 historical **60/60** @ `b8b78b94` remains the pre-revive baseline. Do **not** claim literal 67/67, and do not treat this snapshot as the current inventory.
 
-**No run on main (gated):** none â€” full gated set green.
+**No run on main (gated), at that snapshot:** none. The gated set recorded above was green.
 
 Re-run: `scripts/ci_workflow_inventory.sh` (Linux/WSL/Git Bash) or `powershell -File scripts/ci_workflow_inventory.ps1` (Windows).
 
