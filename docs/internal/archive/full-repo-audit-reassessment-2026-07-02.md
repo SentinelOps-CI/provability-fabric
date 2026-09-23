@@ -1,6 +1,6 @@
-﻿# Full Repository Audit â€” Reassessment Report (2026-07-02)
+﻿# Full Repository Audit — Reassessment Report (2026-07-02)
 
-Reassessment of findings **F01â€“F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md), cross-checked against [remediation-tracker.md](../remediation-tracker.md) and local verification commands run on **2026-07-02** (Windows).
+Reassessment of findings **F01–F39** from [full-repo-audit-2026-07-01.md](full-repo-audit-2026-07-01.md), cross-checked against [remediation-tracker.md](../remediation-tracker.md) and local verification commands run on **2026-07-02** (Windows).
 
 ---
 
@@ -28,8 +28,8 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | Sidecar production unwrap/expect | 97 | **40** (gate baseline; verified) |
 | Ledger `any` count | 152 | **76** (ceiling target 20; verified) |
 | Ledger Jest tests | 0 | **22** (verified) |
-| `retrieval-gateway` buildable | No | **Yes** â€” 14 tests pass (verified) |
-| DSSE trust path | Stubbed | **Wired** â€” fail-closed by default (unset enforces; opt out `PF_ENFORCE_DSSE=0`/`false`) (verified static; Wave 9.1) |
+| `retrieval-gateway` buildable | No | **Yes** — 14 tests pass (verified) |
+| DSSE trust path | Stubbed | **Wired** — fail-closed by default (unset enforces; opt out `PF_ENFORCE_DSSE=0`/`false`) (verified static; Wave 9.1) |
 | CI honesty audit | 47 `\|\| true` files (static) | **59 unjustified** matches in 2026-07-02 scan (exit 1) |
 
 ---
@@ -47,15 +47,15 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | `cd runtime/ledger && npm run typecheck:server` | **0** | `tsc -p tsconfig.server.json --noEmit` clean |
 | `make docs-strict` | **0** | `mkdocs build --strict` succeeded |
 | `python ops/retention/test_retention_manager.py` | **0** | 4 tests OK |
-| Grep `passWithNoTests` | â€” | **Not in ledger or TS SDK** `package.json`; 1 hit in `marketplace-e2e.yaml` |
-| Grep `apollo-server-express` | â€” | **Not in** `runtime/ledger/package.json`; lockfile transitive only; `wave4.test.cjs` asserts removed |
-| Grep `md5` in `revocation.rs` | â€” | **No matches** |
+| Grep `passWithNoTests` | — | **Not in ledger or TS SDK** `package.json`; 1 hit in `marketplace-e2e.yaml` |
+| Grep `apollo-server-express` | — | **Not in** `runtime/ledger/package.json`; lockfile transitive only; `wave4.test.cjs` asserts removed |
+| Grep `md5` in `revocation.rs` | — | **No matches** |
 
 ---
 
-## Per-finding reassessment (F01â€“F39)
+## Per-finding reassessment (F01–F39)
 
-### F01 â€” Signature verification stubbed (P0)
+### F01 — Signature verification stubbed (P0)
 
 | Field | Value |
 |-------|-------|
@@ -67,7 +67,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains (historical)** | Reassessment assumed default-off; **Wave 9.1** made unset=enforce (`PF_ENFORCE_DSSE=0`/`false` opt-out only). Trust roots still required when enforcing. |
 | **CI proof on main** | Pending merge; local cross-lang tests in `tests/crypto/test_cross_lang_dsse.py`. |
 
-### F02 â€” Shadow mode always allows; `is_tool_enabled` always true (P0)
+### F02 — Shadow mode always allows; `is_tool_enabled` always true (P0)
 
 | Field | Value |
 |-------|-------|
@@ -79,19 +79,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Document production profile defaults in deployment guide. |
 | **CI proof on main** | Pending merge; local `integration_tests` 9/9 green. |
 
-### F03 â€” Ledger Docker runs `index-simple.js` (P0)
+### F03 — Ledger Docker runs `index-simple.js` (P0)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | Dockerfile CMD pointed at simple entrypoint; MCP only in full `index.ts`. |
 | **Wave** | 4 |
 | **Status** | **DONE** |
-| **Evidence (verified)** | `runtime/ledger/Dockerfile:37` â†’ `node dist/index.js`; `RUN test -f dist/index.js`. |
+| **Evidence (verified)** | `runtime/ledger/Dockerfile:37` → `node dist/index.js`; `RUN test -f dist/index.js`. |
 | **What changed** | Docker aligned to canonical entrypoint with MCP wiring. |
 | **What remains** | Validate image in platform integration workflow after merge. |
 | **CI proof on main** | Pending merge. |
 
-### F04 â€” MCP tenant field mismatch (P0)
+### F04 — MCP tenant field mismatch (P0)
 
 | Field | Value |
 |-------|-------|
@@ -103,19 +103,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | E2E MCP tenant isolation test on `main` after merge. |
 | **CI proof on main** | Pending merge. |
 
-### F05 â€” `retrieval-gateway` unbuildable (P0)
+### F05 — `retrieval-gateway` unbuildable (P0)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | Rust sources with no `Cargo.toml` or `go.mod`. |
 | **Wave** | 5 |
 | **Status** | **DONE** |
-| **Evidence (verified)** | `runtime/retrieval-gateway/Cargo.toml` exists; `cargo test -p retrieval-gateway` â†’ 14/14 pass. |
+| **Evidence (verified)** | `runtime/retrieval-gateway/Cargo.toml` exists; `cargo test -p retrieval-gateway` → 14/14 pass. |
 | **What changed** | Manifests added; pf-dsse wired; workflow `.github/workflows/retrieval-gateway.yml` added. |
 | **What remains** | First green run on `main` (`retrieval-gateway.yml` currently `no_run`). |
-| **CI proof on main** | **Not yet** â€” workflow gated but no run on `main`. |
+| **CI proof on main** | **Not yet** — workflow gated but no run on `main`. |
 
-### F06 â€” Ghost integration tests in CI (P0)
+### F06 — Ghost integration tests in CI (P0)
 
 | Field | Value |
 |-------|-------|
@@ -125,9 +125,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `tests/integration/test_*.py` smoke tests exist (10 files). |
 | **What changed** | Real integration smoke tests replace ghost paths. |
 | **What remains** | `operational-excellence.yaml` still failing on `main` for other reasons. |
-| **CI proof on main** | **Not green** â€” workflow failure (run 19399591865). |
+| **CI proof on main** | **Not green** — workflow failure (run 19399591865). |
 
-### F07 â€” Broken MCP fraud demo (P0)
+### F07 — Broken MCP fraud demo (P0)
 
 | Field | Value |
 |-------|-------|
@@ -139,7 +139,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Add demo to CI smoke path. |
 | **CI proof on main** | Pending merge. |
 
-### F08 â€” Broken edge-middleware example (P0)
+### F08 — Broken edge-middleware example (P0)
 
 | Field | Value |
 |-------|-------|
@@ -151,7 +151,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Example pytest/CI gate optional. |
 | **CI proof on main** | Pending merge. |
 
-### F09 â€” Broken Prisma performance migration (P0)
+### F09 — Broken Prisma performance migration (P0)
 
 | Field | Value |
 |-------|-------|
@@ -163,7 +163,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Production DB migration path validation. |
 | **CI proof on main** | Pending merge. |
 
-### F10 â€” Replay Docker CLI invocation bug (P0)
+### F10 — Replay Docker CLI invocation bug (P0)
 
 | Field | Value |
 |-------|-------|
@@ -173,9 +173,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `tests/replay/test_docker_invocation.sh` documents correct ENTRYPOINT contract. |
 | **What changed** | Docker replay runner passes args correctly to `python replay_run.py`. |
 | **What remains** | Replay cluster green on `main` after merge + Linux validation. |
-| **CI proof on main** | **Not green** â€” `platform-replay.yml`, `nightly-replay.yml`, `platform-cert-validate.yml` still failing. |
+| **CI proof on main** | **Not green** — `platform-replay.yml`, `nightly-replay.yml`, `platform-cert-validate.yml` still failing. |
 
-### F11 â€” Vacuous Jest gates (P1)
+### F11 — Vacuous Jest gates (P1)
 
 | Field | Value |
 |-------|-------|
@@ -187,7 +187,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | `marketplace-e2e.yaml` still uses `--passWithNoTests` (CI honesty audit). |
 | **CI proof on main** | Pending merge for ledger/SDK; marketplace workflow still red. |
 
-### F12 â€” Impacted-test selector format mismatch (P1)
+### F12 — Impacted-test selector format mismatch (P1)
 
 | Field | Value |
 |-------|-------|
@@ -199,7 +199,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Verify in next PR CI run on `main`. |
 | **CI proof on main** | Pending merge. |
 
-### F13 â€” Sidecar excluded from PR `cargo test` (P1)
+### F13 — Sidecar excluded from PR `cargo test` (P1)
 
 | Field | Value |
 |-------|-------|
@@ -209,9 +209,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `reusable-ci-rust.yml` updated to include sidecar-watcher. |
 | **What changed** | Sidecar in PR Rust CI matrix. |
 | **What remains** | Green reusable caller on `main`. |
-| **CI proof on main** | **Not green** â€” `pf-reusable-caller.yaml` failing. |
+| **CI proof on main** | **Not green** — `pf-reusable-caller.yaml` failing. |
 
-### F14 â€” 4 sidecar integration tests quarantined (P1)
+### F14 — 4 sidecar integration tests quarantined (P1)
 
 | Field | Value |
 |-------|-------|
@@ -223,7 +223,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Monitor for drift on future API changes. |
 | **CI proof on main** | Pending merge. |
 
-### F15 â€” Sync blocking I/O in async log watcher (P1)
+### F15 — Sync blocking I/O in async log watcher (P1)
 
 | Field | Value |
 |-------|-------|
@@ -235,19 +235,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None for this finding. |
 | **CI proof on main** | Pending merge. |
 
-### F16 â€” 97 production unwrap/expect/panic in sidecar (P1)
+### F16 — 97 production unwrap/expect/panic in sidecar (P1)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | 97 production unwrap/expect; 18 in `scheduler.rs` alone. |
 | **Wave** | 3 |
 | **Status** | **PARTIAL** |
-| **Evidence (verified)** | `count_sidecar_unwraps.py` â†’ **40** (gate baseline â‰¤ 40); down from 97. |
+| **Evidence (verified)** | `count_sidecar_unwraps.py` → **40** (gate baseline ≤ 40); down from 97. |
 | **What changed** | P1/P2 modules cleaned (`break_glass`, `revocation`, `witness`, `ni_monitor`, `scheduler`). |
 | **What remains** | Drive count toward < 20; replace mutex `.unwrap()` with poison-safe patterns in remaining modules. |
 | **CI proof on main** | Gate script not yet on `main` CI; local exit 0 at baseline. |
 
-### F17 â€” SDK `verifyTrace` always `{ valid: true }` (P1)
+### F17 — SDK `verifyTrace` always `{ valid: true }` (P1)
 
 | Field | Value |
 |-------|-------|
@@ -259,7 +259,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F18 â€” Demo imports `SentinelOpsClient` (P1)
+### F18 — Demo imports `SentinelOpsClient` (P1)
 
 | Field | Value |
 |-------|-------|
@@ -271,7 +271,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F19 â€” SLO Gates â€” no root lockfile (P1)
+### F19 — SLO Gates — no root lockfile (P1)
 
 | Field | Value |
 |-------|-------|
@@ -281,9 +281,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | Workflow uses mock PF server instead of root lockfile dependency. |
 | **What changed** | SLO workflow decoupled from missing root `package-lock.json`. |
 | **What remains** | Green SLO run on `main`. |
-| **CI proof on main** | **Not green** â€” `slo-gates.yaml` failing (run 28568369544). |
+| **CI proof on main** | **Not green** — `slo-gates.yaml` failing (run 28568369544). |
 
-### F20 â€” CodeQL artifact upload broken (P1)
+### F20 — CodeQL artifact upload broken (P1)
 
 | Field | Value |
 |-------|-------|
@@ -293,9 +293,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `codeql.yaml` matrix artifact wiring fixed. |
 | **What changed** | Upload/download artifact names aligned. |
 | **What remains** | Green CodeQL on `main`. |
-| **CI proof on main** | **Not green** â€” `codeql.yaml` failing (run 28429083030). |
+| **CI proof on main** | **Not green** — `codeql.yaml` failing (run 28429083030). |
 
-### F21 â€” Runtime components absent from compose (P1)
+### F21 — Runtime components absent from compose (P1)
 
 | Field | Value |
 |-------|-------|
@@ -307,7 +307,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Full-platform compose smoke test. |
 | **CI proof on main** | Pending merge. |
 
-### F22 â€” `ws` missing from ledger (P1)
+### F22 — `ws` missing from ledger (P1)
 
 | Field | Value |
 |-------|-------|
@@ -319,7 +319,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F23 â€” Bench Nightly Criterion regression (P1)
+### F23 — Bench Nightly Criterion regression (P1)
 
 | Field | Value |
 |-------|-------|
@@ -329,9 +329,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `bench/BASELINE.md` + `refresh_baseline` workflow input wired; baseline SHA still pending. |
 | **What changed** | Workflow supports baseline refresh via `workflow_dispatch`. |
 | **What remains** | First green `save-baseline` run on Linux `main`; record SHA in BASELINE.md. |
-| **CI proof on main** | **Not green** â€” `bench-nightly-criterion.yaml` failing (run 28569060330). |
+| **CI proof on main** | **Not green** — `bench-nightly-criterion.yaml` failing (run 28569060330). |
 
-### F24 â€” Paper Conformance sidecar integration failures (P1)
+### F24 — Paper Conformance sidecar integration failures (P1)
 
 | Field | Value |
 |-------|-------|
@@ -339,11 +339,11 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Wave** | 1, 3 |
 | **Status** | **PARTIAL** |
 | **Evidence (verified)** | Local: `integration_tests` 9/9; rate-limit cluster (`test_99th_percentile_performance`, clock wraparound) green. |
-| **What changed** | `Instant` overflow + Îµ-tolerance fixes in `ratelimit.rs`. |
+| **What changed** | `Instant` overflow + ε-tolerance fixes in `ratelimit.rs`. |
 | **What remains** | **Two** consecutive green `paper-conformance.yaml` runs on `main`. |
-| **CI proof on main** | **Not green** â€” run 28568545852 in_progress at inventory time; prior failure triaged. |
+| **CI proof on main** | **Not green** — run 28568545852 in_progress at inventory time; prior failure triaged. |
 
-### F25 â€” Egress cert evidence hardcoded accept (P1)
+### F25 — Egress cert evidence hardcoded accept (P1)
 
 | Field | Value |
 |-------|-------|
@@ -355,11 +355,11 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F26 â€” Duplicate ledger entrypoints (P2)
+### F26 — Duplicate ledger entrypoints (P2)
 
 | Field | Value |
 |-------|-------|
-| **Original claim** | Three parallel index files (~60â€“70% duplication). |
+| **Original claim** | Three parallel index files (~60–70% duplication). |
 | **Wave** | 4 |
 | **Status** | **DONE** |
 | **Evidence (verified)** | Shared `server/` module; Docker uses canonical `index.js`. |
@@ -367,19 +367,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Deprecation timeline for `index-simple.ts` / `index-production.ts`. |
 | **CI proof on main** | Pending merge. |
 
-### F27 â€” 152 `any` usages in ledger src (P2)
+### F27 — 152 `any` usages in ledger src (P2)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | 152 `any`; `noImplicitAny: false` globally. |
 | **Wave** | 4 |
 | **Status** | **PARTIAL** |
-| **Evidence (verified)** | `count_ledger_any.py` â†’ **76**; `typecheck:server` exit 0 with `noImplicitAny` for `src/server/`. |
+| **Evidence (verified)** | `count_ledger_any.py` → **76**; `typecheck:server` exit 0 with `noImplicitAny` for `src/server/`. |
 | **What changed** | Server module strictly typed; count halved from 152. |
 | **What remains** | Drive toward ceiling **20**; extend strict typing beyond `server/`. |
 | **CI proof on main** | Pending merge; gate script not on `main` yet. |
 
-### F28 â€” Dual Apollo server stack (P2)
+### F28 — Dual Apollo server stack (P2)
 
 | Field | Value |
 |-------|-------|
@@ -391,7 +391,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Regenerate lockfile to drop transitive `apollo-server-express` entries. |
 | **CI proof on main** | Pending merge. |
 
-### F29 â€” Duplicate `epsilon_guard.rs` (P2)
+### F29 — Duplicate `epsilon_guard.rs` (P2)
 
 | Field | Value |
 |-------|-------|
@@ -403,7 +403,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F30 â€” Egress-firewall regex recompiled per call (P2)
+### F30 — Egress-firewall regex recompiled per call (P2)
 
 | Field | Value |
 |-------|-------|
@@ -415,19 +415,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | None. |
 | **CI proof on main** | Pending merge; `egress.yml` still red on `main` for other reasons. |
 
-### F31 â€” MD5 for approval token IDs (P2)
+### F31 — MD5 for approval token IDs (P2)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | `md5::compute` in `revocation.rs:214`. |
 | **Wave** | 3 |
 | **Status** | **DONE** |
-| **Evidence (verified)** | Grep `md5` in `revocation.rs` â†’ no matches; UUID used in tool-broker. |
+| **Evidence (verified)** | Grep `md5` in `revocation.rs` → no matches; UUID used in tool-broker. |
 | **What changed** | MD5 replaced with UUID-based token IDs. |
 | **What remains** | None. |
 | **CI proof on main** | Pending merge. |
 
-### F32 â€” Documentation drift (P2)
+### F32 — Documentation drift (P2)
 
 | Field | Value |
 |-------|-------|
@@ -437,9 +437,9 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | `make docs-strict` exit 0 (2026-07-02). |
 | **What changed** | Docs paths and on-ramps updated; strict build passes. |
 | **What remains** | Nav inclusion for internal docs (informational warnings only). |
-| **CI proof on main** | **Not green** â€” `docs-build.yaml` / `docs-deploy.yaml` failing on `main`. |
+| **CI proof on main** | **Not green** — `docs-build.yaml` / `docs-deploy.yaml` failing on `main`. |
 
-### F33 â€” Lean sorry debt (P2)
+### F33 — Lean sorry debt (P2)
 
 | Field | Value |
 |-------|-------|
@@ -449,21 +449,21 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **Evidence (verified)** | Grep: `Invariants.lean` 14, `MicroInterp.lean` 2, `proofs/Policy.lean` 4; [lean-sorry-burn-down.md](../lean-sorry-burn-down.md) tracks priority. |
 | **What changed** | Scoped CI enforcement documented; burn-down sequence defined. |
 | **What remains** | Eliminate 24 sorry outside enforced set; expand enforcement when Invariants clean. |
-| **CI proof on main** | **Not green** â€” `lean-style.yaml`, `lean-offline.yaml` failing. |
+| **CI proof on main** | **Not green** — `lean-style.yaml`, `lean-offline.yaml` failing. |
 
-### F34 â€” Two parallel VS Code extensions (P2)
+### F34 — Two parallel VS Code extensions (P2)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | `vscode-extension/` vs `tools/vscode-ext/` unclear canonical. |
 | **Wave** | 5 |
 | **Status** | **DONE** |
-| **Evidence (verified)** | [documentation-map.md](../../documentation-map.md) Â§ VS Code clarifies roles. |
+| **Evidence (verified)** | [documentation-map.md](../../documentation-map.md) § VS Code clarifies roles. |
 | **What changed** | Documentation distinguishes extension purposes. |
 | **What remains** | Optional future merge of extensions. |
 | **CI proof on main** | N/A (docs-only). |
 
-### F35 â€” Crate-wide `#![allow(dead_code)]` on sidecar (P2)
+### F35 — Crate-wide `#![allow(dead_code)]` on sidecar (P2)
 
 | Field | Value |
 |-------|-------|
@@ -475,7 +475,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Remove remaining module-level allows; address dead_code warnings incrementally. |
 | **CI proof on main** | Pending merge. |
 
-### F36 â€” No pre-commit hooks (P3)
+### F36 — No pre-commit hooks (P3)
 
 | Field | Value |
 |-------|-------|
@@ -487,7 +487,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Team adoption / optional CI enforcement. |
 | **CI proof on main** | N/A. |
 
-### F37 â€” No root `go.work` (P3)
+### F37 — No root `go.work` (P3)
 
 | Field | Value |
 |-------|-------|
@@ -499,19 +499,19 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 | **What remains** | Optional checked-in `go.work` for contributors who prefer it. |
 | **CI proof on main** | N/A. |
 
-### F38 â€” ESLint 8.x EOL (P3)
+### F38 — ESLint 8.x EOL (P3)
 
 | Field | Value |
 |-------|-------|
 | **Original claim** | ESLint 8.x across frontend packages (`console/package.json`, etc.). |
 | **Wave** | 6 |
 | **Status** | **OPEN** |
-| **Evidence (verified)** | `console/package.json` â†’ `"eslint": "~8.57.0"`. |
-| **What changed** | None â€” migration deferred. |
+| **Evidence (verified)** | `console/package.json` → `"eslint": "~8.57.0"`. |
+| **What changed** | None — migration deferred. |
 | **What remains** | ESLint 9 flat-config migration across console and other TS frontends. |
-| **CI proof on main** | N/A â€” not gating. |
+| **CI proof on main** | N/A — not gating. |
 
-### F39 â€” Dynamic SQL table interpolation (P3)
+### F39 — Dynamic SQL table interpolation (P3)
 
 | Field | Value |
 |-------|-------|
@@ -529,7 +529,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 
 | Status | Count | IDs |
 |--------|------:|-----|
-| **DONE** | 32 | F01â€“F15, F17â€“F22, F25â€“F26, F28â€“F32, F34, F36â€“F37, F39 |
+| **DONE** | 32 | F01–F15, F17–F22, F25–F26, F28–F32, F34, F36–F37, F39 |
 | **PARTIAL** | 6 | F16, F23, F24, F27, F33, F35 |
 | **OPEN** | 1 | F38 |
 
@@ -577,7 +577,7 @@ Local remediation can be **DONE** while `main` CI proof remains **pending merge*
 
 ### CI honesty scan (verified 2026-07-02)
 
-`python scripts/audit_ci_honesty.py` â†’ exit **1**, **59 unjustified** patterns:
+`python scripts/audit_ci_honesty.py` → exit **1**, **59 unjustified** patterns:
 
 | Pattern | Count |
 |---------|------:|
@@ -597,7 +597,7 @@ Ledger and TS SDK vacuous gates are **fixed locally**; repo-wide honesty debt re
 |-----------|------------|------------|-------|
 | Structural enforcement | B | **B+** | Shadow gated; integration tests green |
 | Crypto trust | F | **B-** | DSSE wired; fail-closed when enforced (F01, F25) |
-| Reliability | C- | **B-** | unwrap 97â†’40; spawn_blocking for logs (F15, F16 partial) |
+| Reliability | C- | **B-** | unwrap 97→40; spawn_blocking for logs (F15, F16 partial) |
 | Test coverage | D | **B** | 9 integration tests; in PR CI (F13, F14) |
 | dead_code hygiene | D | **C** | Crate allow removed; module allows remain (F35 partial) |
 
@@ -618,7 +618,7 @@ Ledger and TS SDK vacuous gates are **fixed locally**; repo-wide honesty debt re
 |-----------|------------|------------|-------|
 | Data model | B | **B** | Unchanged |
 | Migrations | D | **B-** | Broken migration quarantined (F09) |
-| Entry points | F | **B** | Docker â†’ `index.js`; shared server module (F03, F26) |
+| Entry points | F | **B** | Docker → `index.js`; shared server module (F03, F26) |
 | Type safety | D | **C+** | 76 `any` (was 152); server strict (F27 partial) |
 | Tests | F | **B** | 22 Jest tests (F11) |
 | MCP layer | C- | **B-** | Tenant fix; `ws` dep; tests added (F04, F22) |
@@ -629,39 +629,39 @@ Ledger and TS SDK vacuous gates are **fixed locally**; repo-wide honesty debt re
 
 All ten non-issue areas from the original audit **remain true**, with additions:
 
-1. **Evidence v0.1/v0.2** â€” still solid; 13 green workflows include evidence lanes.
-2. **PCS adapter** â€” unchanged; benchmarked.
-3. **SWE-bench pipeline** â€” mock engine for CI; Linux path documented.
-4. **Three checked-in examples** â€” pytest green in CI.
-5. **Docs build** â€” `make docs-strict` passes locally (F32).
-6. **Standards submodules** â€” CERT-V1 + TRACE-REPLAY-KIT pinned.
-7. **Go CLI cmd tests** â€” pass.
-8. **Rust workspace tests** â€” pass; retrieval-gateway now included.
-9. **No hardcoded production secrets** â€” unchanged.
-10. **WASM sandbox** â€” 2 tests pass.
-11. **PF signature signing** â€” `pf_sig.go` distinct fast-path still valid.
+1. **Evidence v0.1/v0.2** — still solid; 13 green workflows include evidence lanes.
+2. **PCS adapter** — unchanged; benchmarked.
+3. **SWE-bench pipeline** — mock engine for CI; Linux path documented.
+4. **Three checked-in examples** — pytest green in CI.
+5. **Docs build** — `make docs-strict` passes locally (F32).
+6. **Standards submodules** — CERT-V1 + TRACE-REPLAY-KIT pinned.
+7. **Go CLI cmd tests** — pass.
+8. **Rust workspace tests** — pass; retrieval-gateway now included.
+9. **No hardcoded production secrets** — unchanged.
+10. **WASM sandbox** — 2 tests pass.
+11. **PF signature signing** — `pf_sig.go` distinct fast-path still valid.
 12. **NEW:** Cross-lang DSSE verify libraries (`core/crypto/dsse-*`).
 13. **NEW:** Ledger Jest suite (22 tests) replaces vacuous gate.
 14. **NEW:** Retention manager validated SQL (F39).
 
 ---
 
-## Remediation PR Stack â€” completion
+## Remediation PR Stack — completion
 
 | PR | Scope | Findings | Completion | Blocker |
 |----|-------|----------|------------|---------|
-| **PR-1: CI honesty** | Replay CLI, ghost tests, impacted selector, vacuous gates, SLO/CodeQL | F06, F10â€“F12, F19â€“F20 | **~85%** | Merge + Linux replay cluster green; 59 CI honesty patterns remain |
-| **PR-2: Trust chain** | DSSE wire-up, shadow gate, egress evidence | F01â€“F02, F17, F25 | **100%** local | `PF_ENFORCE_DSSE` adoption docs |
-| **PR-3: Demo/example fixes** | run-demo, SDK exports, edge-middleware | F07â€“F08, F18 | **100%** local | CI smoke for demos |
-| **PR-4: Ledger consolidation** | Entrypoint, Docker, ws, migrations, Jest, Apollo | F03â€“F04, F09, F11, F22, F26â€“F28 | **~90%** | F27 `any` burn-down to 20 |
-| **PR-5: Runtime hardening** | unwrap burn-down, spawn_blocking, regex cache, tests | F14â€“F16, F30â€“F31, F35 | **~80%** | F16 at gate baseline not target; F35 module allows |
-| **PR-6: Architecture cleanup** | retrieval-gateway, compose, epsilon dedupe, docs, bench | F05, F21, F23â€“F24, F29, F32, F34 | **~85%** | F23 baseline refresh; F24 main CI proof |
+| **PR-1: CI honesty** | Replay CLI, ghost tests, impacted selector, vacuous gates, SLO/CodeQL | F06, F10–F12, F19–F20 | **~85%** | Merge + Linux replay cluster green; 59 CI honesty patterns remain |
+| **PR-2: Trust chain** | DSSE wire-up, shadow gate, egress evidence | F01–F02, F17, F25 | **100%** local | `PF_ENFORCE_DSSE` adoption docs |
+| **PR-3: Demo/example fixes** | run-demo, SDK exports, edge-middleware | F07–F08, F18 | **100%** local | CI smoke for demos |
+| **PR-4: Ledger consolidation** | Entrypoint, Docker, ws, migrations, Jest, Apollo | F03–F04, F09, F11, F22, F26–F28 | **~90%** | F27 `any` burn-down to 20 |
+| **PR-5: Runtime hardening** | unwrap burn-down, spawn_blocking, regex cache, tests | F14–F16, F30–F31, F35 | **~80%** | F16 at gate baseline not target; F35 module allows |
+| **PR-6: Architecture cleanup** | retrieval-gateway, compose, epsilon dedupe, docs, bench | F05, F21, F23–F24, F29, F32, F34 | **~85%** | F23 baseline refresh; F24 main CI proof |
 
 **Overall PR stack:** ~**90%** code-complete locally; **0%** reflected in `main` CI green count (still 13/68).
 
 ---
 
-## Wave 7 â€” CI green program (meta-gaps)
+## Wave 7 — CI green program (meta-gaps)
 
 Wave 7 is **OPEN**. Prerequisites before claiming 67/68 gated green:
 
@@ -669,12 +669,12 @@ Wave 7 is **OPEN**. Prerequisites before claiming 67/68 gated green:
 |-----|--------|------------|
 | Merge remediation branch | Local fixes not on `main` | All |
 | Replay cluster | 4 workflows share F10 fix; need Linux Docker validation | Wave 1 |
-| Bench baseline | F23 â€” first `refresh_baseline` green run | Wave 1 |
-| Paper conformance | F24 â€” two consecutive green runs | Wave 1, 3 |
+| Bench baseline | F23 — first `refresh_baseline` green run | Wave 1 |
+| Paper conformance | F24 — two consecutive green runs | Wave 1, 3 |
 | CI honesty debt | 59 unjustified `\|\| true` / `continue-on-error` / `passWithNoTests` | Wave 7 |
 | Lean workflows | F33 sorry + lean-style/offline failures | Wave 6 |
 | Security cluster | cargo-deny, wasm-scan, CodeQL post-merge | Wave 1 |
-| ESLint 9 | F38 open â€” frontend packages | Wave 6 |
+| ESLint 9 | F38 open — frontend packages | Wave 6 |
 
 **Exit criterion:** 68/68 gated workflows green **twice** on `main` with honest gates (no vacuous test passes).
 
@@ -730,14 +730,14 @@ flowchart TB
 ## Ordered next actions
 
 1. **Merge remediation branch** to `main` and trigger full CI matrix.
-2. **Replay cluster validation** â€” Linux Docker run of `tests/replay/test_docker_invocation.sh`; confirm platform-replay + nightly-replay + platform-cert-validate green.
-3. **Bench baseline refresh** â€” `workflow_dispatch` with `refresh_baseline: true`; record SHA in `bench/BASELINE.md` (F23).
-4. **Paper conformance** â€” confirm two consecutive green `paper-conformance.yaml` runs (F24).
-5. **Ledger `any` burn-down** â€” drive `count_ledger_any.py` from 76 toward 20 (F27).
-6. **Sidecar unwrap burn-down** â€” continue below gate baseline 40 toward < 20 (F16).
-7. **CI honesty sweep** â€” justify or remove 59 patterns flagged by `audit_ci_honesty.py` (Wave 7).
-8. **Lean sorry P1** â€” `Invariants.lean` 14 sorry per [lean-sorry-burn-down.md](../lean-sorry-burn-down.md) (F33).
-9. **ESLint 9 migration** â€” plan flat-config rollout (F38).
+2. **Replay cluster validation** — Linux Docker run of `tests/replay/test_docker_invocation.sh`; confirm platform-replay + nightly-replay + platform-cert-validate green.
+3. **Bench baseline refresh** — `workflow_dispatch` with `refresh_baseline: true`; record SHA in `bench/BASELINE.md` (F23).
+4. **Paper conformance** — confirm two consecutive green `paper-conformance.yaml` runs (F24).
+5. **Ledger `any` burn-down** — drive `count_ledger_any.py` from 76 toward 20 (F27).
+6. **Sidecar unwrap burn-down** — continue below gate baseline 40 toward < 20 (F16).
+7. **CI honesty sweep** — justify or remove 59 patterns flagged by `audit_ci_honesty.py` (Wave 7).
+8. **Lean sorry P1** — `Invariants.lean` 14 sorry per [lean-sorry-burn-down.md](../lean-sorry-burn-down.md) (F33).
+9. **ESLint 9 migration** — plan flat-config rollout (F38).
 10. **First `retrieval-gateway.yml` green** on `main` after merge (F05 CI proof).
 
 ---
