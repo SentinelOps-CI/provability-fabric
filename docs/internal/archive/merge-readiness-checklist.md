@@ -45,13 +45,13 @@ Verified via `gh api repos/SentinelOps-CI/provability-fabric/branches/main/prote
 | `Scheduler & Clock Model` (paper-conformance) | cancelled (optional) | Job timeout on cold cargo cache; not a merge gate |
 | Approving review | **missing** | `mergeStateStatus: BLOCKED`, `reviewDecision: REVIEW_REQUIRED` |
 
-**Merge state:** **CI clear** â€” all four branch-protection checks green. **Merge blocked by review only** until an approver signs off.
+**Merge state:** **CI clear** — all four branch-protection checks green. **Merge blocked by review only** until an approver signs off.
 
 ## Pre-merge (local / PR branch)
 
 - [x] Resolve merge conflicts with `main` (branch `audit-remediation-merge` rebased/current)
-- [x] Open merge PR(s); request review â€” [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144)
-- [x] Submodule `external/TRACE-REPLAY-KIT` at pinned commit with Dockerfile `CMD []` (F10) â€” `957630f`
+- [x] Open merge PR(s); request review — [PR #144](https://github.com/SentinelOps-CI/provability-fabric/pull/144)
+- [x] Submodule `external/TRACE-REPLAY-KIT` at pinned commit with Dockerfile `CMD []` (F10) — `957630f`
 - [x] Run Linux validation script (Windows: skip Docker/replay; see notes below):
 
 ```bash
@@ -92,21 +92,21 @@ make docs-strict
 
 - [x] `tools/standards/versions.json` pin matches `external/TRACE-REPLAY-KIT` HEAD (`957630f1ab8c00031c5f56d32e610a9f8baf69b6`)
 - [x] `external/TRACE-REPLAY-KIT/runner/Dockerfile` uses `ENTRYPOINT ["python", "replay_run.py"]` and `CMD []`
-- [x] `tests/replay/test_docker_invocation.sh` exits 0 on Linux CI â€” **pass** on PR run [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480) (`replay-tests` job)
-- [ ] `integration.yaml` submodule init + full F06/F10/F21 suite â€” **fail** on PR run [28576347398](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347398) (submodule clone; fixed in branch via `make submodules` + token)
+- [x] `tests/replay/test_docker_invocation.sh` exits 0 on Linux CI — **pass** on PR run [28576347480](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347480) (`replay-tests` job)
+- [ ] `integration.yaml` submodule init + full F06/F10/F21 suite — **fail** on PR run [28576347398](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/28576347398) (submodule clone; fixed in branch via `make submodules` + token)
 
 ## CI wiring verified on PR
 
-- [x] `platform-replay.yml` â€” replay docker contract test step wired
-- [x] `integration.yaml` â€” replay contract test step + `test_ledger_mcp_tenant.py` + compose smoke
-- [x] `reusable-ci-rust.yml` â€” `integration_tests` + regression gates + `retrieval-gateway`
-- [x] `reusable-ci-extended.yml` â€” `test_cross_lang_dsse.py` (F01)
-- [x] `ci.yml` â€” `audit_ci_honesty.py` gate
-- [x] `retrieval-gateway.yml` â€” build + test on path trigger (F05)
+- [x] `platform-replay.yml` — replay docker contract test step wired
+- [x] `integration.yaml` — replay contract test step + `test_ledger_mcp_tenant.py` + compose smoke
+- [x] `reusable-ci-rust.yml` — `integration_tests` + regression gates + `retrieval-gateway`
+- [x] `reusable-ci-extended.yml` — `test_cross_lang_dsse.py` (F01)
+- [x] `ci.yml` — `audit_ci_honesty.py` gate
+- [x] `retrieval-gateway.yml` — build + test on path trigger (F05)
 - [x] Placeholder gate: `make no-runtime-placeholders` exit 0 (excludes `build/`, `dist/`, binaries)
-- [x] `replay.yml` â€” F10 docker contract test added (preemptive Wave 7 triage)
+- [x] `replay.yml` — F10 docker contract test added (preemptive Wave 7 triage)
 
-## Post-merge (main â€” do NOT skip)
+## Post-merge (main — do NOT skip)
 
 - [x] Refresh CI inventory baseline (2026-07-03; `main` still 12/68 green until merge):
 
@@ -133,7 +133,7 @@ bash scripts/ci_workflow_inventory.sh --markdown > docs/internal/ci-inventory-la
 **Merge to `main` requires explicit user approval** after PR #144 shows all four branch-protection checks green (currently satisfied) and an approving review is recorded.
 
 <details>
-<summary>PR #144 CI snapshot (2026-07-03, historical â€” superseded)</summary>
+<summary>PR #144 CI snapshot (2026-07-03, historical — superseded)</summary>
 
 **Branch:** `audit-remediation-merge` @ `3d4bc35b`. Prior triage before required checks went green.
 

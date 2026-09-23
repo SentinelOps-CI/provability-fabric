@@ -1,6 +1,6 @@
 ﻿# Evidence v0.2 delivery guide
 
-Historical guide for the eight stacked Evidence v0.2 pull requests plus CI hardening follow-ups. **Merged to `main` on 2026-06-14** (PRs #98â€“#104 into stacked bases; #105 landed `evidence-v02/onboarding` on `main`). CI hardening through #111.
+Historical guide for the eight stacked Evidence v0.2 pull requests plus CI hardening follow-ups. **Merged to `main` on 2026-06-14** (PRs #98–#104 into stacked bases; #105 landed `evidence-v02/onboarding` on `main`). CI hardening through #111.
 
 ## Stack order
 
@@ -47,7 +47,7 @@ Gates align with the [Evidence v0.2 definition of done](../../roadmap/evidence-v
 | 104 | Release docs | `mkdocs build`; quickstart v0.2 section |
 | 105 | Land on main | Full Evidence smoke matrix green on Linux CI |
 
-### CI hardening (post-merge, #106â€“#111)
+### CI hardening (post-merge, #106–#111)
 
 | PR | Fix |
 |----|-----|
@@ -58,7 +58,7 @@ Gates align with the [Evidence v0.2 definition of done](../../roadmap/evidence-v
 | #110 | Create testbed `out/` before replay report |
 | #111 | Migrate remaining workflows off `submodules: recursive`; `main` workflow_dispatch smoke green (run `27512113090`) |
 | #118 | Repo-wide CI hardening: proto-compat, lean/rust/go-node, deny, multiarch, integration paths (merge `3f150b15`) |
-| #121+ | Post-#118 closure stack: artifact v4, platform/bench/security/lean/nightly sweeps â€” see [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) |
+| #121+ | Post-#118 closure stack: artifact v4, platform/bench/security/lean/nightly sweeps — see [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) |
 
 Green baselines: PR #110 (first full matrix after testbed fix), PR #111 (`main` workflow_dispatch [27512113090](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27512113090)), post-#116 [27527807232](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27527807232), post-#118 dispatch [27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912).
 
@@ -66,12 +66,12 @@ Green baselines: PR #110 (first full matrix after testbed fix), PR #111 (`main` 
 
 | Replay acceptance tier | PRs | Mechanism |
 |-----------------|-----|-----------|
-| v0.1 static / digest replay | #92â€“#95, #97 | `pf evidence replay` without `--execute`; trace digest + artifact binding |
+| v0.1 static / digest replay | #92–#95, #97 | `pf evidence replay` without `--execute`; trace digest + artifact binding |
 | v0.2 KIT import | #99 | `pf evidence trace import --kit-trace` |
 | v0.2 schema + `replay_context` | #100 | v0.2 bundle schema; strict path validation |
 | v0.2 deep execute + low-view | #101, #105 | `pf evidence replay --execute --low-view` via TRACE-REPLAY-KIT |
 
-PR **#92** introduced v0.1 static replay only. Deep-replay acceptance deliverables cite **#99â€“#101** and **#105**, not #92 alone.
+PR **#92** introduced v0.1 static replay only. Deep-replay acceptance deliverables cite **#99–#101** and **#105**, not #92 alone.
 
 ## Fresh-clone verification checklist
 
@@ -110,11 +110,11 @@ For CI and private upstream repos, set repository secret **`STANDARDS_GITHUB_TOK
 
 **Local shortcut:** `make evidence-verify` runs standards init, Go/pytest suites, and both testbed scripts (Linux/WSL or Git Bash on Windows).
 
-**Fresh-clone record (2026-06-14):** on `main` after delivery closure â€” `make dev-standards` + `make evidence-verify` (Linux/WSL); Evidence smoke dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869) on `main`.
+**Fresh-clone record (2026-06-14):** on `main` after delivery closure — `make dev-standards` + `make evidence-verify` (Linux/WSL); Evidence smoke dispatch [27515098869](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27515098869) on `main`.
 
 ## Post-merge hygiene
 
-1. ~~Optional: delete remote branches `evidence-v02/*`~~ â€” **Done** (2026-06-14); kept `evidence-v01/snapshot` as archive.
+1. ~~Optional: delete remote branches `evidence-v02/*`~~ — **Done** (2026-06-14); kept `evidence-v01/snapshot` as archive.
 2. Monitor [`evidence-v01-smoke.yml`](https://github.com/SentinelOps-CI/provability-fabric/blob/main/.github/workflows/evidence-v01-smoke.yml) on `main` for regressions; dispatch via Actions when validating delivery.
 3. Ensure org/repo secret **`STANDARDS_GITHUB_TOKEN`** is configured for fork PRs and workflows that call `make submodules`.
 4. Optional: delete remote `evidence-v01/*` branches after v0.1 archive policy is agreed (see [Evidence v0.1 delivery guide](evidence-v0.1-delivery.md#post-merge-hygiene)).

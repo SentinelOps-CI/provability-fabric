@@ -1,6 +1,6 @@
 ﻿# Evidence v0.1 delivery guide
 
-Historical guide for the fifteen stacked Evidence v0.1 pull requests. **Merged to `main` on 2026-06-14** (PRs #82â€“#96 into stacked bases; #97 landed `evidence-v01/testbed` on `main`).
+Historical guide for the fifteen stacked Evidence v0.1 pull requests. **Merged to `main` on 2026-06-14** (PRs #82–#96 into stacked bases; #97 landed `evidence-v01/testbed` on `main`).
 
 ## Stack order
 
@@ -88,10 +88,10 @@ mkdocs build
   specs/evidence/v0.1/examples/valid/basic-evidence-bundle.json --strict
 ```
 
-**Local result (2026-06-14):** executed on `evidence-v01/onboarding-docs` tip â€” 37 pytest passed (1 skipped: live sidecar on Windows), `go test ./...` in `core/evidence` passed, `cargo test -p sidecar-watcher` binding tests passed (CERT-V1 live test skipped without submodule locally), `mkdocs build` passed.
+**Local result (2026-06-14):** executed on `evidence-v01/onboarding-docs` tip — 37 pytest passed (1 skipped: live sidecar on Windows), `go test ./...` in `core/evidence` passed, `cargo test -p sidecar-watcher` binding tests passed (CERT-V1 live test skipped without submodule locally), `mkdocs build` passed.
 
 ## Post-merge hygiene
 
-1. ~~Optional: delete remote branches `evidence-v01/*`~~ â€” **Done** except `evidence-v01/snapshot` (2026-06-14).
-2. ~~Remove `scripts/create-evidence-v01-pr-stack.ps1`~~ â€” done on `main`.
+1. ~~Optional: delete remote branches `evidence-v01/*`~~ — **Done** except `evidence-v01/snapshot` (2026-06-14).
+2. ~~Remove `scripts/create-evidence-v01-pr-stack.ps1`~~ — done on `main`.
 3. Monitor `evidence-v01-smoke.yml` on `main` for regressions.
