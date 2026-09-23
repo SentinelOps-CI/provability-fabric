@@ -14,7 +14,7 @@ Single-page sign-off for the Evidence v0.1 + v0.2 vision and the repo-wide CI gr
 
 ## Full-green CI criterion
 
-Every workflow under `.github/workflows/` that triggers on **`push` to `main`** or **`schedule`** must have a latest `main` run with conclusion **success**. Live counts live in this page and [remediation-tracker.md](../internal/remediation-tracker.md); historical triage in [ci-health-matrix.md](../internal/ci-health-matrix.md) and via:
+Every workflow under `.github/workflows/` that triggers on **`push` to `main`** or **`schedule`** must have a latest `main` run with conclusion **success**. Workflow counts on this page are historical records of the June–July 2026 closure checkpoints at the commits named below, not the current inventory of `main`. Maintainers should check [current Actions runs](https://github.com/SentinelOps-CI/provability-fabric/actions) and regenerate [ci-inventory-latest.md](../internal/ci-inventory-latest.md). Finding status remains in [remediation-tracker.md](../internal/remediation-tracker.md); older triage is in [ci-health-matrix.md](../internal/ci-health-matrix.md). Regenerate inventory via:
 
 ```bash
 scripts/ci_workflow_inventory.sh
@@ -22,9 +22,9 @@ scripts/ci_workflow_inventory.sh --markdown   # docs/internal/ci-inventory-lates
 # Windows: scripts/ci_workflow_inventory.ps1 -Markdown
 ```
 
-**Current posture (2026-07-18 â€” CI-local proofs @ `bae36f642`):** **PR #223** merged. F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Gated CI-local proofs: `dr-cross` (moto), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Inventory exit **0 Ã—2** â€” **69** gated. Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Live ops: [live-ops-secrets.md](../runbooks/live-ops-secrets.md); Wave 7 archive: [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
+**Historical posture (2026-07-18 â€” CI-local proofs @ `bae36f642`):** **PR #223** merged. F33 **DONE**; `lean-offline-full` proven ([29646806851](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/29646806851)). Gated CI-local proofs: `dr-cross` (moto), `publish-updates` (package+HMAC+mock registry), `revocation-sync` (mock registry merge/sign), `edge-load`/`loadtest`/`perf-proofmeter` (latency/error asserts + multi-region mock). Inventory exit **0 Ã—2** â€” **69** gated. Still live-secret only: production AWS DR, live multi-region SaaS, live registry publish, live revocation fetch. Do **not** claim literal 67/67. Live ops: [live-ops-secrets.md](../runbooks/live-ops-secrets.md); Wave 7 archive: [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md); [ci-inventory-latest.md](../internal/ci-inventory-latest.md).
 
-**Inventory exit 0 Ã—2 claimed** at **69** gated (tip `bae36f642`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
+**Inventory exit 0 Ã—2 was claimed at that recorded commit** (**69** gated, tip `bae36f642`). Wave 7 historical **60/60** first closed @ `7d48b3d4` / tip `b8b78b94`.
 
 ### Path to 67/67 (Wave 7 â€” closed 2026-07-16)
 
@@ -110,7 +110,7 @@ Setup steps: [CONTRIBUTING.md](https://github.com/SentinelOps-CI/provability-fab
 
 _Superseded by milestone table above (2026-07-02 refresh)._
 
-Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off: inventory exits **0** Ã—2 on `main` (**69** gated @ tip `6b99ef300`; historical Wave 7 **60/60** @ `b8b78b94`); F23/F24/F33 **DONE**; `lean-offline-full` proven; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md).
+Track per-finding status in [remediation-tracker.md](../internal/remediation-tracker.md). Closure sign-off recorded at tip `6b99ef300`: inventory exit **0** twice (**69** gated; historical Wave 7 **60/60** @ `b8b78b94`). That sign-off is not a current `main` count; re-check Actions and the inventory script. F23/F24/F33 **DONE**; `lean-offline-full` proven; Phase 3 hardening run IDs in [wave7-post-merge-runbook.md](../internal/archive/wave7-post-merge-runbook.md).
 
 Local maintainer gates on `main`: `make dev-standards`, `make standards-pin-check`, `make evidence-verify`, `make docs-strict` â€” all pass (2026-06-17 re-verify). Evidence smoke on `main`: [27670516771](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27670516771) (success); ceremony baseline [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (success). Four gap-closure workflow fixes merged via **PR #134** (`ci/gap-closure-workflow-bumps`).
 

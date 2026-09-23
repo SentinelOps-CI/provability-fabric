@@ -3,6 +3,8 @@
 Generated: 2026-07-22T14:49:40Z UTC
 Repository: `SentinelOps-CI/provability-fabric` branch `main`
 
+> Historical dump from 2026-07-22. These workflow counts record that generation, not the current `main` inventory. Regenerate with `scripts/ci_workflow_inventory.sh --markdown` (or `powershell -File scripts/ci_workflow_inventory.ps1 -Markdown`), or check [current Actions runs](https://github.com/SentinelOps-CI/provability-fabric/actions).
+
 **Inventory honesty:** gated = last main-branch run must be `success`.
 Path-filtered and schedule-only workflows are **not** required to run on every tip push.
 
