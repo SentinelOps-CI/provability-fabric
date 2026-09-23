@@ -1,25 +1,25 @@
 ﻿# Evidence v0.2 status
 
-> **Historical document.** Completion tracker for the Evidence v0.2 integration workstream (implementation and delivery to `main` completed 2026-06-14, PRs #98â€“#105; CI hardening through #118; acceptance docs through #130). **Live gated CI counts and inventory exit codes** are maintained in [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) and [remediation-tracker.md](../remediation-tracker.md) â€” currently **69** gated, inventory exit **0** (Wave 8). Do not cite the 8/67 figures below as current.
+> **Historical document.** Completion tracker for the Evidence v0.2 integration workstream (implementation and delivery to `main` completed 2026-06-14, PRs #98–#105; CI hardening through #118; acceptance docs through #130). **Live gated CI counts and inventory exit codes** are maintained in [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) and [remediation-tracker.md](../remediation-tracker.md) — currently **69** gated, inventory exit **0** (Wave 8). Do not cite the 8/67 figures below as current.
 
-Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98â€“#105); CI hardening through #118 (merged 2026-06-16); evidence acceptance gap docs through #130 (merged 2026-06-16).
+Completion tracker for the Evidence v0.2 integration workstream. Implementation and delivery to `main` completed 2026-06-14 (PRs #98–#105); CI hardening through #118 (merged 2026-06-16); evidence acceptance gap docs through #130 (merged 2026-06-16).
 
 ## Public status checkpoint 2026-06-16
 
 | Item | Status |
 |------|--------|
 | **Main SHA** | `9788bb8a` (merge #130 evidence acceptance gap analysis) |
-| **D1â€“D2** Schema + bundle tooling | Complete â€” v0.1/v0.2 schemas, `pf evidence validate --strict`, compatibility matrix |
-| **D3** Runtime integration | Complete on Linux CI â€” sidecar binding + cert path guard; Windows `cargo test` deferred to CI authority |
-| **D4** Replay | Complete â€” v0.1 static + v0.2 deep execute/low-view; cross-platform testbed hardening in gap-closure PR |
-| **D5** Verification | Evidence smoke green; standards pins verified; program closure docs #127â€“#130 |
+| **D1–D2** Schema + bundle tooling | Complete — v0.1/v0.2 schemas, `pf evidence validate --strict`, compatibility matrix |
+| **D3** Runtime integration | Complete on Linux CI — sidecar binding + cert path guard; Windows `cargo test` deferred to CI authority |
+| **D4** Replay | Complete — v0.1 static + v0.2 deep execute/low-view; cross-platform testbed hardening in gap-closure PR |
+| **D5** Verification | Evidence smoke green; standards pins verified; program closure docs #127–#130 |
 | **Attestation signatures** | Structural + digest-bound only; DSSE verification external ([attestation signatures](../../specs/evidence-attestation-signatures.md)) |
 | **Proof semantics** | Structural + digest-bound only; no Lean checking in Evidence lane |
 | **Docs** | `mkdocs build --strict` passes on maintainer host |
 
-### Explicit non-claims (as of 2026-06-16 checkpoint â€” historical)
+### Explicit non-claims (as of 2026-06-16 checkpoint — historical)
 
-- **Not** full-repo CI green **at that checkpoint** (inventory then: 8/67 gated workflows green on post-#128 `main`). **Superseded:** Wave 8 inventory exit **0** at **69** gated â€” see [evidence-program-closure.md](../../roadmap/evidence-program-closure.md).
+- **Not** full-repo CI green **at that checkpoint** (inventory then: 8/67 gated workflows green on post-#128 `main`). **Superseded:** Wave 8 inventory exit **0** at **69** gated — see [evidence-program-closure.md](../../roadmap/evidence-program-closure.md).
 - **Not** Windows-local `cargo test emit_evidence` when crates.io SSL blocks downloads
 - **Not** in-validator CERT-V1 / attestation signature verification (`--verify-signatures` out of scope)
 - **Not** semantic proof checking (Lean) inside `pf evidence validate`
@@ -39,7 +39,7 @@ Internal evidence acceptance positioning: [evidence-acceptance-positioning.md](e
 |------|--------|
 | Merge commit | `3f150b1569b8dd50061d57ed99f34aa4b8dfffe6` |
 | Post-merge smoke | [workflow_dispatch 27596580912](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27596580912) |
-| Closure stack | #121â€“#128 (`ci/standards-parity` â€¦ `ci/post-closure-hotfixes`) |
+| Closure stack | #121–#128 (`ci/standards-parity` … `ci/post-closure-hotfixes`) |
 | Sign-off page | [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) (#127); hotfixes **#128** merged `de104223`; post-#128 sign-off **#129** merged `fdca37c4` |
 | Post-#128 ceremony | Smoke [27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269), CI [27616317486](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616317486) |
 | Phase 6 ceremony | Smoke [27597765777](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765777), CI [27597765883](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27597765883) |
@@ -49,8 +49,8 @@ Internal evidence acceptance positioning: [evidence-acceptance-positioning.md](e
 | Check | `main` SHA | Result |
 |-------|------------|--------|
 | `make dev-standards` | `fdca37c4` | **Pass** locally (CERT-V1 + TRACE-REPLAY-KIT submodules initialized) |
-| `make standards-pin-check` | `fdca37c4` | **Pass** locally â€” pins match `tools/standards/versions.json` |
-| CI smoke (`STANDARDS_GITHUB_TOKEN`) | `de104223` | **Pass** â€” [run 27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (`make submodules` in Linux CI) |
+| `make standards-pin-check` | `fdca37c4` | **Pass** locally — pins match `tools/standards/versions.json` |
+| CI smoke (`STANDARDS_GITHUB_TOKEN`) | `de104223` | **Pass** — [run 27616315269](https://github.com/SentinelOps-CI/provability-fabric/actions/runs/27616315269) (`make submodules` in Linux CI) |
 
 Org secret `STANDARDS_GITHUB_TOKEN` is configured for CI; local clones use HTTPS submodule URLs when the token is not present.
 
@@ -63,15 +63,15 @@ Maintainer packet (private, gitignored): `private/acceptance-evidence/acceptance
 | `pf evidence validate` v0.1/v0.2 `--strict` | Pass | smoke job in 27616315269 |
 | `pf evidence replay --execute --low-view` | Pass (Windows; `PYTHONIOENCODING=utf-8`) | smoke job in 27616315269 |
 | `mkdocs build --strict` | Pass | Documentation Build on PR #129 |
-| Repo-wide inventory | exit 1 then (8/67 gated green) â€” **historical** | Live: [program closure](../../roadmap/evidence-program-closure.md) (**69** gated, exit **0**) |
+| Repo-wide inventory | exit 1 then (8/67 gated green) — **historical** | Live: [program closure](../../roadmap/evidence-program-closure.md) (**69** gated, exit **0**) |
 
 Deep replay report archived at `private/acceptance-evidence/acceptance-2026-06-16/evidence-v02-replay-report.json`.
 
 ## CI inventory caveat (historical)
 
-At Evidence v0.2 acceptance (post-#128), Evidence smoke and standards-pin baselines were green while the repository was **not** fully green repo-wide â€” inventory then: **8/67** gated workflows green (exit 1).
+At Evidence v0.2 acceptance (post-#128), Evidence smoke and standards-pin baselines were green while the repository was **not** fully green repo-wide — inventory then: **8/67** gated workflows green (exit 1).
 
-**Live counts:** [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) â€” Wave 8 **69** gated, inventory exit **0**. Do not treat 8/67 as current. Archived triage: [ci-health-matrix.md](../ci-health-matrix.md).
+**Live counts:** [evidence-program-closure.md](../../roadmap/evidence-program-closure.md) — Wave 8 **69** gated, inventory exit **0**. Do not treat 8/67 as current. Archived triage: [ci-health-matrix.md](../ci-health-matrix.md).
 
 ## Implementation (branch stack)
 
@@ -102,13 +102,13 @@ Last full Evidence smoke matrix (Linux CI, 2026-06-15): all three jobs green (`e
 
 | Gate | Status |
 |------|--------|
-| 7 stacked PRs opened and merged (#98â€“#104) | Complete |
+| 7 stacked PRs opened and merged (#98–#104) | Complete |
 | Stack landed on `main` (#105) | Complete |
 | Evidence smoke green on Linux CI (#110) | Complete |
 | `main` workflow_dispatch confirmation (#111, run 27512113090) | Complete |
-| Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Complete â€” deleted 2026-06-14; kept `evidence-v01/snapshot` |
-| Fresh-clone checklist recorded | Complete â€” see [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md#fresh-clone-verification-checklist) (2026-06-14, commit on `main`) |
-| mkdocs strict + docs-build CI | Complete â€” #114 |
+| Remote branch cleanup (`evidence-v01/*`, `evidence-v02/*`) | Complete — deleted 2026-06-14; kept `evidence-v01/snapshot` |
+| Fresh-clone checklist recorded | Complete — see [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md#fresh-clone-verification-checklist) (2026-06-14, commit on `main`) |
+| mkdocs strict + docs-build CI | Complete — #114 |
 
 See [Evidence v0.2 integration](../../roadmap/evidence-v0.2.md) for definition of done, [Evidence v0.2 delivery guide](evidence-v0.2-delivery.md) for stack and fresh-clone checklist, and [Evidence v0.1 status](evidence-v0.1-status.md) for the v0.1 baseline.
 
@@ -118,8 +118,8 @@ See [Evidence v0.2 integration](../../roadmap/evidence-v0.2.md) for definition o
 |------|--------|
 | Upstream tags `v1.0.0` not published | Pins use commit SHAs in `tools/standards/versions.json` |
 | Private `verifiable-ai-ci/*` repos | CI requires `STANDARDS_GITHUB_TOKEN` secret |
-| Other workflows using `submodules: recursive` | Complete â€” removed in #111; use plain checkout + `make submodules` |
-| `mkdocs build --strict` | Complete â€” enforced in docs-build CI and `make docs-strict` |
+| Other workflows using `submodules: recursive` | Complete — removed in #111; use plain checkout + `make submodules` |
+| `mkdocs build --strict` | Complete — enforced in docs-build CI and `make docs-strict` |
 
 ## Out of scope (unchanged)
 

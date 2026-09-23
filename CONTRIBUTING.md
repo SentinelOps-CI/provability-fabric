@@ -92,7 +92,7 @@ Prefer profile-scoped Make targets (health-wait, no fixed sleep). Full matrix: [
 ```bash
 make platform-up     # default profile: platform + sidecar (:8000 / :8006)
 make ledger-up       # + ledger GraphQL (:4000), PROFILE=dev
-make check-wiring    # compose â†” code port defaults
+make check-wiring    # compose ↔ code port defaults
 # Console UI (:3000) requires: make full-up
 ```
 
@@ -104,17 +104,17 @@ make check-wiring    # compose â†” code port defaults
 
 **Primary path:** develop inside [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) (Ubuntu recommended). Clone the repo on the Linux filesystem (`~/provability-fabric`), and run bash/`make` targets from WSL. Linux CI remains authoritative for Lean/Lake, evidence replay, and full integration.
 
-Native Windows (PowerShell/cmd) is an **optional smoke subset only** â€” do not chase native Lean, OpenHands, or full `make test` parity on Windows.
+Native Windows (PowerShell/cmd) is an **optional smoke subset only** — do not chase native Lean, OpenHands, or full `make test` parity on Windows.
 
 | Task | Windows native | WSL / Linux |
 |------|----------------|-------------|
-| Go CLI (`core/cli/pf`) | Pass â€” `go test ./...` | Pass |
+| Go CLI (`core/cli/pf`) | Pass — `go test ./...` | Pass |
 | Rust workspace (non-excluded crates) | Pass (see smoke below) | Pass |
 | Evidence validate/pack (`pf evidence`) | Pass (static paths) | Pass |
-| Evidence replay execute, bash testbeds | **Skip** â€” needs bash + submodules | Pass |
+| Evidence replay execute, bash testbeds | **Skip** — needs bash + submodules | Pass |
 | `make evidence-verify`, `make test` | **Use WSL** (Git Bash is partial) | Pass |
 | SWE-bench real engine (OpenHands) | **Skip** | Pass |
-| Lean / Lake builds | **Use WSL** â€” no native Lean in CI | Pass |
+| Lean / Lake builds | **Use WSL** — no native Lean in CI | Pass |
 | Full platform docker compose | Partial | Pass |
 
 **WSL setup (recommended):**
@@ -187,12 +187,12 @@ make docs-strict     # mkdocs build --strict (docs-only PRs)
 CI workflows that call `make submodules` need a repository secret so GitHub Actions can clone private standards repos (`verifiable-ai-ci/CERT-V1`, `verifiable-ai-ci/TRACE-REPLAY-KIT`). **Org admin** must add the secret; contributors cannot self-serve it on the upstream org repo.
 
 1. Create a fine-grained PAT (or classic PAT) owned by a bot/service account with **read** access to `verifiable-ai-ci/CERT-V1` and `verifiable-ai-ci/TRACE-REPLAY-KIT`.
-2. In GitHub: **Settings â†’ Secrets and variables â†’ Actions â†’ New repository secret**.
+2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
 3. Name: `STANDARDS_GITHUB_TOKEN`, value: the PAT.
 4. Verify locally (with the same token exported): `STANDARDS_GITHUB_TOKEN=<pat> make dev-standards`.
 5. Verify in CI: re-run **Standards Pin Drift Check** or **Evidence v0.1 smoke** via `workflow_dispatch`; the `make submodules` step should succeed in the log.
 
-Workflows using this secret are listed in [CI health matrix â€” Required secrets](docs/internal/ci-health-matrix.md#required-secrets-org-prerequisites). Forks without the secret can still run most gates; standards/replay jobs fail until the secret is configured or submodules are vendored locally.
+Workflows using this secret are listed in [CI health matrix — Required secrets](docs/internal/ci-health-matrix.md#required-secrets-org-prerequisites). Forks without the secret can still run most gates; standards/replay jobs fail until the secret is configured or submodules are vendored locally.
 
 See [Evidence v0.2 delivery guide](docs/roadmap/evidence-v0.2-delivery.md) for the fresh-clone checklist and [Evidence program closure](docs/roadmap/evidence-program-closure.md) for live gated CI posture (historical v0.2 status is archived).
 

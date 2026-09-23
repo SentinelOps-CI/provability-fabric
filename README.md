@@ -15,7 +15,7 @@
 
 # Provability Fabric
 
-**Formal specs, runtime policy, and evidence trails** â€” Lean specifications and proofs where present, fail-closed crypto by default, and auditable evidence in one open stack.
+**Formal specs, runtime policy, and evidence trails** — Lean specifications and proofs where present, fail-closed crypto by default, and auditable evidence in one open stack.
 
 <sub>Guarantees are conditional on configured trust roots and deployment policy. Lean in-repo does not mean every production path is proven end-to-end. See [Evidence non-claims](docs/roadmap/evidence-v0.2-status.md#explicit-non-claims) and [deployment trust](docs/guides/deployment-guide.md#production-trust-chain-environment-f01--f02).</sub>
 
@@ -33,7 +33,7 @@
 
 <br/>
 
-[Documentation](https://provability-fabric.org) Â· [Contributing](CONTRIBUTING.md) Â· [Security](SECURITY.md) Â· [CI reference](docs/reference/ci-reference.md)
+[Documentation](https://provability-fabric.org) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [CI reference](docs/reference/ci-reference.md)
 
 </div>
 
@@ -61,7 +61,6 @@ Intentional top-level surface (everything else is product code under these trees
 | [`runtime/`](runtime/) | Sidecar, ledger, brokers, admission |
 | [`adapters/`](adapters/) | Framework / protocol adapters |
 | [`services/`](services/), [`console/`](console/) | **Platform** — Compose-backed Go APIs (default profile) and admin console (`--profile full`) |
-
 | [`proofs/`](proofs/), [`spec-templates/`](spec-templates/), [`bundles/`](bundles/) | Lean policy proofs and agent bundles |
 | [`schemas/`](schemas/), [`config/`](config/), [`api/`](api/), [`specs/`](specs/) | Schemas, protos, evidence specs |
 | [`cmd/`](cmd/), [`releaser/`](releaser/) | Specdoc CLI; Nix supply-chain reproducibility helper |
@@ -124,11 +123,11 @@ cargo clippy --workspace -- -D warnings
 
 Adopt shared schemas, replay tooling, and CI patterns alongside this repo:
 
-- [CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) â€” schema and verifiers  
-- [TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) â€” runner and oracles  
-- [morph-lean-ci](https://github.com/SentinelOps-CI/morph-lean-ci) â€” sharded Lean CI  
-- [morph-replay-runner](https://github.com/SentinelOps-CI/morph-replay-runner) â€” branch replays  
-- [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) â€” permissions, epochs, IFC  
+- [CERT-V1](https://github.com/verifiable-ai-ci/CERT-V1) — schema and verifiers
+- [TRACE-REPLAY-KIT](https://github.com/verifiable-ai-ci/TRACE-REPLAY-KIT) — runner and oracles
+- [morph-lean-ci](https://github.com/SentinelOps-CI/morph-lean-ci) — sharded Lean CI
+- [morph-replay-runner](https://github.com/SentinelOps-CI/morph-replay-runner) — branch replays
+- [mcp-sidecar-demo](https://github.com/SentinelOps-CI/mcp-sidecar-demo) — permissions, epochs, IFC
 
 In-repo: [`docs/specs/standards.md`](docs/specs/standards.md), [`docs/evidence/overview.md`](docs/evidence/overview.md), [`docs/evidence/replay.md`](docs/evidence/replay.md).
 
@@ -242,7 +241,7 @@ flowchart TD
     M --> N[Reach set]
     N --> C
 
-    GNN[GPU neural network] --> ABC["Î±-Î²-CROWN adapter"]
+    GNN[GPU neural network] --> ABC["α-β-CROWN adapter"]
     ABC --> GPUP[GPU verification proof]
     GPUP --> C
 
@@ -250,7 +249,7 @@ flowchart TD
     TL --> GQL[GraphQL API]
 ```
 
-**Major surfaces:** specification bundles (YAML + proofs), runtime guards (sidecars), solver adapters (e.g. Marabou, DryVR, Î±-Î²-CROWN), platform APIs + admin console, WebSocket updates, and JWT-based auth where enabled.
+**Major surfaces:** specification bundles (YAML + proofs), runtime guards (sidecars), solver adapters (e.g. Marabou, DryVR, α-β-CROWN), platform APIs + admin console, WebSocket updates, and JWT-based auth where enabled.
 
 ---
 
@@ -292,7 +291,7 @@ python tests/trust_fire_orchestrator.py
 | Python errors | Run scripts from the **repository root** unless a doc says otherwise. |
 | K8s YAML / Helm | Many deployables are Helm templates, not raw `kubectl apply` files. |
 | Windows paths | Prefer **forward slashes** in Git Bash; use **cmd** for `.bat` installers. |
-| â€œDevice or resource busyâ€ | Close editors/explorers holding files; retry. |
+| “Device or resource busy” | Close editors/explorers holding files; retry. |
 | UI / Heroicons | Match icon names to your `package.json` / TypeScript setup (see `console/tsconfig.json`). |
 
 **Windows:** Use `pf.exe` and Command Prompt for install scripts when Git Bash misbehaves. More detail: `bash scripts/windows-troubleshoot.sh`.
@@ -309,23 +308,23 @@ The default branch is protected by workflows including dependency review (PRs), 
 
 ## License
 
-Apache License 2.0 â€” see [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE).
 
 ---
 
 ## Acknowledgments
 
-- [Lean 4](https://leanprover.github.io/) â€” interactive theorem proving  
-- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) â€” neural network verification  
-- [DryVR](https://github.com/verivital/dryvr) â€” hybrid systems  
-- [Î±-Î²-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) â€” GPU-accelerated NN verification  
-- [Sigstore](https://sigstore.dev/) â€” signing and transparency  
-- [Memurai](https://docs.memurai.com/) â€” Redis-compatible server for Windows  
+- [Lean 4](https://leanprover.github.io/) — interactive theorem proving
+- [Marabou](https://github.com/NeuralNetworkVerification/Marabou) — neural network verification
+- [DryVR](https://github.com/verivital/dryvr) — hybrid systems
+- [α-β-CROWN](https://github.com/Verified-Intelligence/alpha-beta-CROWN) — GPU-accelerated NN verification
+- [Sigstore](https://sigstore.dev/) — signing and transparency
+- [Memurai](https://docs.memurai.com/) — Redis-compatible server for Windows
 
 ---
 
 <div align="center">
 
-<sub>Provability Fabric â€” specifications, enforcement, and evidence for trustworthy agents.</sub>
+<sub>Provability Fabric — specifications, enforcement, and evidence for trustworthy agents.</sub>
 
 </div>
