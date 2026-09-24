@@ -69,7 +69,7 @@ jobs:
   evidence-schema-only:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: evidence-schema-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -115,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: evidence-validator
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -330,7 +330,7 @@ jobs:
 
       - name: Upload deep replay acceptance artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-v02-replay-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/evidence-v0.2
