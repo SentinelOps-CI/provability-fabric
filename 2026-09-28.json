@@ -1,0 +1,8 @@
+{
+  "action_count": 100000,
+  "median_latency_us": 1.7130000173892768,
+  "mean_latency_us": 1.7997720400592243,
+  "p95_latency_us": 1.8140000008770585,
+  "memory_mb": 5,
+  "timestamp": 1790584328.6530516
+}
