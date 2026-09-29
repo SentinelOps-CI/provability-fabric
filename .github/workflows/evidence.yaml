@@ -39,7 +39,7 @@ jobs:
     if: needs.detect-aws.outputs.aws_configured != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Generate offline compliance report (no AWS secrets)
         run: |
           mkdir -p docs/compliance
@@ -57,10 +57,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -70,7 +70,7 @@ jobs:
           pip install boto3 requests
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-west-2
@@ -92,7 +92,7 @@ jobs:
             --end-time "$(date -Iseconds)"
 
       - name: Upload manifest artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-manifest
           path: evidence-manifest.json
@@ -106,10 +106,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download manifest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: evidence-manifest
           path: .
@@ -191,10 +191,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download manifest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: evidence-manifest
           path: .
