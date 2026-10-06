@@ -16,19 +16,19 @@
     "demo:run": "ts-node --esm scripts/run-demo.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@provability-fabric/core-sdk-typescript": "file:../../core/sdk/typescript",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "express": "^5.2.1",
-    "uuid": "^14.0.1",
-    "ws": "^8.21.1"
+    "uuid": "^14.0.2",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@types/express": "^5.0.6",
     "@types/node": "^20.10.6",
     "@types/uuid": "^11.0.0",
-    "@types/ws": "^8.5.10",
+    "@types/ws": "^8.18.2",
     "eslint": "^9.17.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
