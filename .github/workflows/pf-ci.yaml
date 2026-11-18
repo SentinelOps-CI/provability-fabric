@@ -178,6 +178,8 @@ jobs:
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm install redis bitnami/redis \
+            --version 28.3.12 \
+            --wait --timeout 5m \
             --set auth.enabled=false \
             --set architecture=standalone
 
