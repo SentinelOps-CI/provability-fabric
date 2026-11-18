@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Reusable PF CI workflow: TRUST-FIRE GA phases 2/3/6, Kind/Helm/kubectl setup,
-# build & load runtime images into Kind, and PASS gate on trust-fire-report.json
+# build & load runtime images into Kind, and execution-only gate on trust-fire-report.json;
+# legacy phase commands are simulated/non-evidentiary pending issue #282.
 
 name: PF CI Workflow
 
@@ -189,6 +190,8 @@ jobs:
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm install redis bitnami/redis \
+            --version 28.3.12 \
+            --wait --timeout 5m \
             --set auth.enabled=false \
             --set architecture=standalone
 
@@ -406,7 +409,7 @@ jobs:
           python tools/ci/trust_fire_evidence.py gate --report trust-fire-report.json
 
   trust-fire:
-    name: Run TRUST-FIRE Phases 2/3/6 and Gate on PASS
+    name: TRUST-FIRE phase execution contract gate (simulation only)
     if: github.event_name != 'workflow_dispatch' || inputs.mode == 'full'
     runs-on: ubuntu-latest
     needs: setup
