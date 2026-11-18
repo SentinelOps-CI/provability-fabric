@@ -78,6 +78,8 @@ class ReportTests(unittest.TestCase):
     def test_full_suite_pass(self):
         x = report()
         self.assertEqual(x["overall_status"], "PASS")
+        self.assertEqual(x["evidence_classification"], mod.CLASSIFICATION)
+        self.assertIs(x["safety_claim_validated"], False)
         self.assertEqual(x["duration_seconds"], 30)
         self.assertEqual(set(x["phase_results"]), {"phase_2", "phase_3", "phase_6"})
         mod.validate_report(x, expected_context=CONTEXT, expected_selection="2,3,6")
@@ -158,7 +160,9 @@ class ReportTests(unittest.TestCase):
 
     def test_schema_and_source_mismatch(self):
         for key, value in (("schema_version", 2), ("schema_version", True),
-                           ("evidence_source", "hardcoded_pass"), ("test_suite", "other")):
+                           ("evidence_source", "hardcoded_pass"), ("test_suite", "other"),
+                           ("evidence_classification", "PRODUCTION_VERIFIED"),
+                           ("safety_claim_validated", True)):
             with self.subTest(key=key):
                 x = report()
                 x[key] = value

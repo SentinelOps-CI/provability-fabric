@@ -22,7 +22,8 @@ from typing import Any, Mapping
 
 PHASES = ("2", "3", "6")
 SCHEMA_VERSION = 1
-SUITE = "TRUST-FIRE GA CI Subset"
+SUITE = "TRUST-FIRE Legacy Execution Smoke (Phases 2/3/6)"
+CLASSIFICATION = "EXECUTION_ONLY_SIMULATED_PHASES"
 SOURCE = "github_actions_step_outcome"
 COMMANDS = {
     "2": "python tests/privacy/privacy_burn_down.py",
@@ -172,6 +173,8 @@ def build_report(*, raw_selection: str, context: Mapping[str, Any],
         "schema_version": SCHEMA_VERSION,
         "test_suite": SUITE,
         "evidence_source": SOURCE,
+        "evidence_classification": CLASSIFICATION,
+        "safety_claim_validated": False,
         **provenance,
         "requested_phases": list(selected),
         "start_time": selection_started_at,
@@ -215,6 +218,10 @@ def validate_report(report: Mapping[str, Any], *, expected_context: Mapping[str,
         raise EvidenceError("unsupported evidence schema version")
     if report.get("test_suite") != SUITE or report.get("evidence_source") != SOURCE:
         raise EvidenceError("unexpected test suite or evidence source")
+    if report.get("evidence_classification") != CLASSIFICATION:
+        raise EvidenceError("incorrect evidence classification")
+    if report.get("safety_claim_validated") is not False:
+        raise EvidenceError("safety claims cannot be validated by simulated phase commands")
     for key, value in expected.items():
         if report.get(key) != value or type(report.get(key)) is not type(value):
             raise EvidenceError(f"provenance mismatch: {key}")
