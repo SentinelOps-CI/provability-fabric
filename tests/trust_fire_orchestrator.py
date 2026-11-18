@@ -3,7 +3,7 @@
 SPDX-License-Identifier: Apache-2.0
 Copyright 2025 Provability-Fabric Contributors
 
-TRUST-FIRE Orchestrator: Complete GA Test Suite
+TRUST-FIRE Orchestrator: Legacy simulation smoke
 """
 
 import argparse
@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 
 class TrustFireOrchestrator:
-    """TRUST-FIRE Orchestrator: Complete GA Test Suite"""
+    """TRUST-FIRE Orchestrator: Legacy simulation smoke"""
 
     def __init__(self, config: Dict):
         self.config = config
@@ -335,7 +335,7 @@ class TrustFireOrchestrator:
 
     def run_trust_fire_suite(self) -> bool:
         """Run complete TRUST-FIRE test suite"""
-        print("🔥 TRUST-FIRE GA Test Suite")
+        print("🔥 TRUST-FIRE legacy simulation smoke")
         print("=" * 80)
         print(f"Started at: {self.start_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
         print("=" * 80)
@@ -387,43 +387,53 @@ class TrustFireOrchestrator:
             )
 
             if all_criteria_passed:
-                print("\n🎉 TRUST-FIRE GA Test Suite PASSED!")
-                print("✅ All phases and success criteria satisfied")
-                print("🚀 System is ready for GA launch")
+                print("\n🎉 TRUST-FIRE legacy simulation smoke PASSED!")
+                print("Synthetic phase assertions and simulated criteria completed")
+                print("Simulation completed; deployed safety readiness is NOT established")
                 return True
             else:
-                print("\n❌ TRUST-FIRE GA Test Suite FAILED!")
+                print("\n❌ TRUST-FIRE legacy simulation smoke FAILED!")
                 print("❌ Success criteria not met")
                 return False
         else:
-            print("\n❌ TRUST-FIRE GA Test Suite FAILED!")
+            print("\n❌ TRUST-FIRE legacy simulation smoke FAILED!")
             print("❌ One or more phases failed")
             return False
 
-    def generate_report(self) -> Dict:
-        """Generate comprehensive test report"""
+    def generate_report(self, suite_success: bool = False) -> Dict:
+        """Report simulator results without asserting operational safety.
+
+        The simulator's phase methods are synthetic. Even a complete successful
+        simulation is never evidence of deployed enforcement or external audit.
+        """
         end_time = datetime.now()
         duration = end_time - self.start_time
+        expected_phases = {f"phase{i}" for i in range(1, 7)}
+        complete = (
+            set(self.phase_results) == expected_phases
+            and all(
+                isinstance(self.phase_results[p], dict)
+                and self.phase_results[p].get("status") == "PASS"
+                for p in expected_phases
+            )
+        )
 
         report = {
-            "test_suite": "TRUST-FIRE GA Test Suite",
+            "test_suite": "TRUST-FIRE Legacy Simulation Smoke",
+            "simulation_only": True,
+            "safety_claim_validated": False,
             "start_time": self.start_time.isoformat(),
             "end_time": end_time.isoformat(),
             "duration_seconds": duration.total_seconds(),
             "phase_results": self.phase_results,
-            "overall_status": (
-                "PASS"
-                if all(p.get("status") == "PASS" for p in self.phase_results.values())
-                else "FAIL"
-            ),
+            "overall_status": "PASS" if suite_success and complete else "FAIL",
         }
-
         return report
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="TRUST-FIRE GA Test Suite Orchestrator"
+        description="TRUST-FIRE legacy simulation smoke Orchestrator"
     )
     parser.add_argument(
         "--config", default="trust-fire-config.json", help="Configuration file"
@@ -458,7 +468,7 @@ def main():
     success = orchestrator.run_trust_fire_suite()
 
     # Generate report
-    report = orchestrator.generate_report()
+    report = orchestrator.generate_report(suite_success=success)
 
     # Save report
     with open(args.output, "w") as f:
@@ -467,10 +477,10 @@ def main():
     print(f"\n📄 Test report saved to: {args.output}")
 
     if success:
-        print("\n✅ TRUST-FIRE GA Test Suite completed successfully")
+        print("\n✅ TRUST-FIRE legacy simulation smoke completed successfully")
         sys.exit(0)
     else:
-        print("\n❌ TRUST-FIRE GA Test Suite failed")
+        print("\n❌ TRUST-FIRE legacy simulation smoke failed")
         sys.exit(1)
 
 
