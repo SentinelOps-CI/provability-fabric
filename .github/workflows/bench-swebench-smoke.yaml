@@ -58,9 +58,9 @@ jobs:
           sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
-          toolchain: stable
+          toolchain: "1.99.1"
 
       - name: Cache cargo
         uses: ./.github/actions/cache-cargo
