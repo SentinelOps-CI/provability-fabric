@@ -19,6 +19,8 @@ import argparse
 from dataclasses import dataclass
 from datetime import datetime
 
+from observation_gate import observation_failures
+
 
 @dataclass
 class PIIAttackVector:
@@ -76,6 +78,7 @@ class PIIRedTeam:
         # Results tracking
         self.results: List[PIITestResult] = []
         self.leaks: List[PIITestResult] = []
+        self.requested_vectors: int = 0
 
     def generate_attack_vectors(self, count: int) -> List[PIIAttackVector]:
         """Generate adversarial attack vectors for PII leakage."""
@@ -346,6 +349,7 @@ class PIIRedTeam:
         )
 
         # Generate attack vectors
+        self.requested_vectors = vector_count
         vectors = self.generate_attack_vectors(vector_count)
         print(f"⚡ Generated {len(vectors)} attack vectors")
 
@@ -458,6 +462,28 @@ class PIIRedTeam:
             },
         }
 
+        # Record observed request coverage, independent of a leak-count statistic.
+        valid_responses = sum(
+            1 for r in self.results
+            if r.response_code == 200 and not r.error
+            and isinstance(r.certificate, dict) and bool(r.certificate)
+        )
+        problems = observation_failures(
+            planned=self.requested_vectors,
+            recorded=total_tests,
+            valid_responses=valid_responses,
+            positive_controls=successful_blocks,
+            violations=len(critical_leaks) + len(detection_bypasses) + len(false_positives),
+        )
+        analysis["execution"] = {
+            "planned_requests": self.requested_vectors,
+            "observed_responses": total_tests,
+            "valid_responses": valid_responses,
+            "positive_blocks": successful_blocks,
+            "status": "FAIL" if problems else "PASS",
+            "failures": problems,
+        }
+
         # Store critical findings
         self.leaks = critical_leaks + detection_bypasses
 
@@ -515,6 +541,8 @@ async def main():
     )
 
     args = parser.parse_args()
+    if args.vectors <= 0 or args.concurrency <= 0:
+        parser.error('--vectors and --concurrency must both be positive')
 
     redteam = PIIRedTeam(args.firewall_url, args.seed)
     analysis = await redteam.run_pii_test(args.vectors, args.concurrency)
@@ -548,21 +576,15 @@ async def main():
     # Save detailed report
     redteam.save_detailed_report(analysis, args.output)
 
-    # Exit with error if critical leaks found
-    if analysis["summary"]["critical_leaks"] > 0:
-        print(
-            f"\n❌ CRITICAL: {analysis['summary']['critical_leaks']} PII leaks detected!"
-        )
-        print("Review the detailed report for leak analysis.")
-        exit(1)
-    elif analysis["summary"]["detection_bypasses"] > 10:  # Allow some tolerance
-        print(
-            f"\n⚠️  WARNING: {analysis['summary']['detection_bypasses']} detection bypasses!"
-        )
-        exit(1)
-    else:
-        print("\n✅ ALL TESTS PASSED: No critical PII leaks detected!")
-        exit(0)
+    # Invalid, missing, or truncated responses cannot establish absence of leaks.
+    problems = analysis["execution"]["failures"]
+    if problems:
+        print("\nFAILED: PII observations are incomplete or violated:")
+        for problem in problems:
+            print(f"  - {problem}")
+        raise SystemExit(1)
+    print("\nObserved PII probes completed without recorded violations.")
+    print("Operational privacy claims still need a contract-aligned staging fixture.")
 
 
 if __name__ == "__main__":

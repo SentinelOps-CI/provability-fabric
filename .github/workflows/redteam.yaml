@@ -8,9 +8,24 @@ on:
     paths:
       - "runtime/**"
       - "tests/redteam/**"
+      - "tests/test_redteam_observation_gate.py"
+      - ".github/workflows/redteam.yaml"
   workflow_dispatch:
 
 jobs:
+  redteam-observation-contract:
+    name: Red-team observation accounting unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile security harness scripts
+        run: python3 -m py_compile tests/redteam/abac_fuzz.py tests/redteam/pii_leak.py
+      - name: Exercise incomplete and failed execution negative controls
+        run: python3 -m unittest discover -s tests -p 'test_redteam_observation_gate.py' -v
+      - name: Verify explicit offline-mode classification
+        run: python3 tests/redteam/abac_fuzz.py --offline --queries 12
+
   redteam-offline:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
