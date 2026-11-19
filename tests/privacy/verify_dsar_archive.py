@@ -121,7 +121,7 @@ def validate_archive(
             _require(archive.testzip() is None, "ZIP integrity failure")
             raw = archive.read(entries[0])
     except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
-        raise InvalidDSAR("unreadable or corrupt ZIP archive") from exc
+        raise InvalidDSAR(f"unreadable or corrupt ZIP archive ({type(exc).__name__}: {exc})") from exc
     return validate_payload(
         raw, expected_tenant=expected_tenant, after_date=after_date, expected_count=expected_count
     )
