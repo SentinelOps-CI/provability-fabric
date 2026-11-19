@@ -440,6 +440,30 @@ mod tests {
         assert!(!policy.evaluate(&request).await);
     }
 
+    #[tokio::test]
+    async fn production_yaml_enforces_sensitive_label_denials() {
+        let policy: AbacPolicy =
+            serde_yaml::from_str(include_str!("../abac.yaml")).unwrap();
+        policy.validate_configuration().unwrap();
+
+        let mut request = context("user_fixture", &["public"]);
+        assert!(policy.evaluate(&request).await);
+
+        for label in ["private", "confidential", "financial", "pii", "secret"] {
+            request.labels_filter = vec![label.into()];
+            request.allowed_labels = vec![label.into()];
+            request.capabilities = vec![
+                "elevated_privileges".into(),
+                "financial_access".into(),
+                "pii_access".into(),
+            ];
+            assert!(
+                !policy.evaluate(&request).await,
+                "production rule unexpectedly admitted {label}",
+            );
+        }
+    }
+
     #[test]
     fn unsupported_policy_predicate_is_rejected_before_start() {
         let mut policy = create_test_policy();
@@ -474,7 +498,7 @@ mod tests {
                 },
                 LabelPolicy {
                     label: "confidential".to_string(),
-                    access_rule: "elevated_privileges AND tenant_match".to_string(),
+                    access_rule: "elevated_privileges AND tenant_match AND audit_log".to_string(),
                     description: "Confidential data".to_string(),
                 },
             ],
