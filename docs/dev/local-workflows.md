@@ -32,6 +32,59 @@ Warm paths omit `--build`. Health readiness uses `docker compose up --wait` (no 
 
 Run `make check-wiring` (or `python scripts/check_wiring.py`) after changing compose env or code defaults.
 
+## Retrieval receipt signing in the full Compose profile
+
+Full-profile retrieval receipts use a private Ed25519 signing key supplied
+through a read-only Compose secret. There is no checked-in or fallback
+signing seed. `PF_RECEIPT_SIGNING_KEY_FILE` identifies the host-side path;
+the default path is `.local/secrets/retrieval-receipt-signing-key.pem`.
+An absent or malformed key prevents retrieval-gateway startup.
+
+For isolated local development, generate a unique signing key outside the
+tracked source tree.
+
+```sh
+mkdir -p .local/secrets
+chmod 700 .local/secrets
+umask 077
+openssl genpkey -algorithm Ed25519 -out .local/secrets/retrieval-receipt-signing-key.pem
+chmod 600 .local/secrets/retrieval-receipt-signing-key.pem
+```
+
+For production, provision an independently managed private key, set
+`PF_RECEIPT_SIGNING_KEY_FILE` to its absolute host path, and establish the
+corresponding verifier trust root. A signed receipt from a locally generated
+key is not independently trusted provenance.
+
+`scripts/docker-compose-smoke.sh full` creates a temporary disposable
+Ed25519 key and deletes it on both successful and failed runs. It never
+consumes a deployment signing key. This confirms service startup, not
+independent receipt verification.
+
+## Disposable JWT authorization smoke
+
+The authorization candidate expects two independently provisioned settings.
+`PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON` is a JSON object mapping verifier key IDs
+to unpadded base64url Ed25519 public keys, and `PF_RETRIEVAL_JWT_ISSUER`
+is the expected issuer string. The Compose full profile passes these values
+as the Rust gateway's `RETRIEVAL_JWT_VERIFY_KEYS_JSON` and
+`RETRIEVAL_JWT_ISSUER` settings. Empty configuration fails startup; it does
+not disable token checks.
+
+The full-profile Compose smoke generates a **separate** disposable JWT
+issuer key in its temporary directory. It uses OpenSSL and Python standard
+library functionality to export only the raw public key into the container
+environment. `scripts/retrieval_auth_smoke.py` then exercises the real
+`POST /query` endpoint with two signed public requests, forged/expired
+credentials, mismatched tenant/subject, absent label scope, restricted
+labels, and excess limits. Expected HTTP statuses are checked exactly.
+
+The ordinary runtime starts with an empty retrieval index. These tests
+validate request authentication and policy decisions, **not** document
+tenant-isolation or a trusted deployed credential issuer. The temporary
+signing key is deleted even if the smoke fails; neither receipt nor JWT
+private keys are committed or transmitted into Docker build contexts.
+
 ## Platform APIs (default Compose)
 
 ```bash

@@ -71,3 +71,6 @@ vendor/
 /runs/**
 /benchmark_runs/**
 /release-run/*.json
+
+# Exclude local mounted signing keys from workspace Docker contexts.
+/.local/secrets/**

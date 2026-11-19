@@ -255,9 +255,17 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - RECEIPT_SIGNING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      - RECEIPT_SIGNING_KEY_PATH=/run/secrets/retrieval_receipt_signing_key
+      # Missing verifier configuration is passed as empty and rejected by Rust startup.
+      # This preserves docker compose config for unrelated profiles.
+      - RETRIEVAL_JWT_VERIFY_KEYS_JSON=${PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON:-}
+      - RETRIEVAL_JWT_ISSUER=${PF_RETRIEVAL_JWT_ISSUER:-}
       - LEDGER_ENDPOINT=http://ledger:4000
       - RUST_LOG=info
+    secrets:
+      - source: retrieval_receipt_signing_key
+        target: retrieval_receipt_signing_key
+        mode: 0400
     depends_on:
       ledger:
         condition: service_healthy
@@ -353,6 +361,12 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/etc/prometheus/console_libraries"
       - "--web.console.templates=/etc/prometheus/consoles"
+
+# The path must point to a separately provisioned PEM/private signing key.
+# An absent file prevents the retrieval gateway from starting; no default key.
+secrets:
+  retrieval_receipt_signing_key:
+    file: ${PF_RECEIPT_SIGNING_KEY_FILE:-./.local/secrets/retrieval-receipt-signing-key.pem}
 
 volumes:
   postgres_data:

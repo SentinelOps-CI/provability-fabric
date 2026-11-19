@@ -26,7 +26,8 @@ mkdir -p "${context}/runtime/sidecar-watcher/src" \
   "${context}/runtime/retrieval-gateway" \
   "${context}/private" "${context}/runs" \
   "${context}/benchmark_runs" "${context}/release-run" \
-  "${context}/.aws" "${context}/.ssh" "${context}/.kube"
+  "${context}/.aws" "${context}/.ssh" "${context}/.kube" \
+  "${context}/.local/secrets"
 cp "${ROOT}/.dockerignore" "${context}/.dockerignore"
 
 for path in Cargo.toml Cargo.lock runtime/sidecar-watcher/src/lib.rs runtime/retrieval-gateway/Cargo.toml; do
@@ -37,6 +38,7 @@ sensitive=(
   .npmrc .pypirc .netrc
   runtime/sidecar-watcher/.env.staging
   .aws/credentials .ssh/id_rsa .kube/config
+  .local/secrets/retrieval-receipt-signing-key.pem
   private/secret.json runs/private.json benchmark_runs/private.json
   release-run/private.json
 )

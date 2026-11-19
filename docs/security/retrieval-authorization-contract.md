@@ -97,3 +97,30 @@ Before production integration, establish a responsible issuer, stable trust
 roots, credential rollout, negative-control fixtures for multiple tenants,
 operational telemetry, and signed-credential integration tests. The project
 issue tracking these obligations is #297.
+
+## Disposable signed HTTP validation
+
+The full-profile Compose smoke provisions two independent temporary Ed25519
+private keys, one for receipt signing and one for disposable JWT issuance.
+It exports the JWT **public** key to
+`PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON`, sets `PF_RETRIEVAL_JWT_ISSUER`, and
+exercises 15 real HTTP `/query` controls with signed and invalid credentials.
+Associated negative-control tests use independent OpenSSL verification of
+the compact JWT signature and refuse unexpected authorization responses.
+
+Ordinary manual full-profile startup must receive the public-key JSON map
+and trusted issuer through those environment variables; empty values fail
+gateway startup. This smoke uses an unseeded in-memory index, and its
+two accepted public requests must return zero documents. It confirms the
+authenticated admission path, not tenant isolation, document correctness,
+independent receipt provenance, or a production-compatible token issuer.
+Signed tokens remain replayable until expiry; there is no refresh or
+per-token revocation service.
+
+The YAML declares tenant/subject request-rate limits and a concurrent-query
+limit. The current Rust handler retrieves matching rate configurations yet
+does not enforce counters or concurrency admission. These controls are
+**unimplemented**, and a green HTTP smoke does not establish quota or abuse
+resistance. Receipt submission is also best-effort: a ledger failure is
+logged and the query still returns success. A signed local receipt is not
+proof of ledger persistence.

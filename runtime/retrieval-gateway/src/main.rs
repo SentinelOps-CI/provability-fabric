@@ -189,7 +189,7 @@ async fn handle_query(
     let query_hash = context.query_hash.clone();
     let cached_results = state
         .semantic_cache
-        .get(&query_hash, &request.labels_filter, &request.tenant)
+        .get(&query_hash, &request.labels_filter, &request.tenant, limit)
         .await;
 
     let results = if let Some(cached) = cached_results {
@@ -214,6 +214,7 @@ async fn handle_query(
                 &query_hash,
                 &request.labels_filter,
                 &request.tenant,
+                limit,
                 search_results.clone(),
                 None,
             )
