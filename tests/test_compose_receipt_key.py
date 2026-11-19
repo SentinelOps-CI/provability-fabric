@@ -66,8 +66,16 @@ class ReceiptSigningComposeTests(unittest.TestCase):
         self.assertNotIn("docker-compose smoke passed", completed.stdout)
         self.assertFalse(key_path.exists())
 
+    @unittest.skipUnless(shutil.which("openssl"), "OpenSSL is unavailable")
+    def test_unhealthy_ledger_is_failure_and_cleans_up(self) -> None:
+        completed, calls, key_path = self._execute_smoke(fail_ledger=True)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertTrue(any(" down " in f" {c} " for c in calls))
+        self.assertNotIn("docker-compose smoke passed", completed.stdout)
+        self.assertFalse(key_path.exists())
+
     def _execute_smoke(
-        self, *, fail_up: bool = False, fail_gateway: bool = False
+        self, *, fail_up: bool = False, fail_gateway: bool = False, fail_ledger: bool = False
     ) -> tuple[subprocess.CompletedProcess[str], list[str], Path]:
         """Execute the actual shell script with isolated fake network tooling."""
         with tempfile.TemporaryDirectory(prefix="pf-receipt-smoke-") as tmp:
@@ -98,6 +106,8 @@ class ReceiptSigningComposeTests(unittest.TestCase):
                 '#!/usr/bin/env bash\n'
                 'if [[ "$MOCK_FAIL_GATEWAY" == 1 && " $* " == *":8080/health"* ]]; '
                 'then exit 22; fi\n'
+                'if [[ "$MOCK_FAIL_LEDGER" == 1 && " $* " == *":4000/health"* ]]; '
+                'then exit 23; fi\n'
                 'exit 0\n',
                 encoding="utf-8",
             )
@@ -109,6 +119,7 @@ class ReceiptSigningComposeTests(unittest.TestCase):
                 MOCK_DOCKER_LOG=str(log),
                 MOCK_FAIL_UP="1" if fail_up else "0",
                 MOCK_FAIL_GATEWAY="1" if fail_gateway else "0",
+                MOCK_FAIL_LEDGER="1" if fail_ledger else "0",
             )
             completed = subprocess.run(
                 ["bash", str(scripts / SMOKE.name), "full"],

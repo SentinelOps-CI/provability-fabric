@@ -83,8 +83,10 @@ SMOKE_COMPOSE_STARTED=1
 echo "compose up --wait: OK"
 
 # Health endpoints for core services in full profile
-curl -fsS http://localhost:4000/health >/dev/null && echo "ledger /health: OK"
-curl -fsS http://localhost:8080/health >/dev/null && echo "retrieval-gateway /health: OK"
+curl -fsS http://localhost:4000/health >/dev/null
+echo "ledger /health: OK"
+curl -fsS http://localhost:8080/health >/dev/null
+echo "retrieval-gateway /health: OK"
 
 "${COMPOSE[@]}" down -v
 SMOKE_COMPOSE_STARTED=0
