@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Release Preflight Unit Tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-preflight-tests.yml'
+      - 'tools/ci/release_gate.py'
+      - 'tests/ci/test_release_gate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-preflight-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Run release preflight regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 -m unittest discover -s tests/ci -p 'test_release_gate.py' -v
