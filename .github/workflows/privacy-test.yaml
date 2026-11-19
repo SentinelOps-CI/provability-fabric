@@ -100,9 +100,10 @@ jobs:
           gpg --batch --pinentry-mode loopback --generate-key gen-key.batch
           gpg --export --armor test@example.com > test-public-key.asc
 
-      - name: Build DSAR export tool
+      - name: Test and build DSAR export tool
         run: |
           cd tools/privacy
+          go test ./...
           go build -o dsar-export .
 
       - name: Verify actual encrypted synthetic DSAR export
