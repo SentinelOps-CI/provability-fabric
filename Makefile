@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test test-legacy-simulation test-windows go-work clean demo-up demo-down demo-setup install install-dev install-minimal install-standard install-full dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs platform-up platform-up-build ledger-up enforcement-up full-up compose-smoke check-wiring
+.PHONY: help build test test-legacy-simulation test-windows go-work clean demo-up demo-down demo-setup install install-dev install-minimal install-standard install-full dev validate-certs lint bench security security-live security-legacy-simulation test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs platform-up platform-up-build ledger-up enforcement-up full-up compose-smoke check-wiring
 
 include scripts/proto.mk
 
@@ -42,7 +42,9 @@ help:
 	@$(ECHOOK) "  make dev             - Alias for platform-up (no Console UI)"
 	@$(ECHOOK) "  make build           - Build all services"
 	@$(ECHOOK) "  make test            - Run selected local unit, Go, Rust, and demo checks
-	@$(ECHOOK) "  make test-legacy-simulation - Historical synthetic examples only""
+	@$(ECHOOK) "  make test-legacy-simulation - Historical synthetic examples only"
+	@$(ECHOOK) "  make security        - Offline security contract/negative-control tests"
+	@$(ECHOOK) "  make security-live   - Live red-team probes (disposable, fixture seeded)""
 	@$(ECHOOK) "  make clean           - Clean build artifacts"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Demo:"
@@ -482,14 +484,25 @@ swebench-regressions:
 	@$(ECHOOK) "Regressions: $(EXP_DIR)/analysis/baseline_solved_pf_failed.txt, $(EXP_DIR)/analysis/cases/, $(EXP_DIR)/analysis/pf_failure_buckets.csv. Rerun only regression slice then re-harness + make swebench-compare (includes --require-priced-models)."
 
 security:
-	@$(ECHOOK) "🔒 Running security tests..."
-	python tests/redteam/abac_fuzz.py --queries 1000
-	python tests/redteam/pii_leak.py --vectors 1000
-	python tests/security/malicious_adapter_test.py
-	@$(ECHOOK) "✅ Security tests completed"
+	@$(ECHOOK) "Offline security harness contracts and negative controls (no live services)..."
+	python3 -m unittest discover -s tests -p 'test_redteam_observation_gate.py' -v
+	python3 -m unittest discover -s tests -p 'test_redteam_egress_contract.py' -v
+	python3 -m unittest discover -s tests -p 'test_redteam_retrieval_*.py' -v
+	@$(ECHOOK) "Offline contract checks completed; deployed security enforcement is untested."
+
+security-live:
+	@$(ECHOOK) "Running probes against disposable, pre-seeded test services only..."
+	@: "${ABAC_FIXTURE_MANIFEST:?Set ABAC_FIXTURE_MANIFEST to the independently seeded corpus manifest}"
+	python3 tests/redteam/abac_fuzz.py --queries 1000 --fixture-manifest "$ABAC_FIXTURE_MANIFEST"
+	python3 tests/redteam/pii_leak.py --vectors 1000 --tenant acme-corp
+	@$(ECHOOK) "Live probe outcomes depend on deployed service fixtures and policy."
+
+security-legacy-simulation:
+	@$(ECHOOK) "Historical synthetic adapter scenario; not runtime sandbox evidence."
+	python3 tests/security/malicious_adapter_test.py
 
 test-all: test security bench validate-certs
-	@$(ECHOOK) "Selected local checks completed; the security target includes a synthetic adapter exercise."
+	@$(ECHOOK) "Selected local checks completed; deployed security enforcement is not established."
 
 # ---------- Deploy helpers ----------
 helm-install:

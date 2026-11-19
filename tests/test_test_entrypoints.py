@@ -46,6 +46,26 @@ class TestEntrypointTests(unittest.TestCase):
         self.assertIn("python3 tests/integration/test_platform_integration.py", output)
         self.assertIn("synthetic", output.lower())
 
+    def test_security_target_uses_offline_contract_tests(self) -> None:
+        output = self.dry_run("security")
+        self.assertIn("test_redteam_observation_gate.py", output)
+        self.assertIn("test_redteam_egress_contract.py", output)
+        self.assertIn("test_redteam_retrieval_*.py", output)
+        self.assertNotIn("tests/redteam/abac_fuzz.py --queries", output)
+        self.assertNotIn("tests/redteam/pii_leak.py --vectors", output)
+        self.assertNotIn("tests/security/malicious_adapter_test.py", output)
+
+    def test_live_security_target_needs_reference_fixture(self) -> None:
+        output = self.dry_run("security-live")
+        self.assertIn("ABAC_FIXTURE_MANIFEST", output)
+        self.assertIn("--fixture-manifest", output)
+        self.assertIn("tests/redteam/pii_leak.py --vectors", output)
+
+    def test_legacy_sandbox_simulator_is_opt_in(self) -> None:
+        output = self.dry_run("security-legacy-simulation")
+        self.assertIn("tests/security/malicious_adapter_test.py", output)
+        self.assertIn("synthetic", output.lower())
+
     def test_aggregate_target_does_not_claim_exhaustiveness(self) -> None:
         output = self.dry_run("test-all")
         self.assertNotIn("All tests completed successfully", output)
