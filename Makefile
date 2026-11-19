@@ -403,23 +403,15 @@ lint:
 	@$(ECHOOK) "✅ Linting completed"
 
 bench:
-	@$(ECHOOK) "⚡ Running performance benchmarks..."
-	cd demos/verifiable-mcp-fraud && npm run benchmark
-	python tests/performance/performance_benchmarks.py
-	@$(ECHOOK) "✅ Benchmarks completed"
+	@$(ECHOOK) "Running Criterion performance benchmarks..."
+	cargo bench -p provability-fabric-bench --locked -- --sample-size 10 --measurement-time 1 --noplot
+	@$(ECHOOK) "Benchmarks completed"
 
 # Save Criterion baseline and record machine/date/SHA in bench/BASELINE.md (see bench/README.md).
 bench-save-baseline:
 	@$(ECHOOK) "Saving Criterion baseline (provability-fabric-bench)..."
-	cargo bench -p provability-fabric-bench -- --save-baseline main
-	@python -c "\
-import datetime, os, platform, subprocess; \
-d = datetime.datetime.now(datetime.timezone.utc).isoformat(); \
-sha = subprocess.run(['git','rev-parse','HEAD'], capture_output=True, text=True).stdout.strip() or 'unknown'; \
-m = platform.uname(); machine = f'{m.system} {m.release} {m.machine}'; \
-p = os.path.join('bench','BASELINE.md'); \
-open(p,'w').write(f'Criterion baseline: main\ndate: {d}\ngit_sha: {sha}\nmachine: {machine}\n'); \
-print('Wrote', p)"
+	cargo bench -p provability-fabric-bench --locked -- --save-baseline main
+	python3 scripts/record_criterion_baseline.py --path bench/BASELINE.md
 	@$(ECHOOK) "Baseline saved. See bench/BASELINE.md and target/criterion/"
 
 # ---------- SWE-bench Step-2 (WSL/Linux; see experiments/exp-step2-lite-smoke/commands.md) ----------

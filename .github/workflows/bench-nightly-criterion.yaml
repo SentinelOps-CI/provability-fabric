@@ -22,6 +22,9 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/bench-nightly-criterion.yaml"
+      - "Makefile"
+      - "scripts/record_criterion_baseline.py"
+      - "tests/test_record_criterion_baseline.py"
   pull_request:
     paths:
       - "bench/**"
@@ -29,6 +32,9 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/bench-nightly-criterion.yaml"
+      - "Makefile"
+      - "scripts/record_criterion_baseline.py"
+      - "tests/test_record_criterion_baseline.py"
   schedule:
     # Nightly compare against saved baseline.
     - cron: "0 2 * * *"
@@ -47,6 +53,16 @@ env:
   CRITERION_CI_ARGS: "--sample-size 50 --measurement-time 5 --noplot"
 
 jobs:
+  baseline-metadata-unit:
+    name: Baseline metadata unit tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate non-destructive metadata updates
+        run: python3 -m unittest discover -s tests -p 'test_record_criterion_baseline.py' -v
+
   smoke-bench:
     name: Smoke (compile + run benches)
     runs-on: ubuntu-latest
@@ -95,53 +111,7 @@ jobs:
           cargo bench -p provability-fabric-bench -- --save-baseline main ${{ env.CRITERION_CI_ARGS }}
 
       - name: Record baseline metadata in bench/BASELINE.md
-        run: |
-          python3 <<'PY'
-          import datetime
-          import pathlib
-          import platform
-          import re
-          import subprocess
-
-          path = pathlib.Path("bench/BASELINE.md")
-          text = path.read_text(encoding="utf-8")
-          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-          date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-          machine = " ".join(
-              [
-                  platform.uname().system,
-                  platform.uname().release,
-                  platform.uname().machine,
-                  "(GitHub Actions ubuntu-latest)",
-              ]
-          )
-          replacements = {
-              r"(\| Last refresh SHA \| )[^|]+(\|)": rf"\g<1>`{sha}`\g<2>",
-              r"(\| Last refresh date \(UTC\) \| )[^|]+(\|)": rf"\g<1>{date}\g<2>",
-          }
-          for pattern, repl in replacements.items():
-              text, n = re.subn(pattern, repl, text, count=1)
-              if n != 1:
-                  raise SystemExit(f"failed to update BASELINE.md field matching {pattern!r}")
-          # Keep a machine line for operators without rewriting the whole doc.
-          if "| Last refresh machine |" in text:
-              text, n = re.subn(
-                  r"(\| Last refresh machine \| )[^|]+(\|)",
-                  rf"\g<1>{machine}\g<2>",
-                  text,
-                  count=1,
-              )
-              if n != 1:
-                  raise SystemExit("failed to update Last refresh machine")
-          else:
-              needle = "| Workflow | `bench-nightly-criterion.yaml` (`refresh_baseline: true`) |"
-              insert = f"| Last refresh machine | {machine} |\n{needle}"
-              if needle not in text:
-                  raise SystemExit("BASELINE.md missing Workflow row for machine insert")
-              text = text.replace(needle, insert, 1)
-          path.write_text(text, encoding="utf-8")
-          print(f"Updated {path} for {sha} @ {date}")
-          PY
+        run: python3 scripts/record_criterion_baseline.py --path bench/BASELINE.md
 
       - name: Upload updated BASELINE.md
         uses: actions/upload-artifact@v4
