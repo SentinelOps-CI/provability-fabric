@@ -179,10 +179,15 @@ jobs:
 
       - name: Deploy Redis (Bitnami)
         run: |
+          set -euo pipefail
           helm repo add bitnami https://charts.bitnami.com/bitnami
+          # Helm must report ready Pods before kubectl wait is invoked.
+          # Without --wait, an immediate selector lookup can fail with
+          # "no matching resources found" even for a healthy installation.
           helm install redis bitnami/redis \
             --set auth.enabled=false \
-            --set architecture=standalone
+            --set architecture=standalone \
+            --wait --timeout 300s
 
       - name: Wait for Redis
         run: |
@@ -232,7 +237,8 @@ jobs:
         run: |
           helm install postgres bitnami/postgresql \
             --set auth.postgresPassword=testpass \
-            --set auth.database=provability_fabric
+            --set auth.database=provability_fabric \
+            --wait --timeout 300s
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql --timeout=300s
           kubectl apply -f - <<'EOF'
           apiVersion: apps/v1
