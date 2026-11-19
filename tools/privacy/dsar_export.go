@@ -7,7 +7,6 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -234,57 +233,49 @@ func (e *DSARExporter) gatherCapsules() ([]Capsule, error) {
 	return mockCapsules, nil
 }
 
-// createEncryptedZip creates an encrypted ZIP file with the DSAR data
+// createEncryptedZip finalizes a temporary ZIP before encrypting and publishing it.
+// The plaintext archive stays in a private, short-lived file in the output directory.
+// An error never publishes an incomplete ZIP or exposes plaintext at the output path.
 func (e *DSARExporter) createEncryptedZip(data DSARData) error {
-	// Create temporary directory for ZIP creation
-	tempDir, err := os.MkdirTemp("", "dsar-export-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create JSON file with DSAR data
-	jsonPath := filepath.Join(tempDir, "dsar-data.json")
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal DSAR data: %v", err)
+		return fmt.Errorf("failed to marshal DSAR data: %w", err)
 	}
 
-	if err := os.WriteFile(jsonPath, jsonData, 0644); err != nil {
-		return fmt.Errorf("failed to write JSON file: %v", err)
-	}
-
-	// Create ZIP file
-	zipFile, err := os.Create(e.outputPath)
+	archive, err := os.CreateTemp(filepath.Dir(e.outputPath), ".dsar-export-*")
 	if err != nil {
-		return fmt.Errorf("failed to create ZIP file: %v", err)
+		return fmt.Errorf("failed to create temporary DSAR archive: %w", err)
 	}
-	defer zipFile.Close()
+	archivePath := archive.Name()
+	defer os.Remove(archivePath)
 
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	// Add JSON file to ZIP
-	jsonFile, err := os.Open(jsonPath)
+	writer := zip.NewWriter(archive)
+	entry, err := writer.Create("dsar-data.json")
 	if err != nil {
-		return fmt.Errorf("failed to open JSON file: %v", err)
+		_ = writer.Close()
+		_ = archive.Close()
+		return fmt.Errorf("failed to create ZIP entry: %w", err)
 	}
-	defer jsonFile.Close()
-
-	zipEntry, err := zipWriter.Create("dsar-data.json")
-	if err != nil {
-		return fmt.Errorf("failed to create ZIP entry: %v", err)
+	if _, err := entry.Write(jsonData); err != nil {
+		_ = writer.Close()
+		_ = archive.Close()
+		return fmt.Errorf("failed to write DSAR data: %w", err)
+	}
+	// ZIP's central directory is emitted by Close, not by Write.
+	if err := writer.Close(); err != nil {
+		_ = archive.Close()
+		return fmt.Errorf("failed to finalize DSAR ZIP: %w", err)
+	}
+	if err := archive.Close(); err != nil {
+		return fmt.Errorf("failed to close DSAR ZIP: %w", err)
 	}
 
-	if _, err := io.Copy(zipEntry, jsonFile); err != nil {
-		return fmt.Errorf("failed to copy file to ZIP: %v", err)
+	if err := e.encryptFile(archivePath); err != nil {
+		return fmt.Errorf("failed to encrypt DSAR ZIP: %w", err)
 	}
-
-	// Encrypt the ZIP file with recipient's public key
-	if err := e.encryptFile(e.outputPath); err != nil {
-		return fmt.Errorf("failed to encrypt ZIP file: %v", err)
+	if err := os.Rename(archivePath, e.outputPath); err != nil {
+		return fmt.Errorf("failed to publish encrypted DSAR archive: %w", err)
 	}
-
 	return nil
 }
 
