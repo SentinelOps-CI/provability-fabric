@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::fs;
 
 /// ABAC policy configuration
@@ -88,6 +88,9 @@ pub struct QueryContext {
     pub labels_filter: Vec<String>,
     pub query_hash: String,
     pub index_shard: String,
+    /// Scopes bound to the request by a verified JWT.
+    pub allowed_labels: Vec<String>,
+    pub capabilities: Vec<String>,
 }
 
 /// ABAC authorization decision
@@ -108,150 +111,122 @@ impl AbacPolicy {
         
         let policy: AbacPolicy = serde_yaml::from_str(&content)
             .context("Failed to parse ABAC policy YAML")?;
-            
+        policy.validate_configuration()?;
         Ok(policy)
     }
 
-    /// Authorize a query based on context and policies
-    pub async fn authorize_query(&self, context: &QueryContext) -> Result<bool> {
-        let decision = self.evaluate_query(context).await?;
-        Ok(decision.allowed)
+    /// Reject unsupported deployment policies at startup.
+    ///
+    /// Only conjunctions of precisely defined predicates are supported.
+    /// Audit and DP budget predicates are understood but deliberately deny
+    /// at runtime until real durable enforcement is implemented.
+    pub fn validate_configuration(&self) -> Result<()> {
+        if self.default_policy != "deny" || !self.tenant_isolation.enabled
+            || !self.tenant_isolation.strict_mode
+            || self.tenant_isolation.cross_tenant_queries
+        {
+            anyhow::bail!("Retrieval authorization needs strict tenant isolation and default deny");
+        }
+        if self.label_policies.is_empty() || self.subject_rules.is_empty() {
+            anyhow::bail!("Retrieval authorization rules must be nonempty");
+        }
+        let mut labels = HashSet::new();
+        for rule in &self.label_policies {
+            if rule.label.is_empty() || !labels.insert(rule.label.as_str()) {
+                anyhow::bail!("Duplicate or empty ABAC label");
+            }
+            if rule.access_rule.is_empty()
+                || rule.access_rule.split(" AND ").any(|predicate| {
+                    !matches!(
+                        predicate,
+                        "true" | "false" | "tenant_match" | "subject_authorized"
+                            | "elevated_privileges" | "audit_log" | "dp_budget_available"
+                    ) && !(predicate.starts_with("capability:")
+                        && self.capabilities.contains_key(&predicate["capability:".len()..]))
+                })
+            {
+                anyhow::bail!("Unsupported ABAC access predicate for {}", rule.label);
+            }
+        }
+        if self.query_context.complexity_limits.max_query_length == 0
+            || self.query_context.complexity_limits.max_results_per_query == 0
+        {
+            anyhow::bail!("Invalid retrieval complexity limits");
+        }
+        Ok(())
     }
 
-    /// Evaluate ABAC policy; returns false on internal errors (fail closed).
+    /// Authorize a request from a verified tenant/subject and explicit scopes.
+    pub async fn authorize_query(&self, context: &QueryContext) -> Result<bool> {
+        Ok(self.evaluate_query(context).await?.allowed)
+    }
+
+    /// Fail closed on any internal error.
     pub async fn evaluate(&self, context: &QueryContext) -> bool {
         self.authorize_query(context).await.unwrap_or(false)
     }
 
-    /// Evaluate query and return detailed decision
+    /// Require an explicit, fully satisfied label rule for every query label.
     pub async fn evaluate_query(&self, context: &QueryContext) -> Result<AuthorizationDecision> {
         let mut decision = AuthorizationDecision {
-            allowed: self.default_policy == "allow",
+            allowed: false,
             reason: None,
             rules_applied: vec![format!("policy:{}:{}", self.version, self.description)],
             audit_required: false,
         };
-
-        // Check tenant isolation
-        if self.tenant_isolation.enabled {
-            if !self.check_tenant_isolation(context).await? {
-                decision.allowed = false;
-                decision.reason = Some("Tenant isolation violation".to_string());
-                return Ok(decision);
-            }
-            decision.rules_applied.push("tenant_isolation".to_string());
-            if self.tenant_isolation.cross_tenant_queries && context.index_shard != format!("shard_{}", context.tenant) {
-                decision.allowed = false;
-                decision.reason = Some("Cross-tenant query blocked".to_string());
-                return Ok(decision);
-            }
-        }
-
-        // Check subject rules
-        if let Some(subject_rule) = self.find_matching_subject_rule(&context.subject_id) {
-            decision.rules_applied.push(format!("subject_rule:{}", subject_rule.subject_pattern));
-            if let Some(privileges) = &subject_rule.privileges {
-                if privileges.is_empty() {
-                    decision.allowed = false;
-                    decision.reason = Some("Subject lacks required privileges".to_string());
-                    return Ok(decision);
-                }
-            }
-            if let Some(capabilities) = &subject_rule.capabilities {
-                for cap in capabilities {
-                    if let Some(cap_cfg) = self.capabilities.get(cap) {
-                        if cap_cfg.dp_budget_required.unwrap_or(false) && context.tenant.is_empty() {
-                            decision.allowed = false;
-                            decision.reason = Some(format!(
-                                "Capability '{}' ({}) requires tenant context",
-                                cap, cap_cfg.description
-                            ));
-                            return Ok(decision);
-                        }
-                        if !cap_cfg.required_for.is_empty() && context.labels_filter.is_empty() {
-                            decision.allowed = false;
-                            decision.reason = Some(format!(
-                                "Capability '{}' requires labels {:?}",
-                                cap, cap_cfg.required_for
-                            ));
-                            return Ok(decision);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check label policies
-        for label in &context.labels_filter {
-            if let Some(label_policy) = self.find_label_policy(label) {
-                let label_allowed = self.evaluate_label_access(context, label_policy).await?;
-                if !label_allowed {
-                    decision.allowed = false;
-                    decision.reason = Some(format!("Label '{}' access denied", label));
-                    return Ok(decision);
-                }
-                decision.rules_applied.push(format!("label_policy:{}", label));
-                decision.rules_applied.push(format!("label_desc:{}", label_policy.description));
-
-                // Check if audit required
-                if self.audit.always_audit.contains(label) || 
-                   self.audit.always_audit.iter().any(|pattern| label.contains(pattern)) {
-                    decision.audit_required = true;
-                }
-            }
-        }
-
-        if !self.get_rate_limits(context).is_empty() {
-            decision
-                .rules_applied
-                .push("rate_limits_configured".to_string());
-        }
-
-        let limits = &self.query_context.complexity_limits;
-        if context.query.len() > limits.max_query_length {
-            decision.allowed = false;
-            decision.reason = Some(format!(
-                "Query length {} exceeds limit {}",
-                context.query.len(),
-                limits.max_query_length
-            ));
+        if !self.check_tenant_isolation(context).await? {
+            decision.reason = Some("Tenant isolation violation".into());
             return Ok(decision);
         }
-        decision.rules_applied.push(format!(
-            "complexity:max_results={},max_concurrent={}",
-            limits.max_results_per_query, limits.max_concurrent_queries
-        ));
-
-        if decision.audit_required && self.audit.query_logging.enabled {
-            decision.rules_applied.push(format!(
-                "audit_log:text={},hash={},count={},timing={}",
-                self.audit.query_logging.log_query_text,
-                self.audit.query_logging.log_query_hash,
-                self.audit.query_logging.log_result_count,
-                self.audit.query_logging.log_timing
-            ));
-            let _ = &context.query;
+        let limits = &self.query_context.complexity_limits;
+        if context.query.trim().is_empty() || context.query.len() > limits.max_query_length {
+            decision.reason = Some("Invalid query length".into());
+            return Ok(decision);
         }
-
-        // If we get here and default is deny, check if any allow rules matched
-        if self.default_policy == "deny" && !decision.rules_applied.is_empty() {
-            decision.allowed = true;
+        if context.labels_filter.is_empty()
+            || context.labels_filter.len() > self.label_policies.len()
+        {
+            decision.reason = Some("Explicit label scope is mandatory".into());
+            return Ok(decision);
         }
-
+        let subject_rule = match self.find_matching_subject_rule(&context.subject_id) {
+            Some(rule) => rule,
+            None => {
+                decision.reason = Some("Unrecognized subject".into());
+                return Ok(decision);
+            }
+        };
+        decision.rules_applied.push(format!("subject_rule:{}", subject_rule.subject_pattern));
+        for label in &context.labels_filter {
+            if !context.allowed_labels.iter().any(|scope| scope == label) {
+                decision.reason = Some(format!("Label '{label}' absent from signed token scopes"));
+                return Ok(decision);
+            }
+            let Some(rule) = self.find_label_policy(label) else {
+                decision.reason = Some(format!("Unknown label '{label}'"));
+                return Ok(decision);
+            };
+            if !self.evaluate_label_access(context, rule, subject_rule) {
+                decision.reason = Some(format!("Label '{label}' access denied"));
+                return Ok(decision);
+            }
+            decision.rules_applied.push(format!("label_policy:{label}"));
+        }
+        decision.audit_required = self.should_audit(context);
+        decision.allowed = true;
         Ok(decision)
     }
 
-    /// Check tenant isolation rules
     async fn check_tenant_isolation(&self, context: &QueryContext) -> Result<bool> {
-        if self.tenant_isolation.strict_mode {
-            // In strict mode, only allow queries within the same tenant
-            // This would be validated against the index shard mapping
-            return Ok(!context.tenant.is_empty());
-        }
-        Ok(true)
+        Ok(self.tenant_isolation.enabled
+            && self.tenant_isolation.strict_mode
+            && !self.tenant_isolation.cross_tenant_queries
+            && !context.tenant.trim().is_empty()
+            && !context.subject_id.trim().is_empty()
+            && context.index_shard == format!("shard_{}", context.tenant))
     }
 
-    /// Find matching subject rule
+    /// Match the first applicable subject rule (order is significant).
     fn find_matching_subject_rule(&self, subject_id: &str) -> Option<&SubjectRule> {
         self.subject_rules.iter().find(|rule| {
             if rule.subject_pattern == "*" {
@@ -265,42 +240,45 @@ impl AbacPolicy {
         })
     }
 
-    /// Find label policy
     fn find_label_policy(&self, label: &str) -> Option<&LabelPolicy> {
-        self.label_policies.iter().find(|policy| policy.label == label)
+        self.label_policies.iter().find(|rule| rule.label == label)
     }
 
-    /// Evaluate label access
-    async fn evaluate_label_access(&self, context: &QueryContext, policy: &LabelPolicy) -> Result<bool> {
-        // Simplified rule evaluation - in real implementation would use a proper policy engine
-        match policy.access_rule.as_str() {
-            "false" => Ok(false),
-            "true" => Ok(true),
-            "tenant_match" => Ok(!context.tenant.is_empty()),
-            rule if rule.contains("tenant_match") => {
-                // Complex rule with tenant_match requirement
-                Ok(!context.tenant.is_empty())
+    /// Evaluate each conjunct literally; no substring or unknown-rule grants.
+    fn evaluate_label_access(
+        &self, context: &QueryContext, label: &LabelPolicy, subject: &SubjectRule,
+    ) -> bool {
+        label.access_rule.split(" AND ").all(|predicate| match predicate {
+            "true" => true,
+            "false" => false,
+            "tenant_match" => context.index_shard == format!("shard_{}", context.tenant),
+            "subject_authorized" => context.capabilities.iter().any(|x| x == "private_access"),
+            "elevated_privileges" => {
+                context.capabilities.iter().any(|x| x == "elevated_privileges")
+                    && subject.privileges.as_ref().is_some_and(|roles| {
+                        roles.iter().any(|x| x == "elevated_privileges")
+                    })
             }
-            rule if rule.contains("capability:") => {
-                // Would check capability token for required capability
-                // For now, assume granted if subject is not empty
-                Ok(!context.subject_id.is_empty())
+            // There is no durable audit or DP-budget enforcement in this
+            // service yet. Deny instead of asserting those predicates hold.
+            "audit_log" | "dp_budget_available" => false,
+            name if name.starts_with("capability:") => {
+                let cap = &name["capability:".len()..];
+                self.capabilities.contains_key(cap)
+                    && context.capabilities.iter().any(|x| x == cap)
             }
-            _ => {
-                // Default to allow for unknown rules (would be more strict in production)
-                Ok(true)
-            }
-        }
+            _ => false,
+        })
     }
 
     /// Check if query should be audited
     pub fn should_audit(&self, context: &QueryContext) -> bool {
         // Check if any labels require auditing
         context.labels_filter.iter().any(|label| {
-            self.audit.always_audit.contains(label) || 
-            self.audit.always_audit.iter().any(|pattern| {
-                pattern.starts_with("label:") && label == &pattern[6..]
-            })
+            self.audit.always_audit.contains(label)
+                || self.audit.always_audit.iter().any(|pattern| {
+                    pattern.strip_prefix("label:") == Some(label.as_str())
+                })
         })
     }
 
@@ -335,6 +313,8 @@ mod tests {
             labels_filter: vec!["public".to_string()],
             query_hash: "test_hash".to_string(),
             index_shard: "shard_tenant1".to_string(),
+            allowed_labels: vec!["public".into(), "confidential".into(), "private".into()],
+            capabilities: vec![],
         };
 
         let result = policy.check_tenant_isolation(&context).await.unwrap();
@@ -364,9 +344,116 @@ mod tests {
             labels_filter: vec!["confidential".to_string()],
             query_hash: "test_hash".to_string(),
             index_shard: "shard_tenant1".to_string(),
+            allowed_labels: vec!["public".into(), "confidential".into(), "private".into()],
+            capabilities: vec![],
         };
 
         assert!(policy.should_audit(&context));
+    }
+
+    fn context(subject_id: &str, labels: &[&str]) -> QueryContext {
+        QueryContext {
+            tenant: "tenant1".into(),
+            subject_id: subject_id.into(),
+            query: "reference documents".into(),
+            labels_filter: labels.iter().map(|s| (*s).into()).collect(),
+            query_hash: "hash".into(),
+            index_shard: "shard_tenant1".into(),
+            allowed_labels: vec!["public".into(), "private".into(), "confidential".into()],
+            capabilities: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn public_access_needs_signed_label_scope() {
+        let policy = create_test_policy();
+        assert!(policy.evaluate(&context("user1", &["public"])).await);
+        let mut request = context("user1", &["public"]);
+        request.allowed_labels.clear();
+        assert!(!policy.evaluate(&request).await);
+        request.allowed_labels.push("public".into());
+        request.index_shard = "shard_attacker".into();
+        assert!(!policy.evaluate(&request).await);
+    }
+
+    #[tokio::test]
+    async fn missing_or_unknown_label_is_denied() {
+        let policy = create_test_policy();
+        assert!(!policy.evaluate(&context("user1", &[])).await);
+        let mut request = context("user1", &["unknown"]);
+        request.allowed_labels.push("unknown".into());
+        assert!(!policy.evaluate(&request).await);
+    }
+
+    #[tokio::test]
+    async fn privileged_subject_does_not_bypass_unimplemented_audit() {
+        let policy = create_test_policy();
+        let mut request = context("admin_user1", &["confidential"]);
+        request.capabilities.push("elevated_privileges".into());
+        assert!(!policy.evaluate(&request).await);
+    }
+
+    #[tokio::test]
+    async fn private_subject_authorization_is_explicit() {
+        let mut policy = create_test_policy();
+        policy.label_policies.push(LabelPolicy {
+            label: "private".into(),
+            access_rule: "subject_authorized AND tenant_match".into(),
+            description: "Private".into(),
+        });
+        assert!(!policy.evaluate(&context("user1", &["private"])).await);
+        let mut request = context("user1", &["private"]);
+        request.capabilities.push("private_access".into());
+        assert!(policy.evaluate(&request).await);
+    }
+
+    #[tokio::test]
+    async fn secret_and_unimplemented_financial_budget_rules_deny() {
+        let mut policy = create_test_policy();
+        policy.capabilities.insert("financial_access".into(), CapabilityConfig {
+            description: "Finance".into(),
+            required_for: vec!["financial".into()],
+            dp_budget_required: None,
+        });
+        policy.label_policies.extend([
+            LabelPolicy { label: "secret".into(), access_rule: "false".into(), description: "Secret".into() },
+            LabelPolicy {
+                label: "financial".into(),
+                access_rule: "capability:financial_access AND tenant_match AND audit_log".into(),
+                description: "Finance".into(),
+            },
+            LabelPolicy {
+                label: "pii".into(),
+                access_rule: "dp_budget_available AND tenant_match".into(),
+                description: "PII".into(),
+            },
+        ]);
+        let mut request = context("admin_user1", &["secret"]);
+        request.allowed_labels.push("secret".into());
+        assert!(!policy.evaluate(&request).await);
+        request.labels_filter = vec!["financial".into()];
+        request.allowed_labels.push("financial".into());
+        request.capabilities.push("financial_access".into());
+        assert!(!policy.evaluate(&request).await);
+        request.labels_filter = vec!["pii".into()];
+        request.allowed_labels.push("pii".into());
+        assert!(!policy.evaluate(&request).await);
+    }
+
+    #[test]
+    fn unsupported_policy_predicate_is_rejected_before_start() {
+        let mut policy = create_test_policy();
+        policy.label_policies.push(LabelPolicy {
+            label: "private".into(),
+            access_rule: "tenant_match OR true".into(),
+            description: "Unsafe".into(),
+        });
+        assert!(policy.validate_configuration().is_err());
+        let mut policy = create_test_policy();
+        policy.default_policy = "allow".into();
+        assert!(policy.validate_configuration().is_err());
+        let policy = create_test_policy();
+        assert!(policy.validate_configuration().is_ok());
     }
 
     fn create_test_policy() -> AbacPolicy {

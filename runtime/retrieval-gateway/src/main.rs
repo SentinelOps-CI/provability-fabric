@@ -28,11 +28,13 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod abac;
+mod auth;
 mod cache;
 mod receipt;
 mod storage;
 
 use abac::{AbacPolicy, QueryContext};
+use auth::TokenVerifier;
 use cache::SemanticCache;
 use receipt::{AccessReceipt, ReceiptSigner};
 use storage::{StorageAdapter, VectorIndex};
@@ -53,6 +55,7 @@ lazy_static! {
 pub struct AppState {
     storage: Arc<dyn StorageAdapter>,
     abac_policy: Arc<AbacPolicy>,
+    token_verifier: Arc<TokenVerifier>,
     receipt_signer: Arc<ReceiptSigner>,
     receipt_cache: Arc<RwLock<HashMap<String, AccessReceipt>>>,
     semantic_cache: Arc<SemanticCache>,
@@ -109,6 +112,8 @@ async fn main() -> Result<()> {
 
     let storage = Arc::new(VectorIndex::new().await?);
     let abac_policy = Arc::new(AbacPolicy::load_from_file("abac.yaml").await?);
+    // Missing trusted public keys or issuer prevents service startup.
+    let token_verifier = Arc::new(TokenVerifier::from_env()?);
     let receipt_signer = Arc::new(ReceiptSigner::new().await?);
     let receipt_cache = Arc::new(RwLock::new(HashMap::new()));
     let semantic_cache = Arc::new(SemanticCache::new());
@@ -116,16 +121,16 @@ async fn main() -> Result<()> {
     let state = AppState {
         storage,
         abac_policy,
+        token_verifier,
         receipt_signer,
         receipt_cache,
         semantic_cache,
     };
 
+    // Receipt lookup and cache administration have no authenticated
+    // ownership protocol yet. Do not expose those privileged endpoints.
     let app = Router::new()
         .route("/query", post(handle_query))
-        .route("/receipts", get(get_receipt))
-        .route("/cache/stats", get(get_cache_stats))
-        .route("/cache/invalidate/:tenant", post(invalidate_cache))
         .route("/health", get(health_check))
         .layer(
             ServiceBuilder::new()
@@ -152,10 +157,13 @@ async fn handle_query(
 ) -> Result<Json<QueryResponse>, StatusCode> {
     let start_time = std::time::Instant::now();
 
-    if !validate_capability_token(&request.capability_token, &request.tenant, &request.subject_id)
-        .await
-    {
-        return Err(StatusCode::FORBIDDEN);
+    let claims = state
+        .token_verifier
+        .verify(&request.capability_token, &request.tenant, &request.subject_id)
+        .map_err(|_| StatusCode::FORBIDDEN)?;
+    let limit = request.limit.unwrap_or(10);
+    if limit == 0 || limit > state.abac_policy.query_context.complexity_limits.max_results_per_query {
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     let context = QueryContext {
@@ -165,6 +173,8 @@ async fn handle_query(
         labels_filter: request.labels_filter.clone(),
         query_hash: compute_query_hash(&request.query).await,
         index_shard: format!("shard_{}", request.tenant),
+        allowed_labels: claims.allowed_labels,
+        capabilities: claims.capabilities,
     };
 
     if !state.abac_policy.evaluate(&context).await {
@@ -183,17 +193,17 @@ async fn handle_query(
         .await;
 
     let results = if let Some(cached) = cached_results {
-        debug!("Cache hit for query: {}", request.query);
+        debug!("Cache hit for tenant {}", request.tenant);
         cached
     } else {
-        debug!("Cache miss for query: {}", request.query);
+        debug!("Cache miss for tenant {}", request.tenant);
         let search_results = state
             .storage
             .search_with_tenant_isolation(
                 &request.query,
                 &request.tenant,
                 &request.labels_filter,
-                request.limit.unwrap_or(10),
+                limit,
             )
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -214,6 +224,14 @@ async fn handle_query(
 
         search_results
     };
+
+    // Defense in depth against a mislabeled storage or cache result.
+    // Documents with an unknown or extra label must never be returned on
+    // the strength of a different, authorized label.
+    let results: Vec<_> = results.into_iter().filter(|result| {
+        !result.labels.is_empty()
+            && result.labels.iter().all(|label| context.labels_filter.contains(label))
+    }).take(limit).collect();
 
     let query_time_ms = start_time.elapsed().as_millis() as u64;
 
@@ -287,11 +305,6 @@ async fn health_check() -> Json<HealthResponse> {
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: 0,
     })
-}
-
-/// Validate capability token (simplified)
-async fn validate_capability_token(token: &str, tenant: &str, subject_id: &str) -> bool {
-    !token.is_empty() && !tenant.is_empty() && !subject_id.is_empty()
 }
 
 /// Compute hash of query for receipt
