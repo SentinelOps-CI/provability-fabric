@@ -492,8 +492,9 @@ security:
 
 security-live:
 	@$(ECHOOK) "Running probes against disposable, pre-seeded test services only..."
-	@: "${ABAC_FIXTURE_MANIFEST:?Set ABAC_FIXTURE_MANIFEST to the independently seeded corpus manifest}"
-	python3 tests/redteam/abac_fuzz.py --queries 1000 --fixture-manifest "$ABAC_FIXTURE_MANIFEST"
+	@$(ECHOOK) "Requires ABAC_FIXTURE_MANIFEST with independently seeded corpus reference."
+	@test -n "$(ABAC_FIXTURE_MANIFEST)" || { echo "Set ABAC_FIXTURE_MANIFEST to a prepared corpus manifest" >&2; exit 2; }
+	python3 tests/redteam/abac_fuzz.py --queries 1000 --fixture-manifest "$(ABAC_FIXTURE_MANIFEST)"
 	python3 tests/redteam/pii_leak.py --vectors 1000 --tenant acme-corp
 	@$(ECHOOK) "Live probe outcomes depend on deployed service fixtures and policy."
 
