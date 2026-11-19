@@ -116,6 +116,26 @@ jobs:
             examples/workflow_profiles
             examples/artifact_registry.valid.json
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The pinned upstream pyproject declares readme = "../README.md",
+      # which Hatchling rejects as outside the Python project root.
+      # Import directly from the immutable checkout; do not silently
+      # mutate or package the upstream source in this workflow.
+      - name: Prepare PCS Python source checkout and CLI
+        run: |
+          set -euo pipefail
+          python3 -m pip install -q 'jsonschema[format-nongpl]>=4.23.0' 'referencing>=0.35.0,<0.37.0'
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/pcs-core/python" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/pcs-bin"
+          printf '#!/usr/bin/env bash\nset -euo pipefail\nexec python3 -m pcs_core.cli "$@"\n' > "$RUNNER_TEMP/pcs-bin/pcs"
+          chmod 755 "$RUNNER_TEMP/pcs-bin/pcs"
+          echo "$RUNNER_TEMP/pcs-bin" >> "$GITHUB_PATH"
+          PYTHONPATH="$GITHUB_WORKSPACE/pcs-core/python" "$RUNNER_TEMP/pcs-bin/pcs" --help > /dev/null
+          PYTHONPATH="$GITHUB_WORKSPACE/pcs-core/python" python3 -c 'from pcs_core.paths import schemas_dir; assert schemas_dir().is_dir()'
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
@@ -135,7 +155,6 @@ jobs:
 
       - name: Test PCS adapter
         run: |
-          python3 -m pip install -q -e "${{ github.workspace }}/pcs-core/python"
           cd adapters/pcs
           go test -tags pcsbench ./... -count=1
 
@@ -190,7 +209,6 @@ jobs:
           # Validate the in-repo labtrust-release fixtures (kept hash-aligned with
           # PF signed wrappers). pcs-core tip examples can drift independently.
           python3 scripts/refresh-release-manifest-pins.py tests/pcs/fixtures/labtrust-release
-          pip install -q -e "${{ github.workspace }}/pcs-core/python"
           cd core/cli/pf
           PF_COMMIT="$(python -c "import json;print(json.load(open('$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/FIXTURE_MANIFEST.json'))['pf_source_commit'])")"
           export PF_SOURCE_COMMIT="$PF_COMMIT"
@@ -254,7 +272,6 @@ jobs:
       - name: PCS v0.1 PF clean-chain segment
         run: |
           export PCS_CORE_PATH="${{ github.workspace }}/pcs-core"
-          pip install -q -e "$PCS_CORE_PATH/python"
           WORK="$RUNNER_TEMP/pf-clean-chain"
           mkdir -p "$WORK"
           cp "$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release/science_claim_bundle.certified.json" "$WORK/"
@@ -266,7 +283,6 @@ jobs:
 
       - name: pcs-core validate release artifacts
         run: |
-          pip install -q -e pcs-core/python
           RELEASE="$GITHUB_WORKSPACE/tests/pcs/fixtures/labtrust-release"
           pcs validate "$RELEASE/science_claim_bundle.certified.json"
           pcs validate "$RELEASE/verification_result.json"
@@ -588,7 +604,6 @@ jobs:
             "${LABTRUST}/pcs_bench_ingest.v0.json"
           go run . --benchmark-bundle "${LABTRUST}" --pcs-core "$PCS_CORE_PATH"
           cd "$GITHUB_WORKSPACE"
-          pip install -q -e "${PCS_CORE_PATH}/python"
           pcs validate "${LABTRUST}/pcs_bench_ingest.v0.json"
           pcs validate "$GITHUB_WORKSPACE/benchmarks/admission/examples/labtrust_qc_release.pcs_bench_ingest.reference.json"
           python3 "$GITHUB_WORKSPACE/scripts/pcs-bench-producer-contract-check.py" \

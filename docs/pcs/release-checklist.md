@@ -10,6 +10,13 @@ git -C ../pcs-core checkout 9db2ec210c2b5627a72b5cc23a10aebe88dd5012
 export PCS_CORE_PATH=../pcs-core
 ```
 
+PCS CI uses Python 3.12 and imports the pinned `pcs-core` Python source
+directly from the checked-out repository, with its declared `jsonschema` and
+`referencing` dependencies. The upstream `python/pyproject.toml` currently
+references `../README.md`, which Hatchling rejects during editable installation.
+CI uses an explicit temporary `pcs` launcher bound to that checkout and makes
+no source modifications. Fixing upstream wheel packaging is a separate task.
+
 The checked-in PCS schema mirrors target the `pcs-core` compatibility snapshot
 `9db2ec210c2b5627a72b5cc23a10aebe88dd5012` (July 23, 2026). CI checks this exact immutable commit,
 not the continuously changing upstream default branch. This pin preserves
