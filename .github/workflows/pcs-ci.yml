@@ -13,6 +13,7 @@ on:
       - 'tests/pcs/**'
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
+      - 'tests/test_pcs_schema_mirrors.py'
       - 'scripts/pcs-pf-clean-chain.sh'
       - 'scripts/pcs-formal-release-args.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
@@ -49,6 +50,7 @@ on:
       - 'tests/pcs/**'
       - 'tools/pcs-validate/**'
       - 'scripts/pcs-schema-diff.sh'
+      - 'tests/test_pcs_schema_mirrors.py'
       - 'scripts/pcs-pf-clean-chain.sh'
       - 'scripts/pcs-formal-release-args.sh'
       - 'scripts/pcs-freeze-labtrust-release.sh'
@@ -118,6 +120,9 @@ jobs:
             adapters/pcs/go.sum
             core/cli/pf/go.sum
             tools/pcs-validate/go.sum
+
+      - name: Verify schema mirror drift guards
+        run: python3 -m unittest discover -s tests -p 'test_pcs_schema_mirrors.py' -v
 
       - name: Schema mirror matches pcs-core
         run: bash scripts/pcs-schema-diff.sh pcs-core
