@@ -33,13 +33,13 @@ jobs:
       run_sidecar: ${{ steps.set.outputs.run_sidecar }}
       run_labeler: ${{ steps.set.outputs.run_labeler }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name == 'push'
 
       - name: Paths filter (push)
         id: filter
         if: github.event_name == 'push'
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             sidecar:
@@ -71,7 +71,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -97,7 +97,7 @@ jobs:
       needs.resolve-suite.outputs.run_labeler == 'true'
       && needs.resolve-suite.outputs.full_suite != 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -116,7 +116,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -142,7 +142,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -167,7 +167,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -195,7 +195,7 @@ jobs:
     env:
       PF_SHADOW_MODE: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -223,7 +223,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -251,7 +251,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.full_suite == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -280,7 +280,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -306,7 +306,7 @@ jobs:
     if: needs.resolve-suite.outputs.full_suite == 'true'
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -314,7 +314,7 @@ jobs:
           toolchain: stable
 
       - name: Cache cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -340,7 +340,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -361,7 +361,7 @@ jobs:
     needs: resolve-suite
     if: needs.resolve-suite.outputs.run_sidecar == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -428,7 +428,7 @@ jobs:
       && (needs.safety-case-bundle.result == 'success' || needs.safety-case-bundle.result == 'skipped')
       && needs.dfa-equivalence.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -455,7 +455,7 @@ jobs:
       && needs.resolve-suite.outputs.full_suite == 'true'
       && needs.integration.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install protoc
         run: |
@@ -471,7 +471,7 @@ jobs:
         run: cargo bench -p provability-fabric-bench -- --quick --output-format=json | tee performance_report.json
 
       - name: Upload Performance Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: performance-report
           path: performance_report.json
@@ -486,7 +486,7 @@ jobs:
       && needs.resolve-suite.outputs.full_suite == 'true'
       && needs.integration.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -508,7 +508,7 @@ jobs:
           if [ "$audit_status" -eq 2 ]; then exit 2; fi
 
       - name: Upload Security Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-report
           path: security_report.json
@@ -523,7 +523,7 @@ jobs:
       && needs.resolve-suite.outputs.full_suite == 'true'
       && needs.integration.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -537,7 +537,7 @@ jobs:
           cargo test --doc --all-features
 
       - name: Upload Documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: documentation
           path: runtime/sidecar-watcher/target/doc
