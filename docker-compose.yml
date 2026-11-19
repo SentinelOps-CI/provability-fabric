@@ -230,8 +230,8 @@ services:
   egress-firewall:
     profiles: ["enforcement", "full"]
     build:
-      context: ./runtime/egress-firewall
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: runtime/egress-firewall/Dockerfile
     ports:
       - "8081:8081"
     environment:

@@ -55,7 +55,7 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   GO_VERSION: "1.23"
-  RUST_VERSION: "stable"
+  RUST_VERSION: "1.98.1"
   KIND_VERSION: "v0.20.0"
   HELM_VERSION: "v3.13.0"
 
@@ -116,7 +116,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
