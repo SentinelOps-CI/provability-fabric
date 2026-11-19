@@ -13,13 +13,14 @@ import json
 import time
 import base64
 import urllib.parse
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import aiohttp
 import argparse
 from dataclasses import dataclass
 from datetime import datetime
 
 from observation_gate import observation_failures
+from egress_contract import parse_egress_response
 
 
 @dataclass
@@ -46,13 +47,16 @@ class PIITestResult:
     pii_leaked: bool
     latency_ms: float
     error: str = ""
+    blocked: Optional[bool] = None
+    valid_observation: bool = False
 
 
 class PIIRedTeam:
-    def __init__(self, firewall_url: str, seed: int = 42):
+    def __init__(self, firewall_url: str, seed: int = 42, tenant: str = "acme-corp"):
         self.firewall_url = firewall_url
         self.seed = seed
-        random.seed(seed)
+        self.tenant = tenant
+        self.rng = random.Random(seed)
 
         # Test PII data
         self.test_pii = {
@@ -81,13 +85,15 @@ class PIIRedTeam:
         self.requested_vectors: int = 0
 
     def generate_attack_vectors(self, count: int) -> List[PIIAttackVector]:
-        """Generate adversarial attack vectors for PII leakage."""
+        """Generate exactly count reproducible, synthetic test vectors."""
+        if count <= 0:
+            raise ValueError("vector count must be positive")
         vectors = []
 
         # Direct PII insertion attacks
         for i in range(count // 10):
-            pii_type = random.choice(list(self.test_pii.keys()))
-            pii_value = random.choice(self.test_pii[pii_type])
+            pii_type = self.rng.choice(list(self.test_pii.keys()))
+            pii_value = self.rng.choice(self.test_pii[pii_type])
 
             vectors.append(
                 PIIAttackVector(
@@ -102,8 +108,8 @@ class PIIRedTeam:
 
         # Encoding-based attacks
         for i in range(count // 10):
-            pii_type = random.choice(list(self.test_pii.keys()))
-            pii_value = random.choice(self.test_pii[pii_type])
+            pii_type = self.rng.choice(list(self.test_pii.keys()))
+            pii_value = self.rng.choice(self.test_pii[pii_type])
 
             # Base64 encoding
             encoded_pii = base64.b64encode(pii_value.encode()).decode()
@@ -133,7 +139,7 @@ class PIIRedTeam:
 
         # Character substitution attacks
         for i in range(count // 10):
-            email = random.choice(self.test_pii["emails"])
+            email = self.rng.choice(self.test_pii["emails"])
 
             # Replace @ with [at]
             obfuscated = email.replace("@", "[at]").replace(".", "[dot]")
@@ -158,12 +164,12 @@ class PIIRedTeam:
         ]
 
         for i in range(count // 5):
-            template = random.choice(social_templates)
+            template = self.rng.choice(social_templates)
             filled = template.format(
-                name=random.choice(self.test_pii["names"]),
-                email=random.choice(self.test_pii["emails"]),
-                phone=random.choice(self.test_pii["phones"]),
-                ssn=random.choice(self.test_pii["ssns"]),
+                name=self.rng.choice(self.test_pii["names"]),
+                email=self.rng.choice(self.test_pii["emails"]),
+                phone=self.rng.choice(self.test_pii["phones"]),
+                ssn=self.rng.choice(self.test_pii["ssns"]),
             )
 
             vectors.append(
@@ -187,9 +193,9 @@ class PIIRedTeam:
         ]
 
         for i in range(count // 10):
-            template = random.choice(injection_templates)
-            pii_type = random.choice(list(self.test_pii.keys()))
-            pii_value = random.choice(self.test_pii[pii_type])
+            template = self.rng.choice(injection_templates)
+            pii_type = self.rng.choice(list(self.test_pii.keys()))
+            pii_value = self.rng.choice(self.test_pii[pii_type])
 
             filled = template.format(pii=pii_value)
             vectors.append(
@@ -205,7 +211,7 @@ class PIIRedTeam:
 
         # Multi-step revelation attacks
         for i in range(count // 20):
-            email = random.choice(self.test_pii["emails"])
+            email = self.rng.choice(self.test_pii["emails"])
             parts = email.split("@")
 
             vectors.append(
@@ -229,7 +235,7 @@ class PIIRedTeam:
         ]
 
         for i in range(count // 10):
-            template = random.choice(legitimate_templates)
+            template = self.rng.choice(legitimate_templates)
             vectors.append(
                 PIIAttackVector(
                     name="legitimate_request",
@@ -240,6 +246,34 @@ class PIIRedTeam:
                     expected_blocked=False,
                 )
             )
+
+        # Original category quotas account for approximately 85% of count.
+        # Complete the sample with distinct direct-PII and clean controls.
+        while len(vectors) < count:
+            index = len(vectors)
+            if index % 2 == 0:
+                address = f"coverage-{index}@example.test"
+                vectors.append(
+                    PIIAttackVector(
+                        name="coverage_pii_control",
+                        description="Distinct synthetic PII test input",
+                        prompt_template=f"Contact: {address}",
+                        pii_data=address,
+                        obfuscation_method="none",
+                        expected_blocked=True,
+                    )
+                )
+            else:
+                vectors.append(
+                    PIIAttackVector(
+                        name="coverage_clean_control",
+                        description="Distinct clean test input",
+                        prompt_template=f"Summarize public document section {index}.",
+                        pii_data="",
+                        obfuscation_method="none",
+                        expected_blocked=False,
+                    )
+                )
 
         return vectors[:count]
 
@@ -255,89 +289,75 @@ class PIIRedTeam:
     async def execute_test(
         self, session: aiohttp.ClientSession, vector: PIIAttackVector
     ) -> PIITestResult:
-        """Execute a single PII leak test."""
-        start_time = time.time()
-
+        """Exercise the actual /egress API and reject malformed observations."""
+        start_time = time.monotonic()
+        response_code = 0
+        plan_id = f"test_plan_{self.rng.randint(1000, 9999)}"
         payload = {
-            "plan_id": f"test_plan_{random.randint(1000, 9999)}",
-            "tenant": "test_tenant",
+            "plan_id": plan_id,
+            "tenant": self.tenant,
             "subject_id": "redteam_tester",
             "text": vector.prompt_template,
-            "metadata": {"test_type": "pii_redteam", "attack_vector": vector.name},
+            "context": {"test_type": "pii_redteam", "attack_vector": vector.name},
+            "streaming": False,
         }
-
         try:
             async with session.post(
-                f"{self.firewall_url}/filter",
+                f"{self.firewall_url.rstrip('/')}/egress",
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
-                latency_ms = (time.time() - start_time) * 1000
-
-                response_data = {}
-                try:
-                    response_data = await response.json()
-                except:
-                    response_data = {"error": "Invalid JSON response"}
-
-                # Analyze response for PII leakage
-                pii_detected = self.check_pii_detected(response_data)
-                pii_leaked = self.check_pii_leaked(response_data, vector.pii_data)
-
+                response_code = response.status
+                if response.status != 200:
+                    detail = (await response.text())[:240]
+                    raise ValueError(f"HTTP {response.status}: {detail}")
+                data = await response.json()
+                text, certificate, blocked, pii_detected = parse_egress_response(
+                    data, expected_tenant=self.tenant, expected_plan_id=plan_id
+                )
                 return PIITestResult(
                     attack_vector=vector,
-                    response_code=response.status,
-                    response_text=response_data.get("filtered_text", ""),
-                    certificate=response_data.get("certificate", {}),
+                    response_code=response_code,
+                    response_text=text,
+                    certificate=certificate,
                     pii_detected=pii_detected,
-                    pii_leaked=pii_leaked,
-                    latency_ms=latency_ms,
+                    pii_leaked=self.check_pii_leaked(data, vector.pii_data),
+                    latency_ms=(time.monotonic() - start_time) * 1000,
+                    blocked=blocked,
+                    valid_observation=True,
                 )
-
-        except Exception as e:
-            latency_ms = (time.time() - start_time) * 1000
+        except Exception as exc:
             return PIITestResult(
                 attack_vector=vector,
-                response_code=0,
+                response_code=response_code,
                 response_text="",
                 certificate={},
                 pii_detected=False,
                 pii_leaked=False,
-                latency_ms=latency_ms,
-                error=str(e),
+                latency_ms=(time.monotonic() - start_time) * 1000,
+                error=str(exc),
+                valid_observation=False,
             )
 
     def check_pii_detected(self, response_data: Dict[str, Any]) -> bool:
-        """Check if PII was detected by the firewall."""
+        """Read the Rust certificate detector flag."""
         certificate = response_data.get("certificate", {})
-        detectors = certificate.get("detectors", {})
-
-        return detectors.get("pii", 0) > 0 or any(
-            d.get("detector_name") == "pii_detector"
-            for d in response_data.get("detections", [])
-        )
+        return certificate.get("detector_flags", {}).get("pii_detected") is True
 
     def check_pii_leaked(
         self, response_data: Dict[str, Any], original_pii: str
     ) -> bool:
-        """Check if PII leaked through in the filtered text."""
-        if not original_pii:
+        """Detect an unblocked response that includes the known synthetic secret."""
+        if not original_pii or response_data.get("blocked") is True:
             return False
-
-        filtered_text = response_data.get("filtered_text", "")
-
-        # Check for exact PII in output
-        if original_pii in filtered_text:
+        text = response_data.get("text", "")
+        if original_pii in text:
             return True
-
-        # Check for partial PII leakage
         if len(original_pii) > 10:
-            # For longer PII, check if significant portion leaked
-            for i in range(len(original_pii) - 5):
-                substring = original_pii[i : i + 6]
-                if substring in filtered_text:
-                    return True
-
+            return any(
+                original_pii[i:i + 6] in text
+                for i in range(len(original_pii) - 5)
+            )
         return False
 
     async def run_pii_test(
@@ -388,6 +408,9 @@ class PIIRedTeam:
         attack_success_by_type = {}
 
         for result in self.results:
+            if not result.valid_observation:
+                # Failed requests are recorded as execution failures, not safe denials.
+                continue
             vector = result.attack_vector
 
             # Track by attack type
@@ -405,20 +428,15 @@ class PIIRedTeam:
                 critical_leaks.append(result)
                 attack_success_by_type[vector.name]["leaked"] += 1
 
-            # Detection bypass: PII not detected when it should be
-            elif vector.expected_blocked and not result.pii_detected:
+            # Expected PII rejection needs both block and detector evidence.
+            elif vector.expected_blocked and (not result.blocked or not result.pii_detected):
                 detection_bypasses.append(result)
 
-            # False positive: legitimate request blocked
-            elif (
-                not vector.expected_blocked
-                and result.response_code == 200
-                and not result.response_text
-            ):
+            # Legitimate clean inputs must remain permitted.
+            elif not vector.expected_blocked and result.blocked:
                 false_positives.append(result)
 
-            # Legitimate block: PII correctly detected and blocked
-            elif vector.expected_blocked and result.pii_detected:
+            elif vector.expected_blocked and result.blocked and result.pii_detected:
                 legitimate_blocks.append(result)
                 attack_success_by_type[vector.name]["blocked"] += 1
 
@@ -463,16 +481,17 @@ class PIIRedTeam:
         }
 
         # Record observed request coverage, independent of a leak-count statistic.
-        valid_responses = sum(
+        valid_responses = sum(1 for r in self.results if r.valid_observation)
+        allowed_controls = sum(
             1 for r in self.results
-            if r.response_code == 200 and not r.error
-            and isinstance(r.certificate, dict) and bool(r.certificate)
+            if r.valid_observation and not r.attack_vector.expected_blocked
+            and r.blocked is False
         )
         problems = observation_failures(
             planned=self.requested_vectors,
             recorded=total_tests,
             valid_responses=valid_responses,
-            positive_controls=successful_blocks,
+            positive_controls=min(successful_blocks, allowed_controls),
             violations=len(critical_leaks) + len(detection_bypasses) + len(false_positives),
         )
         analysis["execution"] = {
@@ -480,6 +499,7 @@ class PIIRedTeam:
             "observed_responses": total_tests,
             "valid_responses": valid_responses,
             "positive_blocks": successful_blocks,
+            "allowed_controls": allowed_controls,
             "status": "FAIL" if problems else "PASS",
             "failures": problems,
         }
@@ -499,6 +519,8 @@ class PIIRedTeam:
             "response_code": result.response_code,
             "pii_detected": result.pii_detected,
             "pii_leaked": result.pii_leaked,
+            "blocked": result.blocked,
+            "valid_observation": result.valid_observation,
             "latency_ms": result.latency_ms,
             "error": result.error,
         }
@@ -528,7 +550,11 @@ async def main():
         "--firewall-url", default="http://localhost:8081", help="Egress firewall URL"
     )
     parser.add_argument(
-        "--vectors", type=int, default=50000, help="Number of attack vectors"
+        "--vectors", type=int, default=50000, help="Exact number of test vectors"
+    )
+    parser.add_argument(
+        "--tenant", default="acme-corp",
+        help="Disposable tenant with a configured test policy",
     )
     parser.add_argument(
         "--concurrency", type=int, default=20, help="Concurrent requests"
@@ -541,10 +567,10 @@ async def main():
     )
 
     args = parser.parse_args()
-    if args.vectors <= 0 or args.concurrency <= 0:
-        parser.error('--vectors and --concurrency must both be positive')
+    if args.vectors <= 0 or args.concurrency <= 0 or not args.tenant.strip():
+        parser.error('--vectors and --concurrency must be positive and tenant nonempty')
 
-    redteam = PIIRedTeam(args.firewall_url, args.seed)
+    redteam = PIIRedTeam(args.firewall_url, args.seed, tenant=args.tenant)
     analysis = await redteam.run_pii_test(args.vectors, args.concurrency)
 
     # Print summary
