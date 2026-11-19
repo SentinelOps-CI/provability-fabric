@@ -2,7 +2,7 @@
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
-FROM rust:1.88-alpine AS builder
+FROM rust:1.99.1-alpine AS builder
 
 # Install build dependencies (no openssl: reqwest uses rustls-tls)
 RUN apk add --no-cache \
@@ -10,23 +10,12 @@ RUN apk add --no-cache \
     pkgconfig \
     && rm -rf /var/cache/apk/*
 
-# Set working directory
+# Build with the canonical workspace and reviewed root Cargo.lock.
+# Override any floating Rust toolchain selector from the copied source.
 WORKDIR /app
-
-# Workspace member: lockfile lives at repo root; build this crate standalone in image context.
-COPY Cargo.toml ./
-
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release --no-default-features --features mimalloc
-
-# Copy source code and force a real binary rebuild (Cargo can keep the dummy
-# binary when mtimes do not invalidate the release artifact).
-COPY src/ ./src/
-RUN touch src/main.rs \
-    && cargo build --release --no-default-features --features mimalloc
+COPY . .
+RUN cargo +1.99.1 build --locked --release -p egress-firewall \
+    --no-default-features --features mimalloc
 
 # Runtime stage
 FROM alpine:3.19
@@ -49,7 +38,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/egress-firewall ./
 
 # Copy policy files
-COPY policies/ ./policies/
+COPY runtime/egress-firewall/policies/ ./policies/
 
 # Set ownership
 RUN chown -R appuser:appgroup /app

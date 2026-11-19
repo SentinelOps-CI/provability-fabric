@@ -3,20 +3,13 @@
 #
 # Build from repository root: docker build -f runtime/sidecar-watcher/Dockerfile .
 
-FROM rust:1.88-bookworm AS builder
+FROM rust:1.99.1-bookworm AS builder
 WORKDIR /app
-COPY core/crypto/dsse-rs ./core/crypto/dsse-rs
-COPY runtime/sidecar-watcher ./runtime/sidecar-watcher
-# Minimal workspace: root Cargo.toml lists members not copied into this context.
-RUN cat > Cargo.toml <<'EOF'
-[workspace]
-members = [
-    "core/crypto/dsse-rs",
-    "runtime/sidecar-watcher",
-]
-resolver = "2"
-EOF
-RUN cargo build --release -p sidecar-watcher
+# Build against the canonical workspace and reviewed Cargo.lock.
+# The root .dockerignore excludes local build outputs and environment files.
+COPY . .
+# Override any floating Rust toolchain selector in the copied source.
+RUN cargo +1.99.1 build --locked --release -p sidecar-watcher
 
 FROM debian:bookworm-slim
 
