@@ -46,6 +46,47 @@ class TestEntrypointTests(unittest.TestCase):
         self.assertIn("python3 tests/integration/test_platform_integration.py", output)
         self.assertIn("synthetic", output.lower())
 
+    def test_security_target_uses_offline_contract_tests(self) -> None:
+        output = self.dry_run("security")
+        self.assertIn("test_redteam_observation_gate.py", output)
+        self.assertIn("test_redteam_egress_contract.py", output)
+        self.assertIn("test_redteam_retrieval_*.py", output)
+        self.assertNotIn("tests/redteam/abac_fuzz.py --queries", output)
+        self.assertNotIn("tests/redteam/pii_leak.py --vectors", output)
+        self.assertNotIn("tests/security/malicious_adapter_test.py", output)
+
+    def test_live_security_target_needs_reference_fixture(self) -> None:
+        output = self.dry_run("security-live")
+        self.assertIn("ABAC_FIXTURE_MANIFEST", output)
+        self.assertIn("--fixture-manifest", output)
+        self.assertIn("tests/redteam/pii_leak.py --vectors", output)
+        with_fixture = subprocess.run(
+            [
+                "make", "--no-print-directory", "-n", "security-live",
+                "ABAC_FIXTURE_MANIFEST=tests/redteam/fixtures/abac-reference.example.json",
+            ],
+            cwd=ROOT, capture_output=True, text=True, timeout=20, check=False,
+        )
+        self.assertEqual(with_fixture.returncode, 0, with_fixture.stderr)
+        self.assertIn(
+            '--fixture-manifest "tests/redteam/fixtures/abac-reference.example.json"',
+            with_fixture.stdout,
+        )
+
+    def test_live_security_without_fixture_fails_before_running_probes(self) -> None:
+        result = subprocess.run(
+            ["make", "--no-print-directory", "security-live", "ABAC_FIXTURE_MANIFEST="],
+            cwd=ROOT, capture_output=True, text=True, timeout=20, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Set ABAC_FIXTURE_MANIFEST", result.stdout + result.stderr)
+        self.assertNotIn("Running probes with", result.stdout + result.stderr)
+
+    def test_legacy_sandbox_simulator_is_opt_in(self) -> None:
+        output = self.dry_run("security-legacy-simulation")
+        self.assertIn("tests/security/malicious_adapter_test.py", output)
+        self.assertIn("synthetic", output.lower())
+
     def test_aggregate_target_does_not_claim_exhaustiveness(self) -> None:
         output = self.dry_run("test-all")
         self.assertNotIn("All tests completed successfully", output)

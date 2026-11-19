@@ -10,6 +10,8 @@ on:
       - "tests/redteam/**"
       - "tests/test_redteam_observation_gate.py"
       - "tests/test_redteam_egress_contract.py"
+      - "tests/test_redteam_retrieval_contract.py"
+      - "tests/test_redteam_retrieval_client.py"
       - "tests/redteam/requirements.txt"
       - ".github/workflows/redteam.yaml"
   workflow_dispatch:
@@ -31,6 +33,8 @@ jobs:
         run: python3 -m pip install -r tests/redteam/requirements.txt
       - name: Exercise egress API and vector-count negative controls
         run: python3 -m unittest discover -s tests -p 'test_redteam_egress_contract.py' -v
+      - name: Exercise retrieval reference-corpus and client negative controls
+        run: python3 -m unittest discover -s tests -p 'test_redteam_retrieval_*.py' -v
 
   redteam-offline:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

@@ -2,9 +2,10 @@
 """
 ABAC Fuzz Testing for Cross-Tenant Isolation
 
-This script performs comprehensive fuzz testing of the ABAC (Attribute-Based Access Control)
-system to ensure zero cross-tenant data leakage. It generates 100k+ queries with various
-role/label permutations and verifies that no cross-tenant results are returned.
+This is a fixture-bound HTTP probe for the Rust retrieval gateway. The
+independent reference corpus and explicit positive/negative controls prevent
+empty-index or malformed-response runs from earning a success verdict.
+The current server's token verifier is not cryptographically complete.
 """
 
 import asyncio
@@ -17,6 +18,9 @@ import hashlib
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import os
+
+from retrieval_contract import inspect_query_response, load_reference_documents
 
 from observation_gate import observation_failures
 
@@ -39,6 +43,7 @@ class TestCase:
     expected_labels: List[str]
     expected_tenant: str
     test_id: str
+    denial_reason: Optional[str] = None
 
 
 @dataclass
@@ -52,28 +57,32 @@ class TestResult:
     result_count: int
     cross_tenant_leak: bool
     unauthorized_access: bool
+    denial_observed: bool = False
 
 
 class ABACFuzzTester:
     """Comprehensive ABAC fuzz tester"""
 
-    def __init__(self, base_url: str, max_workers: int = 10):
+    def __init__(
+        self,
+        base_url: str,
+        max_workers: int = 10,
+        *,
+        capability_token: str,
+        reference_documents: Dict[str, Dict],
+        seed: int = 42,
+    ):
+        if not capability_token or not reference_documents:
+            raise ValueError("live retrieval probes need a token and an independent reference corpus")
         self.base_url = base_url
         self.max_workers = max_workers
+        self.capability_token = capability_token
+        self.reference_documents = reference_documents
+        self.rng = random.Random(seed)
         self.test_cases: List[TestCase] = []
         self.results: List[TestResult] = []
 
-        # Test data generation
-        self.tenants = [
-            "acme-corp",
-            "tech-startup",
-            "healthcare-org",
-            "financial-bank",
-            "government-agency",
-            "education-uni",
-            "retail-chain",
-            "manufacturing-co",
-        ]
+        self.tenants = sorted({doc["tenant"] for doc in reference_documents.values()})
 
         self.roles = [
             "admin",
@@ -182,27 +191,28 @@ class ABACFuzzTester:
 
     def generate_test_case(self) -> TestCase:
         """Generate a random test case"""
-        tenant = random.choice(self.tenants)
-        subject_id = f"user_{random.randint(1000, 9999)}"
-        subject_roles = random.sample(self.roles, random.randint(1, 3))
+        tenant = self.rng.choice(self.tenants)
+        subject_id = f"user_{self.rng.randint(1000, 9999)}"
+        subject_roles = self.rng.sample(self.roles, self.rng.randint(1, 3))
 
         # Generate query
-        template = random.choice(self.query_templates)
-        topic = random.choice(self.topics)
-        label = random.choice(self.labels)
+        template = self.rng.choice(self.query_templates)
+        topic = self.rng.choice(self.topics)
+        label = self.rng.choice(self.labels)
         query = template.format(
             topic=topic,
             label=label,
             subject=subject_id,
-            date=f"2024-{random.randint(1, 12):02d}",
-            term=random.choice(self.topics),
-            pattern=f"pattern_{random.randint(1, 100)}",
-            criteria=f"criteria_{random.randint(1, 50)}",
-            condition=f"condition_{random.randint(1, 25)}",
+            date=f"2024-{self.rng.randint(1, 12):02d}",
+            term=self.rng.choice(self.topics),
+            pattern=f"pattern_{self.rng.randint(1, 100)}",
+            criteria=f"criteria_{self.rng.randint(1, 50)}",
+            condition=f"condition_{self.rng.randint(1, 25)}",
         )
 
-        # Expected labels based on roles and query
-        expected_labels = self.determine_expected_labels(subject_roles, label)
+        # Roles are workload metadata: the Rust API does not accept role claims.
+        # The requested label filter is the actual wire-level input.
+        expected_labels = [label]
         expected_tenant = tenant
 
         test_id = hashlib.sha256(f"{tenant}:{subject_id}:{query}".encode()).hexdigest()[
@@ -219,122 +229,92 @@ class ABACFuzzTester:
             test_id=test_id,
         )
 
-    def determine_expected_labels(
-        self, roles: List[str], requested_label: str
-    ) -> List[str]:
-        """Determine expected accessible labels based on roles"""
-        accessible_labels = ["public"]  # Public is always accessible
-
-        if "admin" in roles:
-            accessible_labels.extend(["private", "confidential", "internal"])
-        elif "manager" in roles:
-            accessible_labels.extend(["private", "internal"])
-        elif "analyst" in roles:
-            accessible_labels.extend(["private"])
-        elif "finance" in roles and requested_label == "financial":
-            accessible_labels.append("financial")
-        elif "hr" in roles and requested_label == "pii":
-            accessible_labels.append("pii")
-        elif "security" in roles:
-            accessible_labels.extend(["confidential", "sensitive"])
-
-        # Only return labels that were actually requested
-        return [label for label in accessible_labels if label == requested_label]
-
     def generate_test_cases(self, count: int = 100000) -> None:
-        """Generate the specified number of test cases"""
-        logger.info(f"Generating {count} test cases...")
-
-        for i in range(count):
-            test_case = self.generate_test_case()
-            self.test_cases.append(test_case)
-
-            if (i + 1) % 10000 == 0:
-                logger.info(f"Generated {i + 1} test cases")
-
-        logger.info(f"Generated {len(self.test_cases)} test cases")
+        """Construct explicit per-tenant controls and reproducible fuzz workload."""
+        minimum = 3 * len(self.tenants)
+        if count < minimum:
+            raise ValueError(f"at least {minimum} probes needed for per-tenant controls")
+        self.test_cases = []
+        for tenant in self.tenants:
+            # A positive control needs an independently seeded public document.
+            self.test_cases.append(TestCase(
+                tenant=tenant, subject_id="user_fixture", subject_roles=["user"],
+                query="reference corpus", expected_labels=["public"],
+                expected_tenant=tenant, test_id=f"{tenant}-positive-public",
+            ))
+            # These negative controls test input-presence and the explicit
+            # secret-label denial. They do not validate cryptographic tokens.
+            self.test_cases.append(TestCase(
+                tenant=tenant, subject_id="user_fixture", subject_roles=["user"],
+                query="reference corpus", expected_labels=["public"],
+                expected_tenant=tenant, test_id=f"{tenant}-empty-token",
+                denial_reason="empty_token",
+            ))
+            self.test_cases.append(TestCase(
+                tenant=tenant, subject_id="user_fixture", subject_roles=["user"],
+                query="reference corpus", expected_labels=["secret"],
+                expected_tenant=tenant, test_id=f"{tenant}-secret-label",
+                denial_reason="secret_label",
+            ))
+        while len(self.test_cases) < count:
+            self.test_cases.append(self.generate_test_case())
+        logger.info("Prepared %d probes with explicit controls", len(self.test_cases))
 
     async def execute_test_case(
         self, session: "aiohttp.ClientSession", test_case: TestCase
     ) -> TestResult:
-        """Execute a single test case"""
-        start_time = time.time()
-
+        """Run a declared HTTP probe against the current Rust /query protocol."""
+        start_time = time.monotonic()
+        token = "" if test_case.denial_reason == "empty_token" else self.capability_token
+        payload = {
+            "query": test_case.query,
+            "tenant": test_case.tenant,
+            "subject_id": test_case.subject_id,
+            "capability_token": token,
+            "labels_filter": test_case.expected_labels,
+            "limit": 10,
+        }
         try:
-            # Prepare request payload
-            payload = {
-                "tenant": test_case.tenant,
-                "subject_id": test_case.subject_id,
-                "subject_roles": test_case.subject_roles,
-                "query": test_case.query,
-                "test_id": test_case.test_id,
-            }
-
-            # Make request to retrieval gateway
             async with session.post(
-                f"{self.base_url}/api/v1/retrieve",
+                f"{self.base_url.rstrip('/')}/query",
                 json=payload,
                 headers={"Content-Type": "application/json"},
             ) as response:
-                response_time = (time.time() - start_time) * 1000
-
-                if response.status == 200:
-                    data = await response.json()
-                    results = data.get("results", [])
-
-                    # Check for cross-tenant leakage
-                    cross_tenant_leak = False
-                    unauthorized_access = False
-
-                    for result in results:
-                        result_tenant = result.get("tenant")
-                        result_labels = result.get("labels", [])
-
-                        # Check for cross-tenant data
-                        if result_tenant != test_case.expected_tenant:
-                            cross_tenant_leak = True
-                            logger.error(
-                                f"Cross-tenant leak detected: {test_case.test_id}"
-                            )
-
-                        # Check for unauthorized label access
-                        for label in result_labels:
-                            if label not in test_case.expected_labels:
-                                unauthorized_access = True
-                                logger.error(
-                                    f"Unauthorized label access: {test_case.test_id}"
-                                )
-
+                elapsed_ms = (time.monotonic() - start_time) * 1000
+                if test_case.denial_reason:
+                    if response.status != 403:
+                        detail = (await response.text())[:240]
+                        raise ValueError(
+                            f"expected HTTP 403 for {test_case.denial_reason}, "
+                            f"observed {response.status}: {detail}"
+                        )
                     return TestResult(
-                        test_case=test_case,
-                        success=True,
-                        error_message=None,
-                        response_time_ms=response_time,
-                        result_count=len(results),
-                        cross_tenant_leak=cross_tenant_leak,
-                        unauthorized_access=unauthorized_access,
+                        test_case=test_case, success=True, error_message=None,
+                        response_time_ms=elapsed_ms, result_count=0,
+                        cross_tenant_leak=False, unauthorized_access=False,
+                        denial_observed=True,
                     )
-                else:
-                    error_text = await response.text()
-                    return TestResult(
-                        test_case=test_case,
-                        success=False,
-                        error_message=f"HTTP {response.status}: {error_text}",
-                        response_time_ms=(time.time() - start_time) * 1000,
-                        result_count=0,
-                        cross_tenant_leak=False,
-                        unauthorized_access=False,
-                    )
-
-        except Exception as e:
+                if response.status != 200:
+                    detail = (await response.text())[:240]
+                    raise ValueError(f"HTTP {response.status}: {detail}")
+                data = await response.json()
+                count, cross_tenant, unauthorized = inspect_query_response(
+                    data,
+                    expected_tenant=test_case.expected_tenant,
+                    expected_subject=test_case.subject_id,
+                    requested_labels=test_case.expected_labels,
+                    known_documents=self.reference_documents,
+                )
+                return TestResult(
+                    test_case=test_case, success=True, error_message=None,
+                    response_time_ms=elapsed_ms, result_count=count,
+                    cross_tenant_leak=cross_tenant, unauthorized_access=unauthorized,
+                )
+        except Exception as exc:
             return TestResult(
-                test_case=test_case,
-                success=False,
-                error_message=str(e),
-                response_time_ms=(time.time() - start_time) * 1000,
-                result_count=0,
-                cross_tenant_leak=False,
-                unauthorized_access=False,
+                test_case=test_case, success=False, error_message=str(exc),
+                response_time_ms=(time.monotonic() - start_time) * 1000,
+                result_count=0, cross_tenant_leak=False, unauthorized_access=False,
             )
 
     async def run_fuzz_tests(self) -> None:
@@ -471,9 +451,7 @@ class ABACFuzzTester:
             },
         }
 
-        observed_documents = sum(
-            r.result_count for r in self.results if r.success
-        )
+        observed_documents = sum(r.result_count for r in self.results if r.success)
         problems = observation_failures(
             planned=len(self.test_cases),
             recorded=total_tests,
@@ -481,11 +459,31 @@ class ABACFuzzTester:
             positive_controls=observed_documents,
             violations=cross_tenant_leaks + unauthorized_accesses,
         )
+        for tenant in self.tenants:
+            if not any(
+                r.success and not r.test_case.denial_reason
+                and r.test_case.tenant == tenant and r.result_count > 0
+                for r in self.results
+            ):
+                problems.append(f"no seeded positive document observed for tenant {tenant}")
+            for denial_reason in ("empty_token", "secret_label"):
+                if not any(
+                    r.success and r.denial_observed
+                    and r.test_case.tenant == tenant
+                    and r.test_case.denial_reason == denial_reason
+                    for r in self.results
+                ):
+                    problems.append(
+                        f"missing observed {denial_reason} negative control for tenant {tenant}"
+                    )
         report["execution"] = {
             "planned_requests": len(self.test_cases),
             "observed_responses": total_tests,
             "valid_responses": successful_tests,
             "document_observations": observed_documents,
+            "observed_denials": sum(r.denial_observed for r in self.results),
+            "reference_documents": len(self.reference_documents),
+            "test_tenants": list(self.tenants),
             "status": "FAIL" if problems else "PASS",
             "failures": problems,
         }
@@ -535,6 +533,15 @@ async def main():
         action="store_true",
         help="Validate harness setup without calling a live retrieval gateway",
     )
+    parser.add_argument(
+        "--fixture-manifest",
+        help="Independent JSON reference manifest for a pre-seeded, disposable corpus",
+    )
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--token-env", default="PF_RETRIEVAL_CAPABILITY_TOKEN",
+        help="Environment variable containing a disposable test capability token",
+    )
 
     args = parser.parse_args()
     test_count = args.queries if args.queries is not None else args.test_count
@@ -546,11 +553,28 @@ async def main():
         print("Harness setup only: no live gateway requests or security verdict")
         return
 
-    # Create tester
-    tester = ABACFuzzTester(args.base_url, args.max_workers)
-
-    # Generate test cases
-    tester.generate_test_cases(test_count)
+    # A trusted reference manifest must be supplied independently of the
+    # service's own response. Never infer an oracle from a returned document.
+    if not args.fixture_manifest:
+        parser.error("--fixture-manifest is mandatory for live retrieval tests")
+    try:
+        reference_documents = load_reference_documents(args.fixture_manifest)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(f"invalid fixture manifest: {exc}")
+    capability_token = os.environ.get(args.token_env, "")
+    if not capability_token:
+        parser.error(f"missing disposable capability token in {args.token_env}")
+    tester = ABACFuzzTester(
+        args.base_url,
+        args.max_workers,
+        capability_token=capability_token,
+        reference_documents=reference_documents,
+        seed=args.seed,
+    )
+    try:
+        tester.generate_test_cases(test_count)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     # Run tests
     await tester.run_fuzz_tests()

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {
+      "document_id": "alpha-public",
+      "tenant": "alpha",
+      "labels": [
+        "public"
+      ],
+      "content_sha256": "03b18229f6451ca7a74996322723f731198494e4cab170865c2ec44dcbae83c1"
+    },
+    {
+      "document_id": "beta-public",
+      "tenant": "beta",
+      "labels": [
+        "public"
+      ],
+      "content_sha256": "fb8552aad3b68fc3bd9be0c73aad3ca42130c024c37e4af5ae6a9c0bb91621a5"
+    }
+  ]
+}
