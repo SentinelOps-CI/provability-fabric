@@ -6,9 +6,14 @@
 # orchestrator entrypoint, report shape, and overall_status contract without the
 # broken apt docker.io install (conflicts with runner containerd.io).
 
-name: TRUST-FIRE GA Test Suite
+name: TRUST-FIRE Legacy Simulation Smoke (Not Safety Evidence)
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/trust-fire-ga-test.yaml"
+      - "tests/trust_fire_orchestrator.py"
+      - "tests/test_trust_fire_orchestrator_report.py"
   schedule:
     # Run weekly on Sundays at 3 AM UTC
     - cron: "0 3 * * 0"
@@ -31,7 +36,7 @@ env:
 
 jobs:
   trust-fire-smoke:
-    name: TRUST-FIRE orchestrator smoke
+    name: TRUST-FIRE legacy simulator contract smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -54,6 +59,16 @@ jobs:
           curl --version | head -n1
           jq --version
 
+      - name: Reject unsupported partial simulation selection
+        env:
+          RUN_PHASES: ${{ github.event.inputs.run_phases || 'all' }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_PHASES" != "all" ]; then
+            echo "::error::Legacy orchestrator has no phase-selection support; only all is valid"
+            exit 1
+          fi
+
       - name: Install k6
         run: |
           curl -fsSL "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz" -o /tmp/k6.tgz
@@ -64,6 +79,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install redis requests pytest pyyaml boto3
+
+      - name: Test simulation report scope and coverage
+        run: |
+          python -m unittest discover -s tests -p 'test_trust_fire_orchestrator_report.py' -v
 
       - name: Prepare TRUST-FIRE config
         env:
@@ -82,7 +101,8 @@ jobs:
           CONFIG_FILE: ${{ github.event.inputs.config_file || 'trust-fire-config.json' }}
           RUN_PHASES: ${{ github.event.inputs.run_phases || 'all' }}
         run: |
-          echo "TRUST-FIRE smoke phases=$RUN_PHASES (orchestrator contract; Kind-backed phases deferred)"
+          echo "::warning::TRUST-FIRE legacy simulator only; NOT evidence of deployed enforcement, privacy, or external auditing (issue #282)"
+          echo "TRUST-FIRE simulation scope=$RUN_PHASES (orchestrator contract; Kind-backed real-evidence tests remain outstanding)"
           python tests/trust_fire_orchestrator.py \
             --config "$CONFIG_FILE" \
             --output trust-fire-report.json
@@ -100,12 +120,13 @@ jobs:
             echo "No test results file found"
             exit 1
           fi
-          echo "TRUST-FIRE Test Results:"
+          echo "TRUST-FIRE legacy simulator results (non-evidentiary):"
           jq '.' trust-fire-report.json
+          jq -e '(.test_suite == "TRUST-FIRE Legacy Simulation Smoke") and (.simulation_only == true) and (.safety_claim_validated == false)' trust-fire-report.json >/dev/null
           overall_status=$(jq -r '.overall_status' trust-fire-report.json)
           if [ "$overall_status" = "PASS" ]; then
-            echo "TRUST-FIRE GA Test Suite PASSED"
+            echo "TRUST-FIRE simulator contract PASSED (NOT operational safety evidence)"
             exit 0
           fi
-          echo "TRUST-FIRE GA Test Suite FAILED (overall_status=$overall_status)"
+          echo "TRUST-FIRE simulator contract FAILED (overall_status=$overall_status)"
           exit 1
