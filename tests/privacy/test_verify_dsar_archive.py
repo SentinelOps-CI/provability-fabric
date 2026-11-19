@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import io
 import json
 import tempfile
 import unittest
 import zipfile
-from copy import deepcopy
 from pathlib import Path
 
 from verify_dsar_archive import InvalidDSAR, validate_archive, validate_payload
