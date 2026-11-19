@@ -279,72 +279,75 @@ func (e *DSARExporter) createEncryptedZip(data DSARData) error {
 	return nil
 }
 
-// encryptFile encrypts a file using the recipient's public key
+// encryptFile closes each PGP writer before replacing the temporary plaintext.
+// The caller owns the lifetime and eventual removal of the temporary archive.
 func (e *DSARExporter) encryptFile(filePath string) error {
-	// Read the file to encrypt
 	plaintext, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %v", err)
+		return fmt.Errorf("failed to read archive for encryption: %w", err)
 	}
-
-	// Read recipient's public key
 	publicKeyFile, err := os.Open(e.publicKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed to open public key file: %v", err)
+		return fmt.Errorf("failed to open recipient public key: %w", err)
 	}
 	defer publicKeyFile.Close()
 
-	// Parse the public key
 	block, err := armor.Decode(publicKeyFile)
 	if err != nil {
-		return fmt.Errorf("failed to decode armored public key: %v", err)
+		return fmt.Errorf("failed to decode armored public key: %w", err)
 	}
-
 	if block.Type != openpgp.PublicKeyType {
-		return fmt.Errorf("not a public key")
+		return fmt.Errorf("recipient key is not a PGP public key")
 	}
-
 	entity, err := openpgp.ReadEntity(packet.NewReader(block.Body))
 	if err != nil {
-		return fmt.Errorf("failed to read public key entity: %v", err)
+		return fmt.Errorf("failed to parse recipient public key: %w", err)
 	}
 
-	// Create encrypted file
-	encryptedFile, err := os.Create(filePath + ".gpg")
+	cipherPath := filePath + ".gpg"
+	cipherFile, err := os.OpenFile(cipherPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create encrypted file: %v", err)
+		return fmt.Errorf("failed to create encrypted output: %w", err)
 	}
-	defer encryptedFile.Close()
-
-	// Create armored writer
-	armoredWriter, err := armor.Encode(encryptedFile, "PGP MESSAGE", nil)
+	defer os.Remove(cipherPath)
+	armored, err := armor.Encode(cipherFile, "PGP MESSAGE", nil)
 	if err != nil {
-		return fmt.Errorf("failed to create armored writer: %v", err)
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to start armored output: %w", err)
 	}
-	defer armoredWriter.Close()
-
-	// Create encrypted writer
-	encryptedWriter, err := openpgp.Encrypt(armoredWriter, []*openpgp.Entity{entity}, nil, nil, nil)
+	writer, err := openpgp.Encrypt(armored, []*openpgp.Entity{entity}, nil, nil, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create encrypted writer: %v", err)
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to initialize PGP encryption: %w", err)
 	}
-	defer encryptedWriter.Close()
-
-	// Write the plaintext
-	if _, err := encryptedWriter.Write(plaintext); err != nil {
-		return fmt.Errorf("failed to write encrypted data: %v", err)
+	if _, err := writer.Write(plaintext); err != nil {
+		_ = writer.Close()
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to write encrypted archive: %w", err)
+	}
+	// Finish the encrypted data packet, ASCII armor checksum and file in
+	// that order. The original implementation published the file first.
+	if err := writer.Close(); err != nil {
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to finalize PGP payload: %w", err)
+	}
+	if err := armored.Close(); err != nil {
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to finalize armored PGP output: %w", err)
+	}
+	if err := cipherFile.Close(); err != nil {
+		return fmt.Errorf("failed to close encrypted archive: %w", err)
 	}
 
-	// Remove the unencrypted file
 	if err := os.Remove(filePath); err != nil {
-		return fmt.Errorf("failed to remove unencrypted file: %v", err)
+		return fmt.Errorf("failed to remove temporary plaintext archive: %w", err)
 	}
-
-	// Rename encrypted file to original name
-	if err := os.Rename(filePath+".gpg", filePath); err != nil {
-		return fmt.Errorf("failed to rename encrypted file: %v", err)
+	if err := os.Rename(cipherPath, filePath); err != nil {
+		return fmt.Errorf("failed to replace plaintext with ciphertext: %w", err)
 	}
-
 	return nil
 }
 
