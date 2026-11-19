@@ -184,6 +184,23 @@ def evaluate(target: ReleaseTarget, get: Callable[[str], Any]) -> list[str]:
         if not isinstance(value, dict) or value.get("login") != target.actor:
             errors.append(f"commit {field} is not associated with {target.actor}")
 
+    # The PR endpoint describes commits introduced against the selected base.
+    # Enforce GitHub account attribution for the entire introduced history;
+    # a verified tip alone says nothing about the identities of prior commits.
+    history = _paged_proxy(get, f"{root}/pulls/{target.pr_number}/commits", None)
+    if not history or history[-1].get("sha") != target.head_sha:
+        errors.append("PR commit history does not end at the audited head")
+    seen: set[str] = set()
+    for item in history:
+        sha = item.get("sha")
+        if not isinstance(sha, str) or not SHA_RE.fullmatch(sha) or sha in seen:
+            raise GateError("malformed or duplicated PR commit")
+        seen.add(sha)
+        for field in ("author", "committer"):
+            account = item.get(field)
+            if not isinstance(account, dict) or account.get("login") != target.actor:
+                errors.append(f"PR commit {sha} {field} is not associated with {target.actor}")
+
     # The repo's review state is needed in addition to GitHub's green checks.
     reviews = _paged_proxy(get, f"{root}/pulls/{target.pr_number}/reviews", None)
     by_author: dict[str, tuple[str, Any]] = {}
@@ -240,8 +257,12 @@ def evaluate(target: ReleaseTarget, get: Callable[[str], Any]) -> list[str]:
     final_main_commit = _obj(final_main.get("commit"), "final branch commit")
     if (final_head.get("sha") != target.head_sha
             or final_base.get("sha") != target.base_sha
+            or final_base.get("ref") != "main"
             or final_pr.get("state") != "open"
+            or final_pr.get("merged_at") is not None
             or final_pr.get("draft") is not False
+            or final_pr.get("mergeable") is not True
+            or final_pr.get("mergeable_state") != "clean"
             or final_main_commit.get("sha") != target.base_sha
             or final_main.get("protected") is not True):
         errors.append("release refs changed during evaluation")

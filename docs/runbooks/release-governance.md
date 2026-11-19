@@ -21,4 +21,6 @@ Run unit tests with `python3 -m unittest discover -s tests/ci -p 'test_release_g
 
 A preflight success is **not** authorization to deploy. Keep separate gates for signed credential interoperability, access-control negative controls, image and configuration provenance, production secret rotation, genuine enforcement evidence, relevant scheduled and dispatch-only workflows, independent security signoff, staged rollout and rollback readiness. A successful CI job running simulated tests establishes only completion of the simulated commands. A branch-protection setting must be verified and enforced in GitHub before changing the default branch.
 
+The preflight checks account attribution on every commit introduced by the pull request, including the tip. It also rechecks the base branch name and mergeability before completing its assessment. These checks do not replace enforced merge-time branch policies.
+
 The program does not establish the identity of the actor who sent a Git push event; commit author/committer GitHub associations and PR author are distinct facts. Any requirement that the push actor itself be the contributor must be checked using the GitHub audit log or a contributor-authenticated Git CLI workflow.

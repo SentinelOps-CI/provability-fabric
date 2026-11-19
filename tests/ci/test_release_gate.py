@@ -33,6 +33,9 @@ def fixture() -> tuple[release_gate.ReleaseTarget, dict[str, object]]:
         f"{ROOT}/commits/{HEAD}": {
             "author": {"login": "fraware"}, "committer": {"login": "fraware"}
         },
+        f"{ROOT}/pulls/300/commits?per_page=100&page=1": [
+            {"sha": HEAD, "author": {"login": "fraware"}, "committer": {"login": "fraware"}}
+        ],
         f"{ROOT}/pulls/300/reviews?per_page=100&page=1": [
             {"id": 1, "user": {"login": "reviewer"}, "state": "APPROVED", "commit_id": HEAD}
         ],
@@ -93,6 +96,62 @@ class ReleaseGateTests(unittest.TestCase):
     def test_refuses_wrong_commit_author_and_committer(self):
         t, p = fixture(); p[f"{ROOT}/commits/{HEAD}"]["committer"] = {"login": "other"}
         self.assertTrue(any("committer" in s for s in assess(t, p)))
+
+    def test_refuses_unattributed_earlier_pr_commit(self):
+        for role in ("author", "committer"):
+            with self.subTest(role=role):
+                t, p = fixture()
+                k = f"{ROOT}/pulls/300/commits?per_page=100&page=1"
+                p[k].insert(0, {
+                    "sha": "c" * 40,
+                    "author": {"login": "fraware"},
+                    "committer": {"login": "fraware"},
+                })
+                p[k][0][role]["login"] = "another-user"
+                self.assertTrue(any("PR commit" in s and role in s for s in assess(t, p)))
+
+    def test_refuses_commit_history_missing_head(self):
+        t, p = fixture()
+        k = f"{ROOT}/pulls/300/commits?per_page=100&page=1"
+        p[k][0]["sha"] = "c" * 40
+        self.assertTrue(any("history does not end" in s for s in assess(t, p)))
+
+    def test_refuses_duplicate_pr_commit(self):
+        t, p = fixture()
+        k = f"{ROOT}/pulls/300/commits?per_page=100&page=1"
+        p[k].append(copy.deepcopy(p[k][0]))
+        with self.assertRaises(release_gate.GateError):
+            assess(t, p)
+
+    def test_refuses_base_ref_drift_during_evaluation(self):
+        t, p = fixture()
+        calls = 0
+
+        def get(endpoint):
+            nonlocal calls
+            record = copy.deepcopy(p[endpoint])
+            if endpoint == f"{ROOT}/pulls/300":
+                calls += 1
+                if calls == 2:
+                    record["base"]["ref"] = "other-branch"
+            return record
+
+        self.assertIn("release refs changed during evaluation", release_gate.evaluate(t, get))
+
+    def test_refuses_mergeability_drift_during_evaluation(self):
+        t, p = fixture()
+        calls = 0
+
+        def get(endpoint):
+            nonlocal calls
+            record = copy.deepcopy(p[endpoint])
+            if endpoint == f"{ROOT}/pulls/300":
+                calls += 1
+                if calls == 2:
+                    record["mergeable_state"] = "dirty"
+            return record
+
+        self.assertIn("release refs changed during evaluation", release_gate.evaluate(t, get))
 
     def test_refuses_wrong_pr_user(self):
         t, p = fixture(); p[f"{ROOT}/pulls/300"]["user"]["login"] = "other"
