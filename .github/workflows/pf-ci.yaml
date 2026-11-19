@@ -105,6 +105,9 @@ jobs:
           path: ci-src
           token: ${{ secrets.CI_PAT || secrets.GITHUB_TOKEN }}
 
+      - name: Verify Docker build context excludes local data
+        run: bash scripts/check_docker_context.sh
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:

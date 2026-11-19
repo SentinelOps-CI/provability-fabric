@@ -57,3 +57,17 @@ vendor/
 !Cargo.lock
 !go.mod
 !Dockerfile
+
+# Protect root and nested local data from full-workspace Docker builds.
+# Place exclusions last to prevent broad source re-inclusions from overriding them.
+**/.env*
+**/.npmrc
+**/.pypirc
+**/.netrc
+**/.aws/**
+**/.ssh/**
+**/.kube/**
+/private/**
+/runs/**
+/benchmark_runs/**
+/release-run/*.json
