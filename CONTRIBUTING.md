@@ -158,17 +158,20 @@ cargo test -p sidecar-watcher --tests
 
 `sidecar-watcher` uses `autotests = false` and explicit `[[test]]` entries for integration binaries that compile; other sources under `runtime/sidecar-watcher/tests/` are quarantined until updated (see `runtime/sidecar-watcher/tests/README.md`). CI runs `--lib` and `--tests` (see `.github/workflows/reusable-ci-rust.yml`).
 
-### Full test suite
+### Local tests and legacy simulations
 
-From repo root:
+From the repository root with Python 3, Go, the pinned Rust toolchain, Node.js, and the demo dependencies installed:
 
 ```bash
-python tests/trust_fire_orchestrator.py
-# Integration: python tests/integration/test_platform_integration.py
-# See Makefile: make test
+make test                   # Executable Python, Go PCS, Rust workspace, and demo Jest checks
+make test-legacy-simulation # Historical synthetic scenarios only
 ```
 
-Install Python dependencies as needed (e.g. `pip install -r tests/integration/requirements.txt`). Minimal install does not need Python tooling; for full dev run `pip install -r requirements-optional.txt` (see root `requirements-optional.txt`).
+`make test` exercises a selected set of genuine tests. It is not an exhaustive platform integration or security validation. The Rust subset excludes crates with separate integration jobs; see `.github/workflows/reusable-ci-rust.yml` for those checks.
+
+The historical `trust_fire_orchestrator.py` and `test_platform_integration.py` programs contain simulated services, fixed measurements, and synthetic success conditions. Their reports do not establish deployed integration, privacy protection, sandbox containment, or operational readiness. The opt-in `make test-legacy-simulation` target preserves these scenarios for inspection.
+
+Install Python dependencies as needed (e.g. `pip install -r tests/integration/requirements.txt`). Minimal install does not need Python tooling; for full development use `pip install -r requirements-optional.txt` (see root `requirements-optional.txt`).
 
 ### Evidence and CI
 

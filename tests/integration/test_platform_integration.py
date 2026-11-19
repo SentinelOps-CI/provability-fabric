@@ -5,7 +5,7 @@
 """
 Platform Integration Tests
 
-Comprehensive integration tests for the Provability-Fabric platform
+Legacy synthetic platform integration scenarios. No external service is exercised.
 """
 
 import sys
@@ -16,7 +16,7 @@ from typing import Dict, Any, List
 
 
 class PlatformIntegrationTester:
-    """Platform integration test suite"""
+    """Historical synthetic scenarios, not service integration evidence."""
 
     def __init__(self):
         self.test_workspace = Path("test-workspace")
@@ -25,7 +25,7 @@ class PlatformIntegrationTester:
 
     def run_all_tests(self) -> bool:
         """Run all platform integration tests"""
-        print("🚀 Starting Platform Integration Test Suite")
+        print("Starting legacy platform integration simulation (no live services)")
         print("=" * 80)
 
         # Test 1: Core Services Integration
@@ -63,15 +63,15 @@ class PlatformIntegrationTester:
         total = len(self.test_results)
 
         print("\n" + "=" * 80)
-        print("🎯 PLATFORM INTEGRATION TEST RESULTS")
+        print("LEGACY PLATFORM INTEGRATION SIMULATION RESULTS")
         print("=" * 80)
         print(f"Passed: {passed}/{total}")
 
         if passed == total:
-            print("🎉 All platform integration tests passed!")
+            print("Synthetic scenarios completed; operational integration was not exercised.")
             return True
         else:
-            print("❌ Some tests failed - platform needs attention")
+            print("One or more synthetic scenarios failed.")
             return False
 
     def test_core_services_integration(self) -> bool:
@@ -193,7 +193,9 @@ class PlatformIntegrationTester:
         """Generate integration test report"""
         report = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
-            "test_suite": "Platform Integration Tests",
+            "test_suite": "Legacy Platform Integration Simulation",
+            "simulation_only": True,
+            "operational_claim_validated": False,
             "results": self.test_results,
             "summary": {
                 "total_tests": len(self.test_results),

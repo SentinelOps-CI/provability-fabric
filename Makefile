@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps Platform Contributors
 
-.PHONY: help build test test-windows go-work clean demo-up demo-down demo-setup install install-dev install-minimal install-standard install-full dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs platform-up platform-up-build ledger-up enforcement-up full-up compose-smoke check-wiring
+.PHONY: help build test test-legacy-simulation test-windows go-work clean demo-up demo-down demo-setup install install-dev install-minimal install-standard install-full dev validate-certs lint bench security test-all helm-install helm-upgrade docs docs-strict docs-serve quick-start logs rebuild lean-check-duplicates lean-forbid-shadowing vendor-mathlib no-runtime-placeholders submodules standards-pin-check dev-standards evidence-verify proto-lint proto-validate proto-gen proto-gen-go proto-gen-ts proto-gen-rust proto-fixtures proto-compat-test proto-docs platform-up platform-up-build ledger-up enforcement-up full-up compose-smoke check-wiring
 
 include scripts/proto.mk
 
@@ -41,7 +41,8 @@ help:
 	@$(ECHOOK) "  make check-wiring    - Assert local ports/URLs match code defaults"
 	@$(ECHOOK) "  make dev             - Alias for platform-up (no Console UI)"
 	@$(ECHOOK) "  make build           - Build all services"
-	@$(ECHOOK) "  make test            - Run all tests"
+	@$(ECHOOK) "  make test            - Run selected local unit, Go, Rust, and demo checks
+	@$(ECHOOK) "  make test-legacy-simulation - Historical synthetic examples only""
 	@$(ECHOOK) "  make clean           - Clean build artifacts"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Demo:"
@@ -264,12 +265,18 @@ demo-pcs:
 	@$(ECHOOK) "OK: PCS demo completed (verify, sign, inspect --strict, inspect --reverify)"
 
 test:
-	@$(ECHOOK) "🧪 Running platform tests..."
-	python tests/trust_fire_orchestrator.py
-	@$(ECHOOK) "🧪 Running integration tests..."
-	python tests/integration/test_platform_integration.py
-	@$(ECHOOK) "🧪 Running demo tests..."
-	cd demos/verifiable-mcp-fraud && npm test
+	@$(ECHOOK) "Running selected executable local tests; full platform integration is checked in CI."
+	python3 -m unittest discover -s tests -p 'test_record_criterion_baseline.py' -v
+	python3 -m unittest discover -s tests -p 'test_check_go_format.py' -v
+	python3 -m unittest discover -s tests -p 'test_trust_fire_orchestrator_report.py' -v
+	$(MAKE) test-pcs
+	cargo test --locked --workspace --exclude provability-fabric-core-sdk-rust --exclude sidecar-watcher --exclude labeler --exclude tool-broker
+	cd demos/verifiable-mcp-fraud && npm test -- --runInBand
+
+test-legacy-simulation:
+	@$(ECHOOK) "Legacy synthetic exercises only; no deployed integration, privacy, or sandbox claim."
+	python3 tests/trust_fire_orchestrator.py
+	python3 tests/integration/test_platform_integration.py
 
 # Windows-native smoke: CLI + Rust only; use WSL for bash/Lean/replay gates.
 test-windows:
@@ -482,7 +489,7 @@ security:
 	@$(ECHOOK) "✅ Security tests completed"
 
 test-all: test security bench validate-certs
-	@$(ECHOOK) "🎉 All tests completed successfully!"
+	@$(ECHOOK) "Selected local checks completed; the security target includes a synthetic adapter exercise."
 
 # ---------- Deploy helpers ----------
 helm-install:
