@@ -6,8 +6,25 @@ Complete these steps before tagging a Provability Fabric PCS release. CI on `mai
 
 ```bash
 git clone https://github.com/SentinelOps-CI/pcs-core ../pcs-core
+git -C ../pcs-core checkout 9db2ec210c2b5627a72b5cc23a10aebe88dd5012
 export PCS_CORE_PATH=../pcs-core
 ```
+
+PCS CI uses Python 3.12 and imports the pinned `pcs-core` Python source
+directly from the checked-out repository, with its declared `jsonschema` and
+`referencing` dependencies. The upstream `python/pyproject.toml` currently
+references `../README.md`, which Hatchling rejects during editable installation.
+CI uses an explicit temporary `pcs` launcher bound to that checkout and makes
+no source modifications. Fixing upstream wheel packaging is a separate task.
+
+The checked-in PCS schema mirrors target the `pcs-core` compatibility snapshot
+`9db2ec210c2b5627a72b5cc23a10aebe88dd5012` (July 23, 2026). CI checks this exact immutable commit,
+not the continuously changing upstream default branch. This pin preserves
+the current consumer/fixture contract; it does not claim compatibility with
+newer upstream schemas. A separate schema migration must evaluate all changed
+definitions, referential constraints, generators, Go validators, and release
+fixtures before upgrading the snapshot. Do not use `make sync-pcs-schemas`
+against an unreviewed newer checkout: that command replaces schema copies.
 
 ## One-command gate (recommended)
 
@@ -29,7 +46,7 @@ This target runs the schema sync check, `test-pcs-full`, demos, and the PF clean
 ## Step-by-step (same as CI)
 
 ```bash
-make validate-pcs-schema-diff    # or make sync-pcs-schemas if pcs-core updated
+make validate-pcs-schema-diff    # checks the pinned pcs-core compatibility snapshot
 make test-pcs-full
 make demo-pcs
 make demo-pcs-release
@@ -63,7 +80,7 @@ See [Fixtures](fixtures.md).
 
 ## What must be committed
 
-- `config/schemas/pcs/` and `adapters/pcs/schemas/` (in sync with pcs-core)
+- `config/schemas/pcs/` and `adapters/pcs/schemas/` (identical checked-in mirrors, validated against pinned pcs-core)
 - `tests/pcs/fixtures/` release evidence (atomic updates only)
 - `benchmarks/admission/examples/*.pcs_bench_ingest.reference.json` (when producer output changed)
 - Code and documentation under `docs/pcs/`

@@ -19,18 +19,21 @@ if [[ -z "${CANONICAL}" ]]; then
 fi
 
 VENDOR_DIR="${ROOT}/config/schemas/pcs"
+MIRROR_DIR="${ROOT}/adapters/pcs/schemas"
 if [[ ! -d "${CANONICAL}" ]]; then
   echo "pcs-core schemas not found: ${CANONICAL}" >&2
   exit 1
 fi
-if [[ ! -d "${VENDOR_DIR}" ]]; then
-  echo "vendor schemas not found: ${VENDOR_DIR}" >&2
+if [[ ! -d "${VENDOR_DIR}" || ! -d "${MIRROR_DIR}" ]]; then
+  echo "schema mirror directories missing" >&2
   exit 1
 fi
 
 FAILED=0
+CANONICAL_COUNT=0
 for path in "${CANONICAL}"/*.json; do
   [[ -f "${path}" ]] || continue
+  CANONICAL_COUNT=$((CANONICAL_COUNT + 1))
   name="$(basename "${path}")"
   vendor_path="${VENDOR_DIR}/${name}"
   if [[ ! -f "${vendor_path}" ]]; then
@@ -52,12 +55,40 @@ for path in "${CANONICAL}"/*.json; do
   fi
 done
 
+if [[ "${CANONICAL_COUNT}" -eq 0 ]]; then
+  echo "canonical schema directory contains no JSON schemas" >&2
+  FAILED=1
+fi
+
+# Both checked-in copies must agree. PF-only profile extensions under
+# config/schemas/pcs/profiles are intentionally not mirrored.
+for path in "${VENDOR_DIR}"/*.json; do
+  [[ -f "${path}" ]] || continue
+  name="$(basename "${path}")"
+  if [[ ! -f "${MIRROR_DIR}/${name}" ]]; then
+    echo "missing adapter schema mirror: ${name}" >&2
+    FAILED=1
+  elif ! cmp -s "${path}" "${MIRROR_DIR}/${name}"; then
+    echo "adapter schema mirror drift: ${name}" >&2
+    FAILED=1
+  fi
+done
+for path in "${MIRROR_DIR}"/*.json; do
+  [[ -f "${path}" ]] || continue
+  name="$(basename "${path}")"
+  if [[ ! -f "${VENDOR_DIR}/${name}" ]]; then
+    echo "orphaned adapter schema mirror: ${name}" >&2
+    FAILED=1
+  fi
+done
+
 if [[ "${FAILED}" -ne 0 ]]; then
-  echo "FAIL: schema drift between pcs-core and provability-fabric (canonical files)" >&2
+  echo "FAIL: schema drift in canonical or checked-in PCS mirrors" >&2
   exit 1
 fi
 
 echo "OK: config/schemas/pcs matches ${CANONICAL} (canonical benchmark/pcs schemas)"
+echo "OK: adapters/pcs/schemas matches the checked-in config schema mirror"
 for extra in "${VENDOR_DIR}"/*.json; do
   [[ -f "${extra}" ]] || continue
   name="$(basename "${extra}")"
