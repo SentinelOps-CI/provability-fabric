@@ -157,6 +157,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_check_go_format.py' -v
       - name: Check formatting of tracked Go services
         run: python3 scripts/check_go_format.py
+      - name: Validate local test entrypoint selection
+        run: python3 -m unittest discover -s tests -p 'test_test_entrypoints.py' -v
 
   ci-honesty:
     runs-on: ubuntu-latest
