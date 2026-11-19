@@ -105,84 +105,30 @@ jobs:
           cd tools/privacy
           go build -o dsar-export .
 
-      - name: Test DSAR export functionality
+      - name: Verify actual encrypted synthetic DSAR export
+        shell: bash
+        env:
+          GNUPGHOME: ${{ runner.temp }}/gnupg
         run: |
+          set -euo pipefail
           cd tools/privacy
-
-          # Test export with date filter
           ./dsar-export \
             --tenant test-tenant-1 \
             --after 2024-01-01 \
             --output test-export.zip \
             --public-key ../../test-public-key.asc
 
-          # Verify export file exists and is encrypted
-          if [ ! -f test-export.zip ]; then
-            echo "ERROR: Export file not created"
-            exit 1
-          fi
+          test -s test-export.zip
+          grep -q -- '^-----BEGIN PGP MESSAGE-----' test-export.zip
+          gpg --batch --yes --output "$RUNNER_TEMP/dsar-decrypted.zip" \
+            --decrypt test-export.zip
+          python3 ../../tests/privacy/verify_dsar_archive.py \
+            "$RUNNER_TEMP/dsar-decrypted.zip" \
+            --tenant test-tenant-1 --after 2024-01-01
+          rm -f "$RUNNER_TEMP/dsar-decrypted.zip"
 
-          # Test that file is encrypted (should not be readable as plain text)
-          if file test-export.zip | grep -q "text"; then
-            echo "ERROR: Export file is not encrypted"
-            exit 1
-          fi
-
-          echo "DSAR export test passed"
-
-      - name: Test DSAR export schema validation
-        run: |
-          cd tools/privacy
-
-          # Create a test export without encryption for validation
-          cat > test-schema.json <<EOF
-          {
-            "tenant_id": "test-tenant",
-            "export_date": "2024-01-27T10:00:00Z",
-            "usage_events": [
-              {
-                "id": "event-1",
-                "tenant_id": "test-tenant",
-                "cpu_ms": 1500,
-                "net_bytes": 1024000,
-                "timestamp": "2024-01-26T10:00:00Z"
-              }
-            ],
-            "capsules": [
-              {
-                "id": "capsule-1",
-                "hash": "sha256:abc123...",
-                "spec_sig": "sig:def456...",
-                "risk_score": 0.15,
-                "tenant_id": "test-tenant",
-                "created_at": "2024-01-25T10:00:00Z",
-                "updated_at": "2024-01-26T10:00:00Z"
-              }
-            ],
-            "metadata": {
-              "export_version": "1.0",
-              "pii_redacted": true,
-              "encrypted": true
-            }
-          }
-          EOF
-
-          # Validate schema (check for PII fields)
-          if grep -q "email\|phone\|address\|name" test-schema.json; then
-            echo "ERROR: PII fields found in export"
-            exit 1
-          fi
-
-          # Validate required fields
-          required_fields=("tenant_id" "export_date" "usage_events" "capsules" "metadata")
-          for field in "${required_fields[@]}"; do
-            if ! grep -q "\"$field\"" test-schema.json; then
-              echo "ERROR: Required field '$field' missing"
-              exit 1
-            fi
-          done
-
-          echo "DSAR schema validation passed"
+      - name: Exercise DSAR archive negative controls
+        run: python3 -m unittest discover -s tests/privacy -p test_verify_dsar_archive.py -v
 
   test-privacy-load:
     runs-on: ubuntu-latest
@@ -250,25 +196,15 @@ jobs:
           fi
 
   test-privacy-integration:
+    # Aggregates completed isolated checks; no live ledger/DSAR integration is claimed.
+    name: Privacy smoke aggregation (no end-to-end claim)
     runs-on: ubuntu-latest
     needs: [test-epsilon-guard, test-dsar-export, test-privacy-load]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run integration tests
+      - name: Report exercised test scopes
         run: |
-          echo "All privacy tests completed successfully"
-
-          # Verify no PII in any exports
-          # ci-honesty: justified wave7-remediation
-          find . -name "*.json" -exec grep -l "email\|phone\|address\|name" {} \; || true
-
-          # Verify privacy metrics are exposed
-          echo "Privacy metrics should be available at /metrics endpoint"
-
-          # Verify DSAR export tool works
-          echo "DSAR export tool should create encrypted exports"
-
-          echo "Privacy integration test passed"
+          echo "Upstream epsilon-guard tests completed."
+          echo "A synthetic DSAR export was encrypted, decrypted and validated."
+          echo "The sidecar metrics smoke completed."
+          echo "Live ledger export, cross-component privacy, and production DSAR enforcement were not tested."
