@@ -7,7 +7,7 @@
 
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -134,7 +134,7 @@ impl TokenVerifier {
             .context("Invalid signature encoding")?;
         let sig = Signature::from_slice(&sig_bytes).context("Invalid Ed25519 signature size")?;
         let signing_input = format!("{protected}.{payload}");
-        key.verify(signing_input.as_bytes(), &sig)
+        key.verify_strict(signing_input.as_bytes(), &sig)
             .context("Invalid JWT signature")?;
 
         // Parse claims only once their bytes have been authenticated.
