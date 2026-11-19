@@ -119,7 +119,7 @@ jobs:
               {
                   "service": "egress-firewall",
                   "dockerfile": "runtime/egress-firewall/Dockerfile",
-                  "context": "runtime/egress-firewall",
+                  "context": ".",
               },
               {
                   "service": "attestor",
@@ -169,12 +169,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Stage workspace Cargo.lock for Docker build
+      - name: Verify committed Cargo.lock for Docker build
         run: |
-          cargo generate-lockfile
+          set -euo pipefail
+          test -s Cargo.lock
+          git diff --exit-code -- Cargo.lock
           if [ "${{ matrix.context }}" != "." ]; then
             cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
           fi
