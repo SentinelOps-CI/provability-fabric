@@ -212,10 +212,13 @@ impl SemanticCache {
     
     /// Invalidate cache entries for a tenant (e.g., on index update)
     pub async fn invalidate_tenant(&self, tenant: &str) -> Result<()> {
-        let mut cache = self.cache.write().await;
-        let removed = cache.remove(tenant);
-        
-        if removed.is_some() {
+        // Release the cache guard before taking the statistics lock.
+        // Other update paths take these locks in separate scopes as well.
+        let removed = {
+            self.cache.write().await.remove(tenant).is_some()
+        };
+
+        if removed {
             info!("Invalidated all cache entries for tenant: {}", tenant);
             
             // Update statistics
@@ -389,17 +392,19 @@ impl SemanticCache {
     
     /// Update access statistics
     async fn update_access_stats(&self, tenant: &str, cache_key: &CacheKey) {
-        let mut cache = self.cache.write().await;
-        if let Some(tenant_cache) = cache.get_mut(tenant) {
-            if let Some(entry) = tenant_cache.get_mut(cache_key) {
-                entry.accessed_at = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                entry.access_count += 1;
+        {
+            let mut cache = self.cache.write().await;
+            if let Some(tenant_cache) = cache.get_mut(tenant) {
+                if let Some(entry) = tenant_cache.get_mut(cache_key) {
+                    entry.accessed_at = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    entry.access_count += 1;
+                }
             }
         }
-        
+
         let mut stats = self.stats.write().await;
         let tenant_stats = stats.entry(tenant.to_string()).or_insert_with(|| TenantCacheStats {
             tenant: tenant.to_string(),
@@ -423,6 +428,13 @@ impl SemanticCache {
     
     /// Update put statistics
     async fn update_put_stats(&self, tenant: &str) {
+        // Snapshot the cache size before acquiring stats. The previous
+        // stats-write -> cache-read order could deadlock with invalidation
+        // and cleanup, which acquired these locks in the opposite order.
+        let cache_size = {
+            let cache = self.cache.read().await;
+            cache.get(tenant).map_or(0, HashMap::len)
+        };
         let mut stats = self.stats.write().await;
         let tenant_stats = stats.entry(tenant.to_string()).or_insert_with(|| TenantCacheStats {
             tenant: tenant.to_string(),
@@ -435,10 +447,7 @@ impl SemanticCache {
             last_updated: 0,
         });
         
-        let cache = self.cache.read().await;
-        if let Some(tenant_cache) = cache.get(tenant) {
-            tenant_stats.total_cache_size = tenant_cache.len();
-        }
+        tenant_stats.total_cache_size = cache_size;
         
         tenant_stats.last_updated = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -462,29 +471,26 @@ impl SemanticCache {
                 .unwrap()
                 .as_secs();
             
-            let mut cache = cache.write().await;
+            // Never hold both RwLocks at once. Retain only ordinary numeric
+            // snapshots while updating the per-tenant statistics separately.
+            let sizes: Vec<(String, usize)> = {
+                let mut cache = cache.write().await;
+                for entries in cache.values_mut() {
+                    entries.retain(|_, entry| {
+                        now <= entry.created_at.saturating_add(entry.ttl_seconds)
+                    });
+                }
+                cache.iter().map(|(tenant, entries)| (tenant.clone(), entries.len())).collect()
+            };
+
             let mut stats = stats.write().await;
-            
-            for (tenant, tenant_cache) in cache.iter_mut() {
-                let mut expired_keys = Vec::new();
-                
-                for (key, entry) in tenant_cache.iter() {
-                    if now > entry.created_at + entry.ttl_seconds {
-                        expired_keys.push(key.clone());
-                    }
-                }
-                
-                for key in expired_keys {
-                    tenant_cache.remove(&key);
-                }
-                
-                // Update tenant statistics
-                if let Some(tenant_stats) = stats.get_mut(tenant) {
-                    tenant_stats.total_cache_size = tenant_cache.len();
+            for (tenant, size) in sizes {
+                if let Some(tenant_stats) = stats.get_mut(&tenant) {
+                    tenant_stats.total_cache_size = size;
                     tenant_stats.last_updated = now;
                 }
             }
-            
+
             debug!("Cache cleanup completed");
         }
     }
@@ -576,6 +582,55 @@ mod tests {
         assert!(cached.is_some());
     }
     
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_access_put_invalidate_and_cleanup_do_not_deadlock() {
+        let cache = Arc::new(SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 1,
+            max_entries_per_tenant: 16,
+            ..CacheConfig::default()
+        }));
+        let mut work = Vec::new();
+        let labels = vec!["public".to_string()];
+        for worker in 0..6 {
+            let cache = Arc::clone(&cache);
+            let labels = labels.clone();
+            work.push(tokio::spawn(async move {
+                for iteration in 0..150 {
+                    let tenant = if iteration % 2 == 0 { "tenant-a" } else { "tenant-b" };
+                    let query_hash = format!("query-{}", iteration % 12);
+                    match worker % 3 {
+                        0 => {
+                            cache.put(
+                                &query_hash, &labels, tenant,
+                                vec![SearchResult {
+                                    document_id: "synthetic".into(),
+                                    content: "synthetic".into(),
+                                    content_hash: "hash".into(),
+                                    score: 1.0,
+                                    metadata: HashMap::new(),
+                                    labels: labels.clone(),
+                                }],
+                                None,
+                            ).await.unwrap();
+                        }
+                        1 => {
+                            let _ = cache.get(&query_hash, &labels, tenant).await;
+                        }
+                        _ => {
+                            cache.invalidate_tenant(tenant).await.unwrap();
+                        }
+                    }
+                    tokio::task::yield_now().await;
+                }
+            }));
+        }
+        tokio::time::timeout(Duration::from_secs(15), async {
+            for task in work {
+                task.await.unwrap();
+            }
+        }).await.expect("Concurrent cache operations deadlocked");
+    }
+
     #[tokio::test]
     async fn test_cache_invalidation() {
         let cache = SemanticCache::with_config(CacheConfig {
