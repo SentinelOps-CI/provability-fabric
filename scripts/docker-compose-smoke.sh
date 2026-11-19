@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Docker Compose smoke test for production/full profile (F21).
+# Docker Compose full-profile smoke: disposable credentials only.
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT_DIR"
 
 PROFILE="${1:-full}"
-COMPOSE="docker compose --profile ${PROFILE}"
+COMPOSE=(docker compose --profile "$PROFILE")
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "SKIP: docker not available" >&2
@@ -14,6 +14,33 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 echo "=== docker-compose smoke (profile=${PROFILE}) ==="
+
+# Generate a disposable private key outside the source tree; never use production credentials.
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "ERROR: openssl is required for disposable receipt signing" >&2
+  exit 2
+fi
+SMOKE_KEY_DIR="$(mktemp -d)"
+chmod 700 "$SMOKE_KEY_DIR"
+SMOKE_COMPOSE_STARTED=0
+
+cleanup() {
+  status=$?
+  trap - EXIT
+  if [[ "$SMOKE_COMPOSE_STARTED" -eq 1 ]]; then
+    "${COMPOSE[@]}" down -v >/dev/null 2>&1 ||
+      echo "WARNING: failed to clean up smoke containers" >&2
+  fi
+  rm -rf -- "$SMOKE_KEY_DIR"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+export PF_RECEIPT_SIGNING_KEY_FILE="$SMOKE_KEY_DIR/retrieval-receipt.pem"
+openssl genpkey -algorithm Ed25519 -out "$PF_RECEIPT_SIGNING_KEY_FILE" >/dev/null 2>&1
+chmod 600 "$PF_RECEIPT_SIGNING_KEY_FILE"
 
 python scripts/check_wiring.py
 
@@ -43,7 +70,7 @@ if [[ -f Cargo.lock ]]; then
   done
 fi
 
-$COMPOSE config >/dev/null
+"${COMPOSE[@]}" config >/dev/null
 echo "compose config: OK"
 
 # Long-running services exercised by this smoke (health curls below). Omit batch CLIs,
@@ -51,13 +78,17 @@ echo "compose config: OK"
 SMOKE_SERVICES=(
   postgres redis runtime-sidecar ledger retrieval-gateway
 )
-$COMPOSE up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
+SMOKE_COMPOSE_STARTED=1
+"${COMPOSE[@]}" up -d --wait --timeout 180 "${SMOKE_SERVICES[@]}"
 echo "compose up --wait: OK"
 
 # Health endpoints for core services in full profile
-curl -fsS http://localhost:4000/health >/dev/null && echo "ledger /health: OK"
-curl -fsS http://localhost:8080/health >/dev/null && echo "retrieval-gateway /health: OK" || true
+curl -fsS http://localhost:4000/health >/dev/null
+echo "ledger /health: OK"
+curl -fsS http://localhost:8080/health >/dev/null
+echo "retrieval-gateway /health: OK"
 
-$COMPOSE down -v
+"${COMPOSE[@]}" down -v
+SMOKE_COMPOSE_STARTED=0
 echo "compose down: OK"
 echo "=== docker-compose smoke passed ==="
