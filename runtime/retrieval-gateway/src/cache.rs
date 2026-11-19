@@ -530,7 +530,7 @@ mod tests {
                     match worker % 3 {
                         0 => {
                             cache.put(
-                                &query_hash, &labels, tenant,
+                                &query_hash, &labels, tenant, 10,
                                 vec![SearchResult {
                                     document_id: "synthetic".into(),
                                     content: "synthetic".into(),
@@ -543,7 +543,7 @@ mod tests {
                             ).await.unwrap();
                         }
                         1 => {
-                            let _ = cache.get(&query_hash, &labels, tenant).await;
+                            let _ = cache.get(&query_hash, &labels, tenant, 10).await;
                         }
                         _ => {
                             cache.invalidate_tenant(tenant).await.unwrap();
