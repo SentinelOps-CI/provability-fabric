@@ -32,6 +32,35 @@ Warm paths omit `--build`. Health readiness uses `docker compose up --wait` (no 
 
 Run `make check-wiring` (or `python scripts/check_wiring.py`) after changing compose env or code defaults.
 
+## Retrieval receipt signing in the full Compose profile
+
+Full-profile retrieval receipts use a private Ed25519 signing key supplied
+through a read-only Compose secret. There is no checked-in or fallback
+signing seed. `PF_RECEIPT_SIGNING_KEY_FILE` identifies the host-side path;
+the default path is `.local/secrets/retrieval-receipt-signing-key.pem`.
+An absent or malformed key prevents retrieval-gateway startup.
+
+For isolated local development, generate a unique signing key outside the
+tracked source tree.
+
+```sh
+mkdir -p .local/secrets
+chmod 700 .local/secrets
+umask 077
+openssl genpkey -algorithm Ed25519 -out .local/secrets/retrieval-receipt-signing-key.pem
+chmod 600 .local/secrets/retrieval-receipt-signing-key.pem
+```
+
+For production, provision an independently managed private key, set
+`PF_RECEIPT_SIGNING_KEY_FILE` to its absolute host path, and establish the
+corresponding verifier trust root. A signed receipt from a locally generated
+key is not independently trusted provenance.
+
+`scripts/docker-compose-smoke.sh full` creates a temporary disposable
+Ed25519 key and deletes it on both successful and failed runs. It never
+consumes a deployment signing key. This confirms service startup, not
+independent receipt verification.
+
 ## Platform APIs (default Compose)
 
 ```bash
