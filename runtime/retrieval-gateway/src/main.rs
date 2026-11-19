@@ -385,6 +385,185 @@ async fn submit_receipt_to_ledger(receipt: &AccessReceipt) -> Result<()> {
 mod tests {
     use super::*;
 
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use ed25519_dalek::{Signer, SigningKey};
+    use crate::storage::Document;
+
+    fn signed_fixture_token(
+        signer: &SigningKey,
+        tenant: &str,
+        subject: &str,
+        labels: &[&str],
+        capabilities: &[&str],
+    ) -> String {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let header = serde_json::json!({
+            "alg": "EdDSA", "typ": "JWT", "kid": "fixture-issuer-key",
+        });
+        let claims = serde_json::json!({
+            "iss": "fixture-issuer", "aud": "pf-retrieval-gateway",
+            "sub": subject, "tenant": tenant, "iat": now - 2,
+            "nbf": now - 2, "exp": now + 120,
+            "jti": Uuid::new_v4().to_string(),
+            "allowed_labels": labels, "capabilities": capabilities,
+        });
+        let header = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).unwrap());
+        let claims = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let signing_input = format!("{header}.{claims}");
+        let sig = signer.sign(signing_input.as_bytes());
+        format!("{signing_input}.{}", URL_SAFE_NO_PAD.encode(sig.to_bytes()))
+    }
+
+    async fn seeded_gateway_state() -> (AppState, SigningKey) {
+        // These are independently authored test fixtures, not service
+        // responses retrospectively interpreted as an authorization oracle.
+        let index = VectorIndex::new().await.unwrap();
+        let query_embedding = VectorIndex::generate_query_embedding("fixture query");
+        for (id, tenant, labels) in [
+            ("a-public-one", "tenant-a", vec!["public"]),
+            ("a-public-two", "tenant-a", vec!["public"]),
+            ("a-private", "tenant-a", vec!["private"]),
+            ("a-mixed", "tenant-a", vec!["public", "secret"]),
+            ("b-public", "tenant-b", vec!["public"]),
+        ] {
+            index.add_document(Document {
+                id: id.into(),
+                content: format!("fixture content {id}"),
+                tenant: tenant.into(),
+                labels: labels.into_iter().map(str::to_string).collect(),
+                metadata: HashMap::new(),
+                embedding: query_embedding.clone(),
+                created_at: 1,
+                updated_at: 1,
+            }).await.unwrap();
+        }
+        let policy: AbacPolicy = serde_yaml::from_str(include_str!("../abac.yaml")).unwrap();
+        policy.validate_configuration().unwrap();
+        let signer = SigningKey::from_bytes(&[18_u8; 32]);
+        let verifier = TokenVerifier::from_keys(
+            HashMap::from([("fixture-issuer-key".into(), signer.verifying_key())]),
+            "fixture-issuer".into(),
+        ).unwrap();
+        (
+            AppState {
+                storage: Arc::new(index),
+                abac_policy: Arc::new(policy),
+                token_verifier: Arc::new(verifier),
+                receipt_signer: Arc::new(ReceiptSigner::for_test()),
+                receipt_cache: Arc::new(RwLock::new(HashMap::new())),
+                semantic_cache: Arc::new(SemanticCache::with_config(cache::CacheConfig {
+                    cleanup_interval_seconds: 0,
+                    ..cache::CacheConfig::default()
+                })),
+            },
+            signer,
+        )
+    }
+
+    fn seeded_request(
+        signer: &SigningKey,
+        tenant: &str,
+        labels: Vec<&str>,
+        capabilities: &[&str],
+    ) -> QueryRequest {
+        let token = signed_fixture_token(
+            signer, tenant, "user_fixture", &labels, capabilities,
+        );
+        QueryRequest {
+            query: "fixture query".into(),
+            tenant: tenant.into(),
+            subject_id: "user_fixture".into(),
+            capability_token: token,
+            labels_filter: labels.into_iter().map(str::to_string).collect(),
+            limit: Some(10),
+        }
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_enforces_tenant_and_mixed_label_isolation() {
+        let (state, key) = seeded_gateway_state().await;
+        let a = handle_query(
+            State(state.clone()),
+            Json(seeded_request(&key, "tenant-a", vec!["public"], &[])),
+        ).await.unwrap().0;
+        let mut a_ids: Vec<_> = a.results.iter().map(|r| r.document_id.as_str()).collect();
+        a_ids.sort_unstable();
+        assert_eq!(a_ids, vec!["a-public-one", "a-public-two"]);
+        assert!(a.results.iter().all(|r| {
+            r.labels.len() == 1 && r.labels[0] == "public"
+        }));
+        assert_eq!(a.receipt.tenant, "tenant-a");
+        assert_eq!(a.receipt.result_count, 2);
+
+        let b = handle_query(
+            State(state),
+            Json(seeded_request(&key, "tenant-b", vec!["public"], &[])),
+        ).await.unwrap().0;
+        assert_eq!(b.results.len(), 1);
+        assert_eq!(b.results[0].document_id, "b-public");
+        assert_eq!(b.receipt.tenant, "tenant-b");
+        assert_eq!(b.receipt.result_count, 1);
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_never_reuses_limit_one_cache_for_limit_ten() {
+        let (state, key) = seeded_gateway_state().await;
+        let mut request = seeded_request(&key, "tenant-a", vec!["public"], &[]);
+        request.limit = Some(1);
+        let one = handle_query(State(state.clone()), Json(request)).await.unwrap().0;
+        assert_eq!(one.results.len(), 1);
+        let ten = handle_query(
+            State(state),
+            Json(seeded_request(&key, "tenant-a", vec!["public"], &[])),
+        ).await.unwrap().0;
+        assert_eq!(ten.results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_rejects_unsigned_forged_and_forbidden_scopes() {
+        let (state, signer) = seeded_gateway_state().await;
+        let mut legacy = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        legacy.capability_token = "legacy-any-string".into();
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(legacy)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        let mut foreign = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        foreign.tenant = "tenant-b".into();
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(foreign)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        let mut forged = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        forged.capability_token = signed_fixture_token(
+            &SigningKey::from_bytes(&[19_u8; 32]),
+            "tenant-a", "user_fixture", &["public"], &[],
+        );
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(forged)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        for labels in [vec!["private"], vec!["secret"]] {
+            let invalid = seeded_request(&signer, "tenant-a", labels, &[]);
+            assert!(matches!(
+                handle_query(State(state.clone()), Json(invalid)).await,
+                Err(StatusCode::FORBIDDEN),
+            ));
+        }
+
+        let authorized_private = seeded_request(
+            &signer, "tenant-a", vec!["private"], &["private_access"],
+        );
+        let private = handle_query(
+            State(state), Json(authorized_private),
+        ).await.unwrap().0;
+        assert_eq!(private.results.len(), 1);
+        assert_eq!(private.results[0].document_id, "a-private");
+    }
+
     #[tokio::test]
     async fn test_query_hash() {
         let query = "test query";

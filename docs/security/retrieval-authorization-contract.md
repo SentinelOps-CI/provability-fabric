@@ -98,6 +98,25 @@ roots, credential rollout, negative-control fixtures for multiple tenants,
 operational telemetry, and signed-credential integration tests. The project
 issue tracking these obligations is #297.
 
+## Independently seeded handler regression
+
+The Rust unit suite also constructs a separate in-memory corpus containing
+two tenants, two authorized public documents, a private document, and a
+public-plus-secret mixed-classification document. It invokes the production
+`handle_query` function with authenticated signed credentials and verifies
+exact document identifiers and receipt tenant binding. Separate checks reject
+untrusted signatures, wrong-tenant binding, missing private capability, and
+secret retrieval. A sequence of limit-one and limit-ten public requests
+checks that the authorization-sensitive cache does not reuse the smaller
+result set for the larger request.
+
+These seeded checks exercise the real query handler, ABAC evaluator, in-memory
+index, and Ed25519 signer. They are in-process tests rather than external
+HTTP/ledger experiments and do not establish PostgreSQL adapter isolation,
+ledger persistence, operational audit, or a deployed issuer trust model.
+The PostgreSQL adapter's unresolved tenant-transaction problem is tracked
+separately in issue #304.
+
 ## Disposable signed HTTP validation
 
 The full-profile Compose smoke provisions two independent temporary Ed25519

@@ -80,7 +80,7 @@ impl TokenVerifier {
         Self::from_keys(keys, issuer)
     }
 
-    fn from_keys(keys: HashMap<String, VerifyingKey>, issuer: String) -> Result<Self> {
+    pub(crate) fn from_keys(keys: HashMap<String, VerifyingKey>, issuer: String) -> Result<Self> {
         if keys.is_empty() || issuer.trim().is_empty() {
             bail!("Trusted keys and nonempty issuer are mandatory");
         }
