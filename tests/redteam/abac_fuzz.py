@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import logging
 
+from observation_gate import observation_failures
+
 if TYPE_CHECKING:
     import aiohttp
 
@@ -469,6 +471,25 @@ class ABACFuzzTester:
             },
         }
 
+        observed_documents = sum(
+            r.result_count for r in self.results if r.success
+        )
+        problems = observation_failures(
+            planned=len(self.test_cases),
+            recorded=total_tests,
+            valid_responses=successful_tests,
+            positive_controls=observed_documents,
+            violations=cross_tenant_leaks + unauthorized_accesses,
+        )
+        report["execution"] = {
+            "planned_requests": len(self.test_cases),
+            "observed_responses": total_tests,
+            "valid_responses": successful_tests,
+            "document_observations": observed_documents,
+            "status": "FAIL" if problems else "PASS",
+            "failures": problems,
+        }
+
         return report
 
     def save_results(self, filename: str) -> None:
@@ -517,10 +538,12 @@ async def main():
 
     args = parser.parse_args()
     test_count = args.queries if args.queries is not None else args.test_count
+    if test_count <= 0:
+        parser.error('the number of test queries must be positive')
 
     if args.offline:
         print(f"Offline ABAC fuzz validation ({test_count} planned queries)")
-        print("PASSED: offline mode skips live gateway calls in CI")
+        print("Harness setup only: no live gateway requests or security verdict")
         return
 
     # Create tester
@@ -549,12 +572,15 @@ async def main():
     print(f"Total Violations: {violations['total_violations']}")
     print(f"Average Response Time: {summary['avg_response_time_ms']:.2f}ms")
 
-    # Exit with error if violations found
-    if violations["total_violations"] > 0:
-        print(f"\n❌ FAILED: Found {violations['total_violations']} violations!")
-        exit(1)
-    else:
-        print(f"\n✅ PASSED: Zero violations detected!")
+    # A zero-leak count is meaningful only for a complete observed execution.
+    problems = report["execution"]["failures"]
+    if problems:
+        print("\nFAILED: ABAC observations are incomplete or violated:")
+        for problem in problems:
+            print(f"  - {problem}")
+        raise SystemExit(1)
+    print("\nObserved ABAC probes completed without recorded violations.")
+    print("Tenant isolation still needs known seeded cross-tenant fixtures and negative controls.")
 
 
 if __name__ == "__main__":
