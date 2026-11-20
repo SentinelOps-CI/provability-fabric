@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -115,6 +116,8 @@ func NewProofService() *ProofService {
 // treating successful elaboration of admitted goals as verification.
 var admittedTactic = regexp.MustCompile(`(?m)(?:^|[[:space:]])(?:sorry|admit)(?:[[:space:]]|$)`)
 
+var errInvalidActionDSL = errors.New("invalid ActionDSL")
+
 // unverifiedProofResult reports an unsuccessful attempt without issuing a proof
 // hash or a cached artifact. A compiler exit code alone is insufficient.
 func unverifiedProofResult(start time.Time, reason string) *ProofRunResponse {
@@ -191,7 +194,37 @@ func (s *ProofService) generateLeanObligations(actionDSL interface{}, adapterTyp
 
 	var dsl map[string]interface{}
 	if err := json.Unmarshal(dslBytes, &dsl); err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %v", errInvalidActionDSL, err)
+	}
+	if dsl == nil {
+		return "", fmt.Errorf("%w: expected a JSON object", errInvalidActionDSL)
+	}
+	// Validate before calling the code generator, whose rule formatting
+	// assumes typed objects. Invalid client input must not panic a handler.
+	if rawRules, present := dsl["rules"]; present {
+		rules, ok := rawRules.([]interface{})
+		if !ok {
+			return "", fmt.Errorf("%w: rules must be an array", errInvalidActionDSL)
+		}
+		for i, rawRule := range rules {
+			rule, ok := rawRule.(map[string]interface{})
+			if !ok {
+				return "", fmt.Errorf("%w: rule %d must be an object", errInvalidActionDSL, i)
+			}
+			ruleType, ok := rule["type"].(string)
+			if !ok || ruleType == "" {
+				return "", fmt.Errorf("%w: rule %d must declare a type", errInvalidActionDSL, i)
+			}
+			if ruleType == "rate_limit" {
+				rate, ok := rule["rate_limit"].(map[string]interface{})
+				if !ok {
+					return "", fmt.Errorf("%w: rule %d has invalid rate_limit", errInvalidActionDSL, i)
+				}
+				if _, ok := rate["key"].(string); !ok {
+					return "", fmt.Errorf("%w: rule %d has invalid rate_limit.key", errInvalidActionDSL, i)
+				}
+			}
+		}
 	}
 
 	// Generate Lean code
@@ -471,7 +504,11 @@ func (s *ProofService) runProofsHandler(c *gin.Context) {
 
 	resp, err := s.RunProofs(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if errors.Is(err, errInvalidActionDSL) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
