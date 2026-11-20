@@ -90,11 +90,13 @@ so packet make <decision-id> --out artifacts/
 
 ```bash
 POST /api/v1/policy/compile     # English → ActionDSL
-POST /api/v1/proofs/run         # Generate Lean proofs
+POST /api/v1/proofs/run         # Attempt proof validation; reject admitted obligations
 POST /api/v1/policy/build       # ActionDSL → DFA
 POST /api/v1/runtime/deploy     # Deploy to runtime
 POST /api/v1/runtime/epoch/rotate # Rotate epochs
 ```
+
+**Current proof-service limitation.** Generated Lean obligations still contain `sorry` placeholders, and the optional Morph execution path has no verified backend. Requests that encounter either condition return HTTP 422 with `status: "failed"`, an error diagnostic, an empty `proof_hash`, and no proof artifacts. This fail-closed result must not be interpreted as a completed proof, regardless of the service health endpoint. A subsequent build or deployment needs independently checked proof evidence; this endpoint does not currently establish that evidence.
 
 ### Evidence & Replay
 

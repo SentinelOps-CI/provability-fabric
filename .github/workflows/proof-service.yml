@@ -1,0 +1,124 @@
+name: Proof Service Admission Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/proof-service/**"
+      - ".github/workflows/proof-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/proof-service/**"
+      - ".github/workflows/proof-service.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  proof-rejection-and-http-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: services/proof-service
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/proof-service/go.mod
+          cache-dependency-path: services/proof-service/go.sum
+
+      - name: Verify dependencies, race regression, and static checks
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -race -count=1 ./...
+          go vet ./...
+          go build -trimpath -o "$RUNNER_TEMP/proof-service-ci" .
+
+      - name: Build and start production proof service image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag proof-service-ci:local .
+          docker run --detach --rm --name proof-service-ci-smoke \
+            --publish 127.0.0.1:18002:8002 \
+            --env MORPH_ENABLED=true proof-service-ci:local
+
+      - name: Exercise live HTTP rejection contracts against the image
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18002/api/v1"
+
+          def call(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              request = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(request, timeout=5) as response:
+                      status, content = response.status, response.read()
+              except HTTPError as exc:
+                  status, content = exc.code, exc.read()
+              if status != expected:
+                  raise AssertionError(
+                      f"{method} {path}: HTTP {status}, expected {expected}: {content[:200]!r}"
+                  )
+              return json.loads(content)
+
+          for attempt in range(30):
+              try:
+                  health = call("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("proof service did not become reachable")
+
+          assert health["status"] == "healthy"
+          assert health["service"] == "proof-service"
+
+          request = {
+              "policy_hash": "a" * 64,
+              "action_dsl": {"rules": [{"type": "allow", "role": "researcher"}]},
+          }
+          for use_morph in (False, True):
+              proof = call(
+                  "/proofs/run",
+                  method="POST",
+                  payload={**request, "use_morph": use_morph},
+                  expected=422,
+              )
+              assert proof["status"] == "failed", proof
+              assert not proof["proof_hash"], proof
+              assert proof["artifacts"] == [], proof
+              assert proof["diagnostics"][0]["level"] == "error", proof
+              assert call("/artifacts")["count"] == 0
+
+          invalid = {
+              **request,
+              "action_dsl": {"rules": [{"role": "researcher"}]},
+          }
+          call("/proofs/run", method="POST", payload=invalid, expected=400)
+          call("/proofs/run", method="POST", payload={}, expected=400)
+          print(
+              "Live proof service controls passed: denied admissions, "
+              "denied simulated Morph, zero cached artifacts, malformed request rejection. "
+              "No positive proof verification is claimed."
+          )
+          PY
+
+      - name: Remove disposable proof service container
+        if: always()
+        run: |
+          if docker container inspect proof-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f proof-service-ci-smoke
+          fi

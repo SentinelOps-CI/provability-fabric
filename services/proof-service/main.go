@@ -7,12 +7,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -109,11 +111,49 @@ func NewProofService() *ProofService {
 	}
 }
 
+// admittedTactic detects unsupported proof placeholders in generated Lean code.
+// This conservative screen intentionally rejects ambiguous source rather than
+// treating successful elaboration of admitted goals as verification.
+var admittedTactic = regexp.MustCompile(`(?m)(?:^|[[:space:]])(?:sorry|admit)(?:[[:space:]]|$)`)
+
+var errInvalidActionDSL = errors.New("invalid ActionDSL")
+
+// unverifiedProofResult reports an unsuccessful attempt without issuing a proof
+// hash or a cached artifact. A compiler exit code alone is insufficient.
+func unverifiedProofResult(start time.Time, reason string) *ProofRunResponse {
+	return &ProofRunResponse{
+		Status:        "failed",
+		Artifacts:     []string{},
+		Diagnostics:   []Diagnostic{{Level: "error", Message: reason}},
+		Timestamp:     time.Now(),
+		ExecutionTime: int(time.Since(start).Milliseconds()),
+	}
+}
+
 // RunProofs executes proof generation for a policy
 func (s *ProofService) RunProofs(ctx context.Context, req ProofRunRequest) (*ProofRunResponse, error) {
 	startTime := time.Now()
 
-	// Check cache first
+	// Generate Lean obligations from ActionDSL
+	obligations, err := s.generateLeanObligations(req.ActionDSL, req.AdapterType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate Lean obligations: %w", err)
+	}
+
+	// No proof-backed Morph runner is connected. A simulated shard cannot
+	// establish success, even if MORPH_ENABLED is set in the environment.
+	if req.UseMorph {
+		return unverifiedProofResult(startTime, "Morph proof execution is not implemented; no verified proof is available"), nil
+	}
+
+	// Generated scaffolds currently contain sorry tactics. Lean accepts
+	// admissions as axioms, so a successful build does not establish proofs.
+	// Apply this gate before consulting any legacy proof cache entry.
+	if admittedTactic.MatchString(obligations) {
+		return unverifiedProofResult(startTime, "generated Lean obligations contain sorry/admit placeholders; no verified proof is available"), nil
+	}
+
+	// Cached artifacts are considered only for admission-free obligations.
 	if artifact, exists := s.artifacts[req.PolicyHash]; exists {
 		log.Printf("Using cached proof for policy %s", req.PolicyHash)
 		return &ProofRunResponse{
@@ -126,19 +166,8 @@ func (s *ProofService) RunProofs(ctx context.Context, req ProofRunRequest) (*Pro
 		}, nil
 	}
 
-	// Generate Lean obligations from ActionDSL
-	obligations, err := s.generateLeanObligations(req.ActionDSL, req.AdapterType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate Lean obligations: %w", err)
-	}
-
-	// Execute proofs
-	var response *ProofRunResponse
-	if req.UseMorph && s.morphEnabled {
-		response, err = s.runMorphProofs(req, obligations)
-	} else {
-		response, err = s.runLocalProofs(req, obligations)
-	}
+	// Execute admission-free obligations with the local Lean toolchain.
+	response, err := s.runLocalProofs(req, obligations)
 
 	if err != nil {
 		return nil, err
@@ -165,7 +194,37 @@ func (s *ProofService) generateLeanObligations(actionDSL interface{}, adapterTyp
 
 	var dsl map[string]interface{}
 	if err := json.Unmarshal(dslBytes, &dsl); err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %v", errInvalidActionDSL, err)
+	}
+	if dsl == nil {
+		return "", fmt.Errorf("%w: expected a JSON object", errInvalidActionDSL)
+	}
+	// Validate before calling the code generator, whose rule formatting
+	// assumes typed objects. Invalid client input must not panic a handler.
+	if rawRules, present := dsl["rules"]; present {
+		rules, ok := rawRules.([]interface{})
+		if !ok {
+			return "", fmt.Errorf("%w: rules must be an array", errInvalidActionDSL)
+		}
+		for i, rawRule := range rules {
+			rule, ok := rawRule.(map[string]interface{})
+			if !ok {
+				return "", fmt.Errorf("%w: rule %d must be an object", errInvalidActionDSL, i)
+			}
+			ruleType, ok := rule["type"].(string)
+			if !ok || ruleType == "" {
+				return "", fmt.Errorf("%w: rule %d must declare a type", errInvalidActionDSL, i)
+			}
+			if ruleType == "rate_limit" {
+				rate, ok := rule["rate_limit"].(map[string]interface{})
+				if !ok {
+					return "", fmt.Errorf("%w: rule %d has invalid rate_limit", errInvalidActionDSL, i)
+				}
+				if _, ok := rate["key"].(string); !ok {
+					return "", fmt.Errorf("%w: rule %d has invalid rate_limit.key", errInvalidActionDSL, i)
+				}
+			}
+		}
 	}
 
 	// Generate Lean code
@@ -278,6 +337,12 @@ theorem epoch_revocation_safety :
 
 // runLocalProofs executes proofs using local Lean installation
 func (s *ProofService) runLocalProofs(req ProofRunRequest, obligations string) (*ProofRunResponse, error) {
+	// Enforce admission screening at the execution boundary as well as the
+	// public RunProofs entry point, preventing direct internal bypasses.
+	if admittedTactic.MatchString(obligations) {
+		return unverifiedProofResult(time.Now(), "local Lean obligations contain sorry/admit placeholders; compilation was not executed"), nil
+	}
+
 	// Create temporary proof directory
 	proofDir := filepath.Join(s.cachePath, uuid.New().String())
 	if err := os.MkdirAll(proofDir, 0755); err != nil {
@@ -372,10 +437,14 @@ lean_exe generated where
 		})
 	}
 
-	// Calculate proof hash
-	proofHash := s.calculateProofHash(obligations, string(output))
-	if len(artifactIndex) > 0 {
-		s.artifactIndex[proofHash] = artifactIndex
+	// A failed Lean process provides diagnostics, not a proof identifier.
+	// Never put that output into the proof-artifact index or response hash.
+	var proofHash string
+	if status == "success" {
+		proofHash = s.calculateProofHash(obligations, string(output))
+		if len(artifactIndex) > 0 {
+			s.artifactIndex[proofHash] = artifactIndex
+		}
 	}
 
 	return &ProofRunResponse{
@@ -388,116 +457,8 @@ lean_exe generated where
 }
 
 // runMorphProofs executes proofs using Morph shards
-func (s *ProofService) runMorphProofs(req ProofRunRequest, obligations string) (*ProofRunResponse, error) {
-	// Morph integration for distributed proof execution
-	shardCount := req.MorphShards
-	if shardCount == 0 {
-		shardCount = 4
-	}
-
-	var shards []ProofShard
-	var allArtifacts []string
-	var allDiagnostics []Diagnostic
-
-	// Split proof obligations across shards
-	shardObligations := s.splitObligations(obligations, shardCount)
-
-	for i, shardObligation := range shardObligations {
-		shard, err := s.runMorphShard(i, shardObligation, req.PolicyHash)
-		if err != nil {
-			allDiagnostics = append(allDiagnostics, Diagnostic{
-				Level:   "error",
-				Message: fmt.Sprintf("Shard %d failed: %v", i, err),
-			})
-			shard.Status = "failed"
-		}
-
-		shards = append(shards, shard)
-		if len(shard.ProofHash) > 0 {
-			allArtifacts = append(allArtifacts, fmt.Sprintf("morph_shard_%d_%s", i, shard.ProofHash))
-		}
-	}
-
-	// Determine overall status
-	status := "success"
-	for _, shard := range shards {
-		if shard.Status != "success" {
-			status = "failed"
-			break
-		}
-	}
-
-	// Calculate combined proof hash
-	proofHash := s.calculateCombinedProofHash(shards)
-
-	return &ProofRunResponse{
-		ProofHash:   proofHash,
-		Status:      status,
-		Shards:      shards,
-		Artifacts:   allArtifacts,
-		Diagnostics: allDiagnostics,
-	}, nil
-}
-
-// runMorphShard executes a single proof shard on Morph
-func (s *ProofService) runMorphShard(shardID int, obligations string, policyHash string) (ProofShard, error) {
-	startTime := time.Now()
-
-	// Simulate Morph VM execution
-	morphVMID := fmt.Sprintf("morphvm_%s_%d", policyHash[:8], shardID)
-	envSnapshot := s.generateEnvSnapshot()
-
-	// In real implementation, this would call Morph API
-	// For now, simulate successful proof execution
-	time.Sleep(time.Duration(100+shardID*50) * time.Millisecond) // Simulate work
-
-	proofHash := s.calculateProofHash(obligations, fmt.Sprintf("shard_%d", shardID))
-
-	return ProofShard{
-		ShardID:       fmt.Sprintf("shard_%d", shardID),
-		Status:        "success",
-		MorphVMID:     morphVMID,
-		EnvSnapshot:   envSnapshot,
-		ProofHash:     proofHash,
-		ExecutionTime: int(time.Since(startTime).Milliseconds()),
-	}, nil
-}
-
-// splitObligations divides proof obligations across shards
-func (s *ProofService) splitObligations(obligations string, shardCount int) []string {
-	// Simple splitting strategy - in practice this would be more sophisticated
-	lines := strings.Split(obligations, "\n")
-	linesPerShard := len(lines) / shardCount
-
-	var shards []string
-	for i := 0; i < shardCount; i++ {
-		start := i * linesPerShard
-		end := start + linesPerShard
-		if i == shardCount-1 {
-			end = len(lines) // Include remainder in last shard
-		}
-
-		if start < len(lines) {
-			shardLines := lines[start:end]
-			shards = append(shards, strings.Join(shardLines, "\n"))
-		}
-	}
-
-	return shards
-}
-
-// generateEnvSnapshot creates environment snapshot for Morph
-func (s *ProofService) generateEnvSnapshot() string {
-	snapshot := map[string]interface{}{
-		"timestamp":        time.Now().Unix(),
-		"lean_version":     "4.0.0",
-		"mathlib_version":  "4.0.0",
-		"platform_version": "1.0.0",
-	}
-
-	data, _ := json.Marshal(snapshot)
-	hash := sha256.Sum256(data)
-	return fmt.Sprintf("%x", hash)
+func (s *ProofService) runMorphProofs(_ ProofRunRequest, _ string) (*ProofRunResponse, error) {
+	return unverifiedProofResult(time.Now(), "Morph proof execution is not implemented; no verified proof is available"), nil
 }
 
 // calculateProofHash computes hash for proof artifacts
@@ -547,7 +508,19 @@ func (s *ProofService) runProofsHandler(c *gin.Context) {
 
 	resp, err := s.RunProofs(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if errors.Is(err, errInvalidActionDSL) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	// Clients use HTTP success to advance the policy lifecycle. Returning
+	// 200 for an unproved result would mark it as proven in the console and
+	// allow the CLI to persist a nonexistent proof hash.
+	if resp.Status != "success" {
+		c.JSON(http.StatusUnprocessableEntity, resp)
 		return
 	}
 
