@@ -4,6 +4,8 @@
 package dsse
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -145,5 +147,50 @@ func TestRejectTamperedSignature(t *testing.T) {
 	result := VerifyEnvelope(env, AccessReceiptType)
 	if result.Valid {
 		t.Fatal("expected tampered signature to be rejected")
+	}
+}
+
+// TestVersionedResultHashSignature ensures the v2 marker is signed in the
+// pre-existing canonical receipt field, and older Go consumers retain support.
+func TestVersionedResultHashSignature(t *testing.T) {
+	base := fixtureDir(t)
+	payload, err := os.ReadFile(filepath.Join(base, "retrieval_receipt_v2_signed.json"))
+	if err != nil {
+		t.Fatalf("read signed receipt fixture: %v", err)
+	}
+	var fixture struct {
+		Receipt                AccessReceiptPayload `json:"receipt"`
+		SignatureBase64        string               `json:"signature_base64"`
+		PublicKeyPEM           string               `json:"public_key_pem"`
+		CanonicalPayloadSha256 string               `json:"canonical_payload_sha256"`
+	}
+	if err := json.Unmarshal(payload, &fixture); err != nil {
+		t.Fatalf("decode signed receipt fixture: %v", err)
+	}
+	t.Setenv(EnvTrustRootPEM, fixture.PublicKeyPEM)
+	t.Setenv(EnvEnforceDSSE, "1")
+
+	canonical, err := CanonicalReceiptPayload(fixture.Receipt)
+	if err != nil {
+		t.Fatalf("canonical receipt payload: %v", err)
+	}
+	digest := sha256.Sum256(canonical)
+	if actual := hex.EncodeToString(digest[:]); actual != fixture.CanonicalPayloadSha256 {
+		t.Fatalf("canonical payload digest mismatch: %s", actual)
+	}
+	if err := VerifyAccessReceipt(fixture.Receipt, "ed25519", fixture.SignatureBase64); err != nil {
+		t.Fatalf("v2 receipt signature rejected: %v", err)
+	}
+
+	altered := fixture.Receipt
+	altered.ResultHash = strings.Replace(altered.ResultHash, "sha256-v2:", "sha256-v3:", 1)
+	if err := VerifyAccessReceipt(altered, "ed25519", fixture.SignatureBase64); err == nil {
+		t.Fatal("version marker tampering must invalidate the receipt signature")
+	}
+
+	altered = fixture.Receipt
+	altered.ResultHash = strings.Replace(altered.ResultHash, "a", "b", 1)
+	if err := VerifyAccessReceipt(altered, "ed25519", fixture.SignatureBase64); err == nil {
+		t.Fatal("result commitment tampering must invalidate the receipt signature")
 	}
 }
