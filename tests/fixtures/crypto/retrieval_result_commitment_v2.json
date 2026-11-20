@@ -1,0 +1,103 @@
+{
+  "schema_version": 2,
+  "encoding": "pf-retrieval-result-v2-binary",
+  "vectors": [
+    {
+      "name": "empty",
+      "tenant": "tenant-a",
+      "results": [],
+      "expected_result_hash": "sha256-v2:1d29f4c29397d5196ca6658477a1f05c72da8b8d2bb3ab1fcfb095ecec96d117"
+    },
+    {
+      "name": "framing-a",
+      "tenant": "tenant-a",
+      "results": [
+        {
+          "document_id": "ab",
+          "content": "c",
+          "content_hash": "h1",
+          "score": 0.5,
+          "labels": [
+            "public",
+            "internal"
+          ],
+          "metadata": {
+            "β": "é",
+            "alpha": "1"
+          }
+        }
+      ],
+      "expected_result_hash": "sha256-v2:5077aefb85c488399d552d5022a0fee062d7b5a70c1637d514a78591b4034a21"
+    },
+    {
+      "name": "framing-b",
+      "tenant": "tenant-a",
+      "results": [
+        {
+          "document_id": "a",
+          "content": "bc",
+          "content_hash": "h1",
+          "score": 0.5,
+          "labels": [
+            "public",
+            "internal"
+          ],
+          "metadata": {
+            "β": "é",
+            "alpha": "1"
+          }
+        }
+      ],
+      "expected_result_hash": "sha256-v2:b13885df9da9bf777bbce3bcfc70ffb9447bd2b5cf1b1875163162839baab84c"
+    },
+    {
+      "name": "unicode-and-negative-zero",
+      "tenant": "loc-α",
+      "results": [
+        {
+          "document_id": "研究",
+          "content": "café ☕",
+          "content_hash": "sha:unicode",
+          "score": 0,
+          "labels": [
+            "公开",
+            "réservé"
+          ],
+          "metadata": {
+            "á": "x",
+            "a": "y"
+          }
+        }
+      ],
+      "expected_result_hash": "sha256-v2:7cbfb4bf79d624078769abe8cdc419fd6f3478c5799aa5fc1e691f215f21a983"
+    },
+    {
+      "name": "ordered-two-results",
+      "tenant": "tenant-b",
+      "results": [
+        {
+          "document_id": "doc-2",
+          "content": "a",
+          "content_hash": "x",
+          "score": -0.25,
+          "labels": [],
+          "metadata": {}
+        },
+        {
+          "document_id": "doc-1",
+          "content": "b",
+          "content_hash": "y",
+          "score": 1,
+          "labels": [
+            "public"
+          ],
+          "metadata": {
+            "x": "1",
+            "y": "2"
+          }
+        }
+      ],
+      "expected_result_hash": "sha256-v2:cd8bc369bc8eea32038c98af77b2dcb584eae597d8cb8c756a6fb380044aa3dd"
+    }
+  ]
+}
