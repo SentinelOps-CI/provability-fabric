@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use crate::result_commitment::valid_result_hash;
 use base64::{engine::general_purpose::STANDARD as B64_STD, Engine as _};
 use ed25519_dalek::pkcs8::DecodePrivateKey;
 use ed25519_dalek::{Signer, SigningKey};
@@ -154,7 +155,7 @@ impl ReceiptValidator {
             || receipt.tenant.is_empty()
             || receipt.subject_id.is_empty()
             || receipt.query_hash.len() != 64
-            || receipt.result_hash.len() != 64
+            || !valid_result_hash(&receipt.result_hash)
         {
             return Ok(false);
         }
@@ -266,5 +267,27 @@ mod tests {
         let mut invalid = signed.clone();
         invalid.tenant = String::new();
         assert!(!ReceiptValidator::validate_receipt(&invalid).await.unwrap());
+
+        // Legacy SHA-256 receipts remain structurally recognized under v1.
+        assert!(valid_result_hash(&signed.result_hash));
+
+        // A v2 marker is included in the signed field, not interpreted as v1.
+        let mut v2 = sample_receipt();
+        v2.result_hash = format!("sha256-v2:{}", "a".repeat(64));
+        let signed_v2 = signer.sign_receipt(&v2).await.unwrap();
+        assert!(ReceiptValidator::validate_receipt(&signed_v2).await.unwrap());
+        assert!(signer.verify_receipt(&signed_v2).unwrap());
+
+        for malformed in [
+            format!("sha256-v2:{}", "g".repeat(64)),
+            format!("sha256-v2:{}", "A".repeat(64)),
+            "sha256-v3:unrecognized".to_string(),
+            "g".repeat(64),
+        ] {
+            let mut candidate = sample_receipt();
+            candidate.result_hash = malformed;
+            let signed_candidate = signer.sign_receipt(&candidate).await.unwrap();
+            assert!(!ReceiptValidator::validate_receipt(&signed_candidate).await.unwrap());
+        }
     }
 }
