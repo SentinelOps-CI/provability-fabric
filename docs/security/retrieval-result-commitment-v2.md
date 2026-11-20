@@ -84,6 +84,9 @@ new canonical receipt field. The existing Rust, Go, and TypeScript signing
 and verification payload definitions include the entire `result_hash`
 string. The ledger's Prisma model stores it as an unrestricted string. The
 gateway receipt schema accepts the explicit legacy-v1 or v2 syntax.
+The schema also names the actual emitted signature properties (`sign_alg`,
+`sig`), rather than a nonexistent `signature` field, and permits current
+UUID receipt identifiers alongside historical identifier formats.
 
 Downstream integrations that impose a hard 64-character digest limit need
 to adopt the versioned syntax before using v2-producing gateways.
