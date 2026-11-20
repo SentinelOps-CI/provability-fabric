@@ -157,9 +157,11 @@ impl StorageAdapter for VectorIndex {
                     return false;
                 }
 
-                // Every document classification must be authorized.
-                // An empty grant permits only documents with no labels.
-                doc.labels.iter().all(|label| labels_filter.contains(label))
+                // Every returned document must have at least one classification,
+                // and every classification must be explicitly authorized.
+                !doc.labels.is_empty()
+                    && !labels_filter.is_empty()
+                    && doc.labels.iter().all(|label| labels_filter.contains(label))
             })
             .collect();
 
@@ -390,15 +392,14 @@ impl StorageAdapter for PostgresVectorAdapter {
         let vector = query_vector_literal(query);
         let limit = i64::try_from(limit).context("result limit too large")?;
 
-        // Full label containment rejects multi-label records if even one
-        // classification is outside the request's grant. Empty grants only
-        // admit documents with no labels.
+        // Full label containment rejects mixed classifications and any
+        // unclassified record. Empty grants return no search results.
         let rows = sqlx::query(
             r#"SELECT id, content, labels, metadata,
                       (embedding <=> ($1::text)::vector)::double precision AS distance
                FROM documents
-               WHERE tenant = $2 AND labels <@ $3::text[]
-                 AND embedding IS NOT NULL
+               WHERE tenant = $2 AND cardinality(labels) > 0
+                 AND labels <@ $3::text[] AND embedding IS NOT NULL
                ORDER BY embedding <=> ($1::text)::vector, id
                LIMIT $4"#,
         )
@@ -658,28 +659,26 @@ mod postgres_rls_tests {
             "integration-query", "tenant-a", &public, 10,
         ).await.unwrap();
         let ids: Vec<_> = results.iter().map(|r| r.document_id.as_str()).collect();
-        assert_eq!(ids.len(), 2);
+        assert_eq!(ids.len(), 1);
         assert!(ids.contains(&"a-public"));
-        assert!(ids.contains(&"a-open"));
+        assert!(!ids.contains(&"a-open"));
         assert!(!ids.contains(&"a-classified"));
 
         let full_results = storage.search_with_tenant_isolation(
             "integration-query", "tenant-a", &full, 10,
         ).await.unwrap();
-        assert_eq!(full_results.len(), 3);
+        assert_eq!(full_results.len(), 2);
         let empty_grant = storage.search_with_tenant_isolation(
             "integration-query", "tenant-a", &[], 10,
         ).await.unwrap();
-        assert_eq!(empty_grant.len(), 1);
-        assert_eq!(empty_grant[0].document_id, "a-open");
+        assert!(empty_grant.is_empty());
 
         // User-originated label strings are bound, never interpolated into SQL.
         let hostile = vec!["public' OR TRUE --".to_string()];
         let injection = storage.search_with_tenant_isolation(
             "integration-query", "tenant-a", &hostile, 10,
         ).await.unwrap();
-        assert_eq!(injection.len(), 1);
-        assert_eq!(injection[0].document_id, "a-open");
+        assert!(injection.is_empty());
 
         let other = storage.search_with_tenant_isolation(
             "integration-query", "tenant-b", &public, 10,
@@ -742,6 +741,7 @@ mod postgres_rls_tests {
         let index = VectorIndex::new().await.unwrap();
         for (id, labels) in [
             ("both", vec!["public".to_string(), "secret".to_string()]),
+            ("public-only", vec!["public".to_string()]),
             ("open", Vec::new()),
         ] {
             index.add_document(Document {
@@ -754,9 +754,9 @@ mod postgres_rls_tests {
         let visible = index.search_with_tenant_isolation("q", "tenant-a", &granted, 10)
             .await.unwrap();
         assert_eq!(visible.len(), 1);
-        assert_eq!(visible[0].document_id, "open");
+        assert_eq!(visible[0].document_id, "public-only");
         let all = vec!["public".to_string(), "secret".to_string()];
         assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &all, 10).await.unwrap().len(), 2);
-        assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &[], 10).await.unwrap().len(), 1);
+        assert!(index.search_with_tenant_isolation("q", "tenant-a", &[], 10).await.unwrap().is_empty());
     }
 }
