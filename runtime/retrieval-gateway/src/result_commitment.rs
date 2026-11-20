@@ -199,7 +199,7 @@ mod tests {
     fn signed_zero_normalized_and_nonfinite_scores_rejected() {
         let vector = &vectors()[3];
         let mut same = vector.results.clone();
-        same[0].score = 0.0;
+        same[0].score = -0.0;
         assert_eq!(
             compute_result_commitment(&vector.tenant, &same).unwrap(),
             vector.expected_result_hash
