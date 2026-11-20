@@ -58,7 +58,7 @@
           "document_id": "研究",
           "content": "café ☕",
           "content_hash": "sha:unicode",
-          "score": 0,
+          "score": -0.0,
           "labels": [
             "公开",
             "réservé"
