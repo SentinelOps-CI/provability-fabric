@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -154,8 +155,11 @@ func (s *SpecService) CompilePolicy(ctx context.Context, req PolicyCompileReques
 	// Parse English policy using NLP patterns
 	actionDSL, diagnostics, sourceMap := s.parseEnglishPolicy(req.English, req.PolicyID, req.Version, req.Metadata)
 
-	// Calculate policy hash
-	policyHash := s.calculatePolicyHash(actionDSL)
+	// Content-address the compiled policy before making it available to readers.
+	policyHash, err := s.calculatePolicyHash(actionDSL)
+	if err != nil {
+		return nil, err
+	}
 
 	// Store the completed policy atomically with respect to HTTP readers.
 	s.mu.Lock()
@@ -631,10 +635,27 @@ func (s *SpecService) convertToMs(value int, unit string) int {
 	}
 }
 
-func (s *SpecService) calculatePolicyHash(policy ActionDSLPolicy) string {
-	// Create deterministic hash of policy
-	data, _ := json.Marshal(policy)
-	return fmt.Sprintf("%x", data)[:64] // Simplified hash
+// calculatePolicyHash hashes the compiled ActionDSL, excluding the volatile
+// compilation timestamp. All policy identity, rule and caller metadata fields
+// retain their meaning in the digest. A fresh metadata map avoids modifying
+// the stored policy while computing the content identifier.
+func (s *SpecService) calculatePolicyHash(policy ActionDSLPolicy) (string, error) {
+	canonical := policy
+	if policy.Metadata != nil {
+		canonical.Metadata = make(map[string]string, len(policy.Metadata))
+		for key, value := range policy.Metadata {
+			if key != "compiled_at" {
+				canonical.Metadata[key] = value
+			}
+		}
+	}
+
+	data, err := json.Marshal(canonical)
+	if err != nil {
+		return "", fmt.Errorf("encode compiled policy for SHA-256: %w", err)
+	}
+	digest := sha256.Sum256(data)
+	return fmt.Sprintf("%x", digest), nil
 }
 
 // HTTP handlers
