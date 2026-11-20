@@ -111,7 +111,7 @@ func TestPolicyHashRejectsUnencodableContent(t *testing.T) {
 	invalid := ActionDSLPolicy{
 		PolicyID: "bad-numeric-value",
 		Version:  "1.0.0",
-		Rules:    []DSLRule{{
+		Rules: []DSLRule{{
 			RuleID: "rule_1",
 			Type:   "budget",
 			Budget: &Budget{MaxCost: math.Inf(1), Currency: "USD"},
