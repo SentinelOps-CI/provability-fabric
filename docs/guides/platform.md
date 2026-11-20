@@ -98,6 +98,8 @@ POST /api/v1/runtime/epoch/rotate # Rotate epochs
 
 **Current proof-service limitation.** Generated Lean obligations still contain `sorry` placeholders, and the optional Morph execution path has no verified backend. Requests that encounter either condition return HTTP 422 with `status: "failed"`, an error diagnostic, an empty `proof_hash`, and no proof artifacts. This fail-closed result must not be interpreted as a completed proof, regardless of the service health endpoint. A subsequent build or deployment needs independently checked proof evidence; this endpoint does not currently establish that evidence.
 
+**Build issuance limitation.** The build orchestrator currently has no configured trusted proof-evidence verifier. Its `POST /api/v1/policy/build` endpoint returns HTTP 503 rather than accepting a caller-provided proof hash as verification. A request containing `signing_key` returns HTTP 501, since no authenticated build signer is configured and the previous key-independent digest was not a digital signature. Failed requests create no policy builds or proof-backed artifacts. Plain policy compilation remains available through `/api/v1/policy/compile`; verified build issuance needs an authenticated evidence verifier and a separately specified signing trust model.
+
 ### Evidence & Replay
 
 ```bash
