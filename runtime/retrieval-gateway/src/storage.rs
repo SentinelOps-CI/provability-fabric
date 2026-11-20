@@ -25,7 +25,7 @@ pub trait StorageAdapter: Send + Sync {
     ) -> Result<Vec<crate::SearchResult>>;
 
     /// Get document by ID with tenant check
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>>;
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>>;
 
     /// Check if tenant has access to shard
     async fn validate_tenant_shard_access(&self, tenant: &str, shard: &str) -> Result<bool>;
@@ -207,16 +207,15 @@ impl StorageAdapter for VectorIndex {
         Ok(results)
     }
 
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>> {
         let docs = self.documents.read().await;
         
         match docs.get(doc_id) {
-            Some(doc) if doc.tenant == tenant => Ok(Some(doc.clone())),
-            Some(_) => {
-                // Document exists but belongs to different tenant
-                tracing::warn!("Cross-tenant document access attempt: {} -> {}", tenant, doc_id);
-                Ok(None)
-            }
+            Some(doc) if doc.tenant == tenant
+                && !labels_filter.is_empty()
+                && !doc.labels.is_empty()
+                && doc.labels.iter().all(|label| labels_filter.contains(label)) => Ok(Some(doc.clone())),
+            Some(_) => Ok(None),
             None => Ok(None),
         }
     }
@@ -427,14 +426,15 @@ impl StorageAdapter for PostgresVectorAdapter {
         }).collect()
     }
 
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>> {
         let mut tx = self.tenant_transaction(tenant).await?;
         let row = sqlx::query(
             r#"SELECT id, tenant, content, labels, metadata,
                       embedding::text AS embedding_text, created_at, updated_at
-               FROM documents WHERE id = $1 AND tenant = $2"#,
+               FROM documents WHERE id = $1 AND tenant = $2
+                 AND cardinality(labels) > 0 AND labels <@ $3::text[]"#,
         )
-        .bind(doc_id).bind(tenant)
+        .bind(doc_id).bind(tenant).bind(labels_filter)
         .fetch_optional(&mut *tx).await.context("fetch tenant-scoped document")?;
         tx.commit().await.context("finish tenant-scoped document fetch")?;
 
@@ -693,10 +693,14 @@ mod postgres_rls_tests {
         assert_eq!(other.len(), 1);
         assert_eq!(other[0].document_id, "b-public");
 
-        assert!(storage.get_document("b-public", "tenant-a").await.unwrap().is_none());
-        let doc = storage.get_document("a-public", "tenant-a").await.unwrap().unwrap();
+        assert!(storage.get_document("b-public", "tenant-a", &public).await.unwrap().is_none());
+        let doc = storage.get_document("a-public", "tenant-a", &public).await.unwrap().unwrap();
         assert_eq!(doc.embedding.len(), 128);
         assert_eq!(doc.metadata["origin"], "disposable-test");
+        assert!(storage.get_document("a-classified", "tenant-a", &public).await.unwrap().is_none());
+        assert!(storage.get_document("a-classified", "tenant-a", &full).await.unwrap().is_some());
+        assert!(storage.get_document("a-open", "tenant-a", &full).await.unwrap().is_none());
+        assert!(storage.get_document("a-public", "tenant-a", &[]).await.unwrap().is_none());
 
         let stats_a = storage.get_shard_stats("tenant-a").await.unwrap();
         assert_eq!(stats_a.document_count, 3);
@@ -767,5 +771,9 @@ mod postgres_rls_tests {
         let all = vec!["public".to_string(), "secret".to_string()];
         assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &all, 10).await.unwrap().len(), 2);
         assert!(index.search_with_tenant_isolation("q", "tenant-a", &[], 10).await.unwrap().is_empty());
+        assert!(index.get_document("both", "tenant-a", &granted).await.unwrap().is_none());
+        assert!(index.get_document("both", "tenant-a", &all).await.unwrap().is_some());
+        assert!(index.get_document("open", "tenant-a", &all).await.unwrap().is_none());
+        assert!(index.get_document("public-only", "tenant-a", &[]).await.unwrap().is_none());
     }
 }
