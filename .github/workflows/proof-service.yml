@@ -91,6 +91,7 @@ jobs:
                   "/proofs/run",
                   method="POST",
                   payload={**request, "use_morph": use_morph},
+                  expected=422,
               )
               assert proof["status"] == "failed", proof
               assert not proof["proof_hash"], proof
