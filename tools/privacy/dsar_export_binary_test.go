@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/crypto/openpgp/armor"
+	"golang.org/x/crypto/openpgp/packet"
 )
 
 // TestDSAREncryptionUsesBinaryLiteralPacket guards the wire-format contract:
