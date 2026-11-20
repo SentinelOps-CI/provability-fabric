@@ -119,8 +119,8 @@ func TestHTTPProofResultIsNotPresentedAsVerified(t *testing.T) {
 	httpReq.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httpReq)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("HTTP %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unverified proof: HTTP %d, want 422: %s", rec.Code, rec.Body.String())
 	}
 
 	var result ProofRunResponse
