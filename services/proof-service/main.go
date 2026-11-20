@@ -437,10 +437,14 @@ lean_exe generated where
 		})
 	}
 
-	// Calculate proof hash
-	proofHash := s.calculateProofHash(obligations, string(output))
-	if len(artifactIndex) > 0 {
-		s.artifactIndex[proofHash] = artifactIndex
+	// A failed Lean process provides diagnostics, not a proof identifier.
+	// Never put that output into the proof-artifact index or response hash.
+	var proofHash string
+	if status == "success" {
+		proofHash = s.calculateProofHash(obligations, string(output))
+		if len(artifactIndex) > 0 {
+			s.artifactIndex[proofHash] = artifactIndex
+		}
 	}
 
 	return &ProofRunResponse{
