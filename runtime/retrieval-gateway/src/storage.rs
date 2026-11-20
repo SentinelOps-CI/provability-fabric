@@ -395,11 +395,11 @@ impl StorageAdapter for PostgresVectorAdapter {
         // admit documents with no labels.
         let rows = sqlx::query(
             r#"SELECT id, content, labels, metadata,
-                      (embedding <=> $1::vector)::double precision AS distance
+                      (embedding <=> ($1::text)::vector)::double precision AS distance
                FROM documents
                WHERE tenant = $2 AND labels <@ $3::text[]
                  AND embedding IS NOT NULL
-               ORDER BY embedding <=> $1::vector, id
+               ORDER BY embedding <=> ($1::text)::vector, id
                LIMIT $4"#,
         )
         .bind(vector)
