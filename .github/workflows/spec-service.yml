@@ -103,4 +103,7 @@ jobs:
 
       - name: Remove disposable service container
         if: always()
-        run: docker rm -f spec-service-ci-smoke 2>/dev/null || true
+        run: |
+          if docker container inspect spec-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f spec-service-ci-smoke
+          fi
