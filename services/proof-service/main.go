@@ -512,6 +512,14 @@ func (s *ProofService) runProofsHandler(c *gin.Context) {
 		return
 	}
 
+	// Clients use HTTP success to advance the policy lifecycle. Returning
+	// 200 for an unproved result would mark it as proven in the console and
+	// allow the CLI to persist a nonexistent proof hash.
+	if resp.Status != "success" {
+		c.JSON(http.StatusUnprocessableEntity, resp)
+		return
+	}
+
 	c.JSON(http.StatusOK, resp)
 }
 
