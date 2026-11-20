@@ -189,7 +189,7 @@ func TestVersionedResultHashSignature(t *testing.T) {
 	}
 
 	altered = fixture.Receipt
-	altered.ResultHash = strings.Replace(altered.ResultHash, "a", "b", 1)
+	altered.ResultHash = altered.ResultHash[:len(altered.ResultHash)-1] + "0"
 	if err := VerifyAccessReceipt(altered, "ed25519", fixture.SignatureBase64); err == nil {
 		t.Fatal("result commitment tampering must invalidate the receipt signature")
 	}
