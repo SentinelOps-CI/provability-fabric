@@ -1,6 +1,11 @@
 name: APOLLO Proof Bot (read-only proposal inspection)
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/proof-bot.yaml'
+      - 'tools/proofbot/**'
+      - 'tests/test_proofbot_readonly.py'
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
@@ -13,7 +18,7 @@ permissions:
 jobs:
   proof-bot:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     timeout-minutes: 30
     steps:
       - name: Checkout repository without write credentials
@@ -33,6 +38,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_proofbot_readonly.py' -v
 
       - name: Fetch unverified proposals without modifying the repository
+        if: github.event_name != 'pull_request'
         env:
           APOLLO_API_URL: ${{ vars.APOLLO_API_URL }}
         run: |
@@ -47,7 +53,7 @@ jobs:
             --report "$RUNNER_TEMP/apollo-proposal-inventory.json"
 
       - name: Upload unverified proposal inventory
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: apollo-proposal-inventory-${{ github.run_id }}
