@@ -95,6 +95,29 @@ jobs:
           assert compiled["actionDsl"]["policy_id"] == policy_id
           rules = compiled["actionDsl"]["rules"]
           assert len(rules) == 1 and rules[0]["type"] == "allow"
+          assert len(compiled["policy_hash"]) == 64
+          different = request(
+              "/policy/compile",
+              method="POST",
+              payload={
+                  "english": "allow analyst to read confidentialreport when role is analyst",
+                  "policy_id": policy_id,
+              },
+          )
+          assert different["policy_hash"] != compiled["policy_hash"], (
+              "distinct compiled rules must have distinct policy identifiers"
+          )
+          repeated = request(
+              "/policy/compile",
+              method="POST",
+              payload={
+                  "english": "allow analyst to read report when role is analyst",
+                  "policy_id": policy_id,
+              },
+          )
+          assert repeated["policy_hash"] == compiled["policy_hash"], (
+              "recompilation with the same policy content must be stable"
+          )
           assert request("/policy/" + policy_id)["policy_id"] == policy_id
           assert request("/policies")["count"] == 1
           request("/policy/compile", method="POST", payload={}, expected=400)
