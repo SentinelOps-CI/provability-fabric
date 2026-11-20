@@ -20,8 +20,8 @@ WORKDIR /root/
 RUN curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y
 ENV PATH="/root/.elan/bin:${PATH}"
 
-# Verify lake (Lean build tool) is available
-RUN /root/.elan/bin/lake --help || true
+# Fail image creation if the Lean build tool is absent or unusable.
+RUN /root/.elan/bin/lake --help
 
 COPY --from=builder /app/main .
 
