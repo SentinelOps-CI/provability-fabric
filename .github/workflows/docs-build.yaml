@@ -33,11 +33,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Init external standards
-        env:
-          STANDARDS_GITHUB_TOKEN: ${{ secrets.STANDARDS_GITHUB_TOKEN }}
-        run: make submodules
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -63,6 +58,9 @@ jobs:
         run: |
           # Build specdoc tool
           cd cmd/specdoc
+          unformatted=$(gofmt -l *.go)
+          test -z "$unformatted" || { printf 'Unformatted specdoc files:\n%s\n' "$unformatted" >&2; exit 1; }
+          go test ./...
           go build -o specdoc .
           cd ../..
 
@@ -70,12 +68,13 @@ jobs:
           mkdir -p docs/generated
 
           # Generate docs for all spec.yaml files
-          find bundles -name "spec.yaml" -exec sh -c '
-            dir=$$(dirname "$$1")
-            basename=$$(basename "$$dir")
-            output="docs/generated/$$basename.md"
-            cmd/specdoc/specdoc generate "$$1" --out "$$output"
-          ' sh {} \;
+          # Stable, collision-resistant names preserve distinct specification paths.
+          while IFS= read -r -d '' spec; do
+            relative="${spec#bundles/}"
+            relative="${relative%/spec.yaml}"
+            slug="${relative//\//__}"
+            cmd/specdoc/specdoc generate "$spec" --out "docs/generated/${slug}.md"
+          done < <(find bundles -type f -name spec.yaml -print0 | sort -z)
 
       - name: Lint generated documentation
         run: |
