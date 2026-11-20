@@ -351,7 +351,6 @@ impl PostgresVectorAdapter {
 
 }
 
-#[async_trait]
 /// Encode an internally derived, finite vector as pgvector text input.
 /// It is supplied via a bound SQL parameter, never concatenated into SQL.
 fn query_vector_literal(query: &str) -> String {
@@ -378,6 +377,7 @@ fn decode_vector_text(value: Option<String>) -> Result<Vec<f32>> {
     Ok(values)
 }
 
+#[async_trait]
 impl StorageAdapter for PostgresVectorAdapter {
     async fn search_with_tenant_isolation(
         &self,
