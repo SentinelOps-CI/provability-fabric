@@ -10,6 +10,8 @@ on:
       - "runtime/retrieval-gateway/**"
       - "core/crypto/dsse-rs/**"
       - "tests/fixtures/crypto/**"
+      - "tests/test_retrieval_result_commitment_v2.py"
+      - "docs/security/retrieval-result-commitment-v2.md"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/retrieval-gateway.yml"
@@ -18,6 +20,8 @@ on:
       - "runtime/retrieval-gateway/**"
       - "core/crypto/dsse-rs/**"
       - "tests/fixtures/crypto/**"
+      - "tests/test_retrieval_result_commitment_v2.py"
+      - "docs/security/retrieval-result-commitment-v2.md"
       - "Cargo.toml"
       - "Cargo.lock"
 
@@ -43,3 +47,6 @@ jobs:
 
       - name: cargo test -p retrieval-gateway
         run: cargo test -p retrieval-gateway
+
+      - name: Independently verify versioned receipt commitment vectors
+        run: python3 -m unittest discover -s tests -p 'test_retrieval_result_commitment_v2.py' -v
