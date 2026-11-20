@@ -152,17 +152,11 @@ impl StorageAdapter for VectorIndex {
                     return false;
                 }
 
-                // Label filtering
-                if !labels_filter.is_empty() {
-                    let has_matching_label = labels_filter
-                        .iter()
-                        .any(|filter_label| doc.labels.contains(filter_label));
-                    if !has_matching_label {
-                        return false;
-                    }
-                }
-
-                true
+                // Every classification on a document must be authorized.
+                // An "any label matches" check leaks mixed public/secret items.
+                !labels_filter.is_empty()
+                    && !doc.labels.is_empty()
+                    && doc.labels.iter().all(|label| labels_filter.contains(label))
             })
             .collect();
 
@@ -538,6 +532,42 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].document_id, "doc1");
+    }
+
+    #[tokio::test]
+    async fn mixed_labels_are_not_disclosed_through_public_filter() {
+        let index = VectorIndex::new().await.unwrap();
+        for (id, labels) in [
+            ("public-only", vec!["public".into()]),
+            ("mixed", vec!["public".into(), "secret".into()]),
+            ("unlabeled", Vec::new()),
+        ] {
+            index.add_document(Document {
+                id: id.into(),
+                content: format!("fixture-{id}"),
+                tenant: "tenant1".into(),
+                labels,
+                metadata: HashMap::new(),
+                embedding: vec![0.1; 128],
+                created_at: 1,
+                updated_at: 1,
+            }).await.unwrap();
+        }
+
+        let public = index
+            .search_with_tenant_isolation("query", "tenant1", &["public".into()], 10)
+            .await.unwrap();
+        assert_eq!(public.len(), 1);
+        assert_eq!(public[0].document_id, "public-only");
+
+        let empty = index.search_with_tenant_isolation("query", "tenant1", &[], 10)
+            .await.unwrap();
+        assert!(empty.is_empty());
+
+        let expanded = index.search_with_tenant_isolation(
+            "query", "tenant1", &["public".into(), "secret".into()], 10,
+        ).await.unwrap();
+        assert_eq!(expanded.len(), 2);
     }
 
     #[test]
