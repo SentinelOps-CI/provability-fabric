@@ -315,7 +315,9 @@ func (e *DSARExporter) encryptFile(filePath string) error {
 		_ = cipherFile.Close()
 		return fmt.Errorf("failed to start armored output: %w", err)
 	}
-	writer, err := openpgp.Encrypt(armored, []*openpgp.Entity{entity}, nil, nil, nil)
+	// A ZIP archive is binary: text-mode literal packets permit line-ending
+	// normalization by recipients, corrupting otherwise valid ZIP bytes.
+	writer, err := openpgp.Encrypt(armored, []*openpgp.Entity{entity}, nil, &openpgp.FileHints{IsBinary: true}, nil)
 	if err != nil {
 		_ = armored.Close()
 		_ = cipherFile.Close()
