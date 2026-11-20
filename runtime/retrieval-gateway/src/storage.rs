@@ -279,11 +279,13 @@ impl PostgresVectorAdapter {
         Ok(Self { pool })
     }
 
-    /// Initialize database schema
+    /// Run privileged, idempotent migrations; runtime roles have only SELECT.
     pub async fn init_schema(&self) -> Result<()> {
+        let mut tx = self.pool.begin().await.context("begin schema transaction")?;
+        sqlx::query("CREATE EXTENSION IF NOT EXISTS vector")
+            .execute(&mut *tx).await.context("enable vector extension")?;
         sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS documents (
+            r#"CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
                 tenant TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -292,25 +294,61 @@ impl PostgresVectorAdapter {
                 embedding vector(128),
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant);
-            CREATE INDEX IF NOT EXISTS idx_documents_labels ON documents USING GIN(labels);
-            CREATE INDEX IF NOT EXISTS idx_documents_embedding ON documents USING ivfflat (embedding vector_cosine_ops);
-            
-            -- Row Level Security for tenant isolation
-            ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-            
-            CREATE POLICY IF NOT EXISTS tenant_isolation_policy ON documents
-                FOR ALL USING (tenant = current_setting('app.current_tenant', true));
-            "#,
-        )
-        .execute(&self.pool)
-        .await
-        .context("Failed to initialize schema")?;
+            )"#,
+        ).execute(&mut *tx).await.context("create documents table")?;
 
+        for ddl in [
+            "CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents (tenant)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_labels ON documents USING GIN (labels)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_embedding ON documents USING ivfflat (embedding vector_cosine_ops)",
+            "ALTER TABLE documents ENABLE ROW LEVEL SECURITY",
+            "ALTER TABLE documents FORCE ROW LEVEL SECURITY",
+        ] {
+            sqlx::query(ddl).execute(&mut *tx).await.context("initialize document indices and RLS")?;
+        }
+
+        // Restrictive RLS blocks cross-tenant access even if another permissive
+        // policy exists. A matching permissive policy admits the current tenant.
+        sqlx::query(
+            r#"DO $policies$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = current_schema() AND tablename = 'documents'
+                      AND policyname = 'pf_tenant_allow'
+                ) THEN
+                    CREATE POLICY pf_tenant_allow ON documents
+                        AS PERMISSIVE FOR ALL
+                        USING (tenant = current_setting('app.current_tenant', true))
+                        WITH CHECK (tenant = current_setting('app.current_tenant', true));
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = current_schema() AND tablename = 'documents'
+                      AND policyname = 'pf_tenant_guard'
+                ) THEN
+                    CREATE POLICY pf_tenant_guard ON documents
+                        AS RESTRICTIVE FOR ALL
+                        USING (tenant = current_setting('app.current_tenant', true))
+                        WITH CHECK (tenant = current_setting('app.current_tenant', true));
+                END IF;
+            END
+            $policies$"#,
+        ).execute(&mut *tx).await.context("install restrictive tenant RLS")?;
+        tx.commit().await.context("commit schema transaction")?;
         Ok(())
     }
+
+    /// Set tenant context within the same acquired transaction as the query.
+    async fn tenant_transaction(&self, tenant: &str) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+        anyhow::ensure!(!tenant.is_empty(), "tenant must be nonempty");
+        let mut tx = self.pool.begin().await.context("begin tenant transaction")?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+            .bind(tenant)
+            .execute(&mut *tx).await.context("set local tenant context")?;
+        Ok(tx)
+    }
+
 }
 
 #[async_trait]
