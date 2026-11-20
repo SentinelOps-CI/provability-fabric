@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Retrieval PostgreSQL Isolation
+
+on:
+  pull_request:
+    paths:
+      - "runtime/retrieval-gateway/**"
+      - ".github/workflows/retrieval-postgres-isolation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/retrieval-gateway/**"
+      - ".github/workflows/retrieval-postgres-isolation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      # Temporary CI-only database and test role credentials. Never used in
+      # production or deployed to an external database.
+      PF_POSTGRES_TEST_ADMIN_URL: postgres://postgres:testpass@127.0.0.1:5432/postgres
+      PF_POSTGRES_TEST_APP_URL: postgres://pf_retrieval_ci:testpass@127.0.0.1:5432/postgres
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+
+      - name: Cache Cargo artifacts
+        uses: ./.github/actions/cache-cargo
+        with:
+          key-suffix: "-retrieval-postgres"
+
+      - name: Compile and run storage unit controls
+        run: cargo test -p retrieval-gateway --locked
+
+      - name: Test real PostgreSQL tenant isolation with nonprivileged role
+        run: |
+          set -euo pipefail
+          cargo test -p retrieval-gateway --locked \
+            postgres_rls_tenant_and_label_isolation -- --ignored --nocapture
