@@ -3,7 +3,7 @@
 Status: implemented for newly generated retrieval-gateway access receipts.
 The historical receipt signature envelope and its canonical JSON field names are
 unchanged. This specification defines the byte-level meaning of the signed
-\`result_hash\` field for new receipts.
+`result_hash` field for new receipts.
 
 ## Version distinction
 
