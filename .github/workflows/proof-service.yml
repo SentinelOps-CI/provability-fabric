@@ -18,7 +18,7 @@ permissions:
 jobs:
   proof-rejection-and-http-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: services/proof-service
@@ -40,13 +40,17 @@ jobs:
           go vet ./...
           go build -trimpath -o "$RUNNER_TEMP/proof-service-ci" .
 
-      - name: Exercise live HTTP rejection contracts
+      - name: Build and start production proof service image
         run: |
           set -euo pipefail
-          PORT=18002 PROOF_CACHE_PATH="$RUNNER_TEMP/proof-service-cache" MORPH_ENABLED=true \
-            "$RUNNER_TEMP/proof-service-ci" &
-          server_pid=$!
-          trap 'if kill -0 "$server_pid" 2>/dev/null; then kill "$server_pid"; fi' EXIT
+          docker build --pull --tag proof-service-ci:local .
+          docker run --detach --rm --name proof-service-ci-smoke \
+            --publish 127.0.0.1:18002:8002 \
+            --env MORPH_ENABLED=true proof-service-ci:local
+
+      - name: Exercise live HTTP rejection contracts against the image
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           import json
           import time
@@ -111,3 +115,10 @@ jobs:
               "No positive proof verification is claimed."
           )
           PY
+
+      - name: Remove disposable proof service container
+        if: always()
+        run: |
+          if docker container inspect proof-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f proof-service-ci-smoke
+          fi
