@@ -110,21 +110,26 @@ impl VectorIndex {
         }
     }
 
-    /// Generate query embedding (simplified)
+    /// Deterministic 128-dimensional synthetic query vector for integration
+    /// testing. This is a hash-derived placeholder, not a semantic embedding.
     pub fn generate_query_embedding(query: &str) -> Vec<f32> {
-        // Simplified embedding generation based on query hash
-        let hash = {
-            use sha2::{Digest, Sha256};
-            let mut hasher = Sha256::new();
-            hasher.update(query.as_bytes());
-            hasher.finalize()
-        };
+        use sha2::{Digest, Sha256};
 
-        // Convert hash to normalized embedding vector
-        hash.iter()
-            .take(128) // Use first 128 bytes
-            .map(|&byte| (byte as f32 - 128.0) / 128.0) // Normalize to [-1, 1]
-            .collect()
+        let mut values = Vec::with_capacity(128);
+        for counter in 0u8..4 {
+            let mut hasher = Sha256::new();
+            hasher.update(b"pf-retrieval/synthetic-embedding/v1\0");
+            hasher.update((query.len() as u64).to_be_bytes());
+            hasher.update(query.as_bytes());
+            hasher.update([counter]);
+            values.extend(
+                hasher.finalize()
+                    .iter()
+                    .map(|&byte| (f32::from(byte) - 128.0) / 128.0),
+            );
+        }
+        debug_assert_eq!(values.len(), 128);
+        values
     }
 }
 
@@ -152,17 +157,9 @@ impl StorageAdapter for VectorIndex {
                     return false;
                 }
 
-                // Label filtering
-                if !labels_filter.is_empty() {
-                    let has_matching_label = labels_filter
-                        .iter()
-                        .any(|filter_label| doc.labels.contains(filter_label));
-                    if !has_matching_label {
-                        return false;
-                    }
-                }
-
-                true
+                // Every document classification must be authorized.
+                // An empty grant permits only documents with no labels.
+                doc.labels.iter().all(|label| labels_filter.contains(label))
             })
             .collect();
 
