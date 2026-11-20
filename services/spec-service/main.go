@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -128,6 +129,7 @@ type Diagnostic struct {
 
 // SpecService provides English to ActionDSL conversion
 type SpecService struct {
+	mu       sync.RWMutex
 	policies map[string]ActionDSLPolicy
 }
 
@@ -155,8 +157,10 @@ func (s *SpecService) CompilePolicy(ctx context.Context, req PolicyCompileReques
 	// Calculate policy hash
 	policyHash := s.calculatePolicyHash(actionDSL)
 
-	// Store policy
+	// Store the completed policy atomically with respect to HTTP readers.
+	s.mu.Lock()
 	s.policies[req.PolicyID] = actionDSL
+	s.mu.Unlock()
 
 	return &PolicyCompileResponse{
 		ActionDSL:   actionDSL,
@@ -239,18 +243,20 @@ func (s *SpecService) parseEnglishPolicy(english, policyID, version string, meta
 		}
 	}
 
-	// Add default metadata
-	if metadata == nil {
-		metadata = make(map[string]string)
+	// Own the metadata map before adding compiler fields. HTTP requests
+	// normally supply fresh maps, but direct callers may reuse theirs.
+	ownedMetadata := make(map[string]string, len(metadata)+2)
+	for key, value := range metadata {
+		ownedMetadata[key] = value
 	}
-	metadata["compiled_at"] = time.Now().Format(time.RFC3339)
-	metadata["compiler_version"] = "spec-service-v1.0.0"
+	ownedMetadata["compiled_at"] = time.Now().Format(time.RFC3339)
+	ownedMetadata["compiler_version"] = "spec-service-v1.0.0"
 
 	return ActionDSLPolicy{
 		PolicyID:    policyID,
 		Version:     version,
 		Rules:       rules,
-		Metadata:    metadata,
+		Metadata:    ownedMetadata,
 		Permissions: permissions,
 	}, diagnostics, sourceMap
 }
@@ -651,7 +657,9 @@ func (s *SpecService) compileHandler(c *gin.Context) {
 func (s *SpecService) getPolicyHandler(c *gin.Context) {
 	policyID := c.Param("id")
 
+	s.mu.RLock()
 	policy, exists := s.policies[policyID]
+	s.mu.RUnlock()
 	if !exists {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Policy not found"})
 		return
@@ -661,10 +669,12 @@ func (s *SpecService) getPolicyHandler(c *gin.Context) {
 }
 
 func (s *SpecService) listPoliciesHandler(c *gin.Context) {
-	var policies []ActionDSLPolicy
+	s.mu.RLock()
+	policies := make([]ActionDSLPolicy, 0, len(s.policies))
 	for _, policy := range s.policies {
 		policies = append(policies, policy)
 	}
+	s.mu.RUnlock()
 
 	c.JSON(http.StatusOK, gin.H{
 		"policies": policies,
@@ -673,12 +683,15 @@ func (s *SpecService) listPoliciesHandler(c *gin.Context) {
 }
 
 func (s *SpecService) healthHandler(c *gin.Context) {
+	s.mu.RLock()
+	count := len(s.policies)
+	s.mu.RUnlock()
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",
 		"service":   "spec-service",
 		"version":   "1.0.0",
 		"timestamp": time.Now(),
-		"policies":  len(s.policies),
+		"policies":  count,
 	})
 }
 
