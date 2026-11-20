@@ -352,6 +352,32 @@ impl PostgresVectorAdapter {
 }
 
 #[async_trait]
+/// Encode an internally derived, finite vector as pgvector text input.
+/// It is supplied via a bound SQL parameter, never concatenated into SQL.
+fn query_vector_literal(query: &str) -> String {
+    let embedding = VectorIndex::generate_query_embedding(query);
+    debug_assert_eq!(embedding.len(), 128);
+    format!(
+        "[{}]",
+        embedding.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(",")
+    )
+}
+
+/// Decode the vector text returned by PostgreSQL into the documented shape.
+fn decode_vector_text(value: Option<String>) -> Result<Vec<f32>> {
+    let Some(text) = value else { return Ok(Vec::new()) };
+    let inner = text.strip_prefix('[')
+        .and_then(|x| x.strip_suffix(']'))
+        .context("invalid pgvector text encoding")?;
+    let values: Vec<f32> = inner
+        .split(',')
+        .map(|x| x.parse::<f32>().context("invalid pgvector component"))
+        .collect::<Result<_>>()?;
+    anyhow::ensure!(values.len() == 128, "unexpected vector dimensions");
+    anyhow::ensure!(values.iter().all(|x| x.is_finite()), "nonfinite stored vector");
+    Ok(values)
+}
+
 impl StorageAdapter for PostgresVectorAdapter {
     async fn search_with_tenant_isolation(
         &self,
@@ -360,65 +386,44 @@ impl StorageAdapter for PostgresVectorAdapter {
         labels_filter: &[String],
         limit: usize,
     ) -> Result<Vec<crate::SearchResult>> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
+        let mut tx = self.tenant_transaction(tenant).await?;
+        let vector = query_vector_literal(query);
+        let limit = i64::try_from(limit).context("result limit too large")?;
 
-        // Generate query embedding (simplified)
-        let query_embedding = VectorIndex::generate_query_embedding(query);
+        // Full label containment rejects multi-label records if even one
+        // classification is outside the request's grant. Empty grants only
+        // admit documents with no labels.
+        let rows = sqlx::query(
+            r#"SELECT id, content, labels, metadata,
+                      (embedding <=> $1::vector)::double precision AS distance
+               FROM documents
+               WHERE tenant = $2 AND labels <@ $3::text[]
+                 AND embedding IS NOT NULL
+               ORDER BY embedding <=> $1::vector, id
+               LIMIT $4"#,
+        )
+        .bind(vector)
+        .bind(tenant)
+        .bind(labels_filter)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await.context("fetch tenant-scoped search results")?;
+        tx.commit().await.context("finish tenant-scoped vector search")?;
 
-        // Build SQL query with label filtering
-        let labels_condition = if labels_filter.is_empty() {
-            "TRUE".to_string()
-        } else {
-            format!("labels && ARRAY[{}]", 
-                labels_filter.iter()
-                    .map(|l| format!("'{}'", l.replace("'", "''")))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        };
-
-        let sql = format!(
-            r#"
-            SELECT id, content, labels, metadata, 
-                   (embedding <=> $1::vector) as distance
-            FROM documents 
-            WHERE {} 
-            ORDER BY embedding <=> $1::vector 
-            LIMIT $2
-            "#,
-            labels_condition
-        );
-
-        let rows = sqlx::query(&sql)
-            .bind(query_embedding.as_slice())
-            .bind(limit as i64)
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to execute search query")?;
-
-        let results = rows
-            .into_iter()
-            .map(|row| {
-                let distance: f32 = row.get("distance");
-                let score = 1.0 - distance; // Convert distance to similarity
-
-                crate::SearchResult {
-                    document_id: row.get("id"),
-                    content: row.get("content"),
-                    content_hash: content_hash_for(row.get::<String, _>("content").as_str()),
-                    score: score as f64,
-                    metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
-                    labels: row.get("labels"),
-                }
+        rows.into_iter().map(|row| {
+            let distance: f64 = row.try_get("distance")?;
+            anyhow::ensure!(distance.is_finite(), "nonfinite vector distance");
+            let content: String = row.try_get("content")?;
+            Ok(crate::SearchResult {
+                document_id: row.try_get("id")?,
+                content_hash: content_hash_for(&content),
+                content,
+                score: 1.0 - distance,
+                metadata: serde_json::from_value(row.try_get("metadata")?)
+                    .context("invalid document metadata")?,
+                labels: row.try_get("labels")?,
             })
-            .collect();
-
-        Ok(results)
+        }).collect()
     }
 
     async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
