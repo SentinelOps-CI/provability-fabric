@@ -43,9 +43,9 @@
       "description": "Unix timestamp of query execution"
     },
     "result_hash": {
-      "type": "string", 
-      "pattern": "^[a-fA-F0-9]{64}$",
-      "description": "SHA-256 hash of query results"
+      "type": "string",
+      "pattern": "^(?:[a-fA-F0-9]{64}|sha256-v2:[a-f0-9]{64})$",
+      "description": "Signed result commitment: legacy v1 raw SHA-256 hex or sha256-v2-prefixed, domain-separated digest of the complete ordered result fields and tenant. Legacy receipts do not imply v2 binding."
     },
     "result_count": {
       "type": "integer",
