@@ -137,6 +137,8 @@ def fetch_proposal(url: str, candidate: dict[str, Any]) -> str:
             object_pairs_hook=_unique_fields,
             parse_constant=_invalid_constant,
         )
+    except ProposalError:
+        raise
     except (ValueError, UnicodeError) as exc:
         raise ProposalError("invalid_api_json") from exc
     if not isinstance(result, dict):
