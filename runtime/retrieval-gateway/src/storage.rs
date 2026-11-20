@@ -427,72 +427,59 @@ impl StorageAdapter for PostgresVectorAdapter {
     }
 
     async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
-
+        let mut tx = self.tenant_transaction(tenant).await?;
         let row = sqlx::query(
-            "SELECT * FROM documents WHERE id = $1"
+            r#"SELECT id, tenant, content, labels, metadata,
+                      embedding::text AS embedding_text, created_at, updated_at
+               FROM documents WHERE id = $1 AND tenant = $2"#,
         )
-        .bind(doc_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to fetch document")?;
+        .bind(doc_id).bind(tenant)
+        .fetch_optional(&mut *tx).await.context("fetch tenant-scoped document")?;
+        tx.commit().await.context("finish tenant-scoped document fetch")?;
 
-        match row {
-            Some(row) => {
-                let doc = Document {
-                    id: row.get("id"),
-                    content: row.get("content"),
-                    tenant: row.get("tenant"),
-                    labels: row.get("labels"),
-                    metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
-                    embedding: vec![], // Would decode from vector type
-                    created_at: row.get::<i64, _>("created_at") as u64,
-                    updated_at: row.get::<i64, _>("updated_at") as u64,
-                };
-                Ok(Some(doc))
-            }
-            None => Ok(None),
-        }
+        row.map(|row| {
+            let created_at: i64 = row.try_get("created_at")?;
+            let updated_at: i64 = row.try_get("updated_at")?;
+            Ok(Document {
+                id: row.try_get("id")?,
+                content: row.try_get("content")?,
+                tenant: row.try_get("tenant")?,
+                labels: row.try_get("labels")?,
+                metadata: serde_json::from_value(row.try_get("metadata")?)
+                    .context("invalid document metadata")?,
+                embedding: decode_vector_text(row.try_get("embedding_text")?)?,
+                created_at: u64::try_from(created_at).context("negative creation timestamp")?,
+                updated_at: u64::try_from(updated_at).context("negative update timestamp")?,
+            })
+        }).transpose()
     }
 
     async fn validate_tenant_shard_access(&self, tenant: &str, shard: &str) -> Result<bool> {
-        // For PostgreSQL, shard is determined by tenant
-        let expected_shard = format!("shard_{}", tenant);
-        Ok(shard == expected_shard)
+        // A logical shard name is not an independent tenant credential.
+        Ok(!tenant.is_empty() && shard == format!("shard_{}", tenant))
     }
 
     async fn get_shard_stats(&self, tenant: &str) -> Result<ShardStats> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
-
+        let mut tx = self.tenant_transaction(tenant).await?;
         let row = sqlx::query(
-            r#"
-            SELECT 
-                COUNT(*) as document_count,
-                SUM(LENGTH(content)) as total_size_bytes,
-                MAX(updated_at) as last_updated
-            FROM documents
-            "#
+            r#"SELECT COUNT(*) AS document_count,
+                      COALESCE(SUM(OCTET_LENGTH(content)), 0)::bigint AS total_size_bytes,
+                      COALESCE(MAX(updated_at), 0)::bigint AS last_updated
+               FROM documents WHERE tenant = $1"#,
         )
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to get shard stats")?;
+        .bind(tenant)
+        .fetch_one(&mut *tx).await.context("fetch tenant-scoped statistics")?;
+        tx.commit().await.context("finish tenant-scoped statistics")?;
 
+        let count: i64 = row.try_get("document_count")?;
+        let bytes: i64 = row.try_get("total_size_bytes")?;
+        let updated: i64 = row.try_get("last_updated")?;
         Ok(ShardStats {
             shard_id: format!("shard_{}", tenant),
             tenant: tenant.to_string(),
-            document_count: row.get::<i64, _>("document_count") as usize,
-            total_size_bytes: row.get::<i64, _>("total_size_bytes") as u64,
-            last_updated: row.get::<i64, _>("last_updated") as u64,
+            document_count: usize::try_from(count).context("negative document count")?,
+            total_size_bytes: u64::try_from(bytes).context("negative content size")?,
+            last_updated: u64::try_from(updated).context("negative update time")?,
         })
     }
 }
