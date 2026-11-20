@@ -6,23 +6,25 @@
   "required": [
     "receipt_id",
     "tenant",
-    "subject_id", 
+    "subject_id",
     "query_hash",
     "index_shard",
     "timestamp",
     "result_hash",
-    "signature"
+    "sign_alg",
+    "sig"
   ],
   "properties": {
     "receipt_id": {
       "type": "string",
-      "pattern": "^receipt_[a-zA-Z0-9]+$",
-      "description": "Unique identifier for the receipt"
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Unique receipt identifier; currently a UUID, with historical identifiers retained for backward compatibility"
     },
     "tenant": {
       "type": "string",
-      "pattern": "^[a-zA-Z0-9_-]+$",
-      "description": "Tenant identifier for multi-tenancy"
+      "minLength": 1,
+      "description": "Tenant context associated with the retrieval request"
     },
     "subject_id": {
       "type": "string",
@@ -43,9 +45,9 @@
       "description": "Unix timestamp of query execution"
     },
     "result_hash": {
-      "type": "string", 
-      "pattern": "^[a-fA-F0-9]{64}$",
-      "description": "SHA-256 hash of query results"
+      "type": "string",
+      "pattern": "^(?:[a-fA-F0-9]{64}|sha256-v2:[a-f0-9]{64})$",
+      "description": "Signed result commitment: legacy v1 raw SHA-256 hex or sha256-v2-prefixed, domain-separated digest of the complete ordered result fields and tenant. Legacy receipts do not imply v2 binding."
     },
     "result_count": {
       "type": "integer",
@@ -59,12 +61,15 @@
     },
     "sign_alg": {
       "type": "string",
-      "enum": ["ed25519"],
+      "enum": [
+        "ed25519"
+      ],
       "description": "Signature algorithm used"
     },
     "sig": {
       "type": "string",
-      "description": "Ed25519 signature of the receipt"
+      "description": "Base64 Ed25519 receipt signature",
+      "minLength": 1
     },
     "labels_accessed": {
       "type": "array",
@@ -92,7 +97,10 @@
           "description": "List of ABAC rules that were applied"
         }
       },
-      "required": ["allowed", "policy_version"],
+      "required": [
+        "allowed",
+        "policy_version"
+      ],
       "description": "ABAC decision context"
     },
     "privacy_budget": {
