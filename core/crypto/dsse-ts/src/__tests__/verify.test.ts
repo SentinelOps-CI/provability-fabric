@@ -138,5 +138,4 @@ describe('dsse verify', () => {
     };
     expect(verifyAccessReceipt(changedDigest, 'ed25519', signed.signature_base64).ok).toBe(false);
   });
-
 });
