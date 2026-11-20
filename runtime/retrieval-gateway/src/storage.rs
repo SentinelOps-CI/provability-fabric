@@ -577,3 +577,186 @@ mod tests {
         assert!((VectorIndex::cosine_similarity(&a, &c) - 0.0).abs() < 1e-6);
     }
 }
+
+#[cfg(test)]
+mod postgres_rls_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    /// Requires the disposable pgvector PostgreSQL service in CI.
+    #[tokio::test]
+    #[ignore = "requires PF_POSTGRES_TEST_ADMIN_URL and PF_POSTGRES_TEST_APP_URL"]
+    async fn postgres_rls_tenant_and_label_isolation() {
+        let admin_url = std::env::var("PF_POSTGRES_TEST_ADMIN_URL")
+            .expect("disposable PostgreSQL administrator URL is required");
+        let app_url = std::env::var("PF_POSTGRES_TEST_APP_URL")
+            .expect("disposable PostgreSQL nonprivileged role URL is required");
+
+        let admin = PostgresVectorAdapter::new(&admin_url).await.unwrap();
+        admin.init_schema().await.unwrap();
+        admin.init_schema().await.expect("idempotent schema migration");
+
+        // This role and its test-only password exist solely in the disposable
+        // CI database. No production role, credential, or permission is changed.
+        sqlx::query(
+            r#"DO $role$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pf_retrieval_ci') THEN
+                    CREATE ROLE pf_retrieval_ci LOGIN PASSWORD 'testpass';
+                END IF;
+            END
+            $role$"#,
+        )
+        .execute(&admin.pool).await.unwrap();
+        sqlx::query("GRANT USAGE ON SCHEMA public TO pf_retrieval_ci")
+            .execute(&admin.pool).await.unwrap();
+        sqlx::query("GRANT SELECT ON documents TO pf_retrieval_ci")
+            .execute(&admin.pool).await.unwrap();
+        sqlx::query("TRUNCATE TABLE documents")
+            .execute(&admin.pool).await.unwrap();
+
+        let vector = query_vector_literal("integration-query");
+        let fixtures = vec![
+            ("a-public", "tenant-a", vec!["public".to_string()], "first content"),
+            ("a-classified", "tenant-a", vec!["public".to_string(), "secret".to_string()], "classified"),
+            ("a-open", "tenant-a", Vec::new(), "public unlabeled"),
+            ("b-public", "tenant-b", vec!["public".to_string()], "other tenant public"),
+            ("b-secret", "tenant-b", vec!["secret".to_string()], "other tenant private"),
+        ];
+        for (id, tenant, labels, content) in fixtures {
+            sqlx::query(
+                r#"INSERT INTO documents (
+                    id, tenant, labels, content, metadata,
+                    embedding, created_at, updated_at
+                ) VALUES ($1, $2, $3::text[], $4, $5::jsonb,
+                          ($6::text)::vector, 1000, 1001)"#,
+            )
+            .bind(id).bind(tenant).bind(labels).bind(content)
+            .bind(serde_json::json!({"origin": "disposable-test"}))
+            .bind(&vector)
+            .execute(&admin.pool).await.unwrap();
+        }
+
+        let pool = PgPoolOptions::new().max_connections(2)
+            .connect(&app_url).await.expect("connect nonprivileged application role");
+        let storage = PostgresVectorAdapter { pool };
+
+        // The test role must never bypass database RLS.
+        let role: (bool, bool) = sqlx::query_as(
+            "SELECT rolbypassrls, rolsuper FROM pg_roles WHERE rolname = current_user",
+        ).fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(role, (false, false));
+
+        // No transaction-local tenant context: all documents are hidden.
+        let direct: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM documents")
+            .fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(direct.0, 0);
+
+        let public = vec!["public".to_string()];
+        let full = vec!["public".to_string(), "secret".to_string()];
+        let results = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &public, 10,
+        ).await.unwrap();
+        let ids: Vec<_> = results.iter().map(|r| r.document_id.as_str()).collect();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"a-public"));
+        assert!(ids.contains(&"a-open"));
+        assert!(!ids.contains(&"a-classified"));
+
+        let full_results = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &full, 10,
+        ).await.unwrap();
+        assert_eq!(full_results.len(), 3);
+        let empty_grant = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &[], 10,
+        ).await.unwrap();
+        assert_eq!(empty_grant.len(), 1);
+        assert_eq!(empty_grant[0].document_id, "a-open");
+
+        // User-originated label strings are bound, never interpolated into SQL.
+        let hostile = vec!["public' OR TRUE --".to_string()];
+        let injection = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &hostile, 10,
+        ).await.unwrap();
+        assert_eq!(injection.len(), 1);
+        assert_eq!(injection[0].document_id, "a-open");
+
+        let other = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-b", &public, 10,
+        ).await.unwrap();
+        assert_eq!(other.len(), 1);
+        assert_eq!(other[0].document_id, "b-public");
+
+        assert!(storage.get_document("b-public", "tenant-a").await.unwrap().is_none());
+        let doc = storage.get_document("a-public", "tenant-a").await.unwrap().unwrap();
+        assert_eq!(doc.embedding.len(), 128);
+        assert_eq!(doc.metadata["origin"], "disposable-test");
+
+        let stats_a = storage.get_shard_stats("tenant-a").await.unwrap();
+        assert_eq!(stats_a.document_count, 3);
+        assert_eq!(stats_a.last_updated, 1001);
+        let stats_b = storage.get_shard_stats("tenant-b").await.unwrap();
+        assert_eq!(stats_b.document_count, 2);
+        let empty = storage.get_shard_stats("missing").await.unwrap();
+        assert_eq!(empty.document_count, 0);
+        assert_eq!(empty.total_size_bytes, 0);
+        assert_eq!(empty.last_updated, 0);
+        assert!(storage.get_shard_stats("").await.is_err());
+
+        // Exercise pooled connection reuse and concurrent alternating tenants.
+        for _ in 0..12 {
+            let (a, b) = tokio::join!(
+                storage.get_shard_stats("tenant-a"),
+                storage.get_shard_stats("tenant-b")
+            );
+            assert_eq!(a.unwrap().document_count, 3);
+            assert_eq!(b.unwrap().document_count, 2);
+        }
+
+        // Tenant GUC settings from prior transactions must not persist on pool
+        // connections, even with the same two physical sessions being reused.
+        let direct_again: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM documents")
+            .fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(direct_again.0, 0);
+
+        // Explicit RLS guard must exist and must be restrictive.
+        let policy: (bool,) = sqlx::query_as(
+            "SELECT polpermissive FROM pg_policy WHERE polname = 'pf_tenant_guard'",
+        ).fetch_one(&admin.pool).await.unwrap();
+        assert!(!policy.0);
+    }
+
+    #[test]
+    fn deterministic_embedding_has_expected_dimensions() {
+        let embedding = VectorIndex::generate_query_embedding("integration-query");
+        assert_eq!(embedding.len(), 128);
+        assert!(embedding.iter().all(|v| v.is_finite()));
+        assert_ne!(embedding, VectorIndex::generate_query_embedding("different"));
+        assert_eq!(embedding, VectorIndex::generate_query_embedding("integration-query"));
+        assert_eq!(decode_vector_text(Some(query_vector_literal("integration-query"))).unwrap().len(), 128);
+        assert!(decode_vector_text(Some("[1,2]".to_string())).is_err());
+    }
+
+    #[tokio::test]
+    async fn memory_index_enforces_complete_label_containment() {
+        let index = VectorIndex::new().await.unwrap();
+        for (id, labels) in [
+            ("both", vec!["public".to_string(), "secret".to_string()]),
+            ("open", Vec::new()),
+        ] {
+            index.add_document(Document {
+                id: id.to_string(), content: "test".to_string(),
+                tenant: "tenant-a".to_string(), labels, metadata: HashMap::new(),
+                embedding: vec![0.1; 128], created_at: 1, updated_at: 2,
+            }).await.unwrap();
+        }
+        let granted = vec!["public".to_string()];
+        let visible = index.search_with_tenant_isolation("q", "tenant-a", &granted, 10)
+            .await.unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].document_id, "open");
+        let all = vec!["public".to_string(), "secret".to_string()];
+        assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &all, 10).await.unwrap().len(), 2);
+        assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &[], 10).await.unwrap().len(), 1);
+    }
+}
