@@ -151,6 +151,30 @@ func TestMalformedRuleDoesNotProduceProof(t *testing.T) {
 	}
 }
 
+// TestFailedLocalCompilerCannotIssueProofHash exercises the local process
+// failure path with a disposable compiler. A failed build must never emit a
+// proof hash, populate an artifact index, or claim verified proof evidence.
+func TestFailedLocalCompilerCannotIssueProofHash(t *testing.T) {
+	t.Setenv("PROOF_CACHE_PATH", t.TempDir())
+	bin := t.TempDir()
+	script := "#!/bin/sh\nprintf 'intentional compiler failure\\n' >&2\nexit 2\n"
+	if err := os.WriteFile(filepath.Join(bin, "lake"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	service := NewProofService()
+	source := "theorem noAdmission : True := by\n  trivial\n"
+	resp, err := service.runLocalProofs(proofTestRequest(), source)
+	if err != nil {
+		t.Fatalf("run intentionally failing compiler: %v", err)
+	}
+	assertUnverified(t, resp)
+	if len(service.artifactIndex) != 0 {
+		t.Fatal("failed Lean run populated the proof-artifact index")
+	}
+}
+
 func assertUnverified(t *testing.T, result *ProofRunResponse) {
 	t.Helper()
 	if result == nil || result.Status != "failed" || result.ProofHash != "" ||
