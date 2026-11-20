@@ -58,6 +58,9 @@ jobs:
         run: |
           # Build specdoc tool
           cd cmd/specdoc
+          unformatted=$(gofmt -l *.go)
+          test -z "$unformatted" || { printf 'Unformatted specdoc files:\n%s\n' "$unformatted" >&2; exit 1; }
+          go test ./...
           go build -o specdoc .
           cd ../..
 
