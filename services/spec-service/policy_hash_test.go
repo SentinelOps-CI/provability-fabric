@@ -13,7 +13,7 @@ func TestPolicyHashKnownSHA256Vector(t *testing.T) {
 	service := NewSpecService()
 	policy := ActionDSLPolicy{
 		PolicyID: "simple",
-		Version: "v1",
+		Version:  "v1",
 		Metadata: map[string]string{
 			"compiled_at":      "2026-01-01T00:00:00Z",
 			"compiler_version": "v1",
@@ -111,7 +111,7 @@ func TestPolicyHashRejectsUnencodableContent(t *testing.T) {
 	invalid := ActionDSLPolicy{
 		PolicyID: "bad-numeric-value",
 		Version:  "1.0.0",
-		Rules: []DSLRule{{
+		Rules:    []DSLRule{{
 			RuleID: "rule_1",
 			Type:   "budget",
 			Budget: &Budget{MaxCost: math.Inf(1), Currency: "USD"},
