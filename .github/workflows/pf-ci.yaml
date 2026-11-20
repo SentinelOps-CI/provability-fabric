@@ -197,6 +197,7 @@ jobs:
           # Without --wait, an immediate selector lookup can fail with
           # "no matching resources found" even for a healthy installation.
           helm install redis bitnami/redis \
+            --version 28.3.12 \
             --set auth.enabled=false \
             --set architecture=standalone \
             --wait --timeout 300s
@@ -248,6 +249,7 @@ jobs:
       - name: Deploy ledger service
         run: |
           helm install postgres bitnami/postgresql \
+            --version 18.12.23 \
             --set auth.postgresPassword=testpass \
             --set auth.database=provability_fabric \
             --wait --timeout 300s
