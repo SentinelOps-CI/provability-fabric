@@ -19,9 +19,15 @@ import (
 // encrypted ZIP files must remain binary, even if they contain CRLF and other
 // bytes a text-mode OpenPGP recipient might translate.
 func TestDSAREncryptionUsesBinaryLiteralPacket(t *testing.T) {
-	recipient, err := openpgp.NewEntity("DSAR fixture", "", "dsar@example.invalid", &packet.Config{DefaultHash: crypto.SHA256})
+	keyConfig := &packet.Config{DefaultHash: crypto.SHA256}
+	recipient, err := openpgp.NewEntity("DSAR fixture", "", "dsar@example.invalid", keyConfig)
 	if err != nil {
 		t.Fatalf("generate disposable OpenPGP recipient: %v", err)
+	}
+	// NewEntity sets the hash preference after initial signing. Re-sign before
+	// public serialization to persist a verifiable SHA-256 preference.
+	if err := recipient.SerializePrivate(io.Discard, keyConfig); err != nil {
+		t.Fatalf("finalize disposable recipient signatures: %v", err)
 	}
 
 	var publicKey bytes.Buffer
