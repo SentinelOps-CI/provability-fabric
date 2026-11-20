@@ -20,7 +20,7 @@ on:
     - cron: "0 2 * * 0"
 
 env:
-  GO_VERSION: "1.23"
+  GO_VERSION: "1.25.0"
   RUST_VERSION: "stable"
 
 jobs:
