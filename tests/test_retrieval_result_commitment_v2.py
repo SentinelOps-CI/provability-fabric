@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 import struct
 import unittest
@@ -144,6 +145,39 @@ class RetrievalResultReferenceTests(unittest.TestCase):
         self.assertTrue(v2.startswith(PREFIX))
         self.assertEqual(len(v2), len(PREFIX) + 64)
         self.assertEqual(len("a" * 64), 64)
+
+
+    def test_receipt_schema_identifies_actual_signed_wire_fields(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        schema_path = repo / "runtime/retrieval-gateway/schema/receipt.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        signed = json.loads(
+            (FIXTURE.parent / "retrieval_receipt_v2_signed.json").read_text(encoding="utf-8")
+        )
+        receipt = dict(signed["receipt"])
+        receipt.pop("signature")
+        receipt["sig"] = signed["signature_base64"]
+        receipt["sign_alg"] = "ed25519"
+
+        required = set(schema["required"])
+        self.assertIn("sig", required)
+        self.assertIn("sign_alg", required)
+        self.assertNotIn("signature", required)
+        self.assertTrue(required.issubset(receipt.keys()))
+        self.assertTrue(set(receipt).issubset(schema["properties"].keys()))
+
+        pattern = schema["properties"]["result_hash"]["pattern"]
+        for valid in ("a" * 64, "A" * 64, signed["receipt"]["result_hash"]):
+            self.assertIsNotNone(re.fullmatch(pattern, valid), valid)
+        for invalid in (
+            "sha256-v3:" + "a" * 64,
+            "sha256-v2:" + "A" * 64,
+            "sha256-v2:" + "g" * 64,
+            "wrong",
+        ):
+            self.assertIsNone(re.fullmatch(pattern, invalid), invalid)
+        self.assertNotIn("pattern", schema["properties"]["receipt_id"])
+        self.assertGreater(schema["properties"]["receipt_id"]["minLength"], 0)
 
 
 if __name__ == "__main__":
