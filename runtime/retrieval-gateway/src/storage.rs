@@ -648,6 +648,13 @@ mod postgres_rls_tests {
         ).fetch_one(&storage.pool).await.unwrap();
         assert_eq!(role, (false, false));
 
+        // A deliberately over-broad permissive policy must not defeat the
+        // restrictive tenant guard. This is installed only in disposable CI.
+        sqlx::query(
+            "CREATE POLICY pf_ci_wide_policy ON documents AS PERMISSIVE FOR SELECT USING (true)",
+        )
+        .execute(&admin.pool).await.unwrap();
+
         // No transaction-local tenant context: all documents are hidden.
         let direct: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM documents")
             .fetch_one(&storage.pool).await.unwrap();
@@ -723,6 +730,8 @@ mod postgres_rls_tests {
             "SELECT polpermissive FROM pg_policy WHERE polname = 'pf_tenant_guard'",
         ).fetch_one(&admin.pool).await.unwrap();
         assert!(!policy.0);
+        sqlx::query("DROP POLICY pf_ci_wide_policy ON documents")
+            .execute(&admin.pool).await.unwrap();
     }
 
     #[test]
