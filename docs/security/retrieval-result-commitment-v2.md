@@ -43,9 +43,9 @@ other than those described below.
      key bytes. The source map's iteration order is irrelevant.
 
 All counts and string byte lengths must fit in 64 bits. Strings are not
-Unicode-normalized or case-folded. The tenant is the authenticated/authorized
-query context passed to receipt generation; the response items do not carry a
-separate tenant property. Changing that tenant or any bound response field
+Unicode-normalized or case-folded. The tenant is the query-context string passed to receipt generation;
+authorization of that context is assessed separately. The result items do not
+carry a separate tenant property. Changing that tenant or any bound response field
 alters the commitment except for the documented zero normalization and
 metadata entry ordering.
 
@@ -56,8 +56,12 @@ The reference fixture is
 Rust tests in `runtime/retrieval-gateway/src/result_commitment.rs` compare their
 output with five fixed vectors. A separate Python standard-library
 implementation in `tests/test_retrieval_result_commitment_v2.py`
-independently checks those vectors and negative controls. The retrieval
-gateway CI workflow executes both implementations.
+independently checks those vectors and negative controls. The second fixture,
+`tests/fixtures/crypto/retrieval_receipt_v2_signed.json`, contains a fixed
+Ed25519-signed v2 receipt and its test public key. The existing Go and
+TypeScript receipt verifiers validate that signature and reject changes to
+the signed prefix or digest. The retrieval gateway workflow executes the
+Rust, Python, Go, and TypeScript regression suites.
 
 To establish that a receipt commits to a **particular response**, a verifier
 must confirm the receipt's canonical Ed25519 signature using its configured
