@@ -3,12 +3,15 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"crypto"
+	_ "crypto/sha256"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/crypto/openpgp/armor"
 )
 
@@ -16,7 +19,7 @@ import (
 // encrypted ZIP files must remain binary, even if they contain CRLF and other
 // bytes a text-mode OpenPGP recipient might translate.
 func TestDSAREncryptionUsesBinaryLiteralPacket(t *testing.T) {
-	recipient, err := openpgp.NewEntity("DSAR fixture", "", "dsar@example.invalid", nil)
+	recipient, err := openpgp.NewEntity("DSAR fixture", "", "dsar@example.invalid", &packet.Config{DefaultHash: crypto.SHA256})
 	if err != nil {
 		t.Fatalf("generate disposable OpenPGP recipient: %v", err)
 	}
