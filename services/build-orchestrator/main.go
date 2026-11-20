@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +17,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+)
+
+// ProofEvidenceClaim binds a claimed proof to its policy and exact ActionDSL
+// bytes. The verifier must authenticate the evidence and all three bindings;
+// a hash string or an unauthenticated HTTP response is insufficient.
+type ProofEvidenceClaim struct {
+	PolicyHash    string
+	ProofHash     string
+	ActionDSLJSON []byte
+}
+
+// ProofEvidenceVerifier is the trusted evidence boundary for proof-backed
+// builds. Production leaves it unset until a real verifier with a pinned
+// trust root and artifact-binding checks is integrated.
+type ProofEvidenceVerifier interface {
+	Verify(ctx context.Context, claim ProofEvidenceClaim) error
+}
+
+var (
+	errProofVerifierUnavailable = errors.New("trusted proof evidence verifier is not configured")
+	errProofEvidenceRejected    = errors.New("proof evidence was not authenticated")
+	errBuildSigningUnavailable  = errors.New("cryptographic build signing is not configured")
 )
 
 // PolicyBuildRequest represents a request to build a policy
@@ -109,7 +132,7 @@ type FlowPolicy struct {
 	Condition string `json:"condition,omitempty"`
 }
 
-// PolicyBuild represents a signed policy build with proof carries code
+// PolicyBuild represents a policy build with proof evidence metadata
 type PolicyBuild struct {
 	BuildID       string            `json:"build_id"`
 	PolicyHash    string            `json:"policy_hash"`
@@ -140,8 +163,9 @@ type PABManifest struct {
 
 // BuildOrchestrator handles ActionDSL compilation and policy builds
 type BuildOrchestrator struct {
-	builds    map[string]PolicyBuild
-	cachePath string
+	builds        map[string]PolicyBuild
+	cachePath     string
+	proofVerifier ProofEvidenceVerifier
 }
 
 // NewBuildOrchestrator creates a new build orchestrator instance
@@ -160,8 +184,43 @@ func NewBuildOrchestrator() *BuildOrchestrator {
 	}
 }
 
-// BuildPolicy compiles ActionDSL to DFA and creates signed policy build
+// BuildPolicy issues proof-backed builds only from authenticated evidence.
+// Without a configured trusted verifier it must fail before writing artifacts
+// or publishing a build, regardless of the caller-supplied proof hash.
 func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequest) (*PolicyBuildResponse, error) {
+	if req.SigningKey != "" {
+		// The previous "signature" was a bare SHA-256 digest independent of
+		// SigningKey. Refuse caller-managed signing until a trusted signer exists.
+		return nil, errBuildSigningUnavailable
+	}
+	if s.proofVerifier == nil {
+		return nil, errProofVerifierUnavailable
+	}
+
+	// Verify the exact content subsequently passed to the DFA compiler.
+	// JSON cloning prevents caller mutations from changing the action DSL
+	// between evidence verification and compilation.
+	canonical, err := json.Marshal(req.ActionDSL)
+	if err != nil {
+		return nil, fmt.Errorf("encode ActionDSL for verification: %w", err)
+	}
+	var owned map[string]interface{}
+	if err := json.Unmarshal(canonical, &owned); err != nil {
+		return nil, fmt.Errorf("decode ActionDSL for verification: %w", err)
+	}
+	if owned == nil {
+		return nil, errors.New("ActionDSL must be a JSON object")
+	}
+	claim := ProofEvidenceClaim{
+		PolicyHash:    req.PolicyHash,
+		ProofHash:     req.ProofHash,
+		ActionDSLJSON: canonical,
+	}
+	if err := s.proofVerifier.Verify(ctx, claim); err != nil {
+		return nil, fmt.Errorf("%w: %v", errProofEvidenceRejected, err)
+	}
+	req.ActionDSL = owned
+
 	startTime := time.Now()
 	buildID := uuid.New().String()
 
@@ -202,15 +261,6 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		CreatedAt:    time.Now(),
 		Metadata:     req.Metadata,
 		PAB:          pab,
-	}
-
-	// Sign the build if signing key provided
-	if req.SigningKey != "" {
-		signature, err := s.signPolicyBuild(build, req.SigningKey)
-		if err != nil {
-			return nil, fmt.Errorf("build signing failed: %w", err)
-		}
-		build.Signature = signature
 	}
 
 	// Generate artifacts
@@ -433,29 +483,6 @@ func (s *BuildOrchestrator) generateLabelRuleFromPolicyRule(rule map[string]inte
 	return nil
 }
 
-// signPolicyBuild creates cryptographic signature for policy build
-func (s *BuildOrchestrator) signPolicyBuild(build PolicyBuild, signingKey string) (string, error) {
-	// Create canonical representation for signing including PAB
-	buildData, err := json.Marshal(map[string]interface{}{
-		"build_id":      build.BuildID,
-		"policy_hash":   build.PolicyHash,
-		"proof_hash":    build.ProofHash,
-		"automata_hash": build.AutomataHash,
-		"labeler_hash":  build.LabelerHash,
-		"pab":           build.PAB,
-		"created_at":    build.CreatedAt.Unix(),
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// Calculate signature (simplified - in practice would use proper crypto)
-	hash := sha256.Sum256(buildData)
-	signature := fmt.Sprintf("sig_%x", hash)
-
-	return signature, nil
-}
-
 // generateBuildArtifacts creates build artifacts and computes content-addressed hashes
 func (s *BuildOrchestrator) generateBuildArtifacts(build *PolicyBuild) ([]string, []ArtifactMeta, error) {
 	var artifacts []string
@@ -582,7 +609,16 @@ func (s *BuildOrchestrator) buildPolicyHandler(c *gin.Context) {
 
 	resp, err := s.BuildPolicy(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, errBuildSigningUnavailable):
+			status = http.StatusNotImplemented
+		case errors.Is(err, errProofVerifierUnavailable):
+			status = http.StatusServiceUnavailable
+		case errors.Is(err, errProofEvidenceRejected):
+			status = http.StatusUnprocessableEntity
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 

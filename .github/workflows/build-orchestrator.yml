@@ -1,0 +1,114 @@
+name: Build Orchestrator Evidence Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/build-orchestrator/**"
+      - ".github/workflows/build-orchestrator.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/build-orchestrator/**"
+      - ".github/workflows/build-orchestrator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-build-rejection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: services/build-orchestrator
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go module toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/build-orchestrator/go.mod
+          cache-dependency-path: services/build-orchestrator/go.sum
+
+      - name: Verify modules, races, static checks and build
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -race -count=1 ./...
+          go vet ./...
+          go build -trimpath ./...
+
+      - name: Build and run production orchestrator image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag build-orchestrator-ci:local .
+          docker run --detach --rm --name build-orchestrator-ci-smoke \
+            --publish 127.0.0.1:18003:8003 \
+            build-orchestrator-ci:local
+
+      - name: Verify authenticated-build HTTP refusal
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18003/api/v1"
+
+          def request(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              req = Request(base + path, data=data, headers=headers, method=method)
+              try:
+                  with urlopen(req, timeout=5) as resp:
+                      status, content = resp.status, resp.read()
+              except HTTPError as exc:
+                  status, content = exc.code, exc.read()
+              if status != expected:
+                  raise AssertionError(
+                      f"{method} {path} returned {status}, expected {expected}: {content[:200]!r}"
+                  )
+              return json.loads(content)
+
+          for _ in range(30):
+              try:
+                  health = request("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("build-orchestrator did not start")
+
+          assert health["service"] == "build-orchestrator"
+          claim = {
+              "policy_hash": "a" * 64,
+              "proof_hash": "b" * 64,
+              "action_dsl": {
+                  "rules": [{"rule_id": "r1", "type": "allow", "role": "researcher"}]
+              },
+          }
+          declined = request("/policy/build", method="POST", payload=claim, expected=503)
+          assert "error" in declined and "build_id" not in declined, declined
+          signed = request(
+              "/policy/build", method="POST",
+              payload={**claim, "signing_key": "test-only-key"}, expected=501
+          )
+          assert "error" in signed and "signature" not in signed, signed
+          listing = request("/builds")
+          assert listing["count"] == 0, listing
+          print(
+              "Build refusal contract verified: no trusted proof verifier, "
+              "no caller-managed signature, no issued build artifacts. "
+              "This is a negative security test, not a valid-proof issuance test."
+          )
+          PY
+
+      - name: Remove disposable build orchestrator
+        if: always()
+        run: |
+          if docker container inspect build-orchestrator-ci-smoke >/dev/null 2>&1; then
+            docker rm -f build-orchestrator-ci-smoke
+          fi
