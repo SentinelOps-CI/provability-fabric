@@ -1,0 +1,109 @@
+name: Spec Service
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/spec-service/**"
+      - ".github/workflows/spec-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/spec-service/**"
+      - ".github/workflows/spec-service.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: services/spec-service
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/spec-service/go.mod
+          cache-dependency-path: services/spec-service/go.sum
+
+      - name: Verify dependencies, build, and static checks
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -race ./...
+          go vet ./...
+          go build -trimpath ./...
+
+      - name: Build and start actual service image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag spec-service-ci:local .
+          docker run --detach --rm --name spec-service-ci-smoke \
+            --publish 127.0.0.1:18001:8001 spec-service-ci:local
+
+      - name: Verify HTTP behavior against running container
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          root = "http://127.0.0.1:18001/api/v1"
+
+          def request(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              req = Request(root + path, data=data, headers=headers, method=method)
+              try:
+                  with urlopen(req, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              if status != expected:
+                  raise AssertionError(
+                      f"{method} {path}: expected HTTP {expected}, got {status}: {body[:200]!r}"
+                  )
+              return json.loads(body)
+
+          for attempt in range(30):
+              try:
+                  health = request("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("service never became reachable")
+
+          assert health["status"] == "healthy"
+          assert health["service"] == "spec-service"
+          policy_id = "spec-service-ci-smoke"
+          compiled = request(
+              "/policy/compile",
+              method="POST",
+              payload={
+                  "english": "allow analyst to read report when role is analyst",
+                  "policy_id": policy_id,
+              },
+          )
+          assert compiled["actionDsl"]["policy_id"] == policy_id
+          rules = compiled["actionDsl"]["rules"]
+          assert len(rules) == 1 and rules[0]["type"] == "allow"
+          assert request("/policy/" + policy_id)["policy_id"] == policy_id
+          assert request("/policies")["count"] == 1
+          request("/policy/compile", method="POST", payload={}, expected=400)
+          print("Container smoke checks passed: health, policy compilation, storage, rejection")
+          PY
+
+      - name: Remove disposable service container
+        if: always()
+        run: |
+          if docker container inspect spec-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f spec-service-ci-smoke
+          fi
