@@ -7,7 +7,6 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -234,126 +233,121 @@ func (e *DSARExporter) gatherCapsules() ([]Capsule, error) {
 	return mockCapsules, nil
 }
 
-// createEncryptedZip creates an encrypted ZIP file with the DSAR data
+// createEncryptedZip finalizes a temporary ZIP before encrypting and publishing it.
+// The plaintext archive stays in a private, short-lived file in the output directory.
+// An error never publishes an incomplete ZIP or exposes plaintext at the output path.
 func (e *DSARExporter) createEncryptedZip(data DSARData) error {
-	// Create temporary directory for ZIP creation
-	tempDir, err := os.MkdirTemp("", "dsar-export-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create JSON file with DSAR data
-	jsonPath := filepath.Join(tempDir, "dsar-data.json")
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal DSAR data: %v", err)
+		return fmt.Errorf("failed to marshal DSAR data: %w", err)
 	}
 
-	if err := os.WriteFile(jsonPath, jsonData, 0644); err != nil {
-		return fmt.Errorf("failed to write JSON file: %v", err)
-	}
-
-	// Create ZIP file
-	zipFile, err := os.Create(e.outputPath)
+	archive, err := os.CreateTemp(filepath.Dir(e.outputPath), ".dsar-export-*")
 	if err != nil {
-		return fmt.Errorf("failed to create ZIP file: %v", err)
+		return fmt.Errorf("failed to create temporary DSAR archive: %w", err)
 	}
-	defer zipFile.Close()
+	archivePath := archive.Name()
+	defer os.Remove(archivePath)
 
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	// Add JSON file to ZIP
-	jsonFile, err := os.Open(jsonPath)
+	writer := zip.NewWriter(archive)
+	entry, err := writer.Create("dsar-data.json")
 	if err != nil {
-		return fmt.Errorf("failed to open JSON file: %v", err)
+		_ = writer.Close()
+		_ = archive.Close()
+		return fmt.Errorf("failed to create ZIP entry: %w", err)
 	}
-	defer jsonFile.Close()
-
-	zipEntry, err := zipWriter.Create("dsar-data.json")
-	if err != nil {
-		return fmt.Errorf("failed to create ZIP entry: %v", err)
+	if _, err := entry.Write(jsonData); err != nil {
+		_ = writer.Close()
+		_ = archive.Close()
+		return fmt.Errorf("failed to write DSAR data: %w", err)
+	}
+	// ZIP's central directory is emitted by Close, not by Write.
+	if err := writer.Close(); err != nil {
+		_ = archive.Close()
+		return fmt.Errorf("failed to finalize DSAR ZIP: %w", err)
+	}
+	if err := archive.Close(); err != nil {
+		return fmt.Errorf("failed to close DSAR ZIP: %w", err)
 	}
 
-	if _, err := io.Copy(zipEntry, jsonFile); err != nil {
-		return fmt.Errorf("failed to copy file to ZIP: %v", err)
+	if err := e.encryptFile(archivePath); err != nil {
+		return fmt.Errorf("failed to encrypt DSAR ZIP: %w", err)
 	}
-
-	// Encrypt the ZIP file with recipient's public key
-	if err := e.encryptFile(e.outputPath); err != nil {
-		return fmt.Errorf("failed to encrypt ZIP file: %v", err)
+	if err := os.Rename(archivePath, e.outputPath); err != nil {
+		return fmt.Errorf("failed to publish encrypted DSAR archive: %w", err)
 	}
-
 	return nil
 }
 
-// encryptFile encrypts a file using the recipient's public key
+// encryptFile closes each PGP writer before replacing the temporary plaintext.
+// The caller owns the lifetime and eventual removal of the temporary archive.
 func (e *DSARExporter) encryptFile(filePath string) error {
-	// Read the file to encrypt
 	plaintext, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %v", err)
+		return fmt.Errorf("failed to read archive for encryption: %w", err)
 	}
-
-	// Read recipient's public key
 	publicKeyFile, err := os.Open(e.publicKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed to open public key file: %v", err)
+		return fmt.Errorf("failed to open recipient public key: %w", err)
 	}
 	defer publicKeyFile.Close()
 
-	// Parse the public key
 	block, err := armor.Decode(publicKeyFile)
 	if err != nil {
-		return fmt.Errorf("failed to decode armored public key: %v", err)
+		return fmt.Errorf("failed to decode armored public key: %w", err)
 	}
-
 	if block.Type != openpgp.PublicKeyType {
-		return fmt.Errorf("not a public key")
+		return fmt.Errorf("recipient key is not a PGP public key")
 	}
-
 	entity, err := openpgp.ReadEntity(packet.NewReader(block.Body))
 	if err != nil {
-		return fmt.Errorf("failed to read public key entity: %v", err)
+		return fmt.Errorf("failed to parse recipient public key: %w", err)
 	}
 
-	// Create encrypted file
-	encryptedFile, err := os.Create(filePath + ".gpg")
+	cipherPath := filePath + ".gpg"
+	cipherFile, err := os.OpenFile(cipherPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create encrypted file: %v", err)
+		return fmt.Errorf("failed to create encrypted output: %w", err)
 	}
-	defer encryptedFile.Close()
-
-	// Create armored writer
-	armoredWriter, err := armor.Encode(encryptedFile, "PGP MESSAGE", nil)
+	defer os.Remove(cipherPath)
+	armored, err := armor.Encode(cipherFile, "PGP MESSAGE", nil)
 	if err != nil {
-		return fmt.Errorf("failed to create armored writer: %v", err)
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to start armored output: %w", err)
 	}
-	defer armoredWriter.Close()
-
-	// Create encrypted writer
-	encryptedWriter, err := openpgp.Encrypt(armoredWriter, []*openpgp.Entity{entity}, nil, nil, nil)
+	writer, err := openpgp.Encrypt(armored, []*openpgp.Entity{entity}, nil, nil, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create encrypted writer: %v", err)
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to initialize PGP encryption: %w", err)
 	}
-	defer encryptedWriter.Close()
-
-	// Write the plaintext
-	if _, err := encryptedWriter.Write(plaintext); err != nil {
-		return fmt.Errorf("failed to write encrypted data: %v", err)
+	if _, err := writer.Write(plaintext); err != nil {
+		_ = writer.Close()
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to write encrypted archive: %w", err)
+	}
+	// Finish the encrypted data packet, ASCII armor checksum and file in
+	// that order. The original implementation published the file first.
+	if err := writer.Close(); err != nil {
+		_ = armored.Close()
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to finalize PGP payload: %w", err)
+	}
+	if err := armored.Close(); err != nil {
+		_ = cipherFile.Close()
+		return fmt.Errorf("failed to finalize armored PGP output: %w", err)
+	}
+	if err := cipherFile.Close(); err != nil {
+		return fmt.Errorf("failed to close encrypted archive: %w", err)
 	}
 
-	// Remove the unencrypted file
 	if err := os.Remove(filePath); err != nil {
-		return fmt.Errorf("failed to remove unencrypted file: %v", err)
+		return fmt.Errorf("failed to remove temporary plaintext archive: %w", err)
 	}
-
-	// Rename encrypted file to original name
-	if err := os.Rename(filePath+".gpg", filePath); err != nil {
-		return fmt.Errorf("failed to rename encrypted file: %v", err)
+	if err := os.Rename(cipherPath, filePath); err != nil {
+		return fmt.Errorf("failed to replace plaintext with ciphertext: %w", err)
 	}
-
 	return nil
 }
 
