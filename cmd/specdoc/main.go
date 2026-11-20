@@ -275,11 +275,9 @@ func generateMarkdown(data DocData) string {
 	lines = append(lines, "", "## Ledger Risk History", "")
 	lines = append(lines, "To query the risk history for this specification in the ledger:", "")
 	lines = append(lines, "```graphql")
-	lines = append(lines, strings.Split(data.LedgerQuery, "
-")...)
+	lines = append(lines, strings.Split(data.LedgerQuery, "\n")...)
 	lines = append(lines, "```", "")
-	return strings.Join(lines, "
-")
+	return strings.Join(lines, "\n")
 }
 
 func extractID(outputFile string) string {
