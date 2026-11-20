@@ -23,8 +23,8 @@ import (
 // bytes. The verifier must authenticate the evidence and all three bindings;
 // a hash string or an unauthenticated HTTP response is insufficient.
 type ProofEvidenceClaim struct {
-	PolicyHash string
-	ProofHash string
+	PolicyHash    string
+	ProofHash     string
 	ActionDSLJSON []byte
 }
 
@@ -37,8 +37,8 @@ type ProofEvidenceVerifier interface {
 
 var (
 	errProofVerifierUnavailable = errors.New("trusted proof evidence verifier is not configured")
-	errProofEvidenceRejected = errors.New("proof evidence was not authenticated")
-	errBuildSigningUnavailable = errors.New("cryptographic build signing is not configured")
+	errProofEvidenceRejected    = errors.New("proof evidence was not authenticated")
+	errBuildSigningUnavailable  = errors.New("cryptographic build signing is not configured")
 )
 
 // PolicyBuildRequest represents a request to build a policy
@@ -132,7 +132,7 @@ type FlowPolicy struct {
 	Condition string `json:"condition,omitempty"`
 }
 
-// PolicyBuild represents a signed policy build with proof carries code
+// PolicyBuild represents a policy build with proof evidence metadata
 type PolicyBuild struct {
 	BuildID       string            `json:"build_id"`
 	PolicyHash    string            `json:"policy_hash"`
@@ -205,12 +205,15 @@ func (s *BuildOrchestrator) BuildPolicy(ctx context.Context, req PolicyBuildRequ
 		return nil, fmt.Errorf("encode ActionDSL for verification: %w", err)
 	}
 	var owned map[string]interface{}
-	if err := json.Unmarshal(canonical, &owned); err != nil || owned == nil {
-		return nil, fmt.Errorf("decode ActionDSL for verification: %v", err)
+	if err := json.Unmarshal(canonical, &owned); err != nil {
+		return nil, fmt.Errorf("decode ActionDSL for verification: %w", err)
+	}
+	if owned == nil {
+		return nil, errors.New("ActionDSL must be a JSON object")
 	}
 	claim := ProofEvidenceClaim{
-		PolicyHash: req.PolicyHash,
-		ProofHash: req.ProofHash,
+		PolicyHash:    req.PolicyHash,
+		ProofHash:     req.ProofHash,
 		ActionDSLJSON: canonical,
 	}
 	if err := s.proofVerifier.Verify(ctx, claim); err != nil {
