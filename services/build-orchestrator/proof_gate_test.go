@@ -152,6 +152,10 @@ func TestHTTPBuildProofAndSigningFailClosed(t *testing.T) {
 	req.SigningKey = "unsupported-caller-key"
 	post(req, http.StatusNotImplemented)
 
+	// Even a configured verifier must reject invalid proof artifacts.
+	service.proofVerifier = &rejectingProofVerifier{}
+	post(buildTestRequest(), http.StatusUnprocessableEntity)
+
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/builds", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
