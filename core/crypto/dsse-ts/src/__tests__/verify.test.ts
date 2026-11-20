@@ -2,12 +2,15 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import {
   ACCESS_RECEIPT_TYPE,
   DsseEnvelope,
   ENV_ENFORCE_DSSE,
   ENV_TRUST_ROOT_PEM,
+  AccessReceiptPayload,
+  canonicalReceiptPayload,
   enforceDsse,
   resolveFixtureDir,
   verifyAccessReceipt,
@@ -102,5 +105,37 @@ describe('dsse verify', () => {
       'deadbeef',
     );
     expect(result.ok).toBe(true);
+  });
+  it('verifies signed v2 result commitments with the existing receipt contract', () => {
+    const signed = JSON.parse(
+      fs.readFileSync(path.join(fixtureDir, 'retrieval_receipt_v2_signed.json'), 'utf8'),
+    ) as {
+      receipt: AccessReceiptPayload;
+      signature_base64: string;
+      public_key_pem: string;
+      canonical_payload_sha256: string;
+    };
+
+    process.env[ENV_TRUST_ROOT_PEM] = signed.public_key_pem;
+    process.env[ENV_ENFORCE_DSSE] = '1';
+
+    const canonical = canonicalReceiptPayload(signed.receipt);
+    expect(crypto.createHash('sha256').update(canonical, 'utf8').digest('hex'))
+      .toBe(signed.canonical_payload_sha256);
+
+    const accepted = verifyAccessReceipt(signed.receipt, 'ed25519', signed.signature_base64);
+    expect(accepted.ok).toBe(true);
+
+    const wrongVersion = {
+      ...signed.receipt,
+      result_hash: signed.receipt.result_hash.replace('sha256-v2:', 'sha256-v3:'),
+    };
+    expect(verifyAccessReceipt(wrongVersion, 'ed25519', signed.signature_base64).ok).toBe(false);
+
+    const changedDigest = {
+      ...signed.receipt,
+      result_hash: signed.receipt.result_hash.slice(0, -1) + '0',
+    };
+    expect(verifyAccessReceipt(changedDigest, 'ed25519', signed.signature_base64).ok).toBe(false);
   });
 });

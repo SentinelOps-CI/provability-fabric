@@ -1,0 +1,17 @@
+{
+  "receipt": {
+    "receipt_id": "receipt-v2-001",
+    "tenant": "tenant-a",
+    "subject_id": "subject-test",
+    "query_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "index_shard": "shard_tenant-a",
+    "timestamp": 1763630000,
+    "result_hash": "sha256-v2:5077aefb85c488399d552d5022a0fee062d7b5a70c1637d514a78591b4034a21",
+    "result_count": 1,
+    "query_time_ms": 12,
+    "signature": ""
+  },
+  "signature_base64": "WmEM0ZcE2YKO8JBv/ao1YZNI7wGD3dMxLaZUsuLkWTKTZnOy2jxAiynOP61bJRtnjbsRP7vB9Lr4GphXP6ngCg==",
+  "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA9g4tXkNG7Qehtr5DT6C8b5GvXyHHRvutfZG4SHdNHNg=\n-----END PUBLIC KEY-----\n",
+  "canonical_payload_sha256": "6c3dbb71182b70bd822e6a5c3c7f9976d2ad2a6c8699e43345d13b5d3db8437a"
+}
