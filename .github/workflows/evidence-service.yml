@@ -1,0 +1,110 @@
+name: Evidence Service Build and HTTP Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/evidence-service/**"
+      - ".github/workflows/evidence-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/evidence-service/**"
+      - ".github/workflows/evidence-service.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-service-build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: services/evidence-service
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/evidence-service/go.mod
+          cache-dependency-path: services/evidence-service/go.sum
+
+      - name: Verify revision, fixture, dependencies, tests and static checks
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test -f ../../tests/fixtures/crypto/ed25519_public.pem
+          test -f ../../tests/fixtures/crypto/dsse_sample_envelope.json
+          go mod verify
+          go test -race -count=1 -v ./...
+          go vet ./...
+          go build -trimpath -o "$RUNNER_TEMP/evidence-service-ci" .
+
+      - name: Build and launch the production evidence-service image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag evidence-service-ci:local .
+          docker run --detach --rm --name evidence-service-ci-smoke \
+            --publish 127.0.0.1:18004:8004 \
+            --env DATABASE_URL=postgres://evidence:invalid@127.0.0.1:5432/evidence?sslmode=disable \
+            --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
+            evidence-service-ci:local
+
+      - name: Exercise live health and rejection behavior
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18004/api/v1"
+
+          def call(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              request = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(request, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              assert status == expected, (
+                  f"{method} {path}: HTTP {status}, expected {expected}: {body[:200]!r}"
+              )
+              return json.loads(body)
+
+          for _ in range(30):
+              try:
+                  health = call("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("evidence service did not become reachable")
+
+          assert health["service"] == "evidence-service", health
+          assert health["status"] == "healthy", health
+          # The deliberately absent database is not a production-readiness check.
+          assert health["database"] == "disconnected", health
+          call("/evidence/cert", method="POST", payload={}, expected=500)
+          call("/evidence/validate", payload={}, expected=400)
+          invalid = call("/evidence/validate", payload={"raw": {}}, expected=200)
+          assert invalid["schema_valid"] is False, invalid
+          assert invalid["signature_checked"] is False, invalid
+          print("Production image health and negative HTTP behaviors observed.")
+          print("No database-backed storage, signing, or proof validity is claimed.")
+          PY
+
+      - name: Remove disposable evidence-service container
+        if: always()
+        run: |
+          if docker container inspect evidence-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f evidence-service-ci-smoke
+          fi
