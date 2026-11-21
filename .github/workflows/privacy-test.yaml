@@ -123,6 +123,33 @@ jobs:
           grep -q -- '^-----BEGIN PGP MESSAGE-----' test-export.zip
           gpg --batch --yes --output "$RUNNER_TEMP/dsar-decrypted.zip" \
             --decrypt test-export.zip
+          # Diagnostic observations on disposable fixture data. Archive validation
+          # below remains an independent fail-closed check.
+          python3 - "$RUNNER_TEMP/dsar-decrypted.zip" <<'PY'
+          import pathlib
+          import sys
+          import zipfile
+
+          raw = pathlib.Path(sys.argv[1]).read_bytes()
+          print("DSAR GPG interoperability diagnostic:")
+          print(f"  decrypted_bytes={len(raw)}")
+          print(f"  zip_local_magic={raw[:4].hex()}")
+          print(f"  local_header_offset={raw.find(b'PK\\x03\\x04')}")
+          print(f"  central_directory_offset={raw.rfind(b'PK\\x01\\x02')}")
+          print(f"  end_record_offset={raw.rfind(b'PK\\x05\\x06')}")
+          try:
+              with zipfile.ZipFile(sys.argv[1]) as archive:
+                  for item in archive.infolist():
+                      print(
+                          f"  member={item.filename!r} "
+                          f"header_offset={item.header_offset} "
+                          f"uncompressed_size={item.file_size} "
+                          f"compressed_size={item.compress_size}"
+                      )
+                  print(f"  integrity_result={archive.testzip()!r}")
+          except (OSError, ValueError, zipfile.BadZipFile) as exc:
+              print(f"  archive_error={type(exc).__name__}: {exc}")
+          PY
           python3 ../../tests/privacy/verify_dsar_archive.py \
             "$RUNNER_TEMP/dsar-decrypted.zip" \
             --tenant test-tenant-1 --after 2024-01-01
