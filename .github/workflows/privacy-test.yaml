@@ -134,9 +134,9 @@ jobs:
           print("DSAR GPG interoperability diagnostic:")
           print(f"  decrypted_bytes={len(raw)}")
           print(f"  zip_local_magic={raw[:4].hex()}")
-          print(f"  local_header_offset={raw.find(b'PK\\x03\\x04')}")
-          print(f"  central_directory_offset={raw.rfind(b'PK\\x01\\x02')}")
-          print(f"  end_record_offset={raw.rfind(b'PK\\x05\\x06')}")
+          print(f"  local_header_offset={raw.find(bytes.fromhex('504b0304'))}")
+          print(f"  central_directory_offset={raw.rfind(bytes.fromhex('504b0102'))}")
+          print(f"  end_record_offset={raw.rfind(bytes.fromhex('504b0506'))}")
           try:
               with zipfile.ZipFile(sys.argv[1]) as archive:
                   for item in archive.infolist():
