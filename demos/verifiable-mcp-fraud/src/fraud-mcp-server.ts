@@ -30,6 +30,73 @@ interface FraudScore {
   model_version: string;
 }
 
+interface TransactionLookupArgs {
+  transaction_id: string;
+  tenant_id: string;
+}
+
+interface IngestTransactionArgs extends TransactionLookupArgs {
+  amount: number;
+  merchant: string;
+  user_id: string;
+  card_number?: string;
+  location?: string;
+}
+
+// MCP tool arguments are untrusted JSON. Validate required values before they
+// reach the transaction handlers; TypeScript assertions alone do not validate.
+function requireArguments(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Tool arguments must be an object");
+  }
+  return value as Record<string, unknown>;
+}
+
+function requiredString(input: Record<string, unknown>, field: string): string {
+  const value = input[field];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Invalid or missing ${field}`);
+  }
+  return value;
+}
+
+function optionalString(input: Record<string, unknown>, field: string): string | undefined {
+  const value = input[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    throw new Error(`Invalid ${field}`);
+  }
+  return value;
+}
+
+function parseTransactionLookupArgs(value: unknown): TransactionLookupArgs {
+  const input = requireArguments(value);
+  return {
+    transaction_id: requiredString(input, "transaction_id"),
+    tenant_id: requiredString(input, "tenant_id"),
+  };
+}
+
+function parseIngestTransactionArgs(value: unknown): IngestTransactionArgs {
+  const input = requireArguments(value);
+  const amount = input.amount;
+  if (typeof amount !== "number" || !Number.isFinite(amount)) {
+    throw new Error("Invalid or missing amount");
+  }
+  return {
+    ...parseTransactionLookupArgs(input),
+    amount,
+    merchant: requiredString(input, "merchant"),
+    user_id: requiredString(input, "user_id"),
+    card_number: optionalString(input, "card_number"),
+    location: optionalString(input, "location"),
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Operation failed";
+}
+
 class FraudMCPServer {
   private mcpServer: Server;
   private sentinelOps: SentinelOpsClient;
@@ -120,17 +187,17 @@ class FraudMCPServer {
       try {
         switch (name) {
           case "ingest_transaction":
-            return await this.handleIngestTransaction(args as any);
+            return await this.handleIngestTransaction(parseIngestTransactionArgs(args));
           case "score_fraud":
-            return await this.handleScoreFraud(args as any);
+            return await this.handleScoreFraud(parseTransactionLookupArgs(args));
           case "get_transaction":
-            return await this.handleGetTransaction(args as any);
+            return await this.handleGetTransaction(parseTransactionLookupArgs(args));
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         return {
-          content: [{ type: "text", text: `Error: ${error.message}` }],
+          content: [{ type: "text", text: `Error: ${errorMessage(error)}` }],
           isError: true,
         };
       }
@@ -160,8 +227,8 @@ class FraudMCPServer {
       try {
         const result = await this.handleIngestTransaction(req.body);
         res.json({ ok: true, result });
-      } catch (e: any) {
-        res.status(400).json({ ok: false, error: e.message });
+      } catch (error: unknown) {
+        res.status(400).json({ ok: false, error: errorMessage(error) });
       }
     });
 
@@ -169,8 +236,8 @@ class FraudMCPServer {
       try {
         const result = await this.handleScoreFraud(req.body);
         res.json({ ok: true, result });
-      } catch (e: any) {
-        res.status(400).json({ ok: false, error: e.message });
+      } catch (error: unknown) {
+        res.status(400).json({ ok: false, error: errorMessage(error) });
       }
     });
 
@@ -181,8 +248,8 @@ class FraudMCPServer {
           tenant_id: String(req.query.tenant_id || ""),
         });
         res.json({ ok: true, result });
-      } catch (e: any) {
-        res.status(404).json({ ok: false, error: e.message });
+      } catch (error: unknown) {
+        res.status(404).json({ ok: false, error: errorMessage(error) });
       }
     });
 
