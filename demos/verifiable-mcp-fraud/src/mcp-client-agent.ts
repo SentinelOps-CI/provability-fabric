@@ -13,6 +13,15 @@ interface AgentConfig {
   sidecar_url?: string;
 }
 
+// Required fields for the synthetic transaction stream consumed by this agent.
+interface FraudTransaction {
+  id: string;
+  amount: number;
+  merchant: string;
+  user_id: string;
+  location: string;
+}
+
 export class MCPClientAgent {
   private client: Client;
   private sentinelOps: SentinelOpsClient;
@@ -51,7 +60,7 @@ export class MCPClientAgent {
     console.log('Connected to Fraud Detection MCP Server');
   }
 
-  async runFraudDetectionWorkflow(transactions: any[]): Promise<void> {
+  async runFraudDetectionWorkflow(transactions: readonly FraudTransaction[]): Promise<void> {
     console.log(`Starting fraud detection workflow for ${transactions.length} transactions`);
     
     for (const txn of transactions) {
@@ -139,7 +148,7 @@ export class MCPClientAgent {
         CallToolResultSchema
       );
       console.log('✅ Fraud scoring allowed (expected)');
-    } catch (error) {
+    } catch {
       console.log('❌ Fraud scoring denied (check policy configuration)');
     }
 
