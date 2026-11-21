@@ -93,7 +93,7 @@ jobs:
           assert health["status"] == "healthy", health
           # The deliberately absent database is not a production-readiness check.
           assert health["database"] == "disconnected", health
-          call("/evidence/cert", method="POST", payload={}, expected=500)
+          call("/evidence/cert", method="POST", payload=[], expected=400)
           call("/evidence/validate", payload={}, expected=400)
           invalid = call("/evidence/validate", payload={"raw": {}}, expected=200)
           assert invalid["schema_valid"] is False, invalid
