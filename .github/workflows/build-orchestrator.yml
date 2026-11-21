@@ -23,8 +23,10 @@ jobs:
       run:
         working-directory: services/build-orchestrator
     steps:
-      - name: Checkout source
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go module toolchain
         uses: actions/setup-go@v5
@@ -35,6 +37,7 @@ jobs:
       - name: Verify modules, races, static checks and build
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
           go mod verify
           go test -race -count=1 ./...
           go vet ./...
