@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,17 +49,31 @@ func TestGatewayProxyPreservesRequestAndBackendStatus(t *testing.T) {
 
 	router := gin.New()
 	router.NoRoute(NewAPIGateway().routeRequest)
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/proofs/run?mode=synthetic", strings.NewReader(`{"test":true}`))
+	frontend := httptest.NewServer(router)
+	t.Cleanup(frontend.Close)
+	client := frontend.Client()
+	client.Timeout = 5 * time.Second
+	request, err := http.NewRequest(http.MethodPost, frontend.URL+"/api/v1/proofs/run?mode=synthetic", strings.NewReader(`{"test":true}`))
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
 	request.Header.Set("Authorization", "Bearer synthetic-fixture")
 	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
 
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusAccepted {
-		t.Fatalf("proxy returned HTTP %d: %s", recorder.Code, recorder.Body.String())
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("call proxy: %v", err)
 	}
-	if strings.TrimSpace(recorder.Body.String()) != `{"ok":true}` {
-		t.Fatalf("unexpected proxy response: %s", recorder.Body.String())
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read proxy response: %v", err)
+	}
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("proxy returned HTTP %d: %s", response.StatusCode, body)
+	}
+	if strings.TrimSpace(string(body)) != `{"ok":true}` {
+		t.Fatalf("unexpected proxy response: %s", body)
 	}
 
 	select {
