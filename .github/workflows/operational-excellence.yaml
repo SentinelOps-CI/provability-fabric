@@ -395,11 +395,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate all components
+      - name: Identify the reporting boundary
         run: |
-          echo "Validating operational excellence components..."
-          echo "Upstream required jobs (metering, supply-chain, security) completed."
-          echo "Note: cross-region DR only validates when AWS secrets are configured; otherwise those steps are skipped without claiming a DR pass."
+          echo "Security scan job completed; advisory reports are informational."
+          echo "Conditional infrastructure steps and global CI are outside this report."
+          echo "Review uploaded scan artifacts before assessing vulnerability findings."
 
       - name: Generate evidence-scoped summary report
         shell: bash
