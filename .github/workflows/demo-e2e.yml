@@ -8,11 +8,13 @@ on:
     branches: [ main ]
     paths:
       - 'demos/verifiable-mcp-fraud/**'
+      - 'runtime/tool-broker/Dockerfile'
       - '.github/workflows/demo-e2e.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'demos/verifiable-mcp-fraud/**'
+      - 'runtime/tool-broker/Dockerfile'
       - '.github/workflows/demo-e2e.yml'
 
 jobs:
