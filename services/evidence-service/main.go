@@ -402,6 +402,12 @@ func (s *EvidenceService) validateCertificate(cert CertV1) error {
 	if cert.SidecarBuild == "" {
 		return fmt.Errorf("missing sidecar_build")
 	}
+	if err := validateEvidencePathSegment("tenant_id", cert.TenantID); err != nil {
+		return err
+	}
+	if err := validateEvidencePathSegment("session_id", cert.SessionID); err != nil {
+		return err
+	}
 
 	// Validate ni_monitor values
 	validNIMonitor := []string{"inapplicable", "accept", "reject", "error"}
@@ -445,13 +451,29 @@ func (s *EvidenceService) storeCertInDB(cert CertV1) error {
 
 // storeCertInFS stores certificate in filesystem
 func (s *EvidenceService) storeCertInFS(cert CertV1) error {
-	// Create directory structure: evidence/certs/{tenant}/{session}/
-	certDir := filepath.Join(s.storagePath, "certs", cert.TenantID, cert.SessionID)
-	if err := os.MkdirAll(certDir, 0755); err != nil {
+	// Validate again at the storage boundary for callers that bypass
+	// StoreCertificate. os.Root confines traversal through existing symlinks.
+	if err := validateEvidencePathSegment("tenant_id", cert.TenantID); err != nil {
 		return err
 	}
+	if err := validateEvidencePathSegment("session_id", cert.SessionID); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.storagePath, 0755); err != nil {
+		return fmt.Errorf("prepare evidence storage: %w", err)
+	}
+	root, err := os.OpenRoot(s.storagePath)
+	if err != nil {
+		return fmt.Errorf("open evidence storage root: %w", err)
+	}
+	defer root.Close()
 
-	// Generate filename with timestamp
+	certDir := filepath.Join("certs", cert.TenantID, cert.SessionID)
+	if err := root.MkdirAll(certDir, 0755); err != nil {
+		return fmt.Errorf("prepare certificate directory: %w", err)
+	}
+
+	// Create a new certificate file inside the confined storage root.
 	filename := fmt.Sprintf("%d_%s.cert.json", cert.Timestamp.Unix(), uuid.New().String()[:8])
 	certPath := filepath.Join(certDir, filename)
 
@@ -491,7 +513,20 @@ func (s *EvidenceService) storeCertInFS(cert CertV1) error {
 		return err
 	}
 
-	return os.WriteFile(certPath, certData, 0644)
+	file, err := root.OpenFile(certPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("create certificate file: %w", err)
+	}
+	if _, err := file.Write(certData); err != nil {
+		_ = file.Close()
+		_ = root.Remove(certPath)
+		return fmt.Errorf("write certificate file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = root.Remove(certPath)
+		return fmt.Errorf("close certificate file: %w", err)
+	}
+	return nil
 }
 
 // searchCertsInDB searches certificates in database
@@ -767,8 +802,12 @@ func (s *EvidenceService) storeCertHandler(c *gin.Context) {
 		return
 	}
 
+	if err := s.validateCertificate(cert); err != nil {
+		writeError(c, http.StatusBadRequest, "INVALID_CERTIFICATE", err.Error(), "Correct certificate fields and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_CERTIFICATE")
+		return
+	}
 	if err := s.StoreCertificate(c.Request.Context(), cert); err != nil {
-		writeError(c, http.StatusInternalServerError, "CERT_STORE_FAILED", err.Error(), "Check schema/signature and retry", "https://docs.sentinelops.dev/error-catalog#CERT_STORE_FAILED")
+		writeError(c, http.StatusInternalServerError, "CERT_STORE_FAILED", err.Error(), "Check storage and retry", "https://docs.sentinelops.dev/error-catalog#CERT_STORE_FAILED")
 		return
 	}
 
