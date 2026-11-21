@@ -32,6 +32,20 @@ jobs:
         working-directory: demos/verifiable-mcp-fraud
         install-command: npm ci
 
+    - name: Provision disposable receipt signer for full-profile smoke
+      shell: bash
+      run: |
+        set -euo pipefail
+        umask 077
+        key_dir="$(mktemp -d "${RUNNER_TEMP}/pf-demo-receipt-XXXXXXXX")"
+        chmod 700 "$key_dir"
+        key_file="$key_dir/retrieval-receipt.pem"
+        openssl genpkey -algorithm Ed25519 -out "$key_file"
+        chmod 600 "$key_file"
+        test -s "$key_file"
+        printf 'PF_RECEIPT_SIGNING_KEY_FILE=%s\\n' "$key_file" >> "$GITHUB_ENV"
+        printf 'PF_DEMO_RECEIPT_KEY_DIR=%s\\n' "$key_dir" >> "$GITHUB_ENV"
+
     - name: Start platform
       run: |
         echo "Starting complete platform for E2E testing..."
@@ -167,7 +181,20 @@ jobs:
 
     - name: Cleanup
       if: always()
+      shell: bash
       run: |
+        set -uo pipefail
         echo "Cleaning up demo environment..."
-        make demo-down
-        docker system prune -f
+        status=0
+        make demo-down || status=$?
+        # The test key is unique to this CI run. Never publish or reuse it.
+        if [[ -n "${PF_DEMO_RECEIPT_KEY_DIR:-}" ]]; then
+          if [[ "$PF_DEMO_RECEIPT_KEY_DIR" == "$RUNNER_TEMP"/pf-demo-receipt-* ]]; then
+            rm -rf -- "$PF_DEMO_RECEIPT_KEY_DIR" || status=1
+          else
+            echo "Unexpected receipt key directory; refusing unbounded cleanup" >&2
+            status=1
+          fi
+        fi
+        docker system prune -f || status=1
+        exit "$status"
