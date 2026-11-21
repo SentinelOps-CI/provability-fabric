@@ -96,7 +96,7 @@ jobs:
           assert json.loads(call("/ready"))["ready"] is True
           tools = json.loads(call("/api/tools"))
           assert isinstance(tools, list) and tools, tools
-          rejected = json.loads(call("/api/tx/absent?tenant_id=fixture", expected=400))
+          rejected = json.loads(call("/api/tx/absent?tenant_id=fixture", expected=404))
           assert rejected["ok"] is False, rejected
           print("Fraud demo image liveness, tool list and missing-transaction behavior passed.")
           print("Backend policy enforcement, scoring correctness and fraud decisions were not tested.")
