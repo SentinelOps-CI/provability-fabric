@@ -53,6 +53,21 @@ test("MCP stdio handshake, validated transactions, and tenant boundary", { timeo
     });
     assert.notEqual(ingested.isError, true, textContent(ingested));
 
+    // A tenant-supplied ID cannot be used to replace a transaction already
+    // stored under another tenant, or to mutate the original record.
+    const collision = await client.callTool({
+      name: "ingest_transaction",
+      arguments: {
+        transaction_id: "mcp-smoke-001",
+        amount: 1,
+        merchant: "Collision",
+        user_id: "other-user",
+        tenant_id: "tenant-two",
+      },
+    });
+    assert.equal(collision.isError, true, "Cross-tenant ID reuse must be rejected");
+    assert.match(textContent(collision), /Transaction ID already exists/);
+
     const forbidden = await client.callTool({
       name: "get_transaction",
       arguments: {
@@ -74,6 +89,7 @@ test("MCP stdio handshake, validated transactions, and tenant boundary", { timeo
     const row = JSON.parse(textContent(retrieved));
     assert.equal(row.id, "mcp-smoke-001");
     assert.equal(row.tenant_id, "tenant-one");
+    assert.equal(row.amount, 25_000, "Original transaction must remain intact");
 
     // This path emits a high-risk diagnostic. A subsequent MCP response confirms
     // that operational logs did not corrupt the JSON-RPC stdout stream.
