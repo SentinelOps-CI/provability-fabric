@@ -225,7 +225,7 @@ class FraudMCPServer {
     // Optional HTTP wrappers around the demo tools (handy for testing without MCP client)
     this.app.post("/api/ingest", async (req, res) => {
       try {
-        const result = await this.handleIngestTransaction(req.body);
+        const result = await this.handleIngestTransaction(parseIngestTransactionArgs(req.body));
         res.json({ ok: true, result });
       } catch (error: unknown) {
         res.status(400).json({ ok: false, error: errorMessage(error) });
@@ -234,7 +234,7 @@ class FraudMCPServer {
 
     this.app.post("/api/score", async (req, res) => {
       try {
-        const result = await this.handleScoreFraud(req.body);
+        const result = await this.handleScoreFraud(parseTransactionLookupArgs(req.body));
         res.json({ ok: true, result });
       } catch (error: unknown) {
         res.status(400).json({ ok: false, error: errorMessage(error) });
@@ -243,10 +243,10 @@ class FraudMCPServer {
 
     this.app.get("/api/tx/:id", async (req, res) => {
       try {
-        const result = await this.handleGetTransaction({
+        const result = await this.handleGetTransaction(parseTransactionLookupArgs({
           transaction_id: req.params.id,
-          tenant_id: String(req.query.tenant_id || ""),
-        });
+          tenant_id: req.query.tenant_id,
+        }));
         res.json({ ok: true, result });
       } catch (error: unknown) {
         res.status(404).json({ ok: false, error: errorMessage(error) });
