@@ -67,9 +67,9 @@ func TestEvidenceStorageAcceptsValidIdentifiers(t *testing.T) {
 
 func TestEvidenceStorageRejectsUnsafeIdentifiersBeforeSideEffects(t *testing.T) {
 	cases := []struct {
-		name    string
-		value   string
-		tenant  bool
+		name   string
+		value  string
+		tenant bool
 	}{
 		{"empty", "", true},
 		{"dot", ".", true},
