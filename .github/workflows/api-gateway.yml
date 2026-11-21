@@ -1,0 +1,137 @@
+name: API Gateway Production Build and CORS Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/api-gateway/**"
+      - ".github/workflows/api-gateway.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/api-gateway/**"
+      - ".github/workflows/api-gateway.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-production-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: services/api-gateway
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/api-gateway/go.mod
+          cache-dependency-path: services/api-gateway/go.sum
+
+      - name: Verify dependencies, tests, vet, and build
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          go mod verify
+          go test -race -count=1 ./...
+          go vet ./...
+          go build -trimpath -o "$RUNNER_TEMP/api-gateway-ci" .
+
+      - name: Build and run production gateway image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag api-gateway-ci:local .
+          docker run --detach --rm --name api-gateway-ci-smoke \
+            --publish 127.0.0.1:18000:8000 \
+            --env TELEMETRY_DEFAULT_ENABLED=false \
+            api-gateway-ci:local
+
+      - name: Verify CORS, inline routes, and invalid-input behavior
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18000"
+
+          def call(path, *, method="GET", payload=None, headers=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              request_headers = dict(headers or {})
+              if data is not None:
+                  request_headers["Content-Type"] = "application/json"
+              request = Request(base + path, method=method, data=data, headers=request_headers)
+              try:
+                  with urlopen(request, timeout=5) as response:
+                      status, body, response_headers = (
+                          response.status, response.read(), response.headers
+                      )
+              except HTTPError as exc:
+                  status, body, response_headers = exc.code, exc.read(), exc.headers
+              assert status == expected, (
+                  f"{method} {path}: HTTP {status}, expected {expected}: {body[:250]!r}"
+              )
+              return json.loads(body) if body else {}, response_headers
+
+          for _ in range(30):
+              try:
+                  health, _ = call("/api/v1/runtime/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("API gateway did not become reachable")
+
+          assert health["service"] == "runtime-service", health
+          assert health["status"] == "healthy", health
+          _, preflight_headers = call(
+              "/api/v1/runtime/health",
+              method="OPTIONS",
+              headers={
+                  "Origin": "https://client.example",
+                  "Access-Control-Request-Method": "GET",
+              },
+              expected=204,
+          )
+          assert preflight_headers.get("Access-Control-Allow-Origin") == "*", (
+              preflight_headers
+          )
+          assert "GET" in preflight_headers.get("Access-Control-Allow-Methods", "")
+
+          initial, _ = call("/api/v1/telemetry/opt")
+          assert initial["enabled"] is False, initial
+          call(
+              "/api/v1/telemetry/opt",
+              method="POST",
+              payload={"enabled": "invalid"},
+              expected=400,
+          )
+          changed, _ = call(
+              "/api/v1/telemetry/opt",
+              method="POST",
+              payload={"enabled": True},
+          )
+          assert changed["ok"] is True and changed["enabled"] is True, changed
+          final, _ = call("/api/v1/telemetry/opt")
+          assert final["enabled"] is True, final
+
+          missing, _ = call("/unmapped", expected=404)
+          assert missing["error"]["code"] == "SERVICE_NOT_FOUND", missing
+          print("Production API gateway CORS and inline-route contract verified.")
+          print("Backend health, authenticated authorization, and deployments are not tested.")
+          PY
+
+      - name: Remove disposable API gateway container
+        if: always()
+        run: |
+          if docker container inspect api-gateway-ci-smoke >/dev/null 2>&1; then
+            docker rm -f api-gateway-ci-smoke
+          fi
