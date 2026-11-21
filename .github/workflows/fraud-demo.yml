@@ -49,6 +49,12 @@ jobs:
       - name: Exercise demo source lint
         run: npm run --prefix demos/verifiable-mcp-fraud lint
 
+      - name: Verify actual MCP stdio tool calls and tenant controls
+        run: |
+          set -euo pipefail
+          cd demos/verifiable-mcp-fraud
+          timeout 90s node --test tests/mcp-stdio.test.mjs
+
       - name: Build the production demo container
         run: |
           set -euo pipefail
