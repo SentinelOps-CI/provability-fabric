@@ -4,13 +4,27 @@ A modular platform that converts natural-language policies into formal specifica
 
 ## Quick Start
 
-### Option 1: One-Command Demo
+### Option 1: Full-profile service startup
 
 ```bash
+# Provision an Ed25519 private signing key outside tracked source first.
+mkdir -p .local/secrets
+chmod 700 .local/secrets
+(umask 077; openssl genpkey -algorithm Ed25519 -out .local/secrets/retrieval-receipt-signing-key.pem)
 make demo-up
 ```
 
-This starts the complete platform with the Verifiable MCP Fraud demo.
+This builds and starts the full Compose profile, including the fraud-demo HTTP
+service. It does **not** issue a verified policy, deploy a proven monitor, or
+establish receipt provenance. The private key above is for disposable local
+development only; production uses separately provisioned signing material and
+a corresponding verifier trust root.
+
+`make demo-setup` separately attempts the proof-backed policy workflow. The
+current proof service correctly rejects its generated Lean obligations containing
+`sorry`/`admit` (HTTP 422), so this setup is not currently an operational
+proof-backed demo. The full-profile CI smoke asserts this refusal explicitly
+and separately checks service startup, HTTP tool behavior and synthetic inputs.
 
 ### Option 2: Compose Profiles
 
@@ -21,7 +35,7 @@ make platform-up
 # Full stack (ledger, console, enforcement, demo)
 make full-up
 
-# Setup demo data
+# Attempt proof-backed setup (currently fails closed for admitted Lean obligations)
 make demo-setup
 
 # Run demo agent

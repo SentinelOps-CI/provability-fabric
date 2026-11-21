@@ -1,0 +1,61 @@
+name: Tool Broker Locked Production Image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/tool-broker/**"
+      - "core/crypto/dsse-rs/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/tool-broker-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/tool-broker/**"
+      - "core/crypto/dsse-rs/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/tool-broker-image.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tool-broker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up pinned Rust compiler
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.99.1"
+
+      - name: Verify locked tool broker unit tests
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          rustc +1.99.1 --version
+          cargo +1.99.1 test --locked -p tool-broker
+
+      - name: Build actual locked production image
+        run: |
+          set -euo pipefail
+          docker build --pull --file runtime/tool-broker/Dockerfile \
+            --tag tool-broker-locked-ci:local .
+
+      - name: Verify executable is packaged in runtime image
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /bin/sh \
+            tool-broker-locked-ci:local \
+            -ec 'test -x /usr/local/bin/tool-broker'
+          echo "Locked production tool-broker binary exists in the final image."
+          echo "No live kernel authorization or request mediation was claimed."
