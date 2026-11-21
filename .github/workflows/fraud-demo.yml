@@ -1,0 +1,110 @@
+name: Fraud MCP Demo Build and Runtime Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "demos/verifiable-mcp-fraud/**"
+      - "core/sdk/typescript/**"
+      - ".github/workflows/fraud-demo.yml"
+  push:
+    branches: [main]
+    paths:
+      - "demos/verifiable-mcp-fraud/**"
+      - "core/sdk/typescript/**"
+      - ".github/workflows/fraud-demo.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fraud-demo-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            core/sdk/typescript/package-lock.json
+            demos/verifiable-mcp-fraud/package-lock.json
+
+      - name: Verify SDK and demo dependency installations and TypeScript builds
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          npm ci --prefix core/sdk/typescript --no-audit --no-fund
+          npm run --prefix core/sdk/typescript build
+          npm ci --prefix demos/verifiable-mcp-fraud --no-audit --no-fund
+          npm run --prefix demos/verifiable-mcp-fraud build
+          test -s demos/verifiable-mcp-fraud/dist/src/fraud-mcp-server.js
+
+      - name: Exercise demo source lint
+        run: npm run --prefix demos/verifiable-mcp-fraud lint
+
+      - name: Build the production demo container
+        run: |
+          set -euo pipefail
+          docker build --pull --file demos/verifiable-mcp-fraud/Dockerfile \
+            --tag fraud-mcp-demo-ci:local .
+          docker run --detach --rm --name fraud-mcp-demo-ci-smoke \
+            --publish 127.0.0.1:13001:3001 \
+            --env MCP_ENABLE_STDIO=false \
+            fraud-mcp-demo-ci:local
+
+      - name: Verify local liveness, tool discovery and rejected requests
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:13001"
+
+          def call(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              request = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(request, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              assert status == expected, (
+                  f"{method} {path}: HTTP {status}; expected {expected}: {body[:200]!r}"
+              )
+              return body
+
+          for _ in range(30):
+              try:
+                  assert call("/health") == b"ok"
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("Fraud demo failed to become reachable")
+
+          assert json.loads(call("/ready"))["ready"] is True
+          tools = json.loads(call("/api/tools"))
+          assert isinstance(tools, list) and tools, tools
+          rejected = json.loads(call("/api/tx/absent?tenant_id=fixture", expected=400))
+          assert rejected["ok"] is False, rejected
+          print("Fraud demo image liveness, tool list and missing-transaction behavior passed.")
+          print("Backend policy enforcement, scoring correctness and fraud decisions were not tested.")
+          PY
+
+      - name: Remove disposable demo container
+        if: always()
+        run: |
+          if docker container inspect fraud-mcp-demo-ci-smoke >/dev/null 2>&1; then
+            docker rm -f fraud-mcp-demo-ci-smoke
+          fi
