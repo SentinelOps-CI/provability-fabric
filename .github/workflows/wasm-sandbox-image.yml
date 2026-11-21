@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Provability-Fabric Contributors
+
+name: WASM Sandbox Locked Production Image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/wasm-sandbox/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/wasm-sandbox-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/wasm-sandbox/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/wasm-sandbox-image.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-sandbox-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up pinned Rust compiler
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.99.1"
+
+      - name: Native locked package tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          cargo +1.99.1 test --locked -p wasm-sandbox
+
+      - name: Build actual production image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull --file runtime/wasm-sandbox/Dockerfile \
+            --tag wasm-sandbox-locked-ci:local .
+
+      - name: Check packaged executable and non-root identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /bin/sh wasm-sandbox-locked-ci:local \
+            -ec 'test -x /usr/local/bin/wasm-sandbox; test "$(id -u)" -ne 0; test "$(id -un)" = wasm'
+
+      - name: Check CLI help and required module path
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm wasm-sandbox-locked-ci:local --help \
+            > /tmp/wasm-sandbox-help.txt
+          grep -F -- '--module' /tmp/wasm-sandbox-help.txt
+          if docker run --rm wasm-sandbox-locked-ci:local \
+              > /tmp/wasm-sandbox-invalid.txt 2>&1; then
+            echo "WASM sandbox accepted missing required module path" >&2
+            exit 1
+          fi
+          grep -F -- '--module' /tmp/wasm-sandbox-invalid.txt
+          echo "CLI startup, required argument and runtime UID verified."
+          echo "No adversarial WASM, isolation strength, or RustSec remediation was tested."
