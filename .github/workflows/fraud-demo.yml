@@ -104,8 +104,62 @@ jobs:
           assert isinstance(tools, list) and tools, tools
           rejected = json.loads(call("/api/tx/absent?tenant_id=fixture", expected=404))
           assert rejected["ok"] is False, rejected
-          print("Fraud demo image liveness, tool list and missing-transaction behavior passed.")
-          print("Backend policy enforcement, scoring correctness and fraud decisions were not tested.")
+
+          transaction_id = "http-smoke-tenant-boundary"
+          valid = {
+              "transaction_id": transaction_id,
+              "amount": 25000,
+              "merchant": "Casino",
+              "user_id": "ci-user",
+              "tenant_id": "tenant-one",
+              "location": "Offshore",
+          }
+          invalid = json.loads(call(
+              "/api/ingest", method="POST", expected=400,
+              payload={**valid, "amount": "invalid"},
+          ))
+          assert invalid["ok"] is False and "amount" in invalid["error"], invalid
+
+          ingested = json.loads(call("/api/ingest", method="POST", payload=valid))
+          assert ingested["ok"] is True, ingested
+
+          collision = json.loads(call(
+              "/api/ingest", method="POST", expected=400,
+              payload={**valid, "amount": 1, "tenant_id": "tenant-two"},
+          ))
+          assert collision["ok"] is False, collision
+          assert "already exists" in collision["error"], collision
+
+          forbidden = json.loads(call(
+              f"/api/tx/{transaction_id}?tenant_id=tenant-two", expected=404,
+          ))
+          assert forbidden["ok"] is False, forbidden
+          assert "different tenant" in forbidden["error"], forbidden
+
+          owner = json.loads(call(
+              f"/api/tx/{transaction_id}?tenant_id=tenant-one",
+          ))
+          assert owner["ok"] is True, owner
+          row = json.loads(owner["result"]["content"][0]["text"])
+          assert row["tenant_id"] == "tenant-one" and row["amount"] == 25000, row
+
+          invalid_score = json.loads(call(
+              "/api/score", method="POST", expected=400,
+              payload={"transaction_id": transaction_id},
+          ))
+          assert invalid_score["ok"] is False, invalid_score
+          assert "tenant_id" in invalid_score["error"], invalid_score
+
+          score = json.loads(call(
+              "/api/score", method="POST",
+              payload={"transaction_id": transaction_id, "tenant_id": "tenant-one"},
+          ))
+          assert score["ok"] is True, score
+          score_value = json.loads(score["result"]["content"][0]["text"])["fraud_score"]
+          assert isinstance(score_value, (float, int)) and 0 <= score_value <= 1
+
+          print("Fraud demo image input validation, ID collision and supplied-tenant tests passed.")
+          print("Caller identity, platform authorization, independent fraud quality and receipt verification were not tested.")
           PY
 
       - name: Remove disposable demo container
