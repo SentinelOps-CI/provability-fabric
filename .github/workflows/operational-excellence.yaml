@@ -366,12 +366,17 @@ jobs:
           # Best-effort scan; gosec exits non-zero when findings exist.
           gosec -fmt json -out gosec-results.json ./... || test -f gosec-results.json
 
-      - name: Run Rust security scanner
+      - name: Run Rust security scanner using identified upstream snapshot
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Workspace lockfile lives at repo root (sidecar-watcher has no local Cargo.lock).
-          # Exit non-zero on advisories is OK if JSON output was produced.
-          cargo audit --file Cargo.lock --json > cargo-audit-results.json \
-            || test -s cargo-audit-results.json
+          set -euo pipefail
+          # Avoid Git smart-HTTP 403 on the RustSec advisory DB. Fetch the
+          # authoritative upstream revision through GitHub REST/codeload.
+          # The script fails if the database cannot be obtained or parsed;
+          # real vulnerability findings are retained in the JSON artifact.
+          bash scripts/ci/run_rustsec_audit.sh cargo-audit-results.json
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4
@@ -383,6 +388,7 @@ jobs:
             sbom.spdx.json
             gosec-results.json
             cargo-audit-results.json
+            rustsec-database-source.json
           if-no-files-found: warn
 
   # Final Validation
