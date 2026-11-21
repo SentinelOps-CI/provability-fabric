@@ -43,8 +43,8 @@ jobs:
         openssl genpkey -algorithm Ed25519 -out "$key_file"
         chmod 600 "$key_file"
         test -s "$key_file"
-        printf 'PF_RECEIPT_SIGNING_KEY_FILE=%s\\n' "$key_file" >> "$GITHUB_ENV"
-        printf 'PF_DEMO_RECEIPT_KEY_DIR=%s\\n' "$key_dir" >> "$GITHUB_ENV"
+        printf 'PF_RECEIPT_SIGNING_KEY_FILE=%s\n' "$key_file" >> "$GITHUB_ENV"
+        printf 'PF_DEMO_RECEIPT_KEY_DIR=%s\n' "$key_dir" >> "$GITHUB_ENV"
 
     - name: Start platform
       run: |
