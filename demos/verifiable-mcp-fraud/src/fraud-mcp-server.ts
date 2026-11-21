@@ -314,7 +314,7 @@ class FraudMCPServer {
     const shouldBlock = score >= 0.93;
     if (score > 0.8) {
       // Rate limiting should be enforced by platform policy
-      console.log(`[ALERT] High fraud score: ${score} for transaction ${args.transaction_id}`);
+      console.error(`[ALERT] High fraud score: ${score} for transaction ${args.transaction_id}`);
     }
 
     return {
@@ -414,22 +414,27 @@ class FraudMCPServer {
     });
   }
 
-  private async startMcpIfEnabled(): Promise<void> {
-    const enable = (process.env.MCP_ENABLE_STDIO ?? "false").toLowerCase() === "true";
-    if (!enable) {
-      console.log("MCP stdio transport disabled (set MCP_ENABLE_STDIO=true to enable).");
-      return;
-    }
+  // STDIO is a dedicated JSON-RPC transport. Diagnostic output must go
+  // exclusively to stderr, and an MCP child must not bind the HTTP demo port.
+  private isStdioMode(): boolean {
+    return process.argv.includes("--stdio") ||
+      (process.env.MCP_ENABLE_STDIO ?? "false").toLowerCase() === "true";
+  }
+
+  private async startMcp(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.mcpServer.connect(transport);
     console.error("Fraud Detection MCP Server (stdio) connected.");
   }
 
   async run(): Promise<void> {
-    await this.startHttp();
-    await this.startMcpIfEnabled();
+    if (this.isStdioMode()) {
+      await this.startMcp();
+    } else {
+      await this.startHttp();
+    }
 
-    // Keep process alive; HTTP server does this already, but add signal handling for clean exit.
+    // The active HTTP server or MCP stdio transport owns the process lifetime.
     const shutdown = () => process.exit(0);
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
