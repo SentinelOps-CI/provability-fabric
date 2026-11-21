@@ -270,6 +270,13 @@ class FraudMCPServer {
     location?: string;
     tenant_id: string;
   }) {
+    // Keys are global within this in-memory demo store. A second tenant must
+    // never overwrite another tenant's transaction by reusing its identifier.
+    // This also prevents accidental same-tenant replacement of an ingested row.
+    if (this.transactions.has(args.transaction_id)) {
+      throw new Error("Transaction ID already exists");
+    }
+
     const transaction: Transaction = {
       id: args.transaction_id,
       amount: args.amount,
