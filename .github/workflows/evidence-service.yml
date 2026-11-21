@@ -94,6 +94,25 @@ jobs:
           # The deliberately absent database is not a production-readiness check.
           assert health["database"] == "disconnected", health
           call("/evidence/cert", method="POST", payload=[], expected=400)
+          certificate = {
+              "bundle_id": "bundle",
+              "policy_hash": "policy",
+              "proof_hash": "proof",
+              "automata_hash": "automata",
+              "labeler_hash": "labeler",
+              "ni_claim": "test",
+              "ni_monitor": "inapplicable",
+              "sidecar_build": "test",
+              "tenant_id": "tenant-1",
+              "session_id": "session-1",
+              "timestamp": "2026-01-01T00:00:00Z",
+          }
+          for field in ("tenant_id", "session_id"):
+              unsafe = {**certificate, field: "../outside"}
+              rejected = call(
+                  "/evidence/cert", method="POST", payload=unsafe, expected=400
+              )
+              assert rejected["error"]["code"] == "INVALID_CERTIFICATE", rejected
           call("/evidence/validate", payload={}, expected=400)
           invalid = call("/evidence/validate", payload={"raw": {}}, expected=200)
           assert invalid["schema_valid"] is False, invalid
