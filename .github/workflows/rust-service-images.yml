@@ -75,6 +75,6 @@ jobs:
           docker run --rm \
             --entrypoint /bin/sh \
             "rust-service-${{ matrix.package }}:ci" \
-            -ec 'test -x "/usr/local/bin/${{ matrix.package }}"; test "$(id -u)" -ne 0'
+            -ec 'test -x "/usr/local/bin/${{ matrix.package }}"; test "$(id -u)" -ne 0; test "$(id -un)" = "${{ matrix.runtime_user }}"'
           echo "Production image packages its binary and defaults to non-root."
           echo "Service startup, production credentials and deployed authorization were not tested."
