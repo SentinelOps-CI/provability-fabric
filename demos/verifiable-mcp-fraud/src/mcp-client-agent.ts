@@ -52,8 +52,8 @@ export class MCPClientAgent {
   async connect(): Promise<void> {
     // Configure MCP server transport
     const transport = new StdioClientTransport({
-      command: 'node',
-      args: ['dist/fraud-mcp-server.js'],
+      command: process.execPath,
+      args: ['dist/src/fraud-mcp-server.js', '--stdio'],
     });
 
     await this.client.connect(transport);
