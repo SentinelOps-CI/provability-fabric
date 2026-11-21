@@ -1,22 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 SentinelOps
 
-# ---------- builder stage ----------
-FROM rust:1.88-bookworm AS builder
-
+# Build from the repository root with its canonical workspace and Cargo.lock.
+# docker build -f runtime/jwks-manager/Dockerfile .
+FROM rust:1.99.1-bookworm AS builder
 WORKDIR /app
-
-# Cache deps: copy manifests first
-COPY Cargo.toml ./
-
-# Create a dummy src to resolve deps and prime cache
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
-
-# Now copy real sources and build
-COPY src ./src
-RUN cargo build --release --locked
+COPY . .
+RUN cargo +1.99.1 build --locked --release -p jwks-manager
 
 # ---------- runtime stage ----------
 FROM debian:bookworm-slim
