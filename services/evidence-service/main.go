@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -211,6 +212,17 @@ func NewEvidenceService() (*EvidenceService, error) {
 		if err := db.Ping(); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("configured certificate database unavailable: %w", err)
+		}
+	}
+
+	// A network trust root must be explicitly provisioned by the operator.
+	// Validate configuration before creating any local evidence state.
+	if configured := strings.TrimSpace(os.Getenv("EVIDENCE_TRUSTED_JWKS_URL")); configured != "" {
+		if err := validateTrustedJWKSURL(configured); err != nil {
+			if db != nil {
+				_ = db.Close()
+			}
+			return nil, fmt.Errorf("invalid configured evidence JWKS endpoint: %w", err)
 		}
 	}
 
@@ -1071,6 +1083,12 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Callers cannot make the evidence service fetch arbitrary origins. A
+	// request JWKS URL is usable only if the deployment explicitly pinned it.
+	if err := approveJWKSURL(req.JWKSURL); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unapproved JWKS endpoint"})
+		return
+	}
 
 	var raw []byte
 	if len(req.Raw) != 0 {
@@ -1264,14 +1282,55 @@ func writeCanonicalJSON(buf *bytes.Buffer, v interface{}) error {
 }
 
 // fetchEd25519KeysFromJWKS fetches public keys; kept minimal to avoid extra deps
-func fetchEd25519KeysFromJWKS(url string) ([]ed25519.PublicKey, error) {
-	resp, err := http.Get(url)
-	if err != nil {
+// validateTrustedJWKSURL rejects implicit schemes, plaintext endpoints,
+// userinfo, and fragments. Only administrators control the approved endpoint.
+func validateTrustedJWKSURL(endpoint string) error {
+	u, err := neturl.Parse(endpoint)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" ||
+		u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return fmt.Errorf("JWKS endpoint must be an absolute HTTPS URL without credentials or fragments")
+	}
+	return nil
+}
+
+// approveJWKSURL establishes an exact deployment-controlled origin binding.
+// An absent requested URL keeps local PEM-key diagnostics network-free.
+func approveJWKSURL(requested string) error {
+	if requested == "" {
+		return nil
+	}
+	configured := strings.TrimSpace(os.Getenv("EVIDENCE_TRUSTED_JWKS_URL"))
+	if configured == "" || requested != configured {
+		return fmt.Errorf("JWKS endpoint is not configured or does not match the trusted endpoint")
+	}
+	return validateTrustedJWKSURL(configured)
+}
+
+func fetchEd25519KeysFromJWKS(endpoint string) ([]ed25519.PublicKey, error) {
+	if err := validateTrustedJWKSURL(endpoint); err != nil {
 		return nil, err
 	}
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		// Never follow an HTTP redirect to a different origin or private
+		// address. The operator must pin the final URL explicitly.
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	return fetchEd25519KeysFromJWKSWithClient(client, endpoint)
+}
+
+// The client parameter permits real TLS/redirect/size controls in tests.
+// Production callers only reach this via the bounded hardened client above.
+func fetchEd25519KeysFromJWKSWithClient(client *http.Client, endpoint string) ([]ed25519.PublicKey, error) {
+	resp, err := client.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve trusted JWKS: %w", err)
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("jwks http error: %s", resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("JWKS returned HTTP %s", resp.Status)
 	}
 	var jwks struct {
 		Keys []struct {
@@ -1283,9 +1342,16 @@ func fetchEd25519KeysFromJWKS(url string) ([]ed25519.PublicKey, error) {
 			Kid string `json:"kid"`
 		} `json:"keys"`
 	}
-	data, _ := io.ReadAll(resp.Body)
+	const maxJWKSBytes = 1 << 20
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxJWKSBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read trusted JWKS: %w", err)
+	}
+	if len(data) > maxJWKSBytes {
+		return nil, fmt.Errorf("trusted JWKS exceeds 1 MiB")
+	}
 	if err := json.Unmarshal(data, &jwks); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode trusted JWKS: %w", err)
 	}
 	var pubs []ed25519.PublicKey
 	for _, k := range jwks.Keys {
