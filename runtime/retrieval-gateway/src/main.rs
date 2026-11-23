@@ -179,9 +179,10 @@ async fn handle_query(
     let _rate_limits = state.abac_policy.get_rate_limits(&context);
 
     let query_hash = context.query_hash.clone();
+    let result_limit = request.limit.unwrap_or(10);
     let cached_results = state
         .semantic_cache
-        .get(&query_hash, &request.labels_filter, &request.tenant)
+        .get(&query_hash, &request.labels_filter, &request.tenant, result_limit)
         .await;
 
     let results = if let Some(cached) = cached_results {
@@ -195,7 +196,7 @@ async fn handle_query(
                 &request.query,
                 &request.tenant,
                 &request.labels_filter,
-                request.limit.unwrap_or(10),
+                result_limit,
             )
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -206,6 +207,7 @@ async fn handle_query(
                 &query_hash,
                 &request.labels_filter,
                 &request.tenant,
+                result_limit,
                 search_results.clone(),
                 None,
             )
