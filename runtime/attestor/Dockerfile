@@ -1,33 +1,19 @@
-﻿# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Provability-Fabric Contributors
 
 # Multi-stage build for optimal image size and security
-FROM rust:1.88-alpine AS builder
+# Build from the repository root using its canonical dependency graph.
+# docker build --file runtime/attestor/Dockerfile .
+FROM rust:1.99.1-alpine AS builder
 
-# Install build dependencies
 RUN apk add --no-cache \
     musl-dev \
     openssl-dev \
-    pkgconfig \
-    && rm -rf /var/cache/apk/*
+    pkgconfig
 
-# Set working directory
 WORKDIR /app
-
-# Copy dependency files
-COPY Cargo.toml ./
-
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release
-
-# Copy source code
-COPY src/ ./src/
-
-# Build the application
-RUN touch src/main.rs && cargo build --release
+COPY . .
+RUN cargo +1.99.1 build --locked --release -p attestor
 
 # Runtime stage
 FROM alpine:3.19
@@ -59,7 +45,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
 
 # Run the application
 CMD ["./attestor"]
