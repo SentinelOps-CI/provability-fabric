@@ -229,8 +229,11 @@ fn set_test_signing_env(fixtures: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pf_dsse::verify_envelope;
     use std::fs;
+    use std::sync::Mutex;
+
+    // These fixture tests modify process-wide environment variables.
+    static RECEIPT_TEST_ENV: Mutex<()> = Mutex::new(());
 
     fn sample_receipt() -> AccessReceipt {
         AccessReceipt {
@@ -253,6 +256,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_receipt_signing_with_fixture_keys() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -271,6 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fixture_envelope_verifies() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -282,6 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_receipt_validation() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -315,4 +321,63 @@ mod tests {
             assert!(!ReceiptValidator::validate_receipt(&signed_candidate).await.unwrap());
         }
     }
+    #[tokio::test]
+    async fn test_local_verifier_rejects_other_key_and_tampered_fields() {
+        // Independent keys, no trust-root or opt-out environment dependency.
+        let signer = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[17_u8; 32]),
+            key_id: "issuer-a".into(),
+        };
+        let unrelated = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[19_u8; 32]),
+            key_id: "issuer-b".into(),
+        };
+        let signed = signer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(signer.verify_receipt(&signed).unwrap());
+        assert!(!unrelated.verify_receipt(&signed).unwrap());
+
+        let mut tampered = signed.clone();
+        tampered.tenant = "other-tenant".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed.clone();
+        tampered.result_hash = "c".repeat(64);
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed.clone();
+        tampered.sig = "malformed".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed;
+        tampered.sign_alg = "none".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_external_validator_never_accepts_disabled_dsse_mode() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
+        let fixtures = crypto_fixtures_dir();
+        set_test_signing_env(&fixtures);
+        // The lower-level DSSE library deliberately supports a dev-only
+        // structural bypass. This external validator must stay strict.
+        std::env::set_var("PF_ENFORCE_DSSE", "0");
+
+        let issuer = ReceiptSigner::new().await.unwrap();
+        let signed = issuer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(ReceiptValidator::validate_receipt(&signed).await.unwrap());
+
+        let unrelated_issuer = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[29_u8; 32]),
+            key_id: "unrelated".into(),
+        };
+        let forged = unrelated_issuer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(!ReceiptValidator::validate_receipt(&forged).await.unwrap());
+
+        std::env::remove_var("PF_TRUST_ROOT_PEM");
+        assert!(!ReceiptValidator::validate_receipt(&signed).await.unwrap());
+
+        std::env::set_var("PF_ENFORCE_DSSE", "1");
+        std::env::set_var("PF_TRUST_ROOT_PEM", fixtures.join("ed25519_public.pem"));
+    }
+
 }
