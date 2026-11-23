@@ -9,7 +9,7 @@ This guide describes how to configure a pluggable signer and rotate keys.
   - set `CERT_SIGNER_FILE=/path/to/ed25519.pem`
 
 - kms/vault backends:
-  - placeholders; integrate with your provider and set `CERT_SIGNER_BACKEND=kms|vault`
+  - not implemented. Configuring either backend fails startup until a production signing provider is implemented and tested.
 
 ## Rotation steps
 
@@ -41,10 +41,19 @@ requests. Rotate keys by updating the approved JWKS and restarting the
 service after independent trust-root approval. Pin the final URL and operate
 its DNS and TLS trust under deployment control.
 
-A caller-supplied `pem_pub` continues to support local cryptographic
-diagnostics, but a signature verified under a key supplied by that same
-caller does **not** establish an authorized issuer or trusted certificate
-provenance. A `signature_valid` result alone must never authorize access.
+A caller-supplied `pem_pub` is rejected with HTTP 400
+(`UNTRUSTED_VERIFIER_KEY`). A request cannot establish its own issuer
+authority by supplying both a signed certificate and the matching public
+key. `signature_valid=true` is returned only after verification against
+public keys loaded from the operator-configured JWKS at service startup.
+If no trusted verifier keys are configured, signed requests receive
+`signature_valid=false` with `trusted_verifier_unavailable`.
+
+Local verification against an arbitrary caller-owned PEM must happen in
+an explicitly labeled, offline diagnostic tool; it is never an issuer
+trust decision of the evidence-service HTTP API. This is a breaking
+change for console or other callers supplying `pem_pub` and must be
+reflected in any client migration.
 
 This restriction does not implement key-ID binding, rotation, revocation,
 certificate-claim validation or an independently provisioned issuer trust
