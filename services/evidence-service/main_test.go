@@ -49,7 +49,7 @@ func TestDSSEFixtureVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load public key: %v", err)
 	}
-	ok, reason := verifySignature(payloadBytes, envelope.Signatures[0].Sig, "", string(pemB))
+	ok, reason := verifySignature(payloadBytes, envelope.Signatures[0].Sig, nil, string(pemB))
 	if !ok {
 		t.Errorf("verify fixture signature: %s", reason)
 	}
