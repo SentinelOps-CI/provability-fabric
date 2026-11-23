@@ -24,17 +24,17 @@ import (
 func signedValidationCertificate(t *testing.T, private ed25519.PrivateKey) json.RawMessage {
 	t.Helper()
 	claims := map[string]interface{}{
-		"bundle_id":          "fixture-bundle",
-		"policy_hash":        "fixture-policy",
-		"proof_hash":         "fixture-proof",
-		"automata_hash":      "fixture-automata",
-		"labeler_hash":       "fixture-labeler",
-		"ni_monitor":         "accept",
-		"permit_decision":    "permit",
-		"path_witness_ok":    true,
+		"bundle_id":           "fixture-bundle",
+		"policy_hash":         "fixture-policy",
+		"proof_hash":          "fixture-proof",
+		"automata_hash":       "fixture-automata",
+		"labeler_hash":        "fixture-labeler",
+		"ni_monitor":          "accept",
+		"permit_decision":     "permit",
+		"path_witness_ok":     true,
 		"label_derivation_ok": true,
-		"epoch":              float64(1),
-		"egress_profile":     "fixture-profile",
+		"epoch":               float64(1),
+		"egress_profile":      "fixture-profile",
 	}
 	canonical, err := marshalCanonicalJSON(claims)
 	if err != nil {
