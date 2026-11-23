@@ -9,8 +9,8 @@ PROFILE="${1:-full}"
 COMPOSE=(docker compose --profile "$PROFILE")
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "SKIP: docker not available" >&2
-  exit 0
+  echo "ERROR: docker is required to execute the Compose smoke" >&2
+  exit 2
 fi
 
 echo "=== docker-compose smoke (profile=${PROFILE}) ==="
