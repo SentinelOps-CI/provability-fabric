@@ -335,10 +335,11 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 		return fmt.Errorf("certificate preparation failed: %w", err)
 	}
 
-	// Preserve the existing database-to-filesystem fallback behavior.
+	// A configured database is an authoritative persistence backend.
+	// Never report a filesystem-only issuance when its database write fails.
 	if s.db != nil {
 		if err := s.storeCertInDB(prepared); err != nil {
-			log.Printf("Warning: Database storage failed: %v", err)
+			return fmt.Errorf("database certificate storage failed: %w", err)
 		}
 	}
 
@@ -366,8 +367,7 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 		// Database search
 		certs, count, err := s.searchCertsInDB(req)
 		if err != nil {
-			log.Printf("Database search failed, falling back to filesystem: %v", err)
-			return s.searchCertsInFS(req)
+			return nil, fmt.Errorf("database certificate search failed: %w", err)
 		}
 		certificates = certs
 		total = count
