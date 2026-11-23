@@ -244,7 +244,9 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if strings.TrimSpace(os.Getenv("CERT_SIGNER_BACKEND")) != "" {
 		signer, err := newSignerFromEnv()
 		if err != nil {
-			_ = db.Close()
+			if db != nil {
+				_ = db.Close()
+			}
 			return nil, fmt.Errorf("configured certificate signer unavailable: %w", err)
 		}
 		service.signer = signer
