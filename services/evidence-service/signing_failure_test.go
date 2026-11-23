@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"os"
 	"path/filepath"
@@ -166,5 +167,47 @@ func TestEvidenceInvalidCanonicalPayloadFailsBeforeStorage(t *testing.T) {
 	}
 	if _, err := os.Stat(storage); !os.IsNotExist(err) {
 		t.Fatalf("invalid signing payload created storage: %v", err)
+	}
+}
+
+func TestRawEd25519PrivateKeyMustMatchItsPublicHalf(t *testing.T) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyFile := filepath.Join(t.TempDir(), "issuer.pem")
+	t.Setenv("CERT_SIGNER_BACKEND", "file")
+	t.Setenv("CERT_SIGNER_FILE", keyFile)
+	writeKey := func(raw []byte) {
+		t.Helper()
+		encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: raw})
+		if err := os.WriteFile(keyFile, encoded, 0600); err != nil {
+			t.Fatalf("write disposable key: %v", err)
+		}
+	}
+
+	corrupted := append([]byte(nil), private...)
+	corrupted[len(corrupted)-1] ^= 1
+	writeKey(corrupted)
+	if _, err := newSignerFromEnv(); err == nil {
+		t.Fatal("accepted inconsistent embedded Ed25519 public key")
+	}
+
+	writeKey(private)
+	signer, err := newSignerFromEnv()
+	if err != nil {
+		t.Fatalf("valid raw Ed25519 key was rejected: %v", err)
+	}
+	message := []byte("fixture canonical certificate")
+	signature, err := signer.Sign(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawSignature, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ed25519.Verify(public, message, rawSignature) {
+		t.Fatal("signature from accepted raw key is not valid")
 	}
 }
