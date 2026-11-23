@@ -187,3 +187,20 @@ func TestEvidenceStartupRejectsUnreachableConfiguredDatabase(t *testing.T) {
 		t.Fatalf("unexpected unreachable-database error: %v", err)
 	}
 }
+
+func TestEvidenceWithoutDatabaseURLUsesExplicitFilesystemOnlyMode(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("CERT_SIGNER_BACKEND", "")
+	storage := filepath.Join(t.TempDir(), "evidence")
+	t.Setenv("EVIDENCE_STORAGE_PATH", storage)
+	service, err := NewEvidenceService()
+	if err != nil {
+		t.Fatalf("initialize filesystem-only development service: %v", err)
+	}
+	if service.db != nil {
+		t.Fatal("service connected to an implicit database despite an absent DATABASE_URL")
+	}
+	if service.storagePath != storage {
+		t.Fatalf("unexpected filesystem storage path: %q", service.storagePath)
+	}
+}
