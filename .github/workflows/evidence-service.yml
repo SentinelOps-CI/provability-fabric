@@ -19,6 +19,20 @@ jobs:
   evidence-service-build-and-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: evidence_ci
+          POSTGRES_PASSWORD: evidence_ci_fixture_only
+          POSTGRES_DB: evidence_ci
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U evidence_ci -d evidence_ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
     defaults:
       run:
         working-directory: services/evidence-service
@@ -35,6 +49,9 @@ jobs:
           cache-dependency-path: services/evidence-service/go.sum
 
       - name: Verify revision, fixture, dependencies, tests and static checks
+        env:
+          # Disposable PostgreSQL service started for this CI job only.
+          EVIDENCE_TEST_DATABASE_URL: postgres://evidence_ci:evidence_ci_fixture_only@127.0.0.1:15432/evidence_ci?sslmode=disable
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
