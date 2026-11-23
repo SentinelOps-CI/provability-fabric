@@ -16,6 +16,8 @@ pub struct CacheKey {
     pub question_hash: String,
     pub label_set: Vec<String>,
     pub tenant: String,
+    /// Requested result count forms part of the authorization-sensitive cache key.
+    pub result_limit: usize,
 }
 
 /// Cache entry storing search results with metadata
@@ -73,11 +75,6 @@ pub struct CacheConfig {
     /// Cleanup interval in seconds
     pub cleanup_interval_seconds: u64,
     
-    /// Enable semantic similarity for cache keys
-    pub enable_semantic_similarity: bool,
-    
-    /// Semantic similarity threshold (0.0 to 1.0)
-    pub similarity_threshold: f64,
 }
 
 impl Default for CacheConfig {
@@ -87,8 +84,6 @@ impl Default for CacheConfig {
             max_entries_per_tenant: 1000,
             max_memory_per_tenant: 100 * 1024 * 1024, // 100 MB
             cleanup_interval_seconds: 300, // 5 minutes
-            enable_semantic_similarity: true,
-            similarity_threshold: 0.85,
         }
     }
 }
@@ -129,11 +124,13 @@ impl SemanticCache {
         question_hash: &str,
         label_set: &[String],
         tenant: &str,
+        result_limit: usize,
     ) -> Option<Vec<SearchResult>> {
         let cache_key = CacheKey {
             question_hash: question_hash.to_string(),
             label_set: label_set.to_vec(),
             tenant: tenant.to_string(),
+            result_limit,
         };
 
         let hit = {
@@ -145,9 +142,8 @@ impl SemanticCache {
                     return None;
                 }
                 Some(entry.results.clone())
-            } else if self.config.enable_semantic_similarity {
-                self.find_semantically_similar_locked(&cache, tenant, &cache_key)
             } else {
+                // Authorization-sensitive reuse must match the entire cache key.
                 None
             }
         };
@@ -167,6 +163,7 @@ impl SemanticCache {
         question_hash: &str,
         label_set: &[String],
         tenant: &str,
+        result_limit: usize,
         results: Vec<SearchResult>,
         ttl_seconds: Option<u64>,
     ) -> Result<()> {
@@ -179,6 +176,7 @@ impl SemanticCache {
             question_hash: question_hash.to_string(),
             label_set: label_set.to_vec(),
             tenant: tenant.to_string(),
+            result_limit,
         };
         
         let scores: Vec<f64> = results.iter().map(|r| r.score).collect();
@@ -290,76 +288,6 @@ impl SemanticCache {
             .as_secs();
         
         now > entry.created_at + entry.ttl_seconds
-    }
-    
-    /// Find semantically similar cache entries while holding the read lock.
-    fn find_semantically_similar_locked(
-        &self,
-        cache: &HashMap<String, HashMap<CacheKey, CacheEntry>>,
-        tenant: &str,
-        cache_key: &CacheKey,
-    ) -> Option<Vec<SearchResult>> {
-        let tenant_cache = cache.get(tenant)?;
-
-        let mut best_match: Option<(&CacheEntry, f64)> = None;
-
-        for entry in tenant_cache.values() {
-            if self.is_expired(entry) {
-                continue;
-            }
-
-            let similarity = self.calculate_similarity(cache_key, &entry.key);
-            if similarity >= self.config.similarity_threshold {
-                if let Some((_, best_similarity)) = best_match {
-                    if similarity > best_similarity {
-                        best_match = Some((entry, similarity));
-                    }
-                } else {
-                    best_match = Some((entry, similarity));
-                }
-            }
-        }
-
-        best_match.map(|(entry, similarity)| {
-            debug!(
-                "Semantic cache hit with similarity {:.2} for tenant {}: {:?}",
-                similarity, tenant, cache_key
-            );
-            entry.results.clone()
-        })
-    }
-
-    /// Find semantically similar cache entries
-    async fn find_semantically_similar(
-        &self,
-        tenant: &str,
-        cache_key: &CacheKey,
-    ) -> Option<Vec<SearchResult>> {
-        let cache = self.cache.read().await;
-        self.find_semantically_similar_locked(&cache, tenant, cache_key)
-    }
-    
-    /// Calculate similarity between two cache keys
-    fn calculate_similarity(&self, key1: &CacheKey, key2: &CacheKey) -> f64 {
-        // Simple Jaccard similarity for label sets
-        let label_similarity = if key1.label_set.is_empty() && key2.label_set.is_empty() {
-            1.0
-        } else if key1.label_set.is_empty() || key2.label_set.is_empty() {
-            0.0
-        } else {
-            let intersection = key1.label_set.iter()
-                .filter(|label| key2.label_set.contains(label))
-                .count();
-            let union = key1.label_set.len() + key2.label_set.len() - intersection;
-            
-            if union == 0 { 0.0 } else { intersection as f64 / union as f64 }
-        };
-        
-        // Hash similarity (exact match = 1.0, no match = 0.0)
-        let hash_similarity = if key1.question_hash == key2.question_hash { 1.0 } else { 0.0 };
-        
-        // Weighted combination: 70% hash similarity, 30% label similarity
-        0.7 * hash_similarity + 0.3 * label_similarity
     }
     
     /// Evict entries when cache is full
@@ -532,10 +460,10 @@ mod tests {
         ];
         
         // Test put
-        cache.put(question_hash, &labels, tenant, results.clone(), None).await.unwrap();
+        cache.put(question_hash, &labels, tenant, 10, results.clone(), None).await.unwrap();
         
         // Test get
-        let cached = cache.get(question_hash, &labels, tenant).await;
+        let cached = cache.get(question_hash, &labels, tenant, 10).await;
         assert!(cached.is_some());
         assert_eq!(cached.unwrap().len(), 1);
         
@@ -571,14 +499,14 @@ mod tests {
         ];
         
         // Put in tenant1
-        cache.put(question_hash, &labels, tenant1, results.clone(), None).await.unwrap();
+        cache.put(question_hash, &labels, tenant1, 10, results.clone(), None).await.unwrap();
         
         // Should not find in tenant2
-        let cached = cache.get(question_hash, &labels, tenant2).await;
+        let cached = cache.get(question_hash, &labels, tenant2, 10).await;
         assert!(cached.is_none());
         
         // Should find in tenant1
-        let cached = cache.get(question_hash, &labels, tenant1).await;
+        let cached = cache.get(question_hash, &labels, tenant1, 10).await;
         assert!(cached.is_some());
     }
     
@@ -601,7 +529,7 @@ mod tests {
                     match worker % 3 {
                         0 => {
                             cache.put(
-                                &query_hash, &labels, tenant,
+                                &query_hash, &labels, tenant, 10,
                                 vec![SearchResult {
                                     document_id: "synthetic".into(),
                                     content: "synthetic".into(),
@@ -614,7 +542,7 @@ mod tests {
                             ).await.unwrap();
                         }
                         1 => {
-                            let _ = cache.get(&query_hash, &labels, tenant).await;
+                            let _ = cache.get(&query_hash, &labels, tenant, 10).await;
                         }
                         _ => {
                             cache.invalidate_tenant(tenant).await.unwrap();
@@ -653,11 +581,90 @@ mod tests {
         ];
         
         // Put and verify
-        cache.put(question_hash, &labels, tenant, results.clone(), None).await.unwrap();
-        assert!(cache.get(question_hash, &labels, tenant).await.is_some());
+        cache.put(question_hash, &labels, tenant, 10, results.clone(), None).await.unwrap();
+        assert!(cache.get(question_hash, &labels, tenant, 10).await.is_some());
         
         // Invalidate tenant
         cache.invalidate_tenant(tenant).await.unwrap();
-        assert!(cache.get(question_hash, &labels, tenant).await.is_none());
+        assert!(cache.get(question_hash, &labels, tenant, 10).await.is_none());
     }
+    #[tokio::test]
+    async fn cache_never_reuses_results_across_label_or_limit_scopes() {
+        // The old 0.7*hash + 0.3*label Jaccard formula admitted a
+        // three-label cached result for a two-label query: 0.9 >= 0.85.
+        // A returned private document must only be reused for the exact
+        // tenant, query hash, label set, and requested result count.
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let original_labels = vec![
+            "public".to_string(),
+            "confidential".to_string(),
+            "secret".to_string(),
+        ];
+        let smaller_scope = vec!["public".to_string(), "confidential".to_string()];
+        let results = vec![SearchResult {
+            document_id: "restricted-document".into(),
+            content: "synthetic secret fixture".into(),
+            content_hash: "sha256-fixture".into(),
+            score: 0.95,
+            metadata: HashMap::new(),
+            labels: original_labels.clone(),
+        }];
+        cache
+            .put("query-hash", &original_labels, "tenant-a", 10, results, None)
+            .await
+            .unwrap();
+
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 10)
+            .await
+            .is_some());
+        assert!(cache
+            .get("query-hash", &smaller_scope, "tenant-a", 10)
+            .await
+            .is_none(), "removed authorization label returned cached private results");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 1)
+            .await
+            .is_none(), "smaller result limit reused larger cached response");
+        assert!(cache
+            .get("different-query", &original_labels, "tenant-a", 10)
+            .await
+            .is_none(), "different query reused cached response");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-b", 10)
+            .await
+            .is_none(), "different tenant reused cached response");
+    }
+
+    #[tokio::test]
+    async fn cache_retains_distinct_pages_for_different_result_limits() {
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let labels = vec!["public".to_string()];
+        let result = |id: &str| SearchResult {
+            document_id: id.into(),
+            content: "synthetic public fixture".into(),
+            content_hash: "hash".into(),
+            score: 1.0,
+            metadata: HashMap::new(),
+            labels: labels.clone(),
+        };
+        cache.put("q", &labels, "tenant-a", 1, vec![result("first")], None)
+            .await.unwrap();
+        cache.put("q", &labels, "tenant-a", 2, vec![result("first"), result("second")], None)
+            .await.unwrap();
+
+        let first = cache.get("q", &labels, "tenant-a", 1).await.unwrap();
+        let both = cache.get("q", &labels, "tenant-a", 2).await.unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(both.len(), 2);
+        assert_eq!(first[0].document_id, "first");
+        assert_eq!(both[1].document_id, "second");
+    }
+
 }
