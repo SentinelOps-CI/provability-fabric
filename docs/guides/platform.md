@@ -121,8 +121,11 @@ GET /api/v1/evidence/cert/:id   # Get CERT-V1
 POST /api/v1/evidence/search    # Search certificates
 POST /api/v1/replay             # Start replay
 GET /api/v1/replay/:jobId       # Get replay status
-GET /api/v1/compliance/packet/:id # Download compliance packet
+POST /api/v1/compliance/packet # Generate an in-request JSON diagnostic (not a certified archive)
+GET /api/v1/compliance/packet/:id # HTTP 501 until authenticated durable export is implemented
 ```
+
+**Compliance archive status.** The POST endpoint returns a generated JSON diagnostic for the current request. It does not persist packet IDs, authenticate an archive issuer, or produce independently certified compliance evidence. The GET download endpoint deliberately returns `501 PACKET_EXPORT_UNAVAILABLE` for every packet ID. An earlier implementation produced placeholder ZIP files containing synthetic certificate and audit data; that behavior is prohibited. Console and CLI integrations expecting ZIP files must treat the failure as an unavailable feature until authenticated persistence, provenance validation, and a real export contract are implemented.
 
 ### Runtime & Monitoring
 
