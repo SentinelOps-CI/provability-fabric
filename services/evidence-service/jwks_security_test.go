@@ -22,7 +22,7 @@ import (
 func postJWKSValidation(t *testing.T, handler http.Handler, endpoint string) int {
 	t.Helper()
 	payload, err := json.Marshal(map[string]interface{}{
-		"raw": map[string]interface{}{"bundle_id": "test", "sig": "not-a-signature"},
+		"raw":      map[string]interface{}{"bundle_id": "test", "sig": "not-a-signature"},
 		"jwks_url": endpoint,
 	})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestJWKSFetchLimitsResponseAndRefusesRedirects(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"keys": []map[string]string{{
 					"kty": "OKP", "crv": "Ed25519",
-					"x": base64.RawURLEncoding.EncodeToString(pub),
+					"x":   base64.RawURLEncoding.EncodeToString(pub),
 					"kid": "disposable-test-root", "use": "sig", "alg": "EdDSA",
 				}},
 			})
