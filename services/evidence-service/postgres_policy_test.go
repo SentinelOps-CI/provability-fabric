@@ -204,3 +204,23 @@ func TestEvidenceWithoutDatabaseURLUsesExplicitFilesystemOnlyMode(t *testing.T) 
 		t.Fatalf("unexpected filesystem storage path: %q", service.storagePath)
 	}
 }
+
+func TestEvidenceStartupWithoutDatabaseRejectsBrokenSigner(t *testing.T) {
+	// Filesystem-only deployments must return an error, not dereference a
+	// nonexistent database when an explicitly configured signer is invalid.
+	for _, backend := range []string{"file", "kms", "vault"} {
+		t.Run(backend, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "")
+			t.Setenv("CERT_SIGNER_BACKEND", backend)
+			t.Setenv("CERT_SIGNER_FILE", filepath.Join(t.TempDir(), "missing-private-key.pem"))
+			t.Setenv("EVIDENCE_STORAGE_PATH", filepath.Join(t.TempDir(), "evidence"))
+			service, err := NewEvidenceService()
+			if service != nil || err == nil {
+				t.Fatalf("invalid signer backend %q unexpectedly initialized service", backend)
+			}
+			if !strings.Contains(err.Error(), "configured certificate signer unavailable") {
+				t.Fatalf("unexpected signer-startup error: %v", err)
+			}
+		})
+	}
+}
