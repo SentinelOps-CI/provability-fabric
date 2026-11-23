@@ -4,7 +4,6 @@
 package main
 
 import (
-	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -1020,58 +1019,18 @@ func (s *EvidenceService) buildPacketHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, packet)
 }
 
-func (s *EvidenceService) downloadPacketHandler(c *gin.Context) {
-	packetID := c.Param("id")
-
-	// Create temporary zip file
-	zipPath := filepath.Join(s.storagePath, fmt.Sprintf("packet_%s.zip", packetID))
-
-	if err := s.createPacketZip(packetID, zipPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.Header("Content-Type", "application/zip")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=compliance_packet_%s.zip", packetID))
-	c.File(zipPath)
-
-	// Clean up
-	go func() {
-		time.Sleep(1 * time.Minute)
-		os.Remove(zipPath)
-	}()
-}
-
-func (s *EvidenceService) createPacketZip(packetID, zipPath string) error {
-	file, err := os.Create(zipPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	w := zip.NewWriter(file)
-	defer w.Close()
-
-	// Add compliance artifact files (packet_id-bound)
-	files := map[string]string{
-		"cert.json":        `{"packet_id": "` + packetID + `"}`,
-		"audit-proof.json": `{"packet_id": "` + packetID + `", "proof": "generated"}`,
-		"conformance.md":   "# Conformance Report\n\nPacket: " + packetID + "\n",
-	}
-
-	for filename, content := range files {
-		f, err := w.Create(filename)
-		if err != nil {
-			return err
-		}
-
-		_, err = f.Write([]byte(content))
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+// downloadPacketHandler intentionally refuses a compliance archive. The JSON
+// packet returned by POST is not persisted, so an arbitrary packet ID cannot
+// identify authentic evidence. No archive is synthesized from that ID.
+func (_ *EvidenceService) downloadPacketHandler(c *gin.Context) {
+	writeError(
+		c,
+		http.StatusNotImplemented,
+		"PACKET_EXPORT_UNAVAILABLE",
+		"Compliance packet archives are unavailable: no authenticated, persisted packet corresponds to the requested ID",
+		"Use POST /api/v1/compliance/packet for an in-request JSON diagnostic only; it is not a certified evidence archive",
+		"",
+	)
 }
 
 func (s *EvidenceService) healthHandler(c *gin.Context) {

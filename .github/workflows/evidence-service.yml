@@ -147,6 +147,10 @@ jobs:
                   "/evidence/cert", method="POST", payload=unsafe, expected=400
               )
               assert rejected["error"]["code"] == "INVALID_CERTIFICATE", rejected
+          unavailable = call("/compliance/packet/nonpersistent-id", expected=501)
+          assert unavailable["error"]["code"] == "PACKET_EXPORT_UNAVAILABLE", unavailable
+          # No synthetic compliance archive is emitted for any packet ID.
+
           # The actual console contract is POST; a GET with a JSON body
           # remains supported only for backward compatibility.
           call("/evidence/validate", method="POST", payload={}, expected=400)
