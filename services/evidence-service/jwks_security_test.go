@@ -6,11 +6,13 @@ package main
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -47,13 +49,9 @@ func TestCallerJWKSURLCannotCauseOutboundRequest(t *testing.T) {
 	router := gin.New()
 	router.POST("/api/v1/evidence/validate", service.verifyCertHandler)
 
-	for _, configured := range []string{
-		"",
-		server.URL, // Explicit HTTP is still forbidden.
-		"https://trusted.example.org/keys",
-	} {
+	for _, configured := range []string{"", "https://trusted.example.org/keys"} {
 		t.Run(configured, func(t *testing.T) {
-			t.Setenv("EVIDENCE_TRUSTED_JWKS_URL", configured)
+			service.trustedJWKSURL = configured
 			if status := postJWKSValidation(t, router, server.URL); status != http.StatusBadRequest {
 				t.Fatalf("unapproved JWKS URL returned HTTP %d, expected 400", status)
 			}
@@ -77,8 +75,8 @@ func TestJWKSApprovalRequiresExactConfiguredHTTPSURL(t *testing.T) {
 			t.Fatalf("accepted invalid operator trust URL %q", invalid)
 		}
 	}
-	t.Setenv("EVIDENCE_TRUSTED_JWKS_URL", "https://keys.example.org/ed25519.json")
-	if err := approveJWKSURL("https://keys.example.org/ed25519.json"); err != nil {
+	service := &EvidenceService{trustedJWKSURL: "https://keys.example.org/ed25519.json"}
+	if err := service.approveJWKSURL("https://keys.example.org/ed25519.json"); err != nil {
 		t.Fatalf("rejected exact trusted URL: %v", err)
 	}
 	for _, untrusted := range []string{
@@ -86,11 +84,11 @@ func TestJWKSApprovalRequiresExactConfiguredHTTPSURL(t *testing.T) {
 		"https://untrusted.example.org/ed25519.json",
 		"http://keys.example.org/ed25519.json",
 	} {
-		if err := approveJWKSURL(untrusted); err == nil {
+		if err := service.approveJWKSURL(untrusted); err == nil {
 			t.Fatalf("approved caller-controlled URL %q", untrusted)
 		}
 	}
-	if err := approveJWKSURL(""); err != nil {
+	if err := service.approveJWKSURL(""); err != nil {
 		t.Fatalf("network-free PEM diagnostics should still work: %v", err)
 	}
 }
@@ -176,5 +174,109 @@ func TestJWKSFetchLimitsResponseAndRefusesRedirects(t *testing.T) {
 	pubs, err := fetchEd25519KeysFromJWKSWithClient(client, server.URL+"/valid")
 	if err != nil || len(pubs) != 1 || len(pubs[0]) != ed25519.PublicKeySize {
 		t.Fatalf("valid disposable Ed25519 JWKS rejected: keys=%d err=%v", len(pubs), err)
+	}
+}
+
+func TestJWKSHandlerUsesStartupSnapshotWithoutOutboundRequest(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate disposable issuer: %v", err)
+	}
+	var outbound atomic.Int64
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		outbound.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"keys": []map[string]string{{
+				"kty": "OKP", "crv": "Ed25519", "kid": "fixture",
+				"x": base64.RawURLEncoding.EncodeToString(publicKey),
+			}},
+		})
+	}))
+	defer server.Close()
+	trustedURL := server.URL + "/keys"
+	publicKeys, err := fetchEd25519KeysFromJWKSWithClient(server.Client(), trustedURL)
+	if err != nil || len(publicKeys) != 1 {
+		t.Fatalf("load disposable verifier key once: keys=%d err=%v", len(publicKeys), err)
+	}
+	if outbound.Load() != 1 {
+		t.Fatalf("expected exactly one startup fetch, got %d", outbound.Load())
+	}
+
+	service := &EvidenceService{
+		trustedJWKSURL: trustedURL,
+		trustedJWKSKeys: publicKeys,
+	}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/api/v1/evidence/validate", service.verifyCertHandler)
+
+	claims := map[string]interface{}{"bundle_id": "test-fixture"}
+	canonical, err := marshalCanonicalJSON(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue := func(key ed25519.PrivateKey, endpoint string) CertValidationResponse {
+		t.Helper()
+		body := map[string]interface{}{
+			"raw": map[string]interface{}{
+				"bundle_id": "test-fixture",
+				"sig": base64.StdEncoding.EncodeToString(ed25519.Sign(key, canonical)),
+			},
+			"jwks_url": endpoint,
+		}
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/evidence/validate", bytes.NewReader(encoded))
+		req.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		if response.Code != http.StatusOK {
+			t.Fatalf("trusted-key diagnostic returned HTTP %d: %s", response.Code, response.Body.String())
+		}
+		var decoded CertValidationResponse
+		if err := json.Unmarshal(response.Body.Bytes(), &decoded); err != nil {
+			t.Fatal(err)
+		}
+		return decoded
+	}
+	valid := issue(privateKey, trustedURL)
+	if !valid.SignatureChecked || !valid.SignatureValid {
+		t.Fatalf("trusted cached key rejected signature: %+v", valid)
+	}
+	_, wrongKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged := issue(wrongKey, trustedURL)
+	if !forged.SignatureChecked || forged.SignatureValid {
+		t.Fatalf("wrong issuer key accepted: %+v", forged)
+	}
+	// Even after the operator's remote server changes, validation uses only
+	// the initial public-key snapshot. A request never triggers another fetch.
+	server.Close()
+	cached := issue(privateKey, trustedURL)
+	if !cached.SignatureValid || outbound.Load() != 1 {
+		t.Fatalf("validation contacted remote JWKS after startup: response=%+v requests=%d", cached, outbound.Load())
+	}
+}
+
+func TestConfiguredJWKSWithUntrustedTLSFailsStartup(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"keys":[]}`))
+	}))
+	defer server.Close()
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("CERT_SIGNER_BACKEND", "")
+	t.Setenv("EVIDENCE_TRUSTED_JWKS_URL", server.URL)
+	storage := filepath.Join(t.TempDir(), "evidence")
+	t.Setenv("EVIDENCE_STORAGE_PATH", storage)
+	service, err := NewEvidenceService()
+	if service != nil || err == nil || !strings.Contains(err.Error(), "load configured evidence JWKS before serving") {
+		t.Fatalf("failed to reject unavailable trusted JWKS: service=%+v err=%v", service, err)
+	}
+	if _, err := os.Stat(storage); !os.IsNotExist(err) {
+		t.Fatalf("untrusted JWKS startup created filesystem state: %v", err)
 	}
 }
