@@ -350,8 +350,19 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 	return nil
 }
 
+// validateSearchPagination rejects invalid external and internal search parameters.
+func validateSearchPagination(req CertSearchRequest) error {
+	if req.Limit < 0 || req.Offset < 0 {
+		return fmt.Errorf("limit and offset must be nonnegative")
+	}
+	return nil
+}
+
 // SearchCertificates searches for certificates based on criteria
 func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearchRequest) (*CertSearchResponse, error) {
+	if err := validateSearchPagination(req); err != nil {
+		return nil, err
+	}
 	// Set defaults
 	if req.Limit == 0 {
 		req.Limit = 100
@@ -677,15 +688,18 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	for rows.Next() {
 		var certData string
 		if err := rows.Scan(&certData); err != nil {
-			continue
+			return nil, 0, fmt.Errorf("scan certificate row: %w", err)
 		}
 
 		var cert CertV1
 		if err := json.Unmarshal([]byte(certData), &cert); err != nil {
-			continue
+			return nil, 0, fmt.Errorf("decode stored certificate row: %w", err)
 		}
 
 		certificates = append(certificates, cert)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate certificate rows: %w", err)
 	}
 
 	return certificates, total, nil
@@ -696,25 +710,58 @@ func (s *EvidenceService) searchCertsInFS(req CertSearchRequest) (*CertSearchRes
 	var certificates []CertV1
 
 	certsDir := filepath.Join(s.storagePath, "certs")
+	// A new, empty evidence store has no certificate directory.
+	dirInfo, err := os.Lstat(certsDir)
+	if os.IsNotExist(err) {
+		return &CertSearchResponse{Certificates: []CertV1{}, Total: 0, Limit: req.Limit, Offset: req.Offset}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("inspect certificate directory: %w", err)
+	}
+	if !dirInfo.IsDir() {
+		return nil, fmt.Errorf("certificate directory is not a directory")
+	}
+	root, err := os.OpenRoot(s.storagePath)
+	if err != nil {
+		return nil, fmt.Errorf("open certificate storage root: %w", err)
+	}
+	defer root.Close()
 
-	err := filepath.Walk(certsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Continue on errors
+	err = filepath.Walk(certsDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return fmt.Errorf("walk certificate storage: %w", walkErr)
 		}
-
-		if !strings.HasSuffix(path, ".cert.json") {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink in certificate storage")
+		}
+		if !strings.HasSuffix(info.Name(), ".cert.json") {
 			return nil
 		}
-
-		// Read certificate
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("certificate is not a regular file")
 		}
 
+		relative, err := filepath.Rel(s.storagePath, path)
+		if err != nil {
+			return fmt.Errorf("resolve certificate path: %w", err)
+		}
+		// Use the confined root even if a path is replaced after Walk
+		// inspects it; symlinks cannot escape the storage root.
+		file, err := root.Open(relative)
+		if err != nil {
+			return fmt.Errorf("open confined certificate: %w", err)
+		}
+		data, readErr := io.ReadAll(file)
+		closeErr := file.Close()
+		if readErr != nil {
+			return fmt.Errorf("read certificate: %w", readErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close certificate: %w", closeErr)
+		}
 		var cert CertV1
 		if err := json.Unmarshal(data, &cert); err != nil {
-			return nil
+			return fmt.Errorf("decode filesystem certificate: %w", err)
 		}
 
 		// Apply filters
@@ -748,11 +795,11 @@ func (s *EvidenceService) searchCertsInFS(req CertSearchRequest) (*CertSearchRes
 	// Apply pagination
 	total := len(certificates)
 	start := req.Offset
-	end := req.Offset + req.Limit
-
 	if start > total {
 		start = total
 	}
+	// Clamp before adding so a huge caller offset cannot wrap the integer.
+	end := start + req.Limit
 	if end > total {
 		end = total
 	}
@@ -894,6 +941,10 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 		return
 	}
 
+	if err := validateSearchPagination(req); err != nil {
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Use nonnegative limit and offset values", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
+		return
+	}
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
