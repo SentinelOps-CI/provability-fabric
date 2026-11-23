@@ -160,11 +160,12 @@ export const searchCertificates = async (request: {
   return response.data;
 };
 
+// Verification uses only operator-approved public keys. Callers must never
+// supply their own verifier as a trusted issuer for certificate evidence.
 export const verifyCertificate = async (payload: {
   raw?: any;
   cert?: any;
   jwks_url?: string;
-  pem_pub?: string;
 }) => {
   const response = await api.post('/api/v1/evidence/validate', payload);
   return response.data;
