@@ -460,10 +460,10 @@ mod tests {
         ];
         
         // Test put
-        cache.put(question_hash, &labels, tenant, results.clone(), None).await.unwrap();
+        cache.put(question_hash, &labels, tenant, 10, results.clone(), None).await.unwrap();
         
         // Test get
-        let cached = cache.get(question_hash, &labels, tenant).await;
+        let cached = cache.get(question_hash, &labels, tenant, 10).await;
         assert!(cached.is_some());
         assert_eq!(cached.unwrap().len(), 1);
         
@@ -499,14 +499,14 @@ mod tests {
         ];
         
         // Put in tenant1
-        cache.put(question_hash, &labels, tenant1, results.clone(), None).await.unwrap();
+        cache.put(question_hash, &labels, tenant1, 10, results.clone(), None).await.unwrap();
         
         // Should not find in tenant2
-        let cached = cache.get(question_hash, &labels, tenant2).await;
+        let cached = cache.get(question_hash, &labels, tenant2, 10).await;
         assert!(cached.is_none());
         
         // Should find in tenant1
-        let cached = cache.get(question_hash, &labels, tenant1).await;
+        let cached = cache.get(question_hash, &labels, tenant1, 10).await;
         assert!(cached.is_some());
     }
     
@@ -529,7 +529,7 @@ mod tests {
                     match worker % 3 {
                         0 => {
                             cache.put(
-                                &query_hash, &labels, tenant,
+                                &query_hash, &labels, tenant, 10,
                                 vec![SearchResult {
                                     document_id: "synthetic".into(),
                                     content: "synthetic".into(),
@@ -542,7 +542,7 @@ mod tests {
                             ).await.unwrap();
                         }
                         1 => {
-                            let _ = cache.get(&query_hash, &labels, tenant).await;
+                            let _ = cache.get(&query_hash, &labels, tenant, 10).await;
                         }
                         _ => {
                             cache.invalidate_tenant(tenant).await.unwrap();
@@ -581,11 +581,90 @@ mod tests {
         ];
         
         // Put and verify
-        cache.put(question_hash, &labels, tenant, results.clone(), None).await.unwrap();
-        assert!(cache.get(question_hash, &labels, tenant).await.is_some());
+        cache.put(question_hash, &labels, tenant, 10, results.clone(), None).await.unwrap();
+        assert!(cache.get(question_hash, &labels, tenant, 10).await.is_some());
         
         // Invalidate tenant
         cache.invalidate_tenant(tenant).await.unwrap();
-        assert!(cache.get(question_hash, &labels, tenant).await.is_none());
+        assert!(cache.get(question_hash, &labels, tenant, 10).await.is_none());
     }
+    #[tokio::test]
+    async fn cache_never_reuses_results_across_label_or_limit_scopes() {
+        // The old 0.7*hash + 0.3*label Jaccard formula admitted a
+        // three-label cached result for a two-label query: 0.9 >= 0.85.
+        // A returned private document must only be reused for the exact
+        // tenant, query hash, label set, and requested result count.
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let original_labels = vec![
+            "public".to_string(),
+            "confidential".to_string(),
+            "secret".to_string(),
+        ];
+        let smaller_scope = vec!["public".to_string(), "confidential".to_string()];
+        let results = vec![SearchResult {
+            document_id: "restricted-document".into(),
+            content: "synthetic secret fixture".into(),
+            content_hash: "sha256-fixture".into(),
+            score: 0.95,
+            metadata: HashMap::new(),
+            labels: original_labels.clone(),
+        }];
+        cache
+            .put("query-hash", &original_labels, "tenant-a", 10, results, None)
+            .await
+            .unwrap();
+
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 10)
+            .await
+            .is_some());
+        assert!(cache
+            .get("query-hash", &smaller_scope, "tenant-a", 10)
+            .await
+            .is_none(), "removed authorization label returned cached private results");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 1)
+            .await
+            .is_none(), "smaller result limit reused larger cached response");
+        assert!(cache
+            .get("different-query", &original_labels, "tenant-a", 10)
+            .await
+            .is_none(), "different query reused cached response");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-b", 10)
+            .await
+            .is_none(), "different tenant reused cached response");
+    }
+
+    #[tokio::test]
+    async fn cache_retains_distinct_pages_for_different_result_limits() {
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let labels = vec!["public".to_string()];
+        let result = |id: &str| SearchResult {
+            document_id: id.into(),
+            content: "synthetic public fixture".into(),
+            content_hash: "hash".into(),
+            score: 1.0,
+            metadata: HashMap::new(),
+            labels: labels.clone(),
+        };
+        cache.put("q", &labels, "tenant-a", 1, vec![result("first")], None)
+            .await.unwrap();
+        cache.put("q", &labels, "tenant-a", 2, vec![result("first"), result("second")], None)
+            .await.unwrap();
+
+        let first = cache.get("q", &labels, "tenant-a", 1).await.unwrap();
+        let both = cache.get("q", &labels, "tenant-a", 2).await.unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(both.len(), 2);
+        assert_eq!(first[0].document_id, "first");
+        assert_eq!(both[1].document_id, "second");
+    }
+
 }
