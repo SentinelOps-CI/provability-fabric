@@ -326,7 +326,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          # gosec v2.30.0 needs Go 1.25 or newer; avoid an implicit toolchain download.
+          go-version: "1.26"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -361,16 +362,21 @@ jobs:
 
       - name: Run Go security scanner
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
           # Best-effort scan; gosec exits non-zero when findings exist.
           gosec -fmt json -out gosec-results.json ./... || test -f gosec-results.json
 
-      - name: Run Rust security scanner
+      - name: Run Rust security scanner using identified upstream snapshot
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Workspace lockfile lives at repo root (sidecar-watcher has no local Cargo.lock).
-          # Exit non-zero on advisories is OK if JSON output was produced.
-          cargo audit --file Cargo.lock --json > cargo-audit-results.json \
-            || test -s cargo-audit-results.json
+          set -euo pipefail
+          # Avoid Git smart-HTTP 403 on the RustSec advisory DB. Fetch the
+          # authoritative upstream revision through GitHub REST/codeload.
+          # The script fails if the database cannot be obtained or parsed;
+          # real vulnerability findings are retained in the JSON artifact.
+          bash scripts/ci/run_rustsec_audit.sh cargo-audit-results.json
 
       - name: Upload security scan results
         uses: actions/upload-artifact@v4
@@ -382,6 +388,7 @@ jobs:
             sbom.spdx.json
             gosec-results.json
             cargo-audit-results.json
+            rustsec-database-source.json
           if-no-files-found: warn
 
   # Final Validation
@@ -394,29 +401,46 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate all components
+      - name: Identify the reporting boundary
         run: |
-          echo "Validating operational excellence components..."
-          echo "Upstream required jobs (metering, supply-chain, security) completed."
-          echo "Note: cross-region DR only validates when AWS secrets are configured; otherwise those steps are skipped without claiming a DR pass."
+          echo "Security scan job completed; advisory reports are informational."
+          echo "Conditional infrastructure steps and global CI are outside this report."
+          echo "Review uploaded scan artifacts before assessing vulnerability findings."
 
-      - name: Generate summary report
+      - name: Generate evidence-scoped summary report
+        shell: bash
         run: |
-          echo "# Operational Excellence & Market-Launch Sprint Report" > summary.md
-          echo "" >> summary.md
-          echo "## Components Validated" >> summary.md
-          echo "- ✅ Cross-region disaster recovery & zero-downtime upgrades" >> summary.md
-          echo "- ✅ Per-tenant usage metering → bill-ready cost reports" >> summary.md
-                    echo "- ✅ End-to-end supply-chain reproducibility (Nix + in-toto attestations)" >> summary.md
-          echo "" >> summary.md
-          echo "## Done-Looks-Like Checklist" >> summary.md
-          echo "- [x] Cross-region infrastructure deployed and tested" >> summary.md
-          echo "- [x] Zero-downtime upgrade automation functional" >> summary.md
-          echo "- [x] Usage metering generates bill-ready reports" >> summary.md
-                    echo "- [x] Reproducible builds with in-toto attestations" >> summary.md
-          echo "- [x] All CI checks pass with double/triple validation" >> summary.md
-          echo "- [x] Performance benchmarks meet targets" >> summary.md
-          echo "- [x] Security scanning completed without critical issues" >> summary.md
+          set -euo pipefail
+          cat > summary.md <<'EOF'
+          # Operational workflow execution report
+
+          ## What this workflow reports
+
+          This run executes the configured metering, supply-chain,
+          integration, performance and security-scanning jobs. A successful
+          job conclusion establishes completion of its own configured steps,
+          subject to conditional skips and the tests actually performed.
+
+          ## Limits of the evidence
+
+          - Cross-region deployment and disaster-recovery steps depend on AWS
+            credentials. A successful no-credentials run does not attest to a
+            deployed region, a recovery exercise or zero-downtime upgrades.
+          - Gosec and cargo-audit produce informational JSON findings; their
+            finding exit codes are accepted when reports exist. Trivy emits a
+            SARIF report. Review the security-scan-results artifact to assess
+            actual advisories, reachability and remediation status.
+          - Scan job success is not an absence-of-vulnerabilities finding.
+            Outstanding RustSec advisories are tracked separately in #315.
+          - This workflow does not certify global CI success, production
+            deployment, reproducible release artifacts, bill-ready revenue,
+            runtime enforcement, or independent certificate provenance.
+          EOF
+          printf '\n## Linked run evidence\n\n' >> summary.md
+          printf -- '- Security scan artifact: `security-scan-results-%s`\n' \
+            "${{ github.run_id }}" >> summary.md
+          printf -- '- Workflow run: `%s`\n' "${{ github.run_id }}" >> summary.md
+          test -s summary.md
 
       - name: Upload summary report
         uses: actions/upload-artifact@v4
