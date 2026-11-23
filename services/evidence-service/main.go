@@ -190,12 +190,12 @@ type CertValidationResponse struct {
 
 // EvidenceService handles CERT-V1 storage, validation, and compliance
 type EvidenceService struct {
-	db               *sql.DB
-	storagePath      string
-	schemaData       []byte
-	signer           Signer
-	trustedJWKSURL   string
-	trustedJWKSKeys  []ed25519.PublicKey
+	db              *sql.DB
+	storagePath     string
+	schemaData      []byte
+	signer          Signer
+	trustedJWKSURL  string
+	trustedJWKSKeys []ed25519.PublicKey
 }
 
 // NewEvidenceService creates a new evidence service instance
@@ -262,7 +262,7 @@ func NewEvidenceService() (*EvidenceService, error) {
 	service := &EvidenceService{
 		db:              db,
 		storagePath:     storagePath,
-		schemaData:     schemaData,
+		schemaData:      schemaData,
 		trustedJWKSURL:  trustedJWKSURL,
 		trustedJWKSKeys: trustedJWKSKeys,
 	}
