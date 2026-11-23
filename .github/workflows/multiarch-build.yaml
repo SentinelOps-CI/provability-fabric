@@ -3,8 +3,9 @@
 #
 # Wave 11.1 CI cost:
 # - Path-filtered to Dockerfiles + related Rust sources.
-# - Push/PR: linux/amd64 only (native ubuntu-latest; no QEMU).
-# - Schedule / version tags / workflow_dispatch: dual-arch via native
+# - Pull requests: native amd64 + arm64 images (no QEMU).
+# - Main pushes: linux/amd64 only; schedule / version tags / workflow_dispatch
+#   run dual-arch via native
 #   ubuntu-latest (amd64) + ubuntu-24.04-arm (arm64); no QEMU.
 # - Simulated canary / perf / cost jobs removed (were greenwashing).
 
@@ -24,6 +25,7 @@ on:
       - "core/crypto/dsse-rs/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - ".cargo/config.toml"
       - ".github/workflows/multiarch-build.yaml"
   pull_request:
     branches: [main]
@@ -37,6 +39,7 @@ on:
       - "core/crypto/dsse-rs/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - ".cargo/config.toml"
       - ".github/workflows/multiarch-build.yaml"
   schedule:
     # Weekly dual-arch rebuild (native amd64 + arm runners).
@@ -94,7 +97,9 @@ jobs:
           dual = False
 
           if event == "pull_request":
-              pass
+              # Verify published architectures on every affected PR, not only
+              # during scheduled production-image rebuilds.
+              want_arm64 = True
           elif event == "push":
               if ref.startswith("refs/tags/v"):
                   want_arm64 = True
