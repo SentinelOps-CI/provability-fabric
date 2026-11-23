@@ -58,7 +58,7 @@ curl --fail --silent --show-error --location \
 mkdir -p "$directory/db"
 tar -xzf "$directory/advisories.tar.gz" -C "$directory/db" --strip-components=1
 if [[ ! -d "$directory/db/crates" ]] ||
-   [[ -z "$(find "$directory/db/crates" -name 'RUSTSEC-*.toml' -print -quit)" ]]; then
+   [[ -z "$(find "$directory/db/crates" -name 'RUSTSEC-*.md' -print -quit)" ]]; then
   echo "The upstream RustSec snapshot contains no crate advisories" >&2
   exit 1
 fi
