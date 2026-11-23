@@ -36,8 +36,7 @@ jobs:
 
       - name: Build attestor image
         run: |
-          cd runtime/attestor
-          docker build -t provability-fabric/attestor:test .
+          docker build -f runtime/attestor/Dockerfile -t provability-fabric/attestor:test .
 
       - name: Build sidecar image
         run: |
