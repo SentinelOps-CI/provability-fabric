@@ -42,8 +42,8 @@ class ReceiptSigningComposeTests(unittest.TestCase):
         )
 
     @unittest.skipUnless(
-        shutil.which("bash") and shutil.which("dirname"),
-        "Bash and dirname are required for this shell negative control",
+        os.name == "posix" and shutil.which("bash") and shutil.which("dirname"),
+        "POSIX Bash and dirname are required for this shell negative control",
     )
     def test_missing_docker_is_failure_not_skip(self) -> None:
         """The Compose smoke must reject a runner without the Docker CLI."""
