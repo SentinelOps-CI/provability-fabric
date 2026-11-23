@@ -147,10 +147,42 @@ jobs:
                   "/evidence/cert", method="POST", payload=unsafe, expected=400
               )
               assert rejected["error"]["code"] == "INVALID_CERTIFICATE", rejected
-          call("/evidence/validate", payload={}, expected=400)
-          invalid = call("/evidence/validate", payload={"raw": {}}, expected=200)
+          # The actual console contract is POST; a GET with a JSON body
+          # remains supported only for backward compatibility.
+          call("/evidence/validate", method="POST", payload={}, expected=400)
+          invalid = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": {}}, expected=200,
+          )
           assert invalid["schema_valid"] is False, invalid
           assert invalid["signature_checked"] is False, invalid
+          legacy = call("/evidence/validate", method="GET", payload={"raw": {}}, expected=200)
+          assert legacy["schema_valid"] is False, legacy
+          assert legacy["signature_checked"] is False, legacy
+
+          # A structurally valid, unsigned test object must never report
+          # a checked signature. A malformed signature must be rejected.
+          shape = {
+              **certificate,
+              "permit_decision": "deny",
+              "path_witness_ok": False,
+              "label_derivation_ok": False,
+              "epoch": 1,
+              "egress_profile": "test",
+          }
+          unsigned = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": shape}, expected=200,
+          )
+          assert unsigned["schema_valid"] is True, unsigned
+          assert unsigned["signature_checked"] is False, unsigned
+          forged = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": {**shape, "sig": "not-base64!"}}, expected=200,
+          )
+          assert forged["schema_valid"] is True, forged
+          assert forged["signature_checked"] is True, forged
+          assert forged["signature_valid"] is False, forged
           print("Production image health and negative HTTP behaviors observed.")
           print("No database-backed storage, signing, or proof validity is claimed.")
           PY
