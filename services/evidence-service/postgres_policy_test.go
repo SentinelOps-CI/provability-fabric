@@ -173,3 +173,17 @@ func TestEvidenceStartupRejectsReachableDatabaseWithUnusableSchema(t *testing.T)
 		t.Fatalf("unrecognized startup failure: %v", err)
 	}
 }
+
+func TestEvidenceStartupRejectsUnreachableConfiguredDatabase(t *testing.T) {
+	// A non-listening loopback port guarantees no production data access.
+	t.Setenv("DATABASE_URL", "postgres://unavailable:fixture@127.0.0.1:1/evidence?sslmode=disable&connect_timeout=1")
+	t.Setenv("EVIDENCE_STORAGE_PATH", filepath.Join(t.TempDir(), "evidence"))
+	t.Setenv("CERT_SIGNER_BACKEND", "")
+	service, err := NewEvidenceService()
+	if err == nil || service != nil {
+		t.Fatal("configured database outage was silently downgraded to local issuance")
+	}
+	if !strings.Contains(err.Error(), "configured certificate database unavailable") {
+		t.Fatalf("unexpected unreachable-database error: %v", err)
+	}
+}
