@@ -1,5 +1,9 @@
 [build]
 target-dir = "target"
+
+# Preserve the existing x86_64 optimization, without passing x86 CPU flags to
+# native ARM64 compilers used by the multi-architecture production builds.
+[target.'cfg(target_arch = "x86_64")']
 rustflags = ["-C", "target-cpu=x86-64-v3"]
 
 [registries.crates-io]
