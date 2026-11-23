@@ -190,10 +190,12 @@ type CertValidationResponse struct {
 
 // EvidenceService handles CERT-V1 storage, validation, and compliance
 type EvidenceService struct {
-	db          *sql.DB
-	storagePath string
-	schemaData  []byte
-	signer      Signer
+	db               *sql.DB
+	storagePath      string
+	schemaData       []byte
+	signer           Signer
+	trustedJWKSURL   string
+	trustedJWKSKeys  []ed25519.PublicKey
 }
 
 // NewEvidenceService creates a new evidence service instance
@@ -215,15 +217,26 @@ func NewEvidenceService() (*EvidenceService, error) {
 		}
 	}
 
-	// A network trust root must be explicitly provisioned by the operator.
-	// Validate configuration before creating any local evidence state.
-	if configured := strings.TrimSpace(os.Getenv("EVIDENCE_TRUSTED_JWKS_URL")); configured != "" {
-		if err := validateTrustedJWKSURL(configured); err != nil {
+	// Fetch an operator-pinned JWKS only once, during startup. Inbound
+	// validation requests must never supply a network destination or trigger
+	// a key download. A configured but unreachable trust root fails startup.
+	trustedJWKSURL := strings.TrimSpace(os.Getenv("EVIDENCE_TRUSTED_JWKS_URL"))
+	var trustedJWKSKeys []ed25519.PublicKey
+	if trustedJWKSURL != "" {
+		if err := validateTrustedJWKSURL(trustedJWKSURL); err != nil {
 			if db != nil {
 				_ = db.Close()
 			}
 			return nil, fmt.Errorf("invalid configured evidence JWKS endpoint: %w", err)
 		}
+		keys, err := fetchEd25519KeysFromJWKS(trustedJWKSURL)
+		if err != nil {
+			if db != nil {
+				_ = db.Close()
+			}
+			return nil, fmt.Errorf("load configured evidence JWKS before serving: %w", err)
+		}
+		trustedJWKSKeys = keys
 	}
 
 	// Storage path
@@ -247,9 +260,11 @@ func NewEvidenceService() (*EvidenceService, error) {
 	}
 
 	service := &EvidenceService{
-		db:          db,
-		storagePath: storagePath,
-		schemaData:  schemaData,
+		db:              db,
+		storagePath:     storagePath,
+		schemaData:     schemaData,
+		trustedJWKSURL:  trustedJWKSURL,
+		trustedJWKSKeys: trustedJWKSKeys,
 	}
 
 	// A configured, unusable signer must never silently produce unsigned records.
@@ -1085,7 +1100,7 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 	}
 	// Callers cannot make the evidence service fetch arbitrary origins. A
 	// request JWKS URL is usable only if the deployment explicitly pinned it.
-	if err := approveJWKSURL(req.JWKSURL); err != nil {
+	if err := s.approveJWKSURL(req.JWKSURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unapproved JWKS endpoint"})
 		return
 	}
@@ -1134,7 +1149,7 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 			return
 		}
 		sigStr, _ := sigVal.(string)
-		valid, reason := verifySignature(canon, sigStr, req.JWKSURL, req.PEMPub)
+		valid, reason := verifySignature(canon, sigStr, s.trustedJWKSKeys, req.PEMPub)
 		resp.SignatureValid = valid
 		if !valid {
 			resp.Errors = append(resp.Errors, reason)
@@ -1165,7 +1180,7 @@ func (s *EvidenceService) quickSchemaValidate(cert map[string]interface{}) error
 	return nil
 }
 
-func verifySignature(message []byte, sigBase64 string, jwksURL string, pemPub string) (bool, string) {
+func verifySignature(message []byte, sigBase64 string, trustedKeys []ed25519.PublicKey, pemPub string) (bool, string) {
 	// decode base64 (std or url)
 	var sig []byte
 	if b, err := base64.StdEncoding.DecodeString(sigBase64); err == nil {
@@ -1183,14 +1198,11 @@ func verifySignature(message []byte, sigBase64 string, jwksURL string, pemPub st
 			}
 		}
 	}
-	// try JWKS
-	if strings.TrimSpace(jwksURL) != "" {
-		if pubs, err := fetchEd25519KeysFromJWKS(jwksURL); err == nil {
-			for _, pub := range pubs {
-				if ed25519.Verify(pub, message, sig) {
-					return true, ""
-				}
-			}
+	// These keys were loaded from a deployment-controlled URL at startup.
+	// No input supplied by a validation caller can trigger a network fetch.
+	for _, pub := range trustedKeys {
+		if ed25519.Verify(pub, message, sig) {
+			return true, ""
 		}
 	}
 	return false, "signature_mismatch"
@@ -1295,15 +1307,14 @@ func validateTrustedJWKSURL(endpoint string) error {
 
 // approveJWKSURL establishes an exact deployment-controlled origin binding.
 // An absent requested URL keeps local PEM-key diagnostics network-free.
-func approveJWKSURL(requested string) error {
+func (s *EvidenceService) approveJWKSURL(requested string) error {
 	if requested == "" {
 		return nil
 	}
-	configured := strings.TrimSpace(os.Getenv("EVIDENCE_TRUSTED_JWKS_URL"))
-	if configured == "" || requested != configured {
+	if s.trustedJWKSURL == "" || requested != s.trustedJWKSURL {
 		return fmt.Errorf("JWKS endpoint is not configured or does not match the trusted endpoint")
 	}
-	return validateTrustedJWKSURL(configured)
+	return nil
 }
 
 func fetchEd25519KeysFromJWKS(endpoint string) ([]ed25519.PublicKey, error) {
