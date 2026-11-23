@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 use crate::result_commitment::valid_result_hash;
 use base64::{engine::general_purpose::STANDARD as B64_STD, Engine as _};
 use ed25519_dalek::pkcs8::DecodePrivateKey;
-use ed25519_dalek::{Signer, SigningKey};
-use pf_dsse::verify::{canonical_receipt_payload, EnvelopeSignature};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier};
+use pf_dsse::verify::{canonical_receipt_payload, verify_envelope, EnvelopeSignature};
 use pf_dsse::{
-    verify_access_receipt, AccessReceiptPayload, Envelope, ACCESS_RECEIPT_TYPE,
+    AccessReceiptPayload, Envelope, ACCESS_RECEIPT_TYPE,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -132,16 +132,27 @@ impl ReceiptSigner {
         })
     }
 
-    /// Verify receipt signature via pf-dsse.
+    /// Check a receipt against this signer's own Ed25519 public key.
+    ///
+    /// This local consistency check is independent of the ambient DSSE opt-out
+    /// flag. External provenance still needs a separately trusted public key.
     pub fn verify_receipt(&self, receipt: &AccessReceipt) -> Result<bool> {
-        if receipt.sig.is_empty() {
+        if receipt.sign_alg != "ed25519" {
             return Ok(false);
         }
+        let signature_bytes = match B64_STD.decode(&receipt.sig) {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false),
+        };
+        let signature_bytes: [u8; 64] = match signature_bytes.try_into() {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false),
+        };
         let payload = receipt.to_payload();
-        match verify_access_receipt(&payload, &receipt.sign_alg, &receipt.sig) {
-            Ok(()) => Ok(true),
-            Err(_) => Ok(false),
-        }
+        let canonical = canonical_receipt_payload(&payload)
+            .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        Ok(self.signing_key.verifying_key().verify(&canonical, &signature).is_ok())
     }
 }
 
@@ -174,7 +185,21 @@ impl ReceiptValidator {
         }
 
         let payload = receipt.to_payload();
-        Ok(verify_access_receipt(&payload, &receipt.sign_alg, &receipt.sig).is_ok())
+        let canonical = canonical_receipt_payload(&payload)
+            .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
+        // verify_envelope always verifies against PF_TRUST_ROOT_PEM. The
+        // structural-only PF_ENFORCE_DSSE=0 mode must not assert validity
+        // at this external receipt-verification boundary.
+        let envelope = Envelope {
+            payload_type: ACCESS_RECEIPT_TYPE.to_string(),
+            payload: B64_STD.encode(canonical),
+            signatures: vec![EnvelopeSignature {
+                keyid: String::new(),
+                sig: receipt.sig.clone(),
+                alg: receipt.sign_alg.clone(),
+            }],
+        };
+        Ok(verify_envelope(&envelope, ACCESS_RECEIPT_TYPE).valid)
     }
 }
 
