@@ -197,21 +197,21 @@ type EvidenceService struct {
 
 // NewEvidenceService creates a new evidence service instance
 func NewEvidenceService() (*EvidenceService, error) {
-	// Database connection
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://postgres:password@localhost:5432/evidence?sslmode=disable"
-	}
-
-	db, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Test connection
-	if err := db.Ping(); err != nil {
-		log.Printf("Warning: Database connection failed: %v", err)
-		// Continue without database for development
+	// An explicitly configured database is a required persistence backend.
+	// Filesystem-only development is reserved for installations without a
+	// DATABASE_URL setting.
+	configuredDBURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	var db *sql.DB
+	if configuredDBURL != "" {
+		var err error
+		db, err = sql.Open("postgres", configuredDBURL)
+		if err != nil {
+			return nil, fmt.Errorf("open configured certificate database: %w", err)
+		}
+		if err := db.Ping(); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("configured certificate database unavailable: %w", err)
+		}
 	}
 
 	// Storage path
@@ -219,7 +219,12 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if storagePath == "" {
 		storagePath = "/tmp/evidence"
 	}
-	os.MkdirAll(storagePath, 0755)
+	if err := os.MkdirAll(storagePath, 0755); err != nil {
+		if db != nil {
+			_ = db.Close()
+		}
+		return nil, fmt.Errorf("prepare evidence storage directory: %w", err)
+	}
 
 	// Load CERT-V1 schema
 	schemaPath := "external/CERT-V1/schema/cert-v1.schema.json"
@@ -239,15 +244,21 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if strings.TrimSpace(os.Getenv("CERT_SIGNER_BACKEND")) != "" {
 		signer, err := newSignerFromEnv()
 		if err != nil {
-			_ = db.Close()
+			if db != nil {
+				_ = db.Close()
+			}
 			return nil, fmt.Errorf("configured certificate signer unavailable: %w", err)
 		}
 		service.signer = signer
 	}
 
-	// Initialize database schema
+	// A reachable database with an invalid RLS schema is unsafe to use.
+	// Do not claim a successful startup and fall back after a DDL failure.
 	if err := service.initializeSchema(); err != nil {
-		log.Printf("Warning: Could not initialize database schema: %v", err)
+		if db != nil {
+			_ = db.Close()
+		}
+		return nil, fmt.Errorf("initialize certificate database schema: %w", err)
 	}
 
 	return service, nil
@@ -286,13 +297,28 @@ func (s *EvidenceService) initializeSchema() error {
 	-- Row Level Security for multi-tenant isolation
 	ALTER TABLE certificates ENABLE ROW LEVEL SECURITY;
 	
-	CREATE POLICY IF NOT EXISTS tenant_isolation ON certificates
-		FOR ALL TO ALL
-		USING (tenant_id = current_setting('app.current_tenant', true));
+	-- PostgreSQL does not implement CREATE POLICY IF NOT EXISTS.
+	-- Replace only this service-owned policy within a single transaction,
+	-- preventing stale or overly permissive definitions from being reused.
+	DROP POLICY IF EXISTS tenant_isolation ON certificates;
+	CREATE POLICY tenant_isolation ON certificates
+		FOR ALL TO PUBLIC
+		USING (tenant_id = current_setting('app.current_tenant', true))
+		WITH CHECK (tenant_id = current_setting('app.current_tenant', true));
 	`
 
-	_, err := s.db.Exec(schema)
-	return err
+	tx, err := s.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("start certificate schema transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(schema); err != nil {
+		return fmt.Errorf("apply certificate schema and RLS policy: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit certificate schema and RLS policy: %w", err)
+	}
+	return nil
 }
 
 // StoreCertificate validates and stores a CERT-V1 certificate
@@ -309,10 +335,11 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 		return fmt.Errorf("certificate preparation failed: %w", err)
 	}
 
-	// Preserve the existing database-to-filesystem fallback behavior.
+	// A configured database is an authoritative persistence backend.
+	// Never report a filesystem-only issuance when its database write fails.
 	if s.db != nil {
 		if err := s.storeCertInDB(prepared); err != nil {
-			log.Printf("Warning: Database storage failed: %v", err)
+			return fmt.Errorf("database certificate storage failed: %w", err)
 		}
 	}
 
@@ -340,8 +367,7 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 		// Database search
 		certs, count, err := s.searchCertsInDB(req)
 		if err != nil {
-			log.Printf("Database search failed, falling back to filesystem: %v", err)
-			return s.searchCertsInFS(req)
+			return nil, fmt.Errorf("database certificate search failed: %w", err)
 		}
 		certificates = certs
 		total = count
