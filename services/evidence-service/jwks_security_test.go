@@ -11,8 +11,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -203,7 +203,7 @@ func TestJWKSHandlerUsesStartupSnapshotWithoutOutboundRequest(t *testing.T) {
 	}
 
 	service := &EvidenceService{
-		trustedJWKSURL: trustedURL,
+		trustedJWKSURL:  trustedURL,
 		trustedJWKSKeys: publicKeys,
 	}
 	gin.SetMode(gin.TestMode)
@@ -220,7 +220,7 @@ func TestJWKSHandlerUsesStartupSnapshotWithoutOutboundRequest(t *testing.T) {
 		body := map[string]interface{}{
 			"raw": map[string]interface{}{
 				"bundle_id": "test-fixture",
-				"sig": base64.StdEncoding.EncodeToString(ed25519.Sign(key, canonical)),
+				"sig":       base64.StdEncoding.EncodeToString(ed25519.Sign(key, canonical)),
 			},
 			"jwks_url": endpoint,
 		}
