@@ -41,6 +41,31 @@ class ReceiptSigningComposeTests(unittest.TestCase):
             (ROOT / ".dockerignore").read_text(encoding="utf-8"),
         )
 
+    @unittest.skipUnless(
+        shutil.which("bash") and shutil.which("dirname"),
+        "Bash and dirname are required for this shell negative control",
+    )
+    def test_missing_docker_is_failure_not_skip(self) -> None:
+        """The Compose smoke must reject a runner without the Docker CLI."""
+        with tempfile.TemporaryDirectory(prefix="pf-no-docker-") as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            (fake_bin / "dirname").symlink_to(shutil.which("dirname"))
+            env = os.environ.copy()
+            env["PATH"] = str(fake_bin)
+            completed = subprocess.run(
+                [shutil.which("bash"), str(SMOKE), "full"],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+            self.assertEqual(completed.returncode, 2, completed.stdout + completed.stderr)
+            self.assertIn("ERROR: docker is required", completed.stderr)
+            self.assertNotIn("smoke passed", completed.stdout)
+            self.assertNotIn("SKIP", completed.stderr)
+
     @unittest.skipUnless(shutil.which("openssl"), "OpenSSL is unavailable")
     def test_smoke_generates_then_deletes_key(self) -> None:
         completed, calls, key_path = self._execute_smoke()
