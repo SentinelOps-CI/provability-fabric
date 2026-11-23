@@ -350,8 +350,19 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 	return nil
 }
 
+// validateSearchPagination rejects invalid external and internal search parameters.
+func validateSearchPagination(req CertSearchRequest) error {
+	if req.Limit < 0 || req.Offset < 0 {
+		return fmt.Errorf("limit and offset must be nonnegative")
+	}
+	return nil
+}
+
 // SearchCertificates searches for certificates based on criteria
 func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearchRequest) (*CertSearchResponse, error) {
+	if err := validateSearchPagination(req); err != nil {
+		return nil, err
+	}
 	// Set defaults
 	if req.Limit == 0 {
 		req.Limit = 100
@@ -677,15 +688,18 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	for rows.Next() {
 		var certData string
 		if err := rows.Scan(&certData); err != nil {
-			continue
+			return nil, 0, fmt.Errorf("scan certificate row: %w", err)
 		}
 
 		var cert CertV1
 		if err := json.Unmarshal([]byte(certData), &cert); err != nil {
-			continue
+			return nil, 0, fmt.Errorf("decode stored certificate row: %w", err)
 		}
 
 		certificates = append(certificates, cert)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate certificate rows: %w", err)
 	}
 
 	return certificates, total, nil
@@ -894,6 +908,10 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 		return
 	}
 
+	if err := validateSearchPagination(req); err != nil {
+		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Use nonnegative limit and offset values", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
+		return
+	}
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
