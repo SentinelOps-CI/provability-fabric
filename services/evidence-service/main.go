@@ -7,6 +7,7 @@ import (
 	"archive/zip"
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -83,7 +84,13 @@ func newSignerFromEnv() (Signer, error) {
 			return nil, fmt.Errorf("not an Ed25519 private key")
 		}
 		if len(block.Bytes) == ed25519.PrivateKeySize {
-			return &fileSigner{priv: ed25519.PrivateKey(block.Bytes)}, nil
+			// A raw Ed25519 private key embeds the public key in its final
+			// 32 bytes. Reject mismatches instead of issuing invalid signatures.
+			reconstructed := ed25519.NewKeyFromSeed(block.Bytes[:ed25519.SeedSize])
+			if subtle.ConstantTimeCompare(reconstructed, block.Bytes) != 1 {
+				return nil, fmt.Errorf("inconsistent Ed25519 private key encoding")
+			}
+			return &fileSigner{priv: reconstructed}, nil
 		}
 		return nil, fmt.Errorf("unsupported private key format")
 	case "kms":
