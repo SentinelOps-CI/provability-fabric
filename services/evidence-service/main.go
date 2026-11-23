@@ -7,6 +7,7 @@ import (
 	"archive/zip"
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -83,13 +84,19 @@ func newSignerFromEnv() (Signer, error) {
 			return nil, fmt.Errorf("not an Ed25519 private key")
 		}
 		if len(block.Bytes) == ed25519.PrivateKeySize {
-			return &fileSigner{priv: ed25519.PrivateKey(block.Bytes)}, nil
+			// A raw Ed25519 private key embeds the public key in its final
+			// 32 bytes. Reject mismatches instead of issuing invalid signatures.
+			reconstructed := ed25519.NewKeyFromSeed(block.Bytes[:ed25519.SeedSize])
+			if subtle.ConstantTimeCompare(reconstructed, block.Bytes) != 1 {
+				return nil, fmt.Errorf("inconsistent Ed25519 private key encoding")
+			}
+			return &fileSigner{priv: reconstructed}, nil
 		}
 		return nil, fmt.Errorf("unsupported private key format")
 	case "kms":
-		return &kmsSigner{}, nil
+		return nil, fmt.Errorf("kms signing backend is not implemented")
 	case "vault":
-		return &vaultSigner{}, nil
+		return nil, fmt.Errorf("vault signing backend is not implemented")
 	default:
 		return nil, fmt.Errorf("no signer configured")
 	}
@@ -228,11 +235,14 @@ func NewEvidenceService() (*EvidenceService, error) {
 		schemaData:  schemaData,
 	}
 
-	// Initialize signer from environment (optional)
-	if signer, err := newSignerFromEnv(); err == nil {
+	// A configured, unusable signer must never silently produce unsigned records.
+	if strings.TrimSpace(os.Getenv("CERT_SIGNER_BACKEND")) != "" {
+		signer, err := newSignerFromEnv()
+		if err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("configured certificate signer unavailable: %w", err)
+		}
 		service.signer = signer
-	} else if os.Getenv("CERT_SIGNER_BACKEND") != "" {
-		log.Printf("Warning: signer init failed: %v", err)
 	}
 
 	// Initialize database schema
@@ -292,15 +302,21 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 		return fmt.Errorf("certificate validation failed: %w", err)
 	}
 
-	// Store in database
+	// Prepare one canonical, signed certificate before either persistence
+	// backend is accessed. Signing failures must leave no partial record.
+	prepared, err := s.prepareCertificate(cert)
+	if err != nil {
+		return fmt.Errorf("certificate preparation failed: %w", err)
+	}
+
+	// Preserve the existing database-to-filesystem fallback behavior.
 	if s.db != nil {
-		if err := s.storeCertInDB(cert); err != nil {
+		if err := s.storeCertInDB(prepared); err != nil {
 			log.Printf("Warning: Database storage failed: %v", err)
 		}
 	}
 
-	// Store in filesystem
-	if err := s.storeCertInFS(cert); err != nil {
+	if err := s.writeCertInFS(prepared); err != nil {
 		return fmt.Errorf("filesystem storage failed: %w", err)
 	}
 
@@ -449,8 +465,69 @@ func (s *EvidenceService) storeCertInDB(cert CertV1) error {
 	return err
 }
 
-// storeCertInFS stores certificate in filesystem
+// prepareCertificate normalizes the stored fields and signs those exact bytes.
+// It does not establish the truth of the caller-provided evidence claims.
+func (s *EvidenceService) prepareCertificate(cert CertV1) (CertV1, error) {
+	if s.signer == nil && cert.Sig != "" {
+		return CertV1{}, fmt.Errorf("pre-signed certificates require separate trusted verification")
+	}
+	// Avoid mutating the caller's map when populating permission evidence.
+	extensions := make(map[string]interface{}, len(cert.Extensions)+5)
+	for key, value := range cert.Extensions {
+		extensions[key] = value
+	}
+	cert.Extensions = extensions
+	if cert.PermitDecision != "" {
+		cert.Extensions["permit_decision"] = cert.PermitDecision
+	}
+	cert.Extensions["path_witness_ok"] = cert.PathWitnessOK
+	cert.Extensions["label_derivation_ok"] = cert.LabelDerivationOK
+	if cert.Epoch != 0 {
+		cert.Extensions["permission_epoch"] = cert.Epoch
+	}
+	if cert.EgressProfile != "" {
+		cert.Extensions["egress_profile"] = cert.EgressProfile
+	}
+
+	if s.signer != nil {
+		// Never incorporate a caller-supplied signature into a new issuance.
+		cert.Sig = ""
+		encoded, err := json.Marshal(cert)
+		if err != nil {
+			return CertV1{}, fmt.Errorf("encode certificate for signing: %w", err)
+		}
+		var claims map[string]interface{}
+		if err := json.Unmarshal(encoded, &claims); err != nil {
+			return CertV1{}, fmt.Errorf("decode certificate for signing: %w", err)
+		}
+		canonical, err := marshalCanonicalJSON(claims)
+		if err != nil {
+			return CertV1{}, fmt.Errorf("canonicalize certificate: %w", err)
+		}
+		signature, err := s.signer.Sign(canonical)
+		if err != nil {
+			return CertV1{}, fmt.Errorf("sign certificate: %w", err)
+		}
+		signatureBytes, err := base64.RawURLEncoding.DecodeString(signature)
+		if err != nil || len(signatureBytes) != ed25519.SignatureSize {
+			return CertV1{}, fmt.Errorf("signer returned invalid Ed25519 signature encoding")
+		}
+		cert.Sig = signature
+	}
+	return cert, nil
+}
+
+// storeCertInFS preserves the internal direct-call contract for storage tests.
 func (s *EvidenceService) storeCertInFS(cert CertV1) error {
+	prepared, err := s.prepareCertificate(cert)
+	if err != nil {
+		return err
+	}
+	return s.writeCertInFS(prepared)
+}
+
+// writeCertInFS persists an already prepared certificate.
+func (s *EvidenceService) writeCertInFS(cert CertV1) error {
 	// Validate again at the storage boundary for callers that bypass
 	// StoreCertificate. os.Root confines traversal through existing symlinks.
 	if err := validateEvidencePathSegment("tenant_id", cert.TenantID); err != nil {
@@ -476,36 +553,6 @@ func (s *EvidenceService) storeCertInFS(cert CertV1) error {
 	// Create a new certificate file inside the confined storage root.
 	filename := fmt.Sprintf("%d_%s.cert.json", cert.Timestamp.Unix(), uuid.New().String()[:8])
 	certPath := filepath.Join(certDir, filename)
-
-	// Ensure extensions carry key permission evidence fields for compatibility
-	if cert.Extensions == nil {
-		cert.Extensions = map[string]interface{}{}
-	}
-	if cert.PermitDecision != "" {
-		cert.Extensions["permit_decision"] = cert.PermitDecision
-	}
-	cert.Extensions["path_witness_ok"] = cert.PathWitnessOK
-	cert.Extensions["label_derivation_ok"] = cert.LabelDerivationOK
-	if cert.Epoch != 0 {
-		cert.Extensions["permission_epoch"] = cert.Epoch
-	}
-	if cert.EgressProfile != "" {
-		cert.Extensions["egress_profile"] = cert.EgressProfile
-	}
-
-	// Sign the canonical JSON (without sig) if signer configured
-	if s.signer != nil {
-		var generic map[string]interface{}
-		b, _ := json.Marshal(cert)
-		_ = json.Unmarshal(b, &generic)
-		delete(generic, "sig")
-		canon, err := marshalCanonicalJSON(generic)
-		if err == nil {
-			if sig, err := s.signer.Sign(canon); err == nil {
-				cert.Sig = sig
-			}
-		}
-	}
 
 	// Write certificate
 	certData, err := json.MarshalIndent(cert, "", "  ")
