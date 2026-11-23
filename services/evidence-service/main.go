@@ -1335,6 +1335,9 @@ func main() {
 		v1.GET("/evidence/cert/:id", service.getCertHandler)
 		v1.POST("/compliance/packet", service.buildPacketHandler)
 		v1.GET("/compliance/packet/:id", service.downloadPacketHandler)
+		// The console submits certificate payloads with POST. Keep the legacy
+		// GET-with-body route temporarily for existing callers.
+		v1.POST("/evidence/validate", service.verifyCertHandler)
 		v1.GET("/evidence/validate", service.verifyCertHandler)
 		v1.GET("/health", service.healthHandler)
 	}
