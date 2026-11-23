@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@apollo/server": "^4.9.0",
-    "@modelcontextprotocol/sdk": "^1.17.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@prisma/client": "^5.0.0",
     "axios": "^1.6.0",
     "body-parser": "^1.20.2",
