@@ -129,7 +129,7 @@ jobs:
               {
                   "service": "attestor",
                   "dockerfile": "runtime/attestor/Dockerfile",
-                  "context": "runtime/attestor",
+                  "context": ".",
               },
           ]
           if service_filter and service_filter != "all":
@@ -179,9 +179,6 @@ jobs:
           set -euo pipefail
           test -s Cargo.lock
           git diff --exit-code -- Cargo.lock
-          if [ "${{ matrix.context }}" != "." ]; then
-            cp Cargo.lock "${{ matrix.context }}/Cargo.lock"
-          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -226,6 +223,21 @@ jobs:
           # ignore-error: GHA cache export 400s must not fail the job after a successful
           # GHCR push (build+push is the gate; cache is best-effort).
           cache-to: ${{ github.event_name == 'pull_request' && 'type=inline' || format('type=gha,mode=max,scope={0}-{1},ignore-error=true', matrix.service, matrix.arch) }}
+
+      # Pull-request image builds are loaded into native Docker; assert the
+      # packaged service binary and Unix runtime identity, not just compilation.
+      - name: Verify packaged attestor binary and non-root runtime
+        if: github.event_name == 'pull_request' && matrix.service == 'attestor'
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          image="$(printf '%s\n' "$IMAGE_TAGS" | grep -m1 ':sha-')"
+          test -n "$image"
+          docker image inspect "$image" >/dev/null
+          docker run --rm --entrypoint /bin/sh "$image" \
+            -ec 'test -x /app/attestor; test "$(id -u)" -eq 1001; test "$(id -un)" = appuser'
 
       - name: Image size report
         if: github.event_name != 'pull_request'
