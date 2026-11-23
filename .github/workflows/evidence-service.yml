@@ -68,9 +68,26 @@ jobs:
           docker build --pull --tag evidence-service-ci:local .
           docker run --detach --rm --name evidence-service-ci-smoke \
             --publish 127.0.0.1:18004:8004 \
-            --env DATABASE_URL=postgres://evidence:invalid@127.0.0.1:5432/evidence?sslmode=disable \
+            --env DATABASE_URL= \
             --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
             evidence-service-ci:local
+
+      - name: Reject configured database outage in the production image
+        run: |
+          set -euo pipefail
+          error_file="$(mktemp)"
+          trap 'rm -f "$error_file"' EXIT
+          if docker run --rm --network none \
+            --env DATABASE_URL=postgres://evidence:invalid@127.0.0.1:5432/evidence?sslmode=disable \
+            evidence-service-ci:local 2>"$error_file"; then
+            echo "configured database outage incorrectly started the service" >&2
+            exit 1
+          fi
+          if ! grep -q "configured certificate database unavailable" "$error_file"; then
+            echo "service failed for an unexpected reason" >&2
+            exit 1
+          fi
+          echo "Configured database outage rejected by production image."
 
       - name: Exercise live health and rejection behavior
         run: |
