@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 use crate::result_commitment::valid_result_hash;
 use base64::{engine::general_purpose::STANDARD as B64_STD, Engine as _};
 use ed25519_dalek::pkcs8::DecodePrivateKey;
-use ed25519_dalek::{Signer, SigningKey};
-use pf_dsse::verify::{canonical_receipt_payload, EnvelopeSignature};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier};
+use pf_dsse::verify::{canonical_receipt_payload, verify_envelope, EnvelopeSignature};
 use pf_dsse::{
-    verify_access_receipt, AccessReceiptPayload, Envelope, ACCESS_RECEIPT_TYPE,
+    AccessReceiptPayload, Envelope, ACCESS_RECEIPT_TYPE,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -132,16 +132,27 @@ impl ReceiptSigner {
         })
     }
 
-    /// Verify receipt signature via pf-dsse.
+    /// Check a receipt against this signer's own Ed25519 public key.
+    ///
+    /// This local consistency check is independent of the ambient DSSE opt-out
+    /// flag. External provenance still needs a separately trusted public key.
     pub fn verify_receipt(&self, receipt: &AccessReceipt) -> Result<bool> {
-        if receipt.sig.is_empty() {
+        if receipt.sign_alg != "ed25519" {
             return Ok(false);
         }
+        let signature_bytes = match B64_STD.decode(&receipt.sig) {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false),
+        };
+        let signature_bytes: [u8; 64] = match signature_bytes.try_into() {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false),
+        };
         let payload = receipt.to_payload();
-        match verify_access_receipt(&payload, &receipt.sign_alg, &receipt.sig) {
-            Ok(()) => Ok(true),
-            Err(_) => Ok(false),
-        }
+        let canonical = canonical_receipt_payload(&payload)
+            .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        Ok(self.signing_key.verifying_key().verify(&canonical, &signature).is_ok())
     }
 }
 
@@ -174,7 +185,21 @@ impl ReceiptValidator {
         }
 
         let payload = receipt.to_payload();
-        Ok(verify_access_receipt(&payload, &receipt.sign_alg, &receipt.sig).is_ok())
+        let canonical = canonical_receipt_payload(&payload)
+            .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
+        // verify_envelope always verifies against PF_TRUST_ROOT_PEM. The
+        // structural-only PF_ENFORCE_DSSE=0 mode must not assert validity
+        // at this external receipt-verification boundary.
+        let envelope = Envelope {
+            payload_type: ACCESS_RECEIPT_TYPE.to_string(),
+            payload: B64_STD.encode(canonical),
+            signatures: vec![EnvelopeSignature {
+                keyid: String::new(),
+                sig: receipt.sig.clone(),
+                alg: receipt.sign_alg.clone(),
+            }],
+        };
+        Ok(verify_envelope(&envelope, ACCESS_RECEIPT_TYPE).valid)
     }
 }
 
@@ -204,8 +229,11 @@ fn set_test_signing_env(fixtures: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pf_dsse::verify_envelope;
     use std::fs;
+    use std::sync::Mutex;
+
+    // These fixture tests modify process-wide environment variables.
+    static RECEIPT_TEST_ENV: Mutex<()> = Mutex::new(());
 
     fn sample_receipt() -> AccessReceipt {
         AccessReceipt {
@@ -228,6 +256,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_receipt_signing_with_fixture_keys() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -246,6 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fixture_envelope_verifies() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -257,6 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_receipt_validation() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
         set_test_signing_env(&fixtures);
 
@@ -290,4 +321,63 @@ mod tests {
             assert!(!ReceiptValidator::validate_receipt(&signed_candidate).await.unwrap());
         }
     }
+    #[tokio::test]
+    async fn test_local_verifier_rejects_other_key_and_tampered_fields() {
+        // Independent keys, no trust-root or opt-out environment dependency.
+        let signer = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[17_u8; 32]),
+            key_id: "issuer-a".into(),
+        };
+        let unrelated = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[19_u8; 32]),
+            key_id: "issuer-b".into(),
+        };
+        let signed = signer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(signer.verify_receipt(&signed).unwrap());
+        assert!(!unrelated.verify_receipt(&signed).unwrap());
+
+        let mut tampered = signed.clone();
+        tampered.tenant = "other-tenant".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed.clone();
+        tampered.result_hash = "c".repeat(64);
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed.clone();
+        tampered.sig = "malformed".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+
+        tampered = signed;
+        tampered.sign_alg = "none".into();
+        assert!(!signer.verify_receipt(&tampered).unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_external_validator_never_accepts_disabled_dsse_mode() {
+        let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
+        let fixtures = crypto_fixtures_dir();
+        set_test_signing_env(&fixtures);
+        // The lower-level DSSE library deliberately supports a dev-only
+        // structural bypass. This external validator must stay strict.
+        std::env::set_var("PF_ENFORCE_DSSE", "0");
+
+        let issuer = ReceiptSigner::new().await.unwrap();
+        let signed = issuer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(ReceiptValidator::validate_receipt(&signed).await.unwrap());
+
+        let unrelated_issuer = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[29_u8; 32]),
+            key_id: "unrelated".into(),
+        };
+        let forged = unrelated_issuer.sign_receipt(&sample_receipt()).await.unwrap();
+        assert!(!ReceiptValidator::validate_receipt(&forged).await.unwrap());
+
+        std::env::remove_var("PF_TRUST_ROOT_PEM");
+        assert!(!ReceiptValidator::validate_receipt(&signed).await.unwrap());
+
+        std::env::set_var("PF_ENFORCE_DSSE", "1");
+        std::env::set_var("PF_TRUST_ROOT_PEM", fixtures.join("ed25519_public.pem"));
+    }
+
 }
