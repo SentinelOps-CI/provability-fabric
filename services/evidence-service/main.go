@@ -197,8 +197,11 @@ type EvidenceService struct {
 
 // NewEvidenceService creates a new evidence service instance
 func NewEvidenceService() (*EvidenceService, error) {
-	// Database connection
-	dbURL := os.Getenv("DATABASE_URL")
+	// An explicitly configured database is a required persistence backend.
+	// Filesystem-only development is reserved for installations without a
+	// DATABASE_URL setting.
+	configuredDBURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	dbURL := configuredDBURL
 	if dbURL == "" {
 		dbURL = "postgres://postgres:password@localhost:5432/evidence?sslmode=disable"
 	}
@@ -208,12 +211,15 @@ func NewEvidenceService() (*EvidenceService, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Preserve the documented filesystem-only development mode when
-	// PostgreSQL is unavailable. Close the unusable pool so a later database
-	// recovery cannot expose an uninitialized certificate schema.
+	// A configured database outage must never downgrade issuance to local
+	// filesystem storage. Preserve the explicitly documented development
+	// fallback only when DATABASE_URL was not provided.
 	if err := db.Ping(); err != nil {
-		log.Printf("Warning: Database connection failed; using filesystem-only mode: %v", err)
 		_ = db.Close()
+		if configuredDBURL != "" {
+			return nil, fmt.Errorf("configured certificate database unavailable: %w", err)
+		}
+		log.Printf("Warning: development database unavailable; using filesystem-only mode: %v", err)
 		db = nil
 	}
 
