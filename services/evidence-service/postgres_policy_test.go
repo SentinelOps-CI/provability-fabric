@@ -224,3 +224,46 @@ func TestEvidenceStartupWithoutDatabaseRejectsBrokenSigner(t *testing.T) {
 		})
 	}
 }
+
+func TestEvidenceDatabaseOutageCannotDowngradeToFilesystem(t *testing.T) {
+	// A closed SQL handle is a deterministic, offline simulation of a
+	// previously configured database that becomes unavailable at runtime.
+	db, err := sql.Open("postgres", "postgres://fixture:fixture@127.0.0.1:1/evidence?sslmode=disable")
+	if err != nil {
+		t.Fatalf("create database handle: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close database handle: %v", err)
+	}
+
+	ctx := context.Background()
+	storage := filepath.Join(t.TempDir(), "evidence")
+	cert := validStorageTestCertificate()
+	service := &EvidenceService{db: db, storagePath: storage}
+
+	if err := service.StoreCertificate(ctx, cert); err == nil ||
+		!strings.Contains(err.Error(), "database certificate storage failed") {
+		t.Fatalf("database outage did not reject issuance: %v", err)
+	}
+	if _, err := os.Stat(storage); !os.IsNotExist(err) {
+		t.Fatalf("failed database issuance created filesystem storage: %v", err)
+	}
+
+	// An existing, matching filesystem certificate must not be returned as
+	// a successful database search when PostgreSQL has failed.
+	filesystemService := &EvidenceService{storagePath: storage}
+	if err := filesystemService.StoreCertificate(ctx, cert); err != nil {
+		t.Fatalf("seed offline filesystem certificate: %v", err)
+	}
+	filesystemResults, err := filesystemService.SearchCertificates(ctx, CertSearchRequest{TenantID: cert.TenantID})
+	if err != nil || filesystemResults.Total != 1 {
+		t.Fatalf("filesystem positive control failed: results=%+v err=%v", filesystemResults, err)
+	}
+	result, err := service.SearchCertificates(ctx, CertSearchRequest{TenantID: cert.TenantID})
+	if err == nil || !strings.Contains(err.Error(), "database certificate search failed") {
+		t.Fatalf("database search outage was concealed: results=%+v err=%v", result, err)
+	}
+	if result != nil {
+		t.Fatalf("failed database search returned unverified fallback results: %+v", result)
+	}
+}
