@@ -201,26 +201,17 @@ func NewEvidenceService() (*EvidenceService, error) {
 	// Filesystem-only development is reserved for installations without a
 	// DATABASE_URL setting.
 	configuredDBURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	dbURL := configuredDBURL
-	if dbURL == "" {
-		dbURL = "postgres://postgres:password@localhost:5432/evidence?sslmode=disable"
-	}
-
-	db, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// A configured database outage must never downgrade issuance to local
-	// filesystem storage. Preserve the explicitly documented development
-	// fallback only when DATABASE_URL was not provided.
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		if configuredDBURL != "" {
+	var db *sql.DB
+	if configuredDBURL != "" {
+		var err error
+		db, err = sql.Open("postgres", configuredDBURL)
+		if err != nil {
+			return nil, fmt.Errorf("open configured certificate database: %w", err)
+		}
+		if err := db.Ping(); err != nil {
+			_ = db.Close()
 			return nil, fmt.Errorf("configured certificate database unavailable: %w", err)
 		}
-		log.Printf("Warning: development database unavailable; using filesystem-only mode: %v", err)
-		db = nil
 	}
 
 	// Storage path
