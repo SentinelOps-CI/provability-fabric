@@ -113,13 +113,15 @@ def alphabet : List String :=
   ["call(tool1,hash1)", "call(tool2,hash1)", "call(tool1,hash2)",
    "log(hash1)", "log(hash2)", "emit(plan1)", "emit(plan2)", "unknown"]
 
+def matrixRow (state : Nat) : String :=
+  String.intercalate "" (alphabet.map fun event =>
+    let expected := match scan state event fixture with
+      | some target => toString target
+      | none => "reject"
+    s!"{state}\t{event}\t{expected}\n")
+
 def matrix : String :=
-  String.intercalate "" (states.flatMap fun state =>
-    alphabet.map fun event =>
-      let expected := match scan state event fixture with
-        | some target => toString target
-        | none => "reject"
-      s!"{state}\t{event}\t{expected}\n")
+  String.intercalate "" (states.map matrixRow)
 
 #print axioms row_refines_scan
 #print axioms code_refines_row
