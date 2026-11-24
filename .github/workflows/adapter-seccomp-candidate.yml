@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Adapter seccomp native candidate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'adapters/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/adapter-seccomp-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native seccomp library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libseccomp-dev pkg-config
+      - name: Resolve only the upgraded binding
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set -euo pipefail
+          cargo update -p libseccomp --precise 0.4.0
+          cargo metadata --locked --format-version 1 > /tmp/seccomp-metadata.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          packages = json.loads(Path("/tmp/seccomp-metadata.json").read_text())["packages"]
+          assert not any(p["name"] == "nix" and p["version"] == "0.17.0" for p in packages)
+          assert {p["version"] for p in packages if p["name"] == "libseccomp"} == {"0.4.0"}
+          PY
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+      - name: Preserve native lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: adapter-seccomp-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Default and opt-in builds
+        run: |
+          set -euo pipefail
+          cargo test --locked -p fileread-adapter -p httpget-adapter
+          cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
+          cargo test --locked -p httpget-adapter --features seccomp --bin httpget-adapter
+          cargo build --locked -p fileread-adapter --features seccomp
+          cargo build --locked -p httpget-adapter --features seccomp
+      - name: Exercise actual filtered CLI binaries
+        run: python3 tests/test_adapter_seccomp_cli.py
