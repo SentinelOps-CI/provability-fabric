@@ -42,6 +42,7 @@ jobs:
           cargo metadata --format-version 1 > /tmp/pf-cookie-resolved.json
           git diff --check -- Cargo.lock
           git diff -- Cargo.lock
+          cp Cargo.lock /tmp/pf-cookie-candidate.lock
       - name: Preserve native candidate lockfile
         uses: actions/upload-artifact@v4
         with:
@@ -72,4 +73,4 @@ jobs:
           cargo test --locked -p egress-firewall --no-default-features
           cargo test --locked -p egress-firewall
           cargo build --locked -p egress-firewall
-          git diff --exit-code -- Cargo.lock
+          cmp /tmp/pf-cookie-candidate.lock Cargo.lock
