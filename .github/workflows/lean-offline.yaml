@@ -51,6 +51,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Test bounded mathlib retrieval control flow
+        run: python3 -m unittest discover -s tests -p test_vendor_mathlib_cache.py
+
       - name: Cache Lean toolchain
         uses: actions/cache@v4
         with:
