@@ -187,18 +187,20 @@ impl QueueManager {
         // Enqueue item
         let mut queue = self.queue.write().await;
         queue.push_back(item.clone());
-        state.current_queue_length = queue.len();
+        let queue_length = queue.len();
+        state.current_queue_length = queue_length;
         state.total_requests += 1;
+        drop(queue);
 
-        // Update metrics
-        self.update_metrics_enqueue().await;
+        // Use the observed enqueue length; do not reacquire the queue lock.
+        self.update_metrics_enqueue(queue_length).await;
 
         info!(
             "Enqueued request: {} (detector: {}, priority: {:?}, queue length: {})",
             item.id,
             item.detector_type,
             item.priority,
-            queue.len()
+            queue_length
         );
 
         Ok(())
@@ -376,11 +378,15 @@ impl QueueManager {
     async fn calculate_p95_response_time(&self) -> u64 {
         let response_times = self.response_times.read().await;
 
+        Self::p95(&response_times)
+    }
+
+    fn p95(response_times: &[u64]) -> u64 {
         if response_times.is_empty() {
             return 0;
         }
 
-        let mut sorted_times = response_times.clone();
+        let mut sorted_times = response_times.to_vec();
         sorted_times.sort_unstable();
 
         let p95_idx = (sorted_times.len() as f64 * 0.95) as usize;
@@ -389,6 +395,8 @@ impl QueueManager {
 
     /// Record response time for monitoring
     async fn record_response_time(&self, time_ms: u64) {
+        // Match strict-mode checks: acquire state before response_times.
+        let mut state = self.state.write().await;
         let mut response_times = self.response_times.write().await;
         response_times.push(time_ms);
 
@@ -397,18 +405,14 @@ impl QueueManager {
             response_times.remove(0);
         }
 
-        // Update p95 in state
-        let p95 = self.calculate_p95_response_time().await;
-        let mut state = self.state.write().await;
-        state.p95_response_time_ms = p95;
+        // Compute from the held history, without taking a nested read lock.
+        state.p95_response_time_ms = Self::p95(&response_times);
     }
 
     /// Update metrics for enqueue
-    async fn update_metrics_enqueue(&self) {
+    async fn update_metrics_enqueue(&self, queue_length: usize) {
         let mut metrics = self.metrics.write().await;
         metrics.total_enqueued += 1;
-
-        let queue_length = self.queue.read().await.len();
         metrics.average_queue_length = (metrics.average_queue_length
             * (metrics.total_enqueued - 1) as f64
             + queue_length as f64)
@@ -557,6 +561,35 @@ mod tests {
         assert!(dequeued.is_some());
         assert_eq!(dequeued.unwrap().id, "test-1");
         assert_eq!(manager.queue_length().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_queue_operations_complete_and_update_metrics() {
+        let manager = QueueManager::new(QueueManagerConfig::default());
+        let item = QueueItem {
+            id: "bounded".to_string(),
+            priority: Priority::Critical,
+            detector_type: "pii_detector".to_string(),
+            created_at: Instant::now(),
+            tenant: "test-tenant".to_string(),
+            payload_size: 1,
+        };
+        timeout(Duration::from_secs(2), async {
+            manager.enqueue(item).await.unwrap();
+            assert_eq!(manager.get_metrics().await.total_enqueued, 1);
+            let item = manager
+                .dequeue(Duration::from_millis(100))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(item.id, "bounded");
+            manager.record_response_time(42).await;
+            assert!(manager.get_state().await.p95_response_time_ms >= 42);
+            assert_eq!(manager.get_metrics().await.total_dequeued, 1);
+            assert_eq!(manager.get_state().await.current_queue_length, 0);
+        })
+        .await
+        .expect("queue operations must complete within the deadline");
     }
 
     #[tokio::test]

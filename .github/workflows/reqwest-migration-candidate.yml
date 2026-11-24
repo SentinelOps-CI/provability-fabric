@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Candidate-only native resolution; remove after committing Cargo.lock.
+# Candidate-only locked migration qualification; remove after integration.
 name: Direct Reqwest migration candidate
 
 on:
@@ -34,10 +34,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libseccomp-dev pkg-config libssl-dev protobuf-compiler
-      - name: Resolve and inspect direct HTTP client migration
+      - name: Inspect locked direct HTTP client migration
         run: |
           set -euo pipefail
-          cargo metadata --format-version 1 > /tmp/pf-reqwest-metadata.json
           cargo metadata --locked --format-version 1 > /tmp/pf-reqwest-metadata.json
           python3 - <<'PY'
           import json
@@ -78,8 +77,7 @@ jobs:
           assert new_h2 and all(v >= (0, 4, 16) for v in new_h2), new_h2
           # Kubernetes, Actix and Tonic still have legacy HTTP/TLS paths.
           PY
-          git diff --check -- Cargo.lock
-          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
           cp Cargo.lock /tmp/pf-reqwest-resolved.lock
       - name: Preserve native candidate lockfile
         uses: actions/upload-artifact@v4
@@ -90,10 +88,14 @@ jobs:
       - name: Compile all eight clients and run targeted Rust tests
         run: |
           set -euo pipefail
-          cargo test --locked --lib --bins \
+          cargo test --locked --lib --bins --no-run \
             -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
             -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
+          timeout --kill-after=10s 180s cargo test --locked -p sidecar-watcher --lib queue_manager::tests::
           cargo test --locked -p sidecar-watcher --lib cert_v1::tests::schema_validation_
+          timeout --kill-after=10s 300s cargo test --locked --lib --bins --no-fail-fast \
+            -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
+            -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
           cargo test --locked -p sidecar-watcher --test runtime_observation_tests
           cargo test --locked -p egress-firewall --no-default-features
           cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
