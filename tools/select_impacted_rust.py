@@ -28,10 +28,10 @@ PATH_TO_CRATE: list[tuple[str, str]] = [
     ("runtime/kms-proxy/", "kms-proxy"),
     ("runtime/labeler/", "labeler"),
     ("runtime/wasm-sandbox/", "wasm-sandbox"),
-    ("core/crypto/dsse-rs/", "dsse-rs"),
+    ("core/crypto/dsse-rs/", "pf-dsse"),
     ("core/sdk/rust/", "provability-fabric-core-sdk-rust"),
-    ("adapters/http-get/", "http-get"),
-    ("adapters/file-read/", "file-read"),
+    ("adapters/http-get/", "httpget-adapter"),
+    ("adapters/file-read/", "fileread-adapter"),
     ("bench/", "provability-fabric-bench"),
 ]
 

@@ -68,3 +68,44 @@ def test_impacted_only_help():
     )
     assert result.returncode == 0
     assert "build-impacted" in result.stdout or "output-dir" in result.stdout
+
+
+def test_rust_selector_matches_workspace_manifests():
+    """Every path mapping must name the actual Cargo workspace package."""
+    import runpy
+    import tomllib
+
+    root = Path(__file__).resolve().parents[2]
+    selector = runpy.run_path(str(root / "tools" / "select_impacted_rust.py"))
+    workspace = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+    expected = {}
+    for member in workspace["workspace"]["members"]:
+        manifest = tomllib.loads(
+            (root / member / "Cargo.toml").read_text(encoding="utf-8")
+        )
+        expected[member.rstrip("/") + "/"] = manifest["package"]["name"]
+
+    mappings = selector["PATH_TO_CRATE"]
+    assert len(mappings) == len(expected)
+    assert dict(mappings) == expected
+    for prefix, package in expected.items():
+        assert selector["crates_from_files"]([prefix + "Cargo.toml"]) == {package}
+
+
+def test_rust_selector_routes_adapter_and_dsse_changes():
+    """Targeted changes select real testable packages, not directory names."""
+    import runpy
+
+    root = Path(__file__).resolve().parents[2]
+    selector = runpy.run_path(str(root / "tools" / "select_impacted_rust.py"))
+    cases = {
+        "adapters/http-get/src/lib.rs": "httpget-adapter",
+        "adapters/file-read/src/lib.rs": "fileread-adapter",
+        "core/crypto/dsse-rs/src/lib.rs": "pf-dsse",
+    }
+    for path, package in cases.items():
+        result = selector["build_result"]([path], False)
+        assert result["workspace_crates"] == [package]
+        assert result["run_workspace_libs"] is True
+        assert result["run_sidecar_curated"] is False
+        assert result["full_workspace"] is False

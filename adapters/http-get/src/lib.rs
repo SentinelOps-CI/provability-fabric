@@ -208,7 +208,7 @@ impl HttpGetAdapter {
         let start_time = Instant::now();
         
         // Execute request
-        let response = self.client
+        let mut response = self.client
             .get(url)
             .send()
             .await?;
@@ -231,10 +231,24 @@ impl HttpGetAdapter {
             }
         }
         
-        // Read body with size limit
-        let body = response.bytes().await?;
-        if body.len() > self.effect_signature.max_content_length {
-            return Err("Response body exceeds size limit".into());
+        // Enforce the limit incrementally, including chunked responses without
+        // Content-Length. Never append a chunk that exceeds the remaining budget.
+        let limit = self.effect_signature.max_content_length;
+        let mut body = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if chunk.len() > limit - body.len() {
+                return Err("Response body exceeds size limit".into());
+            }
+
+            // Grow geometrically, bounded by the configured limit, rather than
+            // reserving the full allowance for every request. The HTTP stack
+            // still owns its transport buffers independently of this vector.
+            let needed = body.len() + chunk.len();
+            if needed > body.capacity() {
+                let capacity = body.capacity().saturating_mul(2).max(needed).min(limit);
+                body.try_reserve_exact(capacity - body.len())?;
+            }
+            body.extend_from_slice(&chunk);
         }
         
         // Extract security metadata
@@ -288,7 +302,7 @@ impl HttpGetAdapter {
             headers: headers.iter()
                 .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
                 .collect(),
-            body: body.to_vec(),
+            body,
             final_url,
             redirect_count: 0, // Would be tracked during redirects
             response_time_ms: response_time.as_millis() as u64,
@@ -467,6 +481,139 @@ impl HttpGetAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::task::JoinHandle;
+
+    // A real loopback HTTP peer, with an explicit incomplete-body mode.
+    // No external network, credentials, proxy settings or timing sleeps.
+    async fn response_fixture(
+        wire: &'static [u8],
+        keep_open: bool,
+    ) -> (String, JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 1024];
+            loop {
+                let count = stream.read(&mut buffer).await.unwrap();
+                assert!(count > 0, "client closed before sending request headers");
+                request.extend_from_slice(&buffer[..count]);
+                assert!(request.len() <= 8192, "fixture request exceeds header budget");
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            stream.write_all(wire).await.unwrap();
+            if keep_open {
+                // The response intentionally never completes. The test must
+                // observe the size rejection before the request timeout.
+                std::future::pending::<()>().await;
+            } else {
+                stream.shutdown().await.unwrap();
+            }
+        });
+        (format!("http://{addr}/"), task)
+    }
+
+    async fn execute_fixture(
+        wire: &'static [u8],
+        limit: usize,
+        keep_open: bool,
+    ) -> (Result<HttpGetResponse, Box<dyn Error>>, u64) {
+        let (url, server) = response_fixture(wire, keep_open).await;
+        let mut adapter = HttpGetAdapter::new(HttpGetEffect {
+            url: url.clone(),
+            max_content_length: limit,
+            timeout_ms: 30_000,
+            ..HttpGetEffect::default()
+        })
+        .unwrap();
+
+        // Isolate the loopback fixture from ambient HTTP_PROXY settings.
+        adapter.client = Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::limited(0))
+            .build()
+            .unwrap();
+
+        let result = tokio::time::timeout(Duration::from_secs(5), adapter.execute(&url, None)).await;
+        if keep_open {
+            server.abort();
+        }
+        let joined = server.await;
+        if !keep_open {
+            joined.unwrap();
+        }
+        (result.expect("response did not finish within the test deadline"), adapter.request_count)
+    }
+
+    #[tokio::test]
+    async fn bounded_body_accepts_exact_limit_across_chunks() {
+        let (result, count) = execute_fixture(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n2\r\nab\r\n2\r\ncd\r\n0\r\n\r\n",
+            4,
+            false,
+        )
+        .await;
+        let response = result.unwrap();
+        assert_eq!(response.body, b"abcd");
+        assert_eq!(response.content_length, None);
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn bounded_body_rejects_oversized_incomplete_chunked_response() {
+        let (result, count) = execute_fixture(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n3\r\ncde\r\n",
+            4,
+            true,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().to_string(), "Response body exceeds size limit");
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn bounded_body_rejects_declared_oversize_without_reading_body() {
+        let (result, count) = execute_fixture(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n",
+            4,
+            true,
+        )
+        .await;
+        assert_eq!(result.unwrap_err().to_string(), "Content length exceeds limit");
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn bounded_body_rejects_truncated_response() {
+        let (result, count) = execute_fixture(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nab",
+            4,
+            false,
+        )
+        .await;
+        assert!(result.is_err());
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn bounded_body_accepts_empty_response() {
+        let (result, count) = execute_fixture(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            4,
+            false,
+        )
+        .await;
+        let response = result.unwrap();
+        assert!(response.body.is_empty());
+        assert_eq!(response.content_length, Some(0));
+        assert_eq!(count, 1);
+    }
     
     #[test]
     fn test_effect_signature_validation() {
