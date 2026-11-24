@@ -15,7 +15,7 @@
  */
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
@@ -233,6 +233,7 @@ pub struct DFAInterpreter {
     current_state: u32,
     transition_map: HashMap<(u32, String), u32>,
     rate_limiters: HashMap<String, LegacyRateLimiter>,
+    validation_error: Option<String>,
 }
 
 impl OptimizedDFA {
@@ -741,7 +742,9 @@ impl DFAInterpreter {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
         let content = fs::read_to_string(path)?;
         let table: DFATable = serde_json::from_str(&content)?;
-        Ok(Self::from_table(table))
+        let interpreter = Self::from_table(table);
+        interpreter.validate().map_err(std::io::Error::other)?;
+        Ok(interpreter)
     }
 
     /// Create interpreter from DFA table
@@ -765,12 +768,15 @@ impl DFAInterpreter {
             );
         }
 
-        Self {
+        let mut interpreter = Self {
+            current_state: table.start,
             table,
-            current_state: 0,
             transition_map,
             rate_limiters,
-        }
+            validation_error: None,
+        };
+        interpreter.validation_error = interpreter.validate().err();
+        interpreter
     }
 
     /// Reset interpreter to start state
@@ -780,11 +786,14 @@ impl DFAInterpreter {
 
     /// Check if current state is accepting
     pub fn is_accepting(&self) -> bool {
-        self.table.accepting.contains(&self.current_state)
+        self.validation_error.is_none() && self.table.accepting.contains(&self.current_state)
     }
 
     /// Process an event and transition
     pub fn process_event(&mut self, event: &str, current_time: u64) -> Result<bool, String> {
+        if let Some(ref error) = self.validation_error {
+            return Err(format!("Invalid DFA: {error}"));
+        }
         // Check rate limits first
         if !self.check_rate_limits(event, current_time) {
             return Err("Rate limit exceeded".to_string());
@@ -849,8 +858,26 @@ impl DFAInterpreter {
             }
         }
 
+        let mut states = HashSet::new();
+        for &state in &self.table.states {
+            if !states.insert(state) {
+                return Err(format!("Duplicate DFA state {state}"));
+            }
+        }
+
+        // Reject ambiguous transitions before they can be silently overwritten.
+        let mut transition_keys = HashSet::new();
         // Check that all transition states exist
         for transition in &self.table.transitions {
+            if transition.event.is_empty() {
+                return Err("Empty DFA event".to_string());
+            }
+            if !transition_keys.insert((transition.from_state, transition.event.as_str())) {
+                return Err(format!(
+                    "Duplicate transition from state {} for event {}",
+                    transition.from_state, transition.event
+                ));
+            }
             if !self.table.states.contains(&transition.from_state) {
                 return Err(format!(
                     "From state {} not in states list",
@@ -862,6 +889,16 @@ impl DFAInterpreter {
                     "To state {} not in states list",
                     transition.to_state
                 ));
+            }
+        }
+
+        let mut rate_limit_tools = HashSet::new();
+        for limit in &self.table.rate_limits {
+            if limit.tool.is_empty() || limit.window_ms == 0 {
+                return Err("Invalid DFA rate-limit tool or window".to_string());
+            }
+            if !rate_limit_tools.insert(limit.tool.as_str()) {
+                return Err(format!("Duplicate rate limit for tool {}", limit.tool));
             }
         }
 
@@ -1092,11 +1129,23 @@ mod tests {
             states: vec![0, 1],
             start: 0,
             accepting: vec![0, 1],
-            transitions: vec![Transition {
-                from_state: 0,
-                event: "call(tool1,hash1)".to_string(),
-                to_state: 1,
-            }],
+            transitions: vec![
+                Transition {
+                    from_state: 0,
+                    event: "call(tool1,hash1)".to_string(),
+                    to_state: 1,
+                },
+                Transition {
+                    from_state: 1,
+                    event: "call(tool1,hash2)".to_string(),
+                    to_state: 1,
+                },
+                Transition {
+                    from_state: 1,
+                    event: "call(tool1,hash3)".to_string(),
+                    to_state: 0,
+                },
+            ],
             rate_limits: vec![RateLimit {
                 tool: "tool1".to_string(),
                 window_ms: 1000,
@@ -1118,6 +1167,58 @@ mod tests {
         let result = interpreter.process_event("call(tool1,hash3)", 2000);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Rate limit exceeded");
+        assert_eq!(interpreter.current_state(), 1);
+
+        // The existing closed-window contract includes the event at t=1000.
+        // At t=2001 that event expires, and the exact transition is permitted.
+        assert!(interpreter.process_event("call(tool1,hash3)", 2001).is_ok());
+        assert_eq!(interpreter.current_state(), 0);
+    }
+
+    #[test]
+    fn test_nonzero_start_and_exact_transition() {
+        let table = DFATable {
+            states: vec![7, 42],
+            start: 42,
+            accepting: vec![7],
+            transitions: vec![Transition {
+                from_state: 42,
+                event: "call(tool1,hash1)".to_string(),
+                to_state: 7,
+            }],
+            rate_limits: vec![],
+        };
+        let mut interpreter = DFAInterpreter::from_table(table);
+        assert_eq!(interpreter.current_state(), 42);
+        assert!(!interpreter.is_accepting());
+        assert!(interpreter.process_event("call(tool1,hash2)", 1000).is_err());
+        assert_eq!(interpreter.current_state(), 42);
+        assert!(interpreter.process_event("call(tool1,hash1)", 1001).is_ok());
+        assert!(interpreter.is_accepting());
+        interpreter.reset();
+        assert_eq!(interpreter.current_state(), 42);
+    }
+
+    #[test]
+    fn test_ambiguous_policy_is_rejected_at_load_and_execution() {
+        let table = DFATable {
+            states: vec![0, 1],
+            start: 0,
+            accepting: vec![0, 1],
+            transitions: vec![
+                Transition { from_state: 0, event: "log(x)".into(), to_state: 0 },
+                Transition { from_state: 0, event: "log(x)".into(), to_state: 1 },
+            ],
+            rate_limits: vec![],
+        };
+        let mut interpreter = DFAInterpreter::from_table(table.clone());
+        assert!(interpreter.validate().is_err());
+        assert!(!interpreter.is_accepting());
+        assert!(interpreter.process_event("log(x)", 1000).is_err());
+
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), serde_json::to_vec(&table).unwrap()).unwrap();
+        assert!(DFAInterpreter::from_file(file.path()).is_err());
     }
 
     #[test]

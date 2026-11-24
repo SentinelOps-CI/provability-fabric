@@ -242,15 +242,13 @@ impl Watcher {
                     info!("Loaded DFA from {}", path);
                     Some(interpreter)
                 }
-                Err(e) => {
-                    warn!("Failed to load DFA from {}: {}", path, e);
-                    None
-                }
+                Err(e) => anyhow::bail!("Failed to load configured DFA from {}: {}", path, e),
             },
-            Err(_) => {
+            Err(env::VarError::NotPresent) => {
                 info!("No DFA_PATH specified, DFA evaluation disabled");
                 None
             }
+            Err(e) => anyhow::bail!("Invalid DFA_PATH: {}", e),
         };
 
         let spec_sig = env::var("SPEC_SIG").unwrap_or_default();
