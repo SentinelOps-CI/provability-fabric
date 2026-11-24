@@ -77,6 +77,15 @@ impl VectorIndex {
     /// Add document to index
     pub async fn add_document(&self, document: Document) -> Result<()> {
         let mut docs = self.documents.write().await;
+        // Document IDs are globally unique, matching the PostgreSQL primary
+        // key. A different tenant must never replace an existing document.
+        if let Some(existing) = docs.get(&document.id) {
+            anyhow::ensure!(
+                existing.tenant == document.tenant,
+                "document ID belongs to another tenant"
+            );
+        }
+
         let mut shards = self.tenant_shards.write().await;
         let mut embeddings = self.embeddings.write().await;
 
@@ -527,6 +536,69 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].document_id, "doc1");
+    }
+
+    #[tokio::test]
+    async fn test_cross_tenant_document_replacement_is_rejected() {
+        let index = VectorIndex::new().await.unwrap();
+        let public = vec!["public".to_string()];
+        let original = Document {
+            id: "shared-id".to_string(),
+            content: "original tenant content".to_string(),
+            tenant: "tenant-a".to_string(),
+            labels: public.clone(),
+            metadata: HashMap::new(),
+            embedding: VectorIndex::generate_query_embedding("q"),
+            created_at: 1,
+            updated_at: 1,
+        };
+        index.add_document(original.clone()).await.unwrap();
+
+        let mut conflicting = original.clone();
+        conflicting.tenant = "tenant-b".to_string();
+        conflicting.content = "replacement content".to_string();
+        conflicting.embedding = vec![0.0; 128];
+        assert!(index.add_document(conflicting).await.is_err());
+
+        let retained = index
+            .get_document("shared-id", "tenant-a", &public)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained.content, original.content);
+        assert_eq!(retained.embedding, original.embedding);
+        assert!(index
+            .get_document("shared-id", "tenant-b", &public)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(!index
+            .validate_tenant_shard_access("tenant-b", "shard_tenant-b")
+            .await
+            .unwrap());
+        assert_eq!(index.get_shard_stats("tenant-a").await.unwrap().document_count, 1);
+        assert_eq!(index.get_shard_stats("tenant-b").await.unwrap().document_count, 0);
+
+        let results = index
+            .search_with_tenant_isolation("q", "tenant-a", &public, 10)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, original.content);
+        assert!((results[0].score - 1.0).abs() < 1e-5);
+
+        // Same-tenant replacement continues to work.
+        let mut updated = original;
+        updated.content = "updated tenant content".to_string();
+        updated.updated_at = 2;
+        index.add_document(updated.clone()).await.unwrap();
+        let retained = index
+            .get_document("shared-id", "tenant-a", &public)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained.content, updated.content);
+        assert_eq!(retained.updated_at, 2);
     }
 
     #[tokio::test]
