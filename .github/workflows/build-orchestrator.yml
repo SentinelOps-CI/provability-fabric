@@ -24,12 +24,12 @@ jobs:
         working-directory: services/build-orchestrator
     steps:
       - name: Checkout exact source revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go module toolchain
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: services/build-orchestrator/go.mod
           cache-dependency-path: services/build-orchestrator/go.sum

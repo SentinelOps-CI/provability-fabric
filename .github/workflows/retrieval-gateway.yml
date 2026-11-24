@@ -34,7 +34,7 @@ jobs:
     name: Build and test retrieval-gateway
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
@@ -56,7 +56,7 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_retrieval_result_commitment_v2.py' -v
 
       - name: Set up Go receipt verifier
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.23"
           cache: false
@@ -65,7 +65,7 @@ jobs:
         run: cd core/crypto/dsse && go test ./...
 
       - name: Set up Node receipt verifier
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
 

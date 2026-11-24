@@ -97,9 +97,9 @@ jobs:
     env:
       PCS_CORE_PATH: ${{ github.workspace }}/pcs-core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: SentinelOps-CI/pcs-core
           path: pcs-core
@@ -116,7 +116,7 @@ jobs:
             examples/workflow_profiles
             examples/artifact_registry.valid.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -136,7 +136,7 @@ jobs:
           PYTHONPATH="$GITHUB_WORKSPACE/pcs-core/python" "$RUNNER_TEMP/pcs-bin/pcs" --help > /dev/null
           PYTHONPATH="$GITHUB_WORKSPACE/pcs-core/python" python3 -c 'from pcs_core.paths import schemas_dir; assert schemas_dir().is_dir()'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.23"
           cache-dependency-path: |

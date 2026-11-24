@@ -44,7 +44,7 @@ jobs:
       PF_POSTGRES_TEST_APP_URL: postgres://pf_retrieval_ci:testpass@127.0.0.1:5432/postgres
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 

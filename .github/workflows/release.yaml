@@ -32,7 +32,7 @@ jobs:
       ni-passed: ${{ steps.check-ni.outputs.passed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check NI Pass Rate
         id: check-ni
@@ -65,7 +65,7 @@ jobs:
       slo-passed: ${{ steps.check-slo.outputs.passed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check SLO Compliance
         id: check-slo
@@ -102,7 +102,7 @@ jobs:
       evidence-passed: ${{ steps.check-evidence.outputs.passed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check Safety Case Evidence
         id: check-evidence
@@ -135,7 +135,7 @@ jobs:
       security-passed: ${{ steps.check-security.outputs.passed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check Security Metrics
         id: check-security
@@ -175,7 +175,7 @@ jobs:
       needs.security-fence.outputs.security-passed == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create Release
         run: |

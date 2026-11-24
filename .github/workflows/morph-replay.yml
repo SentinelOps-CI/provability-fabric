@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Package replay bundles
         run: |
@@ -63,14 +63,14 @@ jobs:
           echo '{"skipped":true,"reason":"MORPH_API_KEY not set"}' > evidence/morph/evidence-pack/summary.json
 
       - name: Upload evidence pack
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: morph-evidence-pack
           path: evidence/morph/evidence-pack/
 
       - name: Upload morph summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: morph-replay-summary
           path: evidence/morph/evidence-pack/summary.json

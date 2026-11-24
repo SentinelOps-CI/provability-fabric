@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install k6
         run: |
@@ -72,7 +72,7 @@ jobs:
             --max-fail-rate 0.01 --max-p95-ms 400 --min-checks-rate 0.99
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: edge-load-smoke-results
@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Require live edge secrets (fail-closed)
         env:
@@ -150,7 +150,7 @@ jobs:
 
       - name: Upload live results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: edge-load-full-results
           path: |
