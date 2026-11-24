@@ -144,6 +144,83 @@ mod tests {
     }
 
     #[test]
+    fn schema_validation_retains_document_and_local_file_references() {
+        let inline = serde_json::json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "definitions": {"text": {"type": "string"}},
+            "$ref": "#/definitions/text"
+        });
+        let compiled = jsonschema::JSONSchema::compile(&inline).expect("compile inline reference");
+        assert!(compiled.is_valid(&serde_json::json!("text")));
+        assert!(!compiled.is_valid(&serde_json::json!(123)));
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let target = tmp.path().join("schema.json");
+        fs::write(&target, r#"{"type":"string"}"#).expect("write local schema");
+        // The native qualification job runs on Linux. This URL also works
+        // on Unix hosts where TempDir creates paths under the normal temp root.
+        #[cfg(unix)]
+        {
+            let local = serde_json::json!({
+                "$ref": format!("file://{}", target.display())
+            });
+            let compiled = jsonschema::JSONSchema::compile(&local).expect("compile local reference");
+            assert!(compiled.is_valid(&serde_json::json!("text")));
+            assert!(!compiled.is_valid(&serde_json::json!(123)));
+        }
+    }
+
+    #[test]
+    fn schema_validation_rejects_external_http_references_without_connecting() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind fixture");
+        let address = listener.local_addr().expect("fixture address");
+        listener.set_nonblocking(true).expect("nonblocking listener");
+        let stopped = Arc::new(AtomicBool::new(false));
+        let stop_worker = Arc::clone(&stopped);
+        let worker = std::thread::spawn(move || {
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        // A real resolver would receive a valid remote schema.
+                        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+                        stream.set_write_timeout(Some(Duration::from_secs(2))).unwrap();
+                        let mut request = [0u8; 4096];
+                        let _ = stream.read(&mut request);
+                        let body = br#"{"type":"string"}"#;
+                        let header = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes());
+                        let _ = stream.write_all(body);
+                        return true;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        if stop_worker.load(Ordering::Acquire) {
+                            return false;
+                        }
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => panic!("fixture accept failed: {error}"),
+                }
+            }
+        });
+        let schema = serde_json::json!({"$ref": format!("http://{address}/schema.json")});
+        // Reference resolution may be lazy: compile and evaluate the instance.
+        let accepted = match jsonschema::JSONSchema::compile(&schema) {
+            Ok(compiled) => compiled.is_valid(&serde_json::json!("text")),
+            Err(_) => false,
+        };
+        stopped.store(true, Ordering::Release);
+        let contacted = worker.join().expect("fixture worker");
+        assert!(!contacted, "schema validation contacted the HTTP fixture");
+        assert!(!accepted, "external HTTP reference unexpectedly validated");
+    }
+
+    #[test]
     fn write_cert_with_binding_emits_binding_jsonl() {
         if !cert_schema_available() {
             eprintln!("skip: CERT-V1 schema missing");

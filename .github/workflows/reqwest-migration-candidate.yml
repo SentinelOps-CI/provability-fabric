@@ -64,12 +64,19 @@ jobs:
               ("libseccomp", "0.4.0"), ("cookie", "0.18.3"),
           ]:
               assert versions.get(name) == {version}, (name, versions.get(name))
+          assert versions.get("reqwest") == {"0.12.28"}, versions.get("reqwest")
+          schema_ids = [i for i, p in packages.items() if p["name"] == "jsonschema"]
+          assert len(schema_ids) == 1
+          schema_node = nodes[schema_ids[0]]
+          assert "resolve-http" not in schema_node["features"]
+          assert "resolve-file" in schema_node["features"]
+          assert not any(d["name"] == "reqwest" for d in schema_node["deps"])
           assert "humantime" not in versions
           assert "0.17.0" not in versions.get("nix", set())
           assert "1.0.12" in versions.get("webpki-roots", set())
           new_h2 = [tuple(map(int, v.split("."))) for v in versions.get("h2", set()) if v.startswith("0.4.")]
           assert new_h2 and all(v >= (0, 4, 16) for v in new_h2), new_h2
-          # Old transitive HTTP/TLS paths are not considered remediated here.
+          # Kubernetes, Actix and Tonic still have legacy HTTP/TLS paths.
           PY
           git diff --check -- Cargo.lock
           git diff -- Cargo.lock
@@ -86,6 +93,8 @@ jobs:
           cargo test --locked --lib --bins \
             -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
             -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
+          cargo test --locked -p sidecar-watcher --lib cert_v1::tests::schema_validation_
+          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
           cargo test --locked -p egress-firewall --no-default-features
           cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
           cargo test --locked -p httpget-adapter --features seccomp --bin httpget-adapter
