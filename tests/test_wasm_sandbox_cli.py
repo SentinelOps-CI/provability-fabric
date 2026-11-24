@@ -51,6 +51,11 @@ class SandboxCLI(unittest.TestCase):
     executable = None
     image = None
 
+    @classmethod
+    def setUpClass(cls):
+        if cls.executable is None and cls.image is None:
+            raise unittest.SkipTest("standalone CLI target must be specified")
+
     def invoke(self, wasm, *options):
         with tempfile.TemporaryDirectory(prefix="pf-wasm-cli-") as directory:
             root = pathlib.Path(directory)
