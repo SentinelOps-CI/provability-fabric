@@ -9,6 +9,7 @@ on:
     paths:
       - "runtime/wasm-sandbox/**"
       - "tests/test_wasm_sandbox_cli.py"
+      - "tests/security/malicious_adapter_test.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -18,6 +19,7 @@ on:
     paths:
       - "runtime/wasm-sandbox/**"
       - "tests/test_wasm_sandbox_cli.py"
+      - "tests/security/malicious_adapter_test.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -47,6 +49,11 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
           cargo +1.99.1 test --locked -p wasm-sandbox
+
+      - name: Execute TRUST-FIRE Phase 3 against locked native binary
+        run: |
+          cargo +1.99.1 build --locked -p wasm-sandbox
+          python3 tests/security/malicious_adapter_test.py --executable target/debug/wasm-sandbox
 
       - name: Build actual production image
         shell: bash
