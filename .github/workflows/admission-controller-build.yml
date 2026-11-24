@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Admission Controller Locked Build
+
+on:
+  pull_request:
+    paths:
+      - "runtime/admission-controller/**"
+      - ".github/workflows/admission-controller-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/admission-controller/**"
+      - ".github/workflows/admission-controller-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  admission-controller-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: runtime/admission-controller/go.mod
+          cache-dependency-path: runtime/admission-controller/go.sum
+      - name: Verify dependency checksums and compile all packages
+        working-directory: runtime/admission-controller
+        run: |
+          set -euo pipefail
+          go version
+          go mod download
+          go mod verify
+          go vet -mod=readonly ./...
+          go test -mod=readonly ./...
+          go build -mod=readonly ./...
+          git diff --exit-code -- go.mod go.sum
+      - name: Build actual admission-controller image
+        run: docker build --pull -t admission-controller-ci:local runtime/admission-controller
+      - name: Verify packaged executable
+        run: docker run --rm --entrypoint /bin/sh admission-controller-ci:local -ec 'test -x /root/admission-controller'
