@@ -83,7 +83,7 @@ fn verify_bytes(bytes: &[u8], expected: Option<&str>) -> Result<()> {
 fn engine() -> Result<Engine> {
     let mut config = Config::new();
     config.consume_fuel(true);
-    Ok(Engine::new(&config)?)
+    Engine::new(&config)
 }
 
 fn execute(engine: &Engine, module: &Module, fuel: u64) -> Result<ExecutionResult> {
