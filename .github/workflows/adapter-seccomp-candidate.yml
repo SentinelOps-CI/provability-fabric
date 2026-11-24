@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo update -p libseccomp --precise 0.4.0
-          cargo metadata --locked --format-version 1 > /tmp/seccomp-metadata.json
+          cargo metadata --locked --features httpget-adapter/seccomp,fileread-adapter/seccomp --format-version 1 > /tmp/seccomp-metadata.json
           python3 - <<'PY'
           import json
           from pathlib import Path
