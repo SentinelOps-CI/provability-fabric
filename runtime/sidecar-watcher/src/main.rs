@@ -36,12 +36,12 @@ mod privacy;
 
 use dfa::DFAInterpreter;
 use ni_monitor::{
-    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus, SecurityLabel,
+    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus,
 };
 use privacy::epsilon_guard::EpsilonGuard;
 use sidecar_watcher::assumption::{Assumption, AssumptionMonitor};
 use sidecar_watcher::egress_cert::{
-    BridgeGuarantee, EgressCertificate, PermissionEvidence, ProofHashes as CertProofHashes,
+    BridgeGuarantee, EgressCertificate, ProofHashes as CertProofHashes,
 };
 use sidecar_watcher::env_config;
 use sidecar_watcher::time_util;
@@ -317,9 +317,11 @@ impl Watcher {
             session_id: self.tenant_id.clone(),
             user_id: "system".to_string(),
             operation: action.action_type.clone(),
-            input_labels: vec![SecurityLabel::Internal], // Default input label
-            output_labels: vec![SecurityLabel::Public],  // Default output label
-            data_paths: vec!["$.data".to_string()],
+            // The observed log line contains no authenticated classifications
+            // or field paths. Missing evidence must not be replaced by labels.
+            input_labels: Vec::new(),
+            output_labels: Vec::new(),
+            data_paths: Vec::new(),
             metadata: std::collections::HashMap::new(),
         };
 
@@ -401,7 +403,7 @@ impl Watcher {
         let cert_start_time = Instant::now();
         let Some(certificate) = self.generate_egress_certificate(action) else {
             self.metrics.cert_issuance_failures.inc();
-            self.log_violation("egress certificate denied: missing or placeholder evidence hashes");
+            self.log_violation("egress certificate denied: missing verified authorization or proof evidence");
             return Ok(false);
         };
         let cert_duration = cert_start_time.elapsed();
@@ -489,10 +491,9 @@ impl Watcher {
 
     /// Generate egress certificate with PAB hashes
     ///
-    /// This method creates an egress certificate that includes the proof carries code
-    /// hashes from the PAB, providing cryptographic verification of the system's
-    /// correctness without requiring Lean proof execution at runtime.
-    fn generate_egress_certificate(&self, action: &Action) -> Option<EgressCertificate> {
+    /// Configured hashes identify artifacts; they do not verify their proofs.
+    /// The log ingestion path has no trusted permission/witness producer yet.
+    fn generate_egress_certificate(&self, _action: &Action) -> Option<EgressCertificate> {
         let session_id = self.tenant_id.clone();
         let bundle_id = format!("bundle_{}", self.spec_sig);
         let plan_hash = env_config::resolve_evidence_hash("PLAN_HASH", "test-plan-hash").ok()?;
@@ -516,43 +517,10 @@ impl Watcher {
         };
         cert.add_proof_hashes(proof_hashes);
 
-        // Add permission evidence from NI monitor state
-        let monni_statuses = self.ni_monitor.get_monni_status();
-        let path_witness_ok = monni_statuses
-            .values()
-            .all(|s| matches!(s, NIMonitorStatus::Accept | NIMonitorStatus::Inapplicable));
-        let label_derivation_ok = path_witness_ok;
+        // Do not derive permission, Merkle witness, label derivation or epoch
+        // from a local NI verdict. Leave these at their fail-closed defaults
+        // until a trusted producer verifies them for this specific action.
         let bridge = self.ni_monitor.generate_bridge_guarantee();
-        let permit_decision = if path_witness_ok && label_derivation_ok && bridge.local_checks_ok {
-            "accept"
-        } else {
-            "reject"
-        }
-        .to_string();
-
-        let permission_evidence = PermissionEvidence {
-            permit_decision,
-            path_witness_ok,
-            label_derivation_ok,
-            epoch: 1,
-            principal_id: "system".to_string(),
-            action_type: action.action_type.clone(),
-            resource_id: env_config::resolve_evidence_hash(
-                env_config::EVIDENCE_RESOURCE_ID_ENV,
-                "test-resource-id",
-            )
-            .ok()?,
-            field_path: None,
-            abac_attributes: std::collections::HashMap::new(),
-            session_attributes: std::collections::HashMap::new(),
-            scope: Some(self.tenant_id.clone()),
-            tenant: self.tenant_id.clone(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        };
-        cert.add_permission_evidence(permission_evidence);
 
         // Add bridge guarantee from NI monitor checks
         let bridge_guarantee = BridgeGuarantee {
@@ -564,6 +532,9 @@ impl Watcher {
         };
         cert.content.bridge_guarantee = bridge_guarantee;
 
+        if !certificate_evidence_complete(&cert) {
+            return None;
+        }
         Some(cert)
     }
 
@@ -693,6 +664,22 @@ impl Watcher {
 
         Ok(())
     }
+}
+
+/// Necessary evidence conditions, not a verifier of externally supplied data.
+/// This helper is used only on the internally assembled certificate candidate.
+fn certificate_evidence_complete(cert: &EgressCertificate) -> bool {
+    let evidence = &cert.content.permission_evidence;
+    let witness = &cert.content.witness_verification;
+    let bridge = &cert.content.bridge_guarantee;
+    evidence.permit_decision == "accept"
+        && evidence.path_witness_ok
+        && evidence.label_derivation_ok
+        && witness.merkle_path_valid
+        && witness.field_commit_valid
+        && witness.label_derivation_valid
+        && bridge.local_checks_ok
+        && bridge.proof_verification
 }
 
 async fn metrics_handler(
@@ -858,6 +845,19 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_local_ni_verdict_does_not_establish_permission_evidence() {
+        let mut cert = EgressCertificate::new(
+            "session".into(), "bundle".into(), "plan".into(), "policy".into(),
+        );
+        assert!(!certificate_evidence_complete(&cert));
+        cert.content.bridge_guarantee.local_checks_ok = true;
+        cert.content.bridge_guarantee.proof_verification = true;
+        assert!(!certificate_evidence_complete(&cert));
+        cert.content.permission_evidence.permit_decision = "accept".into();
+        assert!(!certificate_evidence_complete(&cert));
+    }
 
     // Note: Watcher::new() is async; this test is only illustrative and
     // not compiled in release builds.
