@@ -226,12 +226,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_egress_manager_chunks() {
-        let profile = EgressProfile::default();
+        let mut profile = EgressProfile::default();
+        profile.flush_cadence_ms = u64::MAX; // Test buffering independently of timing.
         let mut manager = EgressManager::new(profile, "session-1".to_string());
         let events = manager.write_egress(b"hello world").await.unwrap();
-        assert!(!events.is_empty());
+        assert!(events.is_empty());
+        assert_eq!(manager.get_stats().buffer_size, 11);
+        assert_eq!(manager.get_stats().total_events, 0);
+
+        let events = manager.flush_all().await.unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].sequence, 1);
+        assert_eq!(events[0].data.len(), 4096);
+        assert_eq!(&events[0].data[..11], b"hello world");
+        assert!(events[0].data[11..].iter().all(|byte| *byte == 0));
         let stats = manager.get_stats();
-        assert!(stats.total_events >= 1);
+        assert_eq!(stats.total_events, 1);
+        assert_eq!(stats.buffer_size, 0);
+        assert_eq!(stats.pending_events, 0);
         assert_eq!(manager.get_profile().name, "EGRESS-DET-P1");
     }
 }

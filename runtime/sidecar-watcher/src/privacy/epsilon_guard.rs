@@ -295,16 +295,18 @@ mod tests {
         accountant.add_query(0.1, 0.01).unwrap();
         accountant.add_query(0.2, 0.02).unwrap();
 
-        assert_eq!(accountant.epsilon, 0.3);
-        assert_eq!(accountant.delta, 0.03);
+        // Decimal fractions are inexact in binary floating point. Only the
+        // numerical test oracle changes; budget enforcement is unmodified.
+        assert!((accountant.epsilon - 0.3).abs() < 4.0 * f64::EPSILON);
+        assert!((accountant.delta - 0.03).abs() < 4.0 * f64::EPSILON);
 
         // Check budget limits
         assert!(!accountant.is_exhausted(1.0, 0.1));
         assert!(accountant.is_exhausted(0.2, 0.1));
 
         let (remaining_epsilon, remaining_delta) = accountant.remaining_budget(1.0, 0.1);
-        assert_eq!(remaining_epsilon, 0.7);
-        assert_eq!(remaining_delta, 0.07);
+        assert!((remaining_epsilon - 0.7).abs() < 4.0 * f64::EPSILON);
+        assert!((remaining_delta - 0.07).abs() < 4.0 * f64::EPSILON);
     }
 
     #[tokio::test]

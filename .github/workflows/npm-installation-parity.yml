@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: Apache-2.0
+name: npm Installation Parity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'package*.json'
+      - 'runtime/ledger/package*.json'
+      - 'core/sdk/typescript/package*.json'
+      - 'scripts/check_npm_lockfile_parity.mjs'
+      - 'tests/test_npm_lockfile_parity.mjs'
+      - '.github/workflows/npm-installation-parity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package*.json'
+      - 'runtime/ledger/package*.json'
+      - 'core/sdk/typescript/package*.json'
+      - 'scripts/check_npm_lockfile_parity.mjs'
+      - 'tests/test_npm_lockfile_parity.mjs'
+      - '.github/workflows/npm-installation-parity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  locked-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [workspace, ledger, sdk]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check direct dependency parity
+        run: |
+          node --version
+          npm --version
+          node --test tests/test_npm_lockfile_parity.mjs
+          node scripts/check_npm_lockfile_parity.mjs
+      - name: Workspace locked installation and tests
+        if: matrix.mode == 'workspace'
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run prisma:generate -w provability-fabric-ledger
+          npm run typecheck:server -w provability-fabric-ledger
+          npm test -w provability-fabric-ledger -- --runInBand
+          npm test -w @provability-fabric/core-sdk-typescript -- --runInBand
+          git diff --exit-code -- package.json package-lock.json runtime/ledger/package.json runtime/ledger/package-lock.json core/sdk/typescript/package.json core/sdk/typescript/package-lock.json
+      - name: Standalone locked installation and tests
+        if: matrix.mode != 'workspace'
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            ledger) path=runtime/ledger ;;
+            sdk) path=core/sdk/typescript ;;
+            *) exit 1 ;;
+          esac
+          # Isolate the installation to prevent npm finding the root workspace.
+          isolated="$(mktemp -d)"
+          git archive HEAD "$path" | tar -x -C "$isolated"
+          cd "$isolated/$path"
+          cp package-lock.json "$isolated/expected-lock.json"
+          cp package.json "$isolated/expected-manifest.json"
+          npm ci --no-audit --no-fund
+          if [[ "$MODE" == ledger ]]; then
+            npm run prisma:generate
+            npm run typecheck:server
+          fi
+          npm test -- --runInBand
+          cmp package-lock.json "$isolated/expected-lock.json"
+          cmp package.json "$isolated/expected-manifest.json"

@@ -595,27 +595,32 @@ mod tests {
 
     #[test]
     fn test_chunk_flushing() {
+        let event = ReplayEvent {
+            event_id: "event0".to_string(),
+            event_type: "test".to_string(),
+            timestamp: 1000,
+            payload: serde_json::Value::String("test_data".to_string()),
+            metadata: HashMap::new(),
+        };
+        let encoded = serde_json::to_vec(&event).unwrap();
         let mut config = ReplayConfig::default();
-        config.chunk_bytes = 100; // Small chunks for testing
-
+        config.chunk_bytes = encoded.len();
+        config.flush_ms = u64::MAX; // Isolate the size-triggered path.
         let mut session = ReplaySession::new("test_session".to_string(), config);
 
-        // Add events until chunk is full
-        for i in 0..10 {
-            let event = ReplayEvent {
-                event_id: format!("event{}", i),
-                event_type: "test".to_string(),
-                timestamp: 1000 + i as u64,
-                payload: serde_json::Value::String("test_data".to_string()),
-                metadata: HashMap::new(),
-            };
-
-            session.add_event(event).unwrap();
-        }
-
-        // Force flush
-        session.flush_chunk().unwrap();
+        session.add_event(event.clone()).unwrap();
+        assert_eq!(session.sequence_number, 0);
+        assert_eq!(session.chunk_buffer, encoded);
+        session.add_event(event).unwrap();
         assert_eq!(session.sequence_number, 1);
+        assert_eq!(session.chunk_buffer, encoded);
+        assert_eq!(session.events.len(), 2);
+
+        session.flush_chunk().unwrap();
+        assert_eq!(session.sequence_number, 2);
+        assert!(session.chunk_buffer.is_empty());
+        session.flush_chunk().unwrap();
+        assert_eq!(session.sequence_number, 2, "empty flush must be a no-op");
     }
 
     #[test]
