@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+# Temporary resolver for the targeted HTTP security remediation candidate.
+name: Rust HTTP security lock candidate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    if: github.head_ref == 'security/rust-actix-cookie-lock-20261124'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Resolve targeted HTTP dependency updates
+        run: |
+          set -euo pipefail
+          cargo update -p actix-web --precise 4.20.0
+          cargo update -p actix-http --precise 3.22.0
+          cargo update -p cookie@0.18.1 --precise 0.18.3
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          git diff --exit-code -- . ':!Cargo.lock'
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+      - name: Verify locked dependency resolution
+        run: |
+          set -euo pipefail
+          cargo tree --locked -i actix-web@4.20.0
+          cargo tree --locked -i actix-http@3.22.0
+          cargo tree --locked -i cookie@0.18.3
+      - name: Preserve resolver-produced lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-http-security-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
