@@ -52,6 +52,13 @@ jobs:
               deps = [d for d in nodes[workspace[name]]["deps"] if d["name"] == "reqwest"]
               assert len(deps) == 1, (name, deps)
               assert packages[deps[0]["pkg"]]["version"] == "0.12.28", (name, deps)
+          # Direct servers use the already locked Axum 0.7 / Hyper 1 graph.
+          for name in ("jwks-manager", "kms-proxy", "telemetry-service", "sidecar-watcher"):
+              deps = nodes[workspace[name]]["deps"]
+              assert not any(d["name"] == "hyper" for d in deps), name
+              axum = [d for d in deps if d["name"] == "axum"]
+              assert len(axum) == 1 and packages[axum[0]["pkg"]]["version"] == "0.7.9", (name, axum)
+              assert "http2" in nodes[axum[0]["pkg"]]["features"], name
           lock = tomllib.loads(Path("Cargo.lock").read_text())
           versions = {}
           for p in lock["package"]:
@@ -102,6 +109,12 @@ jobs:
           cargo test --locked -p sidecar-watcher --test dfa_equiv
           cargo test --locked -p sidecar-watcher --test ni_monitor_egress
           cargo test --locked -p sidecar-watcher --bin sidecar-watcher test_local_ni_verdict_does_not_establish_permission_evidence
+      - name: Qualify migrated HTTP interfaces over loopback
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          cargo test --locked -p jwks-manager -p kms-proxy -p telemetry-service --bins test_loopback_dispatch_and_body_limit -- --nocapture
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher test_metrics_http_loopback -- --nocapture
       - name: Run full native functional suites
         if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
         run: |
