@@ -20,6 +20,26 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// Length framing prevents ambiguous concatenations of adjacent fields.
+fn hash_field(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value);
+}
+
+fn hash_strings(hasher: &mut Sha256, values: &[String]) {
+    hasher.update((values.len() as u64).to_be_bytes());
+    for value in values {
+        hash_field(hasher, value.as_bytes());
+    }
+}
+
+fn hash_labels(hasher: &mut Sha256, labels: &[SecurityLabel]) {
+    hasher.update((labels.len() as u64).to_be_bytes());
+    for label in labels {
+        hash_field(hasher, label.to_string().as_bytes());
+    }
+}
+
 fn unix_timestamp_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -232,15 +252,30 @@ impl NIPrefix {
     /// to provide cryptographic proof of the prefix state.
     pub fn get_hash(&self) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(self.prefix_id.as_bytes());
-        hasher.update(self.input_label.to_string().as_bytes());
-        hasher.update(self.output_label.to_string().as_bytes());
-        hasher.update(self.created_at.to_string().as_bytes());
-        hasher.update(self.last_updated.to_string().as_bytes());
+        hash_field(&mut hasher, b"pf-ni-prefix-v2");
+        hash_field(&mut hasher, self.prefix_id.as_bytes());
+        hash_field(&mut hasher, self.input_label.to_string().as_bytes());
+        hash_field(&mut hasher, self.output_label.to_string().as_bytes());
+        hasher.update(self.created_at.to_be_bytes());
+        hasher.update(self.last_updated.to_be_bytes());
+        hasher.update((self.events.len() as u64).to_be_bytes());
 
         for event in &self.events {
-            hasher.update(event.event_id.as_bytes());
-            hasher.update(event.timestamp.to_string().as_bytes());
+            hash_field(&mut hasher, event.event_id.as_bytes());
+            hasher.update(event.timestamp.to_be_bytes());
+            hash_field(&mut hasher, event.session_id.as_bytes());
+            hash_field(&mut hasher, event.user_id.as_bytes());
+            hash_field(&mut hasher, event.operation.as_bytes());
+            hash_labels(&mut hasher, &event.input_labels);
+            hash_labels(&mut hasher, &event.output_labels);
+            hash_strings(&mut hasher, &event.data_paths);
+            let mut metadata: Vec<_> = event.metadata.iter().collect();
+            metadata.sort_unstable_by(|a, b| a.0.cmp(b.0));
+            hasher.update((metadata.len() as u64).to_be_bytes());
+            for (key, value) in metadata {
+                hash_field(&mut hasher, key.as_bytes());
+                hash_field(&mut hasher, value.as_bytes());
+            }
         }
 
         format!("{:x}", hasher.finalize())
@@ -324,6 +359,8 @@ impl ProofHashes {
 #[derive(Debug, Clone)]
 pub struct NIMonitorState {
     pub prefixes: HashMap<String, NIPrefix>,
+    // Local process-memory reference only; not an external attestation.
+    prefix_digests: HashMap<String, String>,
     pub active_sessions: HashSet<String>,
     pub violation_count: u64,
     pub last_audit: u64,
@@ -336,6 +373,7 @@ impl NIMonitorState {
     pub fn new(config: NIMonitorConfig) -> Self {
         Self {
             prefixes: HashMap::new(),
+            prefix_digests: HashMap::new(),
             active_sessions: HashSet::new(),
             violation_count: 0,
             last_audit: unix_timestamp_secs(),
@@ -367,8 +405,13 @@ impl NIMonitorState {
             return Err("Maximum number of prefixes exceeded".to_string());
         }
 
+        // Detect unexpected state changes before extending the prefix.
+        if self.prefixes.contains_key(&prefix_id) && !self.verify_prefix_integrity(&prefix_id)? {
+            return Err("NI prefix integrity mismatch".to_string());
+        }
+
         // Get or create prefix, add event, and evaluate violations in one pass.
-        let (violates, audit_prefix) = {
+        let (violates, audit_prefix, digest) = {
             let prefix = self.prefixes.entry(prefix_id.clone()).or_insert_with(|| {
                 NIPrefix::new(
                     prefix_id.clone(),
@@ -392,8 +435,9 @@ impl NIMonitorState {
             } else {
                 None
             };
-            (violates, audit_prefix)
+            (violates, audit_prefix, prefix.get_hash())
         };
+        self.prefix_digests.insert(prefix_id, digest);
 
         if violates {
             self.violation_count += 1;
@@ -515,12 +559,11 @@ impl NIMonitorState {
         let state_consistent = self.last_audit > 0 && !self.active_sessions.is_empty();
 
         // Condition 4: Proof hashes are available
-        let proof_hashes_ok = !self.proof_hashes.policy_proof_hash.is_empty()
-            && !self.proof_hashes.automata_hash.is_empty()
-            && !self.proof_hashes.labeler_hash.is_empty()
-            && !self.proof_hashes.ni_bridge_hash.is_empty();
+        let prefix_integrity_ok = self.prefixes.keys().all(|id|
+            self.verify_prefix_integrity(id).unwrap_or(false));
 
-        label_ordering_ok && no_violations && state_consistent && proof_hashes_ok
+        label_ordering_ok && no_violations && state_consistent && prefix_integrity_ok
+            && self.verify_proof_hashes()
     }
 
     /// Verify that proof hashes match expected values
@@ -528,16 +571,10 @@ impl NIMonitorState {
     /// This verification ensures that the runtime implementation matches
     /// the formal proofs and generated artifacts.
     fn verify_proof_hashes(&self) -> bool {
-        if !self.config.proof_hash_verification {
-            return true; // Verification disabled
-        }
-
-        // In a real implementation, this would verify against the actual proof hashes
-        // For now, we'll return true if the hashes are non-empty
-        !self.proof_hashes.policy_proof_hash.is_empty()
-            && !self.proof_hashes.automata_hash.is_empty()
-            && !self.proof_hashes.labeler_hash.is_empty()
-            && !self.proof_hashes.ni_bridge_hash.is_empty()
+        // No independently trusted artifact manifest is wired into this monitor.
+        // Nonempty or locally generated hashes, and disabled verification, do
+        // not establish correspondence with a reviewed proof or executable.
+        false
     }
 
     /// Get the list of bridge conditions that must hold
@@ -560,13 +597,14 @@ impl NIMonitorState {
         let mut to_remove = Vec::new();
 
         for (prefix_id, prefix) in &self.prefixes {
-            if now - prefix.last_updated > max_age_seconds {
+            if now.saturating_sub(prefix.last_updated) > max_age_seconds {
                 to_remove.push(prefix_id.clone());
             }
         }
 
         for prefix_id in to_remove {
             self.prefixes.remove(&prefix_id);
+            self.prefix_digests.remove(&prefix_id);
         }
     }
 
@@ -579,9 +617,9 @@ impl NIMonitorState {
 
         let computed_hash = prefix.get_hash();
 
-        // In a real implementation, this would compare against a stored hash
-        // For now, we just return true if the hash computation succeeds
-        Ok(!computed_hash.is_empty())
+        let expected = self.prefix_digests.get(prefix_id)
+            .ok_or_else(|| format!("No recorded digest for prefix {prefix_id}"))?;
+        Ok(&computed_hash == expected)
     }
 
     /// Update proof hashes
@@ -914,6 +952,51 @@ mod tests {
         assert_eq!(hash.len(), 64);
         assert!(hash.bytes().all(|b| b.is_ascii_hexdigit()));
         assert_eq!(prefix.get_hash(), hash);
+    }
+
+    #[test]
+    fn test_prefix_digest_detects_changed_event_content() {
+        let mut state = NIMonitorState::new(NIMonitorConfig::default());
+        let event = NIEvent {
+            event_id: "event".into(),
+            timestamp: 1000,
+            session_id: "session".into(),
+            user_id: "user".into(),
+            operation: "read".into(),
+            input_labels: vec![SecurityLabel::Internal],
+            output_labels: vec![SecurityLabel::Internal],
+            data_paths: vec!["$.data".into()],
+            metadata: HashMap::from([("a".into(), "1".into()), ("b".into(), "2".into())]),
+        };
+        state.add_event(event.clone()).unwrap();
+        let id = state.generate_prefix_id(&event);
+        assert!(state.verify_prefix_integrity(&id).unwrap());
+        let original = state.prefixes[&id].clone();
+        let mut reordered = original.clone();
+        reordered.events[0].metadata = HashMap::from([("b".into(), "2".into()), ("a".into(), "1".into())]);
+        assert_eq!(original.get_hash(), reordered.get_hash());
+
+        let mut changed = original.clone();
+        changed.events[0].output_labels = vec![SecurityLabel::Public];
+        assert_ne!(original.get_hash(), changed.get_hash());
+        let mut changed = original.clone();
+        changed.events[0].data_paths = vec!["$.other".into()];
+        assert_ne!(original.get_hash(), changed.get_hash());
+
+        state.prefixes.get_mut(&id).unwrap().events[0].user_id = "other".into();
+        assert!(!state.verify_prefix_integrity(&id).unwrap());
+        assert!(state.add_event(event).is_err());
+    }
+
+    #[test]
+    fn test_untrusted_proof_hashes_never_establish_verification() {
+        let mut state = NIMonitorState::new(NIMonitorConfig::default());
+        let mut hashes = ProofHashes::new();
+        hashes.compute_from_files("policy", "automata", "labeler");
+        state.update_proof_hashes(hashes);
+        assert!(!state.generate_bridge_guarantee().proof_verification);
+        state.config.proof_hash_verification = false;
+        assert!(!state.generate_bridge_guarantee().proof_verification);
     }
 
     #[test]
