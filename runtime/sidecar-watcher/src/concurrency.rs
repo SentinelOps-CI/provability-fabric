@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Lock-free ring buffer for high-performance event ingress
+/// Mutex-protected ring buffer for event ingress (legacy type name).
 pub struct LockFreeRingBuffer<T> {
     buffer: Mutex<Vec<T>>,
     head: AtomicUsize,
@@ -32,7 +32,7 @@ pub struct LockFreeRingBuffer<T> {
 }
 
 impl<T: Default + Clone> LockFreeRingBuffer<T> {
-    /// Create new lock-free ring buffer with power-of-2 capacity
+    /// Create a ring buffer with power-of-2 storage capacity.
     pub fn new(capacity: usize) -> Self {
         let actual_capacity = capacity.next_power_of_two();
         let buffer = Mutex::new(vec![T::default(); actual_capacity]);
@@ -563,33 +563,23 @@ mod tests {
         // Benchmark push operations
         let start = Instant::now();
         for i in 0..100_000 {
-            while buffer.push(i).is_err() {
-                thread::yield_now();
-            }
+            assert!(buffer.push(std::hint::black_box(i)).is_ok());
         }
         let push_duration = start.elapsed();
 
         // Benchmark pop operations
         let start = Instant::now();
-        let mut count = 0;
-        while let Some(_) = buffer.pop() {
-            count += 1;
+        for expected in 0..100_000 {
+            assert_eq!(std::hint::black_box(buffer.pop()), Some(expected));
         }
         let pop_duration = start.elapsed();
+        assert!(buffer.is_empty());
 
-        assert_eq!(count, 100_000);
-
-        // Performance should be sub-millisecond for 100k operations
-        assert!(
-            push_duration.as_millis() < 1,
-            "Push too slow: {:?}",
-            push_duration
-        );
-        assert!(
-            pop_duration.as_millis() < 1,
-            "Pop too slow: {:?}",
-            pop_duration
-        );
+        // Keep the original threshold in the dedicated optimized CI gate.
+        if !cfg!(debug_assertions) {
+            assert!(push_duration.as_millis() < 1, "Push too slow: {:?}", push_duration);
+            assert!(pop_duration.as_millis() < 1, "Pop too slow: {:?}", pop_duration);
+        }
 
         println!("100k push operations: {:?}", push_duration);
         println!("100k pop operations: {:?}", pop_duration);

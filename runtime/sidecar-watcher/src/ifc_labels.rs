@@ -165,11 +165,16 @@ impl OptimizedIFCManager {
         to_label: LabelId,
         prefix: LabelPrefix,
     ) -> bool {
-        // Set the corresponding bit in allow bitset
-        let key = (to_label, prefix);
-        let current_bitset = self.allow_bitsets.get(&key).copied().unwrap_or(0);
-        let new_bitset = current_bitset | (1u128 << from_label);
-        self.allow_bitsets.insert(key, new_bitset);
+        // This records a previously authorized declassification; it does not
+        // determine authorization. Reject IDs outside the supported bitset.
+        let Some(bit) = 1u128.checked_shl(from_label) else { return false; };
+        if self.get_label_by_id(from_label).is_none()
+            || self.get_label_by_id(to_label).is_none()
+            || to_label >= 128
+        {
+            return false;
+        }
+        *self.allow_bitsets.entry((to_label, prefix)).or_insert(0) |= bit;
         true
     }
 
@@ -181,11 +186,15 @@ impl OptimizedIFCManager {
         prefix: LabelPrefix,
         required_labels: &[LabelId],
     ) -> bool {
+        if label >= 128 || self.get_label_by_id(label).is_none() {
+            return false;
+        }
         let key = (label, prefix);
         if let Some(&allow_bitset) = self.allow_bitsets.get(&key) {
             // Check if all required labels are in the allow set
             for &required_label in required_labels {
-                if allow_bitset & (1u128 << required_label) == 0 {
+                let Some(bit) = 1u128.checked_shl(required_label) else { return false; };
+                if self.get_label_by_id(required_label).is_none() || allow_bitset & bit == 0 {
                     return false;
                 }
             }
@@ -590,6 +599,20 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_label_ids_do_not_grant_or_panic() {
+        let mut manager = OptimizedIFCManager::new().unwrap();
+        let internal = manager.get_label("internal").unwrap().id;
+        let secret = manager.get_label("secret").unwrap().id;
+        assert!(!manager.declassify(128, internal, 0));
+        assert!(!manager.declassify(secret, 128, 0));
+        assert!(!manager.declassify(100, internal, 0));
+        assert!(!manager.is_output_allowed(128, 0, &[]));
+        assert!(manager.declassify(secret, internal, 0));
+        assert!(!manager.is_output_allowed(internal, 0, &[128]));
+        assert!(manager.is_output_allowed(internal, 0, &[secret]));
+    }
+
+    #[test]
     fn test_label_join_caching() {
         let mut manager = OptimizedIFCManager::new().unwrap();
 
@@ -637,32 +660,26 @@ mod tests {
         // Benchmark declassify operations
         let start = std::time::Instant::now();
         for _ in 0..100_000 {
-            manager.declassify(secret_id, internal_id, 0);
+            assert!(manager.declassify(std::hint::black_box(secret_id), internal_id, 0));
         }
         let duration = start.elapsed();
 
-        // Should complete in less than 1ms for 100k operations
-        assert!(
-            duration.as_millis() < 1,
-            "Declassify too slow: {:?}",
-            duration
-        );
+        if !cfg!(debug_assertions) {
+            assert!(duration.as_millis() < 1, "Declassify too slow: {:?}", duration);
+        }
         println!("100k declassify operations took: {:?}", duration);
 
         // Benchmark output allowed checks
         let start = std::time::Instant::now();
         let required_labels = vec![secret_id];
         for _ in 0..100_000 {
-            let _ = manager.is_output_allowed(internal_id, 0, &required_labels);
+            assert!(manager.is_output_allowed(internal_id, 0, std::hint::black_box(&required_labels)));
         }
         let duration = start.elapsed();
 
-        // Should complete in less than 1ms for 100k operations
-        assert!(
-            duration.as_millis() < 1,
-            "Output check too slow: {:?}",
-            duration
-        );
+        if !cfg!(debug_assertions) {
+            assert!(duration.as_millis() < 1, "Output check too slow: {:?}", duration);
+        }
         println!("100k output checks took: {:?}", duration);
     }
 

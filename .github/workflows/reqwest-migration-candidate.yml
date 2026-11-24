@@ -85,12 +85,16 @@ jobs:
           name: reqwest-migration-native-Cargo-lock
           path: Cargo.lock
           if-no-files-found: error
-      - name: Compile all eight clients and run targeted Rust tests
+      - name: Compile all eight clients
+        id: compile
         run: |
           set -euo pipefail
           cargo test --locked --lib --bins --no-run \
             -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
             -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
+      - name: Run targeted sidecar regressions
+        run: |
+          set -euo pipefail
           timeout --kill-after=10s 180s cargo test --locked -p sidecar-watcher --lib queue_manager::tests::
           cargo test --locked -p sidecar-watcher --lib cert_v1::tests::schema_validation_
           timeout --kill-after=10s 180s cargo test --locked -p sidecar-watcher --lib ni_monitor::tests::
@@ -98,17 +102,30 @@ jobs:
           cargo test --locked -p sidecar-watcher --test dfa_equiv
           cargo test --locked -p sidecar-watcher --test ni_monitor_egress
           cargo test --locked -p sidecar-watcher --bin sidecar-watcher test_local_ni_verdict_does_not_establish_permission_evidence
+      - name: Run full native functional suites
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: |
+          set -euo pipefail
           timeout --kill-after=10s 300s cargo test --locked --lib --bins --no-fail-fast \
             -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
             -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
-          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
-          cargo test --locked -p egress-firewall --no-default-features
+      - name: Run runtime observation tests
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: cargo test --locked -p sidecar-watcher --test runtime_observation_tests
+      - name: Run firewall tests
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: cargo test --locked -p egress-firewall --no-default-features
+      - name: Run seccomp and executable adapter tests
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: |
+          set -euo pipefail
           cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
           cargo test --locked -p httpget-adapter --features seccomp --bin httpget-adapter
           cargo build --locked -p fileread-adapter --features seccomp
           cargo build --locked -p httpget-adapter --features seccomp
           python3 tests/test_adapter_seccomp_cli.py
       - name: Build the actual Alpine firewall image
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
         run: |
           set -euo pipefail
           docker build -f runtime/egress-firewall/Dockerfile -t pf-egress-reqwest:ci .
@@ -118,3 +135,14 @@ jobs:
             test -x /app/egress-firewall
           '
           cmp /tmp/pf-reqwest-resolved.lock Cargo.lock
+      - name: Enforce original sidecar timing thresholds in release mode
+        if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          lscpu
+          # Single test thread avoids concurrent timing tests competing for CPU.
+          # No threshold changes and no continue-on-error.
+          cargo test --release --locked -p sidecar-watcher --lib test_performance_benchmark -- --test-threads=1 --nocapture
+          git diff --exit-code -- Cargo.lock
