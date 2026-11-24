@@ -193,9 +193,18 @@ impl NIPrefix {
     /// Check if prefix violates non-interference
     ///
     /// This implements the exact violation detection logic required by \MonNI_L:
-    /// 1. No event input label should dominate the prefix input label
-    /// 2. No event output label should be dominated by the prefix output label
+    /// 1. Every observed input flows only to an equal or higher output label.
+    /// 2. Every input and output respects the declared prefix bounds.
+    /// This is a local label-flow check, not a proof of global noninterference.
     pub fn violates_ni(&self) -> bool {
+        for event in &self.events {
+            if event.input_labels.is_empty() || event.output_labels.is_empty()
+                || event.input_labels.iter().any(|input|
+                    event.output_labels.iter().any(|output| !input.le(output)))
+            {
+                return true;
+            }
+        }
         // Check if any event has input labels that are not dominated by the prefix input label
         for event in &self.events {
             for input_label in &event.input_labels {
@@ -345,13 +354,18 @@ impl NIMonitorState {
             return Ok(true);
         }
 
-        // Check if we've exceeded the maximum number of prefixes
-        if self.prefixes.len() >= self.config.max_prefixes {
+        // Validate the slicing boundary before constructing a prefix ID.
+        if !(8..=71).contains(&self.config.prefix_length) {
+            return Err("Invalid NI prefix length".to_string());
+        }
+        let prefix_id = self.generate_prefix_id(&event);
+
+        // Existing prefixes do not consume an additional prefix slot.
+        if !self.prefixes.contains_key(&prefix_id)
+            && self.prefixes.len() >= self.config.max_prefixes
+        {
             return Err("Maximum number of prefixes exceeded".to_string());
         }
-
-        // Generate prefix ID based on event characteristics
-        let prefix_id = self.generate_prefix_id(&event);
 
         // Get or create prefix, add event, and evaluate violations in one pass.
         let (violates, audit_prefix) = {
@@ -381,23 +395,19 @@ impl NIMonitorState {
             (violates, audit_prefix)
         };
 
-        // Check for non-interference violations
         if violates {
             self.violation_count += 1;
-
-            if self.config.strict_mode {
-                return Err("Non-interference violation detected".to_string());
-            }
         }
 
-        // Track active session
-        self.active_sessions.insert(event.session_id.clone());
-
-        // Audit logging
+        // Record denied attempts as well as accepted attempts.
         if let Some(prefix_clone) = audit_prefix {
             self.log_audit_event(&event, &prefix_clone);
         }
+        if violates && self.config.strict_mode {
+            return Err("Non-interference violation detected".to_string());
+        }
 
+        self.active_sessions.insert(event.session_id.clone());
         Ok(true)
     }
 
@@ -820,6 +830,30 @@ mod tests {
     }
 
     #[test]
+    fn test_local_flow_rejects_missing_and_mixed_labels() {
+        let mut monitor = NIMonitor::new(NIMonitorConfig::default());
+        let event = NIEvent {
+            event_id: "mixed".into(),
+            timestamp: 1000,
+            session_id: "session".into(),
+            user_id: "user".into(),
+            operation: "read".into(),
+            input_labels: vec![SecurityLabel::Public, SecurityLabel::Secret],
+            output_labels: vec![SecurityLabel::Public, SecurityLabel::Secret],
+            data_paths: vec!["$.data".into()],
+            metadata: HashMap::new(),
+        };
+        assert!(monitor.monitor_event(event.clone()).is_err());
+        let mut missing = event.clone();
+        missing.input_labels.clear();
+        assert!(monitor.monitor_event(missing).is_err());
+        let mut missing = event;
+        missing.output_labels.clear();
+        assert!(monitor.monitor_event(missing).is_err());
+        assert_eq!(monitor.get_stats().violation_count, 3);
+    }
+
+    #[test]
     fn test_ni_monitor_basic() {
         let config = NIMonitorConfig::default();
         let mut monitor = NIMonitor::new(config);
@@ -831,7 +865,7 @@ mod tests {
             user_id: "user1".to_string(),
             operation: "read".to_string(),
             input_labels: vec![SecurityLabel::Internal],
-            output_labels: vec![SecurityLabel::Public],
+            output_labels: vec![SecurityLabel::Confidential],
             data_paths: vec!["$.data".to_string()],
             metadata: HashMap::new(),
         };
@@ -877,17 +911,18 @@ mod tests {
         );
 
         let hash = prefix.get_hash();
-        assert!(!hash.is_empty());
-        assert!(hash.starts_with("prefix_"));
+        assert_eq!(hash.len(), 64);
+        assert!(hash.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert_eq!(prefix.get_hash(), hash);
     }
 
     #[test]
-    fn test_concurrency_stress() {
+    fn test_prefix_grouping_at_capacity() {
         let mut config = NIMonitorConfig::default();
-        config.max_prefixes = 1000;
+        config.max_prefixes = 100;
         let mut monitor = NIMonitor::new(config);
 
-        // Create many events to stress test the monitor
+        // Sequential events share 100 session/operation/label groups.
         for i in 0..1000 {
             let event = NIEvent {
                 event_id: format!("event_{}", i),
@@ -896,7 +931,7 @@ mod tests {
                 user_id: format!("user_{}", i % 50),
                 operation: "read".to_string(),
                 input_labels: vec![SecurityLabel::Internal],
-                output_labels: vec![SecurityLabel::Public],
+                output_labels: vec![SecurityLabel::Internal],
                 data_paths: vec![format!("$.data_{}", i)],
                 metadata: HashMap::new(),
             };
@@ -906,7 +941,8 @@ mod tests {
         }
 
         let stats = monitor.get_stats();
-        assert_eq!(stats.total_prefixes, 1000);
+        assert_eq!(stats.total_prefixes, 100);
+        assert_eq!(monitor.get_prefixes().values().map(|p| p.events.len()).sum::<usize>(), 1000);
         assert_eq!(stats.active_sessions, 100);
     }
 
@@ -948,13 +984,15 @@ mod tests {
                 user_id: format!("user_{}", i % 50),
                 operation: "read".to_string(),
                 input_labels: vec![SecurityLabel::Internal],
-                output_labels: vec![SecurityLabel::Public],
+                output_labels: vec![SecurityLabel::Internal],
                 data_paths: vec![format!("$.path_{}", i)],
                 metadata: HashMap::new(),
             };
             assert!(monitor.monitor_event(event).is_ok());
         }
 
-        println!("Processed 10000 prefixes");
+        assert_eq!(monitor.get_stats().total_prefixes, 100);
+        assert_eq!(monitor.get_prefixes().values().map(|p| p.events.len()).sum::<usize>(), 10_000);
+        assert_eq!(monitor.get_stats().violation_count, 0);
     }
 }

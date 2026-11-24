@@ -17,7 +17,7 @@ fn sample_ni_event() -> NIEvent {
         user_id: "user_123".to_string(),
         operation: "read".to_string(),
         input_labels: vec![SecurityLabel::Internal],
-        output_labels: vec![SecurityLabel::Public],
+        output_labels: vec![SecurityLabel::Internal],
         data_paths: vec!["$.data".to_string()],
         metadata: HashMap::new(),
     }
@@ -28,6 +28,15 @@ fn test_ni_monitor_accepts_valid_event() {
     let mut monitor = NIMonitor::new(NIMonitorConfig::default());
     let result = monitor.monitor_event(sample_ni_event());
     assert!(result.is_ok(), "expected NI monitor to accept valid event");
+}
+
+#[test]
+fn test_ni_monitor_rejects_downward_flow() {
+    let mut monitor = NIMonitor::new(NIMonitorConfig::default());
+    let mut event = sample_ni_event();
+    event.output_labels = vec![SecurityLabel::Public];
+    assert!(monitor.monitor_event(event).is_err());
+    assert_eq!(monitor.get_stats().violation_count, 1);
 }
 
 #[test]
