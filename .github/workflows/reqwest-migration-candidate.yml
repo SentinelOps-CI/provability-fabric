@@ -17,6 +17,34 @@ permissions:
   contents: read
 
 jobs:
+  lean-dfa-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Provision repository Lean toolchain
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
+      - name: Check refinement theorems and regenerate transition matrix
+        run: |
+          set -euo pipefail
+          lean --version
+          lean -DwarningAsError=true --run core/lean-libs/Runtime/DFAIndex.lean /tmp/pf-dfa-matrix.tsv | tee /tmp/pf-dfa-axioms.txt
+          for theorem in row_refines_scan code_refines_row encoded_refines_scan trace_refinement; do
+            grep -F "PF.Runtime.DFAIndex.$theorem" /tmp/pf-dfa-axioms.txt
+          done
+          if grep -Fq sorryAx /tmp/pf-dfa-axioms.txt; then
+            exit 1
+          fi
+          cmp /tmp/pf-dfa-matrix.tsv runtime/sidecar-watcher/tests/fixtures/dfa_lean_matrix.tsv
+          test "$(wc -l < /tmp/pf-dfa-matrix.tsv)" -eq 40
   resolve-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60

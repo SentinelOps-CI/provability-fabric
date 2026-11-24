@@ -254,6 +254,45 @@ fn reference_table() -> DFATable {
     }
 }
 
+/// The candidate CI independently regenerates this complete matrix with
+/// Lean. This test binds each expected transition to both Rust interpreters.
+#[test]
+fn test_lean_reference_matrix() {
+    let table = reference_table();
+    let indexed = OptimizedDFA::from_table(table.clone()).unwrap();
+    let mut seen = std::collections::HashSet::new();
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for line in include_str!("fixtures/dfa_lean_matrix.tsv").lines() {
+        let fields: Vec<_> = line.split('\t').collect();
+        assert_eq!(fields.len(), 3);
+        let state: u32 = fields[0].parse().unwrap();
+        let event = fields[1];
+        assert!(seen.insert((state, event)), "duplicate matrix case");
+        let expected = if fields[2] == "reject" {
+            rejected += 1;
+            None
+        } else {
+            accepted += 1;
+            Some(fields[2].parse::<u32>().unwrap())
+        };
+        assert_eq!(indexed.step(state, event), expected, "state={state} event={event}");
+        if table.states.contains(&state) {
+            let mut initial = table.clone();
+            initial.start = state;
+            // Isolate transition semantics from rate-limit history.
+            initial.rate_limits.clear();
+            let mut legacy = DFAInterpreter::from_table(initial);
+            let result = legacy.process_event(event, 0);
+            assert_eq!(result.is_ok(), expected.is_some());
+            assert_eq!(legacy.current_state(), expected.unwrap_or(state));
+        } else {
+            assert!(expected.is_none());
+        }
+    }
+    assert_eq!((seen.len(), accepted, rejected), (40, 6, 34));
+}
+
 #[test]
 fn test_indexed_reference_equivalence_5k() {
     let table = reference_table();
