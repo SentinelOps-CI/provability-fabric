@@ -69,14 +69,17 @@ jobs:
 
   rust-adapters:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
-          toolchain: stable
+          toolchain: "1.98.1"
       - name: Build Rust adapters
         run: |
-          cargo build -p httpget-adapter -p fileread-adapter
+          cargo build --locked -p httpget-adapter -p fileread-adapter
       - name: Test Rust adapters
         run: |
-          cargo test -p httpget-adapter -p fileread-adapter
+          cargo test --locked -p httpget-adapter -p fileread-adapter
+          git diff --exit-code -- Cargo.lock
