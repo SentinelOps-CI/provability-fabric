@@ -30,11 +30,15 @@ jobs:
           set -euo pipefail
           node --version
           npm --version
+          # Explicitly update the ancestor dependency and both direct versions.
+          # Express 4.21.2 pins body-parser 1.20.3.
+          npm update express body-parser cors --package-lock-only --ignore-scripts --no-audit --no-fund --workspace runtime/ledger
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund --workspace runtime/ledger
           isolated="$(mktemp -d)"
           git archive HEAD runtime/ledger | tar -x -C "$isolated"
           (
             cd "$isolated/runtime/ledger"
+            npm update express body-parser cors --package-lock-only --ignore-scripts --no-audit --no-fund
             npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           )
           cp "$isolated/runtime/ledger/package-lock.json" runtime/ledger/package-lock.json
@@ -78,6 +82,10 @@ jobs:
               "follow-redirects": {1: (1, 16, 3)},
               "@modelcontextprotocol/sdk": {1: (1, 32, 1)},
               "body-parser": {1: (1, 20, 9), 2: (2, 4, 0)},
+              "express": {4: (4, 22, 3), 5: (5, 3, 0)},
+              "cors": {2: (2, 8, 6)},
+              "qs": {6: (6, 16, 2)},
+              "path-to-regexp": {0: (0, 1, 13), 8: (8, 4, 2)},
           }
           for path in ("package-lock.json", "runtime/ledger/package-lock.json"):
               packages = json.loads(Path(path).read_text())["packages"]
@@ -88,7 +96,7 @@ jobs:
                           if actual[0] in minimums:
                               assert actual >= minimums[actual[0]], (path, key, actual, minimums[actual[0]])
               prefix = "runtime/ledger/" if path == "package-lock.json" else ""
-              for name, expected in [("@modelcontextprotocol/sdk", "1.32.1"), ("body-parser", "1.20.9")]:
+              for name, expected in [("@modelcontextprotocol/sdk", "1.32.1"), ("body-parser", "1.20.9"), ("express", "4.22.3"), ("cors", "2.8.6")]:
                   entry = packages.get(f"{prefix}node_modules/{name}") or packages.get(f"node_modules/{name}")
                   assert entry and entry["version"] == expected, (path, name, entry)
           PY
