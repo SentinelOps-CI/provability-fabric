@@ -73,6 +73,13 @@ pub fn configure(profile: Profile) -> Result<(), Box<dyn Error>> {
         ] {
             filter.add_rule(ScmpAction::Allow, ScmpSyscall::from_name(name)?)?;
         }
+        // Tokio's signal driver uses an unnamed AF_UNIX socket pair.
+        // Keep this additional capability scoped to the HTTP profile.
+        filter.add_rule_conditional(
+            ScmpAction::Allow,
+            ScmpSyscall::from_name("socketpair")?,
+            &[ScmpArgCompare::new(0, ScmpCompareOp::Equal, libc::AF_UNIX as u64)],
+        )?;
         // DNS resolution uses blocking worker threads. Do not permit
         // ordinary process creation or namespace creation through clone.
         let required = libc::CLONE_THREAD as u64;
@@ -127,6 +134,20 @@ mod tests {
         } else {
             assert!(fd >= 0, "HTTP profile must permit sockets");
             assert_eq!(unsafe { libc::close(fd) }, 0);
+        }
+        let mut pair = [-1; 2];
+        // SAFETY: pair points to two writable descriptors.
+        let result = unsafe {
+            libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM, 0, pair.as_mut_ptr())
+        };
+        if profile == Profile::HttpGet {
+            assert_eq!(result, 0, "HTTP runtime needs a Unix socket pair");
+            for fd in pair {
+                assert_eq!(unsafe { libc::close(fd) }, 0);
+            }
+        } else {
+            assert_eq!(result, -1);
+            assert_eq!(std::io::Error::last_os_error().raw_os_error(), Some(libc::EPERM));
         }
         // SAFETY: getppid has no arguments; it is deliberately absent from
         // the allowlist. This distinguishes a loaded filter from no filter.

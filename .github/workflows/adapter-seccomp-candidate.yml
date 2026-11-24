@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-name: Adapter seccomp native candidate
+name: Adapter seccomp locked validation
 
 on:
   pull_request:
@@ -28,12 +28,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libseccomp-dev pkg-config
-      - name: Resolve only the upgraded binding
-        env:
-          CARGO_TERM_COLOR: never
+      - name: Verify locked enabled seccomp graph
         run: |
           set -euo pipefail
-          cargo update -p libseccomp --precise 0.4.0
           cargo metadata --locked --features httpget-adapter/seccomp,fileread-adapter/seccomp --format-version 1 > /tmp/seccomp-metadata.json
           python3 - <<'PY'
           import json
@@ -42,14 +39,6 @@ jobs:
           assert not any(p["name"] == "nix" and p["version"] == "0.17.0" for p in packages)
           assert {p["version"] for p in packages if p["name"] == "libseccomp"} == {"0.4.0"}
           PY
-          git diff --check -- Cargo.lock
-          git diff -- Cargo.lock
-      - name: Preserve native lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: adapter-seccomp-Cargo-lock
-          path: Cargo.lock
-          if-no-files-found: error
       - name: Default and opt-in builds
         run: |
           set -euo pipefail
@@ -59,4 +48,6 @@ jobs:
           cargo build --locked -p fileread-adapter --features seccomp
           cargo build --locked -p httpget-adapter --features seccomp
       - name: Exercise actual filtered CLI binaries
-        run: python3 tests/test_adapter_seccomp_cli.py
+        run: |
+          python3 tests/test_adapter_seccomp_cli.py
+          git diff --exit-code -- Cargo.lock
