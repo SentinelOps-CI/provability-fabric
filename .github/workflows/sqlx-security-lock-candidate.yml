@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+name: SQLx security lock candidate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    if: github.head_ref == 'security/sqlx-postgres-supported-driver-20261124'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      CARGO_TERM_COLOR: never
+      PF_POSTGRES_TEST_ADMIN_URL: postgres://postgres:testpass@127.0.0.1:5432/postgres
+      PF_POSTGRES_TEST_APP_URL: postgres://pf_retrieval_ci:testpass@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Resolve SQLx and inspect active dependency graph
+        run: |
+          set -euo pipefail
+          cargo update -p sqlx --precise 0.8.6
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          git diff --exit-code -- . ':!Cargo.lock'
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+          cargo tree --locked -p retrieval-gateway -e normal
+      - name: Preserve resolver-produced lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlx-security-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+      - name: Run locked retrieval tests
+        run: cargo test --locked -p retrieval-gateway
+      - name: Exercise PostgreSQL tenant and label isolation
+        run: cargo test --locked -p retrieval-gateway postgres_rls_tenant_and_label_isolation -- --ignored --nocapture
