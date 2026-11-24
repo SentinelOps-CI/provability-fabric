@@ -175,7 +175,7 @@ type CertValidationRequest struct {
 	Raw     json.RawMessage `json:"raw,omitempty"`
 	Cert    *CertV1         `json:"cert,omitempty"`
 	JWKSURL string          `json:"jwks_url,omitempty"`
-	PEMPub  string          `json:"pem_pub,omitempty"` // optional PEM-encoded Ed25519 public key
+	PEMPub  string          `json:"pem_pub,omitempty"` // deprecated: rejected as an untrusted caller key
 }
 
 // CertValidationResponse is returned by /evidence/validate
@@ -1057,6 +1057,15 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// An attacker could sign arbitrary claims with their own key and submit
+	// that key as pem_pub. Signature-valid means trusted issuer verification,
+	// never just self-consistency under a request-provided public key.
+	if strings.TrimSpace(req.PEMPub) != "" {
+		writeError(c, http.StatusBadRequest, "UNTRUSTED_VERIFIER_KEY",
+			"Caller-supplied verification keys are not accepted",
+			"Configure an operator-controlled trusted JWKS before validating signatures", "")
+		return
+	}
 	// Callers cannot make the evidence service fetch arbitrary origins. A
 	// request JWKS URL is usable only if the deployment explicitly pinned it.
 	if err := s.approveJWKSURL(req.JWKSURL); err != nil {
@@ -1108,7 +1117,7 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 			return
 		}
 		sigStr, _ := sigVal.(string)
-		valid, reason := verifySignature(canon, sigStr, s.trustedJWKSKeys, req.PEMPub)
+		valid, reason := verifySignature(canon, sigStr, s.trustedJWKSKeys)
 		resp.SignatureValid = valid
 		if !valid {
 			resp.Errors = append(resp.Errors, reason)
@@ -1139,7 +1148,7 @@ func (s *EvidenceService) quickSchemaValidate(cert map[string]interface{}) error
 	return nil
 }
 
-func verifySignature(message []byte, sigBase64 string, trustedKeys []ed25519.PublicKey, pemPub string) (bool, string) {
+func verifySignature(message []byte, sigBase64 string, trustedKeys []ed25519.PublicKey) (bool, string) {
 	// decode base64 (std or url)
 	var sig []byte
 	if b, err := base64.StdEncoding.DecodeString(sigBase64); err == nil {
@@ -1149,13 +1158,8 @@ func verifySignature(message []byte, sigBase64 string, trustedKeys []ed25519.Pub
 	} else {
 		return false, "sig_decode_error"
 	}
-	// try PEM
-	if strings.TrimSpace(pemPub) != "" {
-		if pub, err := loadEd25519PublicKeyFromPEMString(pemPub); err == nil {
-			if ed25519.Verify(pub, message, sig) {
-				return true, ""
-			}
-		}
+	if len(trustedKeys) == 0 {
+		return false, "trusted_verifier_unavailable"
 	}
 	// These keys were loaded from a deployment-controlled URL at startup.
 	// No input supplied by a validation caller can trigger a network fetch.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -49,10 +50,11 @@ func TestDSSEFixtureVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load public key: %v", err)
 	}
-	ok, reason := verifySignature(payloadBytes, envelope.Signatures[0].Sig, nil, string(pemB))
-	if !ok {
-		t.Errorf("verify fixture signature: %s", reason)
+	if len(sigBytes) != ed25519.SignatureSize {
+		t.Fatalf("fixture signature has %d bytes, expected %d", len(sigBytes), ed25519.SignatureSize)
 	}
-	_ = pub
-	_ = sigBytes
+	ok, reason := verifySignature(payloadBytes, envelope.Signatures[0].Sig, []ed25519.PublicKey{pub})
+	if !ok {
+		t.Errorf("trusted fixture signature was rejected: %s", reason)
+	}
 }
