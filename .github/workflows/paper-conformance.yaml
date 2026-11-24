@@ -244,7 +244,7 @@ jobs:
           cargo test test_fixed_dns_enforcement -- --nocapture
           cargo test test_readonly_filesystem_enforcement -- --nocapture
 
-  # Prompt 79: Local NI Monitor + Egress Certificate (full suite — 10k prefixes)
+  # Prompt 79: Local NI Monitor + Egress Certificate (10k events, 100 groups)
   ni-monitor-egress:
     name: NI Monitor & Egress Certificate
     runs-on: ubuntu-latest
@@ -261,17 +261,20 @@ jobs:
       - name: Run NI Monitor & Egress Certificate Tests
         run: |
           cd runtime/sidecar-watcher
-          cargo test test_ni_monitor_verdict_consistency -- --nocapture
+          cargo test --locked -p sidecar-watcher --lib ni_monitor::tests:: -- --nocapture
+          cargo test --locked -p sidecar-watcher --test ni_monitor_egress -- --nocapture
           cargo test test_egress_certificate_validation -- --nocapture
           cargo test test_egress_certificate_schema_validation -- --nocapture
           cargo test test_egress_certificate_dsse_signature -- --nocapture
           cargo test test_egress_certificate_export_import -- --nocapture
           cargo test test_egress_certificate_expiry_handling -- --nocapture
 
-      - name: Verify 10k Prefixes Processed
+      - name: Verify event and prefix accounting
         run: |
           cd runtime/sidecar-watcher
-          cargo test --lib test_ni_monitor_verdict_consistency -- --nocapture 2>&1 | grep -q "Processed 10000 prefixes" || exit 1
+          # The test asserts 10,000 observed events, 100 groups and zero
+          # violations. A printed marker is not the verification oracle.
+          cargo test --locked --lib ni_monitor::tests::test_ni_monitor_verdict_consistency -- --exact --nocapture
 
   # Prompt 80: Cryptographic Envelope + Rekor/TUF + M-of-N Break-Glass
   crypto-envelope-break-glass:
