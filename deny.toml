@@ -69,6 +69,19 @@ allow = [
     "LGPL-3.0",
 ]
 
+# Mozilla/CCADB certificate data, not a general code-license allowance.
+# https://cdla.dev/permissive-2-0/ (section 2.1)
+# The retrieval image distributes each resolved package's original LICENSE.
+[[licenses.exceptions]]
+name = "webpki-roots"
+version = "=0.26.11"
+allow = ["CDLA-Permissive-2.0"]
+
+[[licenses.exceptions]]
+name = "webpki-roots"
+version = "=1.0.12"
+allow = ["CDLA-Permissive-2.0"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "warn"

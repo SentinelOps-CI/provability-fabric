@@ -46,11 +46,23 @@ jobs:
         with:
           key-suffix: "-retrieval-gateway"
 
-      - name: cargo build -p retrieval-gateway
-        run: cargo build -p retrieval-gateway
+      - name: Locked retrieval gateway build and tests
+        run: |
+          cargo build --locked -p retrieval-gateway
+          cargo test --locked -p retrieval-gateway
+          git diff --exit-code -- Cargo.lock
 
-      - name: cargo test -p retrieval-gateway
-        run: cargo test -p retrieval-gateway
+      - name: Verify packaged certificate-root license texts
+        run: |
+          set -euo pipefail
+          docker build -f runtime/retrieval-gateway/Dockerfile -t pf-retrieval-licenses:ci .
+          docker run --rm --entrypoint /bin/sh pf-retrieval-licenses:ci -ec '
+            dir=/usr/share/doc/retrieval-gateway/third-party-licenses
+            for version in 0.26.11 1.0.12; do
+              test -s "$dir/webpki-roots-$version.LICENSE"
+              grep -F "Community Data License Agreement" "$dir/webpki-roots-$version.LICENSE"
+            done
+          '
 
       - name: Independently verify versioned receipt commitment vectors
         run: python3 -m unittest discover -s tests -p 'test_retrieval_result_commitment_v2.py' -v
