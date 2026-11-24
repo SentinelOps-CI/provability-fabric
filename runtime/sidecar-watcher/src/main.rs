@@ -4,10 +4,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use axum::{body::Body, http::Response, Router};
 use prometheus_client::{
     encoding::text::encode,
     metrics::{counter::Counter, gauge::Gauge, histogram::Histogram},
@@ -682,22 +679,27 @@ fn certificate_evidence_complete(cert: &EgressCertificate) -> bool {
         && bridge.proof_verification
 }
 
-async fn metrics_handler(
-    _req: Request<Body>,
-    registry: Arc<Registry>,
-) -> Result<Response<Body>, hyper::Error> {
+async fn metrics_handler(registry: Arc<Registry>) -> Response<Body> {
     let mut buffer = String::new();
     if encode(&mut buffer, &registry).is_err() {
-        return Ok(Response::builder()
+        return Response::builder()
             .status(500)
             .body(Body::from("metrics encode failed"))
-            .unwrap_or_else(|_| Response::new(Body::empty())));
+            .expect("static metrics response");
     }
 
-    Ok(Response::builder()
+    Response::builder()
         .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
         .body(Body::from(buffer))
-        .unwrap_or_else(|_| Response::new(Body::empty())))
+        .expect("static metrics response")
+}
+
+// Preserve the previous metrics server's path-independent dispatch.
+fn metrics_router(registry: Arc<Registry>) -> Router {
+    Router::new().fallback(move || {
+        let registry = registry.clone();
+        async move { metrics_handler(registry).await }
+    })
 }
 
 #[tokio::main]
@@ -717,15 +719,8 @@ async fn main() -> Result<()> {
     // Start Prometheus /metrics server using the registry from Watcher
     let registry = watcher.registry.clone();
     let metrics_addr = SocketAddr::from(([0, 0, 0, 0], 9090));
-    let make_svc = make_service_fn(move |_conn| {
-        let registry = registry.clone();
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| {
-                metrics_handler(req, registry.clone())
-            }))
-        }
-    });
-    let metrics_server = Server::bind(&metrics_addr).serve(make_svc);
+    let metrics_listener = tokio::net::TcpListener::bind(metrics_addr).await?;
+    let metrics_server = axum::serve(metrics_listener, metrics_router(registry));
     info!("Metrics server listening on {}", metrics_addr);
 
     // Start HTTP health server on PORT (default 8006)
@@ -845,6 +840,24 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_metrics_http_loopback() {
+        let mut registry = Registry::default();
+        let metrics = Metrics::new(&mut registry);
+        metrics.total_actions.inc();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, metrics_router(Arc::new(registry))).await.unwrap();
+        });
+        let client = Client::builder().no_proxy().timeout(Duration::from_secs(5)).build().unwrap();
+        let response = client.get(format!("http://{addr}/metrics")).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+        assert!(response.text().await.unwrap().contains("# EOF"));
+        server.abort();
+    }
 
     #[test]
     fn test_local_ni_verdict_does_not_establish_permission_evidence() {

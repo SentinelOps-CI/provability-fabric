@@ -4287,7 +4287,6 @@ dependencies = [
  "blake3",
  "chrono",
  "ed25519-dalek",
- "hyper 0.14.32",
  "jsonschema",
  "k8s-openapi",
  "kube",
