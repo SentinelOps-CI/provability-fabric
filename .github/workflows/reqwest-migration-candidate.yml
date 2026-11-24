@@ -1,0 +1,104 @@
+# SPDX-License-Identifier: Apache-2.0
+# Candidate-only native resolution; remove after committing Cargo.lock.
+name: Direct Reqwest migration candidate
+
+on:
+  pull_request:
+    branches:
+      - security/rust-combined-remediation-20261124
+      - main
+    paths:
+      - '**/Cargo.toml'
+      - 'Cargo.lock'
+      - 'runtime/egress-firewall/Dockerfile'
+      - '.github/workflows/reqwest-migration-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native build requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libseccomp-dev pkg-config libssl-dev protobuf-compiler
+      - name: Resolve and inspect direct HTTP client migration
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-reqwest-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-reqwest-metadata.json
+          python3 - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+          data = json.loads(Path("/tmp/pf-reqwest-metadata.json").read_text())
+          packages = {p["id"]: p for p in data["packages"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          expected = {"egress-firewall", "httpget-adapter", "jwks-manager", "kms-proxy",
+                      "retrieval-gateway", "sidecar-watcher", "telemetry-service", "tool-broker"}
+          workspace = {packages[i]["name"]: i for i in data["workspace_members"]}
+          for name in expected:
+              deps = [d for d in nodes[workspace[name]]["deps"] if d["name"] == "reqwest"]
+              assert len(deps) == 1, (name, deps)
+              assert packages[deps[0]["pkg"]]["version"] == "0.12.28", (name, deps)
+          lock = tomllib.loads(Path("Cargo.lock").read_text())
+          versions = {}
+          for p in lock["package"]:
+              versions.setdefault(p["name"], set()).add(p["version"])
+          for name, version in [
+              ("wasmtime", "36.0.22"), ("sqlx", "0.8.6"), ("tokio", "1.53.3"),
+              ("openssl", "0.10.80"), ("actix-web", "4.20.0"), ("actix-http", "3.22.0"),
+              ("url", "2.5.9"), ("anyhow", "1.0.103"), ("time", "0.3.47"),
+              ("libseccomp", "0.4.0"), ("cookie", "0.18.3"),
+          ]:
+              assert versions.get(name) == {version}, (name, versions.get(name))
+          assert "humantime" not in versions
+          assert "0.17.0" not in versions.get("nix", set())
+          assert "1.0.12" in versions.get("webpki-roots", set())
+          new_h2 = [tuple(map(int, v.split("."))) for v in versions.get("h2", set()) if v.startswith("0.4.")]
+          assert new_h2 and all(v >= (0, 4, 16) for v in new_h2), new_h2
+          # Old transitive HTTP/TLS paths are not considered remediated here.
+          PY
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+          cp Cargo.lock /tmp/pf-reqwest-resolved.lock
+      - name: Preserve native candidate lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: reqwest-migration-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Compile all eight clients and run targeted Rust tests
+        run: |
+          set -euo pipefail
+          cargo test --locked --lib --bins \
+            -p egress-firewall -p httpget-adapter -p jwks-manager -p kms-proxy \
+            -p retrieval-gateway -p sidecar-watcher -p telemetry-service -p tool-broker
+          cargo test --locked -p egress-firewall --no-default-features
+          cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
+          cargo test --locked -p httpget-adapter --features seccomp --bin httpget-adapter
+          cargo build --locked -p fileread-adapter --features seccomp
+          cargo build --locked -p httpget-adapter --features seccomp
+          python3 tests/test_adapter_seccomp_cli.py
+      - name: Build the actual Alpine firewall image
+        run: |
+          set -euo pipefail
+          docker build -f runtime/egress-firewall/Dockerfile -t pf-egress-reqwest:ci .
+          docker run --rm --entrypoint /bin/sh pf-egress-reqwest:ci -ec '
+            test -s /usr/share/doc/egress-firewall/third-party-licenses/webpki-roots-1.0.12.LICENSE
+            grep -F "Community Data License Agreement" /usr/share/doc/egress-firewall/third-party-licenses/webpki-roots-1.0.12.LICENSE
+            test -x /app/egress-firewall
+          '
+          cmp /tmp/pf-reqwest-resolved.lock Cargo.lock
