@@ -16,7 +16,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -111,66 +110,14 @@ impl Default for DFAState {
     }
 }
 
-/// High-performance DFA engine with zero-allocation hot path
+/// Exact-event DFA index. Lookup borrows the event string and preserves state IDs.
 pub struct OptimizedDFA {
-    states: Vec<DFAState>,
+    states: HashSet<StateId>,
     start_state: StateId,
-    accepting_states: Vec<StateId>,
-    // Pre-computed jump tables for hot paths
-    call_jump_table: Vec<[StateId; 256]>,
-    emit_jump_table: Vec<[StateId; 256]>,
-    // Sparse dispatch for cold paths
-    sparse_transitions: HashMap<(StateId, EventKind), StateId>,
-    // Rate limiting data
-    rate_limiters: HashMap<String, RateLimiter>,
-}
-
-/// Optimized rate limiter with ring buffer
-#[derive(Debug, Clone)]
-struct RateLimiter {
-    window_ms: u32,
-    bound: u32,
-    events: VecDeque<u32>, // Ring buffer of timestamps in milliseconds
-    count: usize,
-}
-
-impl RateLimiter {
-    fn new(window_ms: u32, bound: u32) -> Self {
-        Self {
-            window_ms,
-            bound,
-            events: VecDeque::with_capacity(bound as usize * 2),
-            count: 0,
-        }
-    }
-
-    #[inline(always)]
-    fn check(&mut self, current_time_ms: u32) -> bool {
-        self.cleanup_old_events(current_time_ms);
-        self.count < self.bound as usize
-    }
-
-    #[inline(always)]
-    fn record(&mut self, current_time_ms: u32) {
-        self.cleanup_old_events(current_time_ms);
-        if self.count < self.bound as usize {
-            self.events.push_back(current_time_ms);
-            self.count += 1;
-        }
-    }
-
-    #[inline(always)]
-    fn cleanup_old_events(&mut self, current_time_ms: u32) {
-        let window_start = current_time_ms.saturating_sub(self.window_ms);
-        while let Some(&timestamp) = self.events.front() {
-            if timestamp < window_start {
-                self.events.pop_front();
-                self.count = self.count.saturating_sub(1);
-            } else {
-                break;
-            }
-        }
-    }
+    current_state: StateId,
+    accepting_states: HashSet<StateId>,
+    transitions: HashMap<StateId, HashMap<String, StateId>>,
+    rate_limiters: HashMap<String, LegacyRateLimiter>,
 }
 
 /// Event structure for hot path processing
@@ -237,464 +184,77 @@ pub struct DFAInterpreter {
 }
 
 impl OptimizedDFA {
-    /// Create optimized DFA from table with Hopcroft minimization and product pruning
+    /// Index a validated policy without changing its language or state identity.
     pub fn from_table(table: DFATable) -> Result<Self, Box<dyn Error>> {
-        // First create the basic DFA
-        let mut dfa = Self::from_table_basic(table)?;
-
-        // Apply Hopcroft minimization
-        dfa.minimize_hopcroft();
-
-        // Apply product pruning
-        dfa.apply_product_pruning();
-
-        Ok(dfa)
-    }
-
-    /// Create basic DFA from table representation (without optimization)
-    fn from_table_basic(table: DFATable) -> Result<Self, Box<dyn Error>> {
-        let mut states = Vec::new();
-        let mut call_jump_table = Vec::new();
-        let mut emit_jump_table = Vec::new();
-        let mut sparse_transitions = HashMap::new();
-        let mut rate_limiters = HashMap::new();
-
-        // Initialize states with jump tables
-        for &state_id in &table.states {
-            let dfa_state = DFAState {
-                id: state_id,
-                is_accepting: table.accepting.contains(&state_id),
-                ..Default::default()
-            };
-
-            // Initialize jump tables
-            let mut call_jumps = [0u32; 256];
-            let mut emit_jumps = [0u32; 256];
-
-            // Process transitions for this state
-            for transition in &table.transitions {
-                if transition.from_state == state_id {
-                    if let Some(event_kind) = Self::parse_event_kind(&transition.event) {
-                        match event_kind {
-                            EventKind::Call => {
-                                if let Some(tag) = Self::extract_call_tag(&transition.event) {
-                                    call_jumps[tag as usize] = transition.to_state;
-                                }
-                            }
-                            EventKind::Emit => {
-                                if let Some(bucket) = Self::extract_emit_bucket(&transition.event) {
-                                    emit_jumps[bucket as usize] = transition.to_state;
-                                }
-                            }
-                            _ => {
-                                // Store in sparse transitions for cold paths
-                                sparse_transitions
-                                    .insert((state_id, event_kind), transition.to_state);
-                            }
-                        }
-                    }
-                }
-            }
-
-            states.push(dfa_state);
-            call_jump_table.push(call_jumps);
-            emit_jump_table.push(emit_jumps);
+        DFAInterpreter::from_table(table.clone())
+            .validate().map_err(std::io::Error::other)?;
+        let mut transitions: HashMap<StateId, HashMap<String, StateId>> = HashMap::new();
+        for transition in table.transitions {
+            transitions.entry(transition.from_state).or_default()
+                .insert(transition.event, transition.to_state);
         }
-
-        // Initialize rate limiters
-        for rate_limit in &table.rate_limits {
-            rate_limiters.insert(
-                rate_limit.tool.clone(),
-                RateLimiter::new(rate_limit.window_ms, rate_limit.bound),
-            );
-        }
-
+        let rate_limiters = table.rate_limits.into_iter().map(|limit| {
+            (limit.tool, LegacyRateLimiter::new(limit.window_ms, limit.bound))
+        }).collect();
         Ok(Self {
-            states,
+            states: table.states.into_iter().collect(),
             start_state: table.start,
-            accepting_states: table.accepting,
-            call_jump_table,
-            emit_jump_table,
-            sparse_transitions,
+            current_state: table.start,
+            accepting_states: table.accepting.into_iter().collect(),
+            transitions,
             rate_limiters,
         })
     }
 
-    /// Hot path: zero-allocation state transition
-    #[inline(always)]
-    pub fn step(&self, state: StateId, event: &Event) -> StateId {
-        match event.kind {
-            EventKind::Call => {
-                if state < self.call_jump_table.len() as u32 {
-                    self.call_jump_table[state as usize][event.call_tag as usize]
-                } else {
-                    state
-                }
-            }
-            EventKind::Emit => {
-                if state < self.emit_jump_table.len() as u32 {
-                    self.emit_jump_table[state as usize][event.emit_bucket as usize]
-                } else {
-                    state
-                }
-            }
-            _ => {
-                // Cold path: sparse dispatch
-                self.sparse_transitions
-                    .get(&(state, event.kind))
-                    .copied()
-                    .unwrap_or(state)
-            }
-        }
+    /// Borrowed exact-symbol lookup. None denotes a missing transition.
+    #[inline]
+    pub fn step(&self, state: StateId, event: &str) -> Option<StateId> {
+        self.transitions.get(&state)?.get(event).copied()
     }
 
-    /// Process event with rate limiting
-    pub fn process_event(&mut self, event: &Event, current_time_ms: u32) -> Result<bool, String> {
-        // Check rate limits
-        if !self.check_rate_limits(event, current_time_ms) {
+    /// Rejected events change neither state nor rate-limit history.
+    pub fn process_event(&mut self, event: &str, current_time_ms: u64) -> Result<bool, String> {
+        if self.rate_limiters.iter().any(|(tool, limiter)| {
+            event.contains(tool) && !limiter.check(current_time_ms, event)
+        }) {
             return Err("Rate limit exceeded".to_string());
         }
-
-        // Update rate limiters
-        self.update_rate_limits(event, current_time_ms);
-
+        let next = self.step(self.current_state, event).ok_or_else(|| {
+            format!("No transition for state {} with event {}", self.current_state, event)
+        })?;
+        for (tool, limiter) in &mut self.rate_limiters {
+            if event.contains(tool) {
+                limiter.update(current_time_ms, event.to_string());
+            }
+        }
+        self.current_state = next;
         Ok(true)
     }
 
-    /// Check rate limits for event
-    #[inline(always)]
-    fn check_rate_limits(&mut self, event: &Event, current_time_ms: u32) -> bool {
-        for (tool, limiter) in &mut self.rate_limiters {
-            if event.tool_name.contains(tool)
-                && !limiter.check(current_time_ms) {
-                    return false;
-                }
-        }
-        true
-    }
-
-    /// Update rate limiters
-    #[inline(always)]
-    fn update_rate_limits(&mut self, event: &Event, current_time_ms: u32) {
-        for (tool, limiter) in &mut self.rate_limiters {
-            if event.tool_name.contains(tool) {
-                limiter.record(current_time_ms);
-            }
-        }
-    }
-
-    /// Parse event kind from string
-    fn parse_event_kind(event_str: &str) -> Option<EventKind> {
-        if let Some(open_paren) = event_str.find('(') {
-            let kind_str = &event_str[..open_paren];
-            EventKind::from_str(kind_str)
-        } else {
-            EventKind::from_str(event_str)
-        }
-    }
-
-    /// Extract call tag from event string
-    fn extract_call_tag(event_str: &str) -> Option<CallTag> {
-        if let Some(open_paren) = event_str.find('(') {
-            if let Some(close_paren) = event_str.find(')') {
-                let args = &event_str[open_paren + 1..close_paren];
-                if let Some(comma) = args.find(',') {
-                    let tag_str = &args[..comma];
-                    tag_str.parse().ok()
-                } else {
-                    args.parse().ok()
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Extract emit bucket from event string
-    fn extract_emit_bucket(event_str: &str) -> Option<EmitBucket> {
-        if let Some(open_paren) = event_str.find('(') {
-            if let Some(close_paren) = event_str.find(')') {
-                let args = &event_str[open_paren + 1..close_paren];
-                args.parse().ok()
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Get current state
     pub fn current_state(&self) -> StateId {
-        self.start_state
+        self.current_state
     }
 
-    /// Check if state is accepting
     pub fn is_accepting(&self, state: StateId) -> bool {
         self.accepting_states.contains(&state)
     }
 
-    /// Validate DFA integrity
+    /// Reset the automaton state, preserving rate-limit history.
+    pub fn reset(&mut self) {
+        self.current_state = self.start_state;
+    }
+
     pub fn validate(&self) -> Result<(), String> {
-        if self.start_state >= self.states.len() as u32 {
-            return Err("Start state out of bounds".to_string());
+        if !self.states.contains(&self.start_state)
+            || !self.accepting_states.is_subset(&self.states)
+            || self.transitions.iter().any(|(from, edges)| {
+                !self.states.contains(from)
+                    || edges.values().any(|to| !self.states.contains(to))
+            })
+        {
+            return Err("Invalid indexed DFA state".to_string());
         }
-
-        for &accepting_state in &self.accepting_states {
-            if accepting_state >= self.states.len() as u32 {
-                return Err(format!("Accepting state {} out of bounds", accepting_state));
-            }
-        }
-
         Ok(())
-    }
-
-    /// Apply Hopcroft minimization algorithm to reduce DFA states
-    fn minimize_hopcroft(&mut self) {
-        if self.states.len() <= 1 {
-            return; // Nothing to minimize
-        }
-
-        // Initialize partitions: accepting and non-accepting states
-        let mut partitions = Vec::new();
-        let mut accepting_states = Vec::new();
-        let mut non_accepting_states = Vec::new();
-
-        for state in &self.states {
-            if state.is_accepting {
-                accepting_states.push(state.id);
-            } else {
-                non_accepting_states.push(state.id);
-            }
-        }
-
-        if !accepting_states.is_empty() {
-            partitions.push(accepting_states);
-        }
-        if !non_accepting_states.is_empty() {
-            partitions.push(non_accepting_states);
-        }
-
-        // Hopcroft algorithm main loop
-        let mut worklist = partitions.clone();
-        let mut partition_map = HashMap::new();
-
-        for (i, partition) in partitions.iter().enumerate() {
-            for &state in partition {
-                partition_map.insert(state, i);
-            }
-        }
-
-        while let Some(current_partition) = worklist.pop() {
-            if current_partition.is_empty() {
-                continue;
-            }
-
-            // Find all possible transitions from this partition
-            let mut transitions = HashMap::new();
-            for &state in &current_partition {
-                if let Some(state_idx) = self.states.iter().position(|s| s.id == state) {
-                    // Check call transitions
-                    for (call_tag, &next_state) in
-                        self.call_jump_table[state_idx].iter().enumerate()
-                    {
-                        if next_state != state {
-                            transitions
-                                .entry(('c', call_tag as u16, next_state))
-                                .or_insert_with(Vec::new)
-                                .push(state);
-                        }
-                    }
-                    // Check emit transitions
-                    for (emit_bucket, &next_state) in
-                        self.emit_jump_table[state_idx].iter().enumerate()
-                    {
-                        if next_state != state {
-                            transitions
-                                .entry(('e', emit_bucket as u16, next_state))
-                                .or_insert_with(Vec::new)
-                                .push(state);
-                        }
-                    }
-                }
-            }
-
-            // Split partitions based on transitions
-            for ((_event_type, _event_value, _next_state), states) in transitions {
-                if states.len() < current_partition.len() {
-                    // Split the partition
-                    let mut new_partition = Vec::new();
-                    let mut remaining_partition = current_partition.clone();
-
-                    for state in states {
-                        if let Some(pos) = remaining_partition.iter().position(|&s| s == state) {
-                            remaining_partition.remove(pos);
-                            new_partition.push(state);
-                        }
-                    }
-
-                    if !new_partition.is_empty() && !remaining_partition.is_empty() {
-                        // Update partition map
-                        let new_partition_id = partitions.len();
-                        for &state in &new_partition {
-                            partition_map.insert(state, new_partition_id);
-                        }
-                        for &state in &remaining_partition {
-                            partition_map.insert(state, partitions.len() - 1);
-                        }
-
-                        partitions.push(new_partition);
-                        worklist.push(remaining_partition);
-                    }
-                }
-            }
-        }
-
-        // Merge equivalent states
-        self.merge_equivalent_states(&partitions);
-    }
-
-    /// Apply product pruning to remove DFAs unrelated to current event kind
-    fn apply_product_pruning(&mut self) {
-        // Analyze event kind usage patterns
-        let mut event_usage = HashMap::new();
-
-        for state_idx in 0..self.states.len() {
-            // Count call transitions
-            for (call_tag, &next_state) in self.call_jump_table[state_idx].iter().enumerate() {
-                if next_state != self.states[state_idx].id {
-                    *event_usage.entry(('c', call_tag as u16)).or_insert(0) += 1;
-                }
-            }
-
-            // Count emit transitions
-            for (emit_bucket, &next_state) in self.emit_jump_table[state_idx].iter().enumerate() {
-                if next_state != self.states[state_idx].id {
-                    *event_usage.entry(('e', emit_bucket as u16)).or_insert(0) += 1;
-                }
-            }
-        }
-
-        // Prune rarely used transitions (threshold: < 5% of total transitions)
-        let total_transitions: usize = event_usage.values().sum();
-        let threshold = (total_transitions as f64 * 0.05) as usize;
-
-        for state_idx in 0..self.states.len() {
-            // Prune call transitions
-            for (call_tag, next_state) in self.call_jump_table[state_idx].iter_mut().enumerate() {
-                if *next_state != self.states[state_idx].id {
-                    let usage = event_usage.get(&('c', call_tag as u16)).unwrap_or(&0);
-                    if *usage < threshold {
-                        *next_state = self.states[state_idx].id; // Self-loop for unused transitions
-                    }
-                }
-            }
-
-            // Prune emit transitions
-            for (emit_bucket, next_state) in self.emit_jump_table[state_idx].iter_mut().enumerate()
-            {
-                if *next_state != self.states[state_idx].id {
-                    let usage = event_usage.get(&('e', emit_bucket as u16)).unwrap_or(&0);
-                    if *usage < threshold {
-                        *next_state = self.states[state_idx].id; // Self-loop for unused transitions
-                    }
-                }
-            }
-        }
-    }
-
-    /// Merge equivalent states after Hopcroft minimization
-    fn merge_equivalent_states(&mut self, partitions: &[Vec<StateId>]) {
-        if partitions.len() >= self.states.len() {
-            return; // No merging possible
-        }
-
-        // Create state mapping
-        let mut state_mapping = HashMap::new();
-        let mut new_states = Vec::new();
-        let mut new_call_jump_table = Vec::new();
-        let mut new_emit_jump_table = Vec::new();
-
-        for (new_id, partition) in partitions.iter().enumerate() {
-            if partition.is_empty() {
-                continue;
-            }
-
-            // Use the first state in the partition as the representative
-            let representative = partition[0];
-            state_mapping.insert(representative, new_id as StateId);
-
-            // Merge state properties
-            let merged_state = DFAState {
-                id: new_id as StateId,
-                is_accepting: partition.iter().any(|&state_id| {
-                    self.states
-                        .iter()
-                        .any(|s| s.id == state_id && s.is_accepting)
-                }),
-                ..Default::default()
-            };
-
-            // Merge jump tables
-            let mut call_jumps = [0u32; 256];
-            let mut emit_jumps = [0u32; 256];
-
-            for &state_id in partition {
-                if let Some(state_idx) = self.states.iter().position(|s| s.id == state_id) {
-                    for (i, &transition) in self.call_jump_table[state_idx].iter().enumerate() {
-                        if transition != state_id {
-                            call_jumps[i] = transition;
-                        }
-                    }
-                    for (i, &transition) in self.emit_jump_table[state_idx].iter().enumerate() {
-                        if transition != state_id {
-                            emit_jumps[i] = transition;
-                        }
-                    }
-                }
-            }
-
-            new_states.push(merged_state);
-            new_call_jump_table.push(call_jumps);
-            new_emit_jump_table.push(emit_jumps);
-        }
-
-        // Update state mappings in jump tables
-        for call_jumps in &mut new_call_jump_table {
-            for jump in call_jumps.iter_mut() {
-                if let Some(&mapped_state) = state_mapping.get(jump) {
-                    *jump = mapped_state;
-                }
-            }
-        }
-
-        for emit_jumps in &mut new_emit_jump_table {
-            for jump in emit_jumps.iter_mut() {
-                if let Some(&mapped_state) = state_mapping.get(jump) {
-                    *jump = mapped_state;
-                }
-            }
-        }
-
-        // Update the DFA with merged states
-        self.states = new_states;
-        self.call_jump_table = new_call_jump_table;
-        self.emit_jump_table = new_emit_jump_table;
-
-        // Update start state
-        if let Some(&new_start) = state_mapping.get(&self.start_state) {
-            self.start_state = new_start;
-        }
-
-        // Update accepting states
-        self.accepting_states = self
-            .states
-            .iter()
-            .filter(|s| s.is_accepting)
-            .map(|s| s.id)
-            .collect();
     }
 }
 
@@ -964,9 +524,12 @@ mod tests {
 
         let dfa = OptimizedDFA::from_table(table).unwrap();
 
-        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
-        let next_state = dfa.step(0, &event);
-        assert_eq!(next_state, 1);
+        assert_eq!(dfa.step(0, "call(tool1,1)"), Some(1));
+        assert_eq!(dfa.step(0, "call(tool2,1)"), None);
+        assert_eq!(dfa.step(0, "call(tool1,257)"), None);
+        assert_eq!(dfa.step(1, "emit(plan1)"), Some(2));
+        assert_eq!(dfa.step(1, "emit(plan2)"), None);
+        assert_eq!(dfa.step(99, "call(tool1,1)"), None);
     }
 
     #[test]
@@ -975,11 +538,10 @@ mod tests {
             states: vec![0, 1],
             start: 0,
             accepting: vec![0, 1],
-            transitions: vec![Transition {
-                from_state: 0,
-                event: "call(tool1,1)".to_string(),
-                to_state: 1,
-            }],
+            transitions: vec![
+                Transition { from_state: 0, event: "call(tool1,1)".into(), to_state: 1 },
+                Transition { from_state: 1, event: "call(tool1,1)".into(), to_state: 1 },
+            ],
             rate_limits: vec![RateLimit {
                 tool: "tool1".to_string(),
                 window_ms: 1000,
@@ -989,14 +551,13 @@ mod tests {
 
         let mut dfa = OptimizedDFA::from_table(table).unwrap();
 
-        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
-
-        // First two calls should succeed
-        assert!(dfa.process_event(&event, 1000).is_ok());
-        assert!(dfa.process_event(&event, 1500).is_ok());
-
-        // Third call should fail
-        assert!(dfa.process_event(&event, 2000).is_err());
+        let event = "call(tool1,1)";
+        assert!(dfa.process_event(event, 1000).is_ok());
+        assert_eq!(dfa.current_state(), 1);
+        assert!(dfa.process_event(event, 1500).is_ok());
+        assert_eq!(dfa.process_event(event, 2000).unwrap_err(), "Rate limit exceeded");
+        assert_eq!(dfa.current_state(), 1);
+        assert!(dfa.process_event(event, 2001).is_ok());
     }
 
     #[test]
@@ -1027,12 +588,11 @@ mod tests {
 
         let dfa = OptimizedDFA::from_table(table).unwrap();
 
-        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
-
-        // Benchmark hot path
+        let event = "call(tool1,1)";
+        assert_eq!(dfa.step(0, event), Some(1));
         let start = Instant::now();
         for _ in 0..100_000 {
-            let _ = dfa.step(0, &event);
+            std::hint::black_box(dfa.step(std::hint::black_box(0), std::hint::black_box(event)));
         }
         let duration = start.elapsed();
 

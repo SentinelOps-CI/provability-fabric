@@ -6,7 +6,7 @@ use std::time::Instant;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use sidecar_watcher::{
-    dfa::{OptimizedDFA, Event, EventKind, DFATable, Transition, RateLimit},
+    dfa::{OptimizedDFA, DFATable, Transition, RateLimit},
     ifc_labels::OptimizedIFCManager,
     ratelimit::{OptimizedRateLimiter, RateLimitConfig},
     crypto::{AsyncSigningPipeline, SigningWorkerConfig, CertCore, SigningRequest},
@@ -27,10 +27,10 @@ pub fn performance_benchmarks(c: &mut Criterion) {
     group.bench_function("dfa_hot_path_step", |b| {
         let table = create_test_dfa_table();
         let dfa = OptimizedDFA::from_table(table).unwrap();
-        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
+        let event = "call(tool1,1)";
         
         b.iter(|| {
-            black_box(dfa.step(0, &event))
+            black_box(dfa.step(0, event))
         });
     });
     
@@ -93,11 +93,11 @@ pub fn sub_millisecond_benchmarks(c: &mut Criterion) {
     group.bench_function("dfa_step_100k_ops", |b| {
         let table = create_test_dfa_table();
         let dfa = OptimizedDFA::from_table(table).unwrap();
-        let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
+        let event = "call(tool1,1)";
         
         b.iter(|| {
             for _ in 0..100_000 {
-                black_box(dfa.step(0, &event));
+                black_box(dfa.step(0, event));
             }
         });
     });
@@ -207,11 +207,12 @@ pub fn memory_efficiency_benchmarks(c: &mut Criterion) {
     group.bench_function("dfa_memory_layout", |b| {
         let table = create_large_dfa_table();
         let dfa = OptimizedDFA::from_table(table).unwrap();
+        let event = "call(tool0,1)";
+        assert_eq!(dfa.step(0, event), Some(1));
         
         b.iter(|| {
-            let event = Event::new(EventKind::Call, 1, 0, "tool1".to_string());
             for _ in 0..1000 {
-                black_box(dfa.step(0, &event));
+                black_box(dfa.step(0, event));
             }
         });
     });
@@ -264,12 +265,12 @@ pub fn concurrency_benchmarks(c: &mut Criterion) {
         
         b.iter(|| {
             let handles: Vec<_> = (0..4)
-                .map(|thread_id| {
+                .map(|_| {
                     let dfa = Arc::clone(&dfa);
                     std::thread::spawn(move || {
-                        let event = Event::new(EventKind::Call, thread_id as u16, 0, "tool1".to_string());
+                        let event = "call(tool1,1)";
                         for _ in 0..25000 {
-                            black_box(dfa.step(0, &event));
+                            black_box(dfa.step(0, event));
                         }
                     })
                 })
