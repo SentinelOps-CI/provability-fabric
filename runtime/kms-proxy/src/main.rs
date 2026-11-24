@@ -4,9 +4,12 @@
 use anyhow::Result;
 use base64::Engine;
 use chrono::{DateTime, Utc};
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
+use axum::{
+    body::{Body, Bytes},
+    extract::{DefaultBodyLimit, FromRequest, Request},
+    http::Response,
+    response::IntoResponse,
+    Router,
 };
 use metrics::{counter, histogram};
 use redis::AsyncCommands;
@@ -539,9 +542,9 @@ impl KmsProxy {
 }
 
 async fn handle_request(
-    req: Request<Body>,
+    req: Request,
     proxy: Arc<KmsProxy>,
-) -> Result<Response<Body>, hyper::Error> {
+) -> Result<Response<Body>, Response<Body>> {
     let path = req.uri().path();
     let method = req.method();
 
@@ -550,7 +553,8 @@ async fn handle_request(
         | ("POST", "/kms/decrypt")
         | ("POST", "/kms/sign")
         | ("POST", "/kms/verify") => {
-            let body_bytes = hyper::body::to_bytes(req.into_body()).await?;
+            let body_bytes = Bytes::from_request(req, &()).await
+                .map_err(|rejection| rejection.into_response())?;
             let kms_request: KmsRequest =
                 serde_json::from_slice(&body_bytes).unwrap_or_else(|_| KmsRequest {
                     operation: "unknown".to_string(),
@@ -594,6 +598,18 @@ async fn handle_request(
     }
 }
 
+// Retain existing method/path dispatch and bound collected request bodies.
+const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
+
+fn http_router(proxy: Arc<KmsProxy>) -> Router {
+    Router::new()
+        .fallback(move |req: Request| {
+            let proxy = proxy.clone();
+            async move { handle_request(req, proxy).await }
+        })
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
@@ -601,23 +617,35 @@ async fn main() -> Result<()> {
     let proxy = Arc::new(KmsProxy::new());
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8082));
 
-    let make_svc = make_service_fn(move |_conn| {
-        let proxy = proxy.clone();
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| {
-                let proxy = proxy.clone();
-                handle_request(req, proxy)
-            }))
-        }
-    });
-
-    let server = Server::bind(&addr).serve(make_svc);
-
+    let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("KMS Proxy listening on {}", addr);
-
-    if let Err(e) = server.await {
-        error!("Server error: {}", e);
-    }
+    axum::serve(listener, http_router(proxy)).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod http_transport_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_loopback_dispatch_and_body_limit() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let app = http_router(Arc::new(KmsProxy::new()));
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let client = Client::builder().no_proxy()
+            .timeout(std::time::Duration::from_secs(5)).build().unwrap();
+        let base = format!("http://{addr}");
+        let unknown = client.get(format!("{base}/unknown")).send().await.unwrap();
+        assert_eq!(unknown.status().as_u16(), 404);
+        assert_eq!(unknown.json::<serde_json::Value>().await.unwrap()["error"], "Not found");
+        
+        let oversized = client.post(format!("{base}/kms/encrypt"))
+            .body(vec![b'x'; MAX_REQUEST_BODY_BYTES + 1]).send().await.unwrap();
+        assert_eq!(oversized.status().as_u16(), 413);
+        server.abort();
+    }
 }

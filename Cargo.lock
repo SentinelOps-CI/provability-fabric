@@ -2450,9 +2450,9 @@ name = "jwks-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.7.9",
  "base64 0.21.7",
  "chrono",
- "hyper 0.14.32",
  "jsonwebtoken",
  "reqwest",
  "serde",
@@ -2482,11 +2482,11 @@ name = "kms-proxy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.7.9",
  "base64 0.21.7",
  "chrono",
  "hex",
  "hmac",
- "hyper 0.14.32",
  "metrics",
  "metrics-exporter-prometheus",
  "redis",
@@ -4629,8 +4629,8 @@ name = "telemetry-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.7.9",
  "chrono",
- "hyper 0.14.32",
  "prometheus-client 0.20.0",
  "reqwest",
  "serde",
