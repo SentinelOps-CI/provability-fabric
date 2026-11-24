@@ -1351,6 +1351,16 @@ async fn health_handler() -> Result<HttpResponse, Error> {
     })))
 }
 
+fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.route("/egress", web::post().to(egress_handler))
+        // GET + HEAD: Docker/wget --spider uses HEAD and must not 404.
+        .service(
+            web::resource("/health")
+                .route(web::get().to(health_handler))
+                .route(web::head().to(health_handler)),
+        );
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Initialize firewall
@@ -1391,13 +1401,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(firewall_data.clone())
-            .route("/egress", web::post().to(egress_handler))
-            // GET + HEAD: Docker/wget --spider uses HEAD and must not 404.
-            .service(
-                web::resource("/health")
-                    .route(web::get().to(health_handler))
-                    .route(web::head().to(health_handler)),
-            )
+            .configure(configure_routes)
     })
     // Bind on all interfaces so Docker healthchecks and peer services can reach us.
     .bind(("0.0.0.0", 8081))?
@@ -1408,6 +1412,43 @@ async fn main() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[actix_web::test]
+    async fn http_routes_work_without_cookie_support() {
+        use actix_web::{http::StatusCode, test as http_test};
+
+        let app = http_test::init_service(
+            App::new()
+                .app_data(web::Data::new(EgressFirewall::new(
+                    "http://127.0.0.1:1".to_string(),
+                )))
+                .configure(configure_routes),
+        )
+        .await;
+
+        let request = http_test::TestRequest::get().uri("/health").to_request();
+        let response = http_test::call_service(&app, request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body: serde_json::Value = http_test::read_body_json(response).await;
+        assert_eq!(body["status"], "healthy");
+        assert!(body["timestamp"].as_u64().is_some());
+
+        let request = http_test::TestRequest::default()
+            .method(actix_web::http::Method::HEAD)
+            .uri("/health")
+            .to_request();
+        let response = http_test::call_service(&app, request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Reject invalid JSON at the extractor before any egress.
+        let request = http_test::TestRequest::post()
+            .uri("/egress")
+            .insert_header(("content-type", "application/json"))
+            .set_payload("{")
+            .to_request();
+        let response = http_test::call_service(&app, request).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
 
     #[tokio::test]
     async fn test_pii_detection() {
