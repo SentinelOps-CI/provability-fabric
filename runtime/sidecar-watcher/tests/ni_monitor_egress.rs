@@ -3,6 +3,7 @@
  * Copyright 2025 Provability-Fabric Contributors
  */
 
+use ed25519_dalek::SigningKey;
 use sidecar_watcher::egress_cert::{EgressCertificate, WitnessVerification};
 use sidecar_watcher::ni_monitor::{
     NIEvent, NIMonitor, NIMonitorConfig, SecurityLabel,
@@ -54,8 +55,13 @@ fn test_egress_certificate_sign_and_verify() {
         witness_hash: "witness".to_string(),
         verification_time_ms: 1,
     };
-    assert!(cert.sign("private-key").is_ok());
-    assert!(cert.verify_signature().unwrap());
+    let key = SigningKey::from_bytes(&[11; 32]);
+    let unrelated = SigningKey::from_bytes(&[12; 32]);
+    cert.sign(&key).unwrap();
+    assert!(cert.verify_signature(&key.verifying_key()).unwrap());
+    assert!(!cert.verify_signature(&unrelated.verifying_key()).unwrap());
+    cert.content.witness_verification.merkle_path_valid = false;
+    assert!(!cert.verify_signature(&key.verifying_key()).unwrap());
 }
 
 #[test]

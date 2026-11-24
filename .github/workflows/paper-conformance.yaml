@@ -265,7 +265,7 @@ jobs:
           cargo test --locked -p sidecar-watcher --test ni_monitor_egress -- --nocapture
           cargo test test_egress_certificate_validation -- --nocapture
           cargo test test_egress_certificate_schema_validation -- --nocapture
-          cargo test test_egress_certificate_dsse_signature -- --nocapture
+          cargo test --locked -p sidecar-watcher --lib egress_cert::tests::test_egress_certificate_ed25519_signature -- --exact --nocapture
           cargo test test_egress_certificate_export_import -- --nocapture
           cargo test test_egress_certificate_expiry_handling -- --nocapture
 

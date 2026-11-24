@@ -14,12 +14,61 @@
  * limitations under the License.
  */
 
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::error::Error;
 
 use crate::time_util;
+
+const EGRESS_SIGNATURE_ALGORITHM: &str = "ed25519-pf-egress-v1";
+const EGRESS_SIGNATURE_DOMAIN: &[u8] = b"provability-fabric:egress-certificate:v1\0";
+
+// Encode objects in sorted key order regardless of HashMap iteration order
+// or serde_json's preserve_order feature. This is the versioned Rust wire
+// format, not a claim of RFC 8785 cross-language canonicalization.
+fn write_sorted_json(value: &serde_json::Value, out: &mut Vec<u8>) -> serde_json::Result<()> {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut fields: Vec<_> = map.iter().collect();
+            fields.sort_unstable_by(|a, b| a.0.cmp(b.0));
+            out.push(b'{');
+            for (i, (key, value)) in fields.into_iter().enumerate() {
+                if i != 0 { out.push(b','); }
+                serde_json::to_writer(&mut *out, key)?;
+                out.push(b':');
+                write_sorted_json(value, out)?;
+            }
+            out.push(b'}');
+        }
+        serde_json::Value::Array(values) => {
+            out.push(b'[');
+            for (i, value) in values.iter().enumerate() {
+                if i != 0 { out.push(b','); }
+                write_sorted_json(value, out)?;
+            }
+            out.push(b']');
+        }
+        _ => serde_json::to_writer(&mut *out, value)?,
+    }
+    Ok(())
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn decode_hex<const N: usize>(value: &str) -> Option<[u8; N]> {
+    if value.len() != N * 2 || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return None;
+    }
+    let mut decoded = [0; N];
+    for (i, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        decoded[i] = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
+    }
+    Some(decoded)
+}
 
 /// Egress certificate configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +86,7 @@ impl Default for EgressCertConfig {
         Self {
             enable_certification: true,
             require_signature: true,
-            signature_algorithm: "sha256".to_string(),
+            signature_algorithm: EGRESS_SIGNATURE_ALGORITHM.to_string(),
             certificate_ttl_seconds: 3600, // 1 hour
             enable_audit_logging: true,
             max_certificates_per_session: 100,
@@ -236,7 +285,7 @@ impl EgressCertificate {
         Self {
             content,
             signature: None,
-            signature_algorithm: "sha256".to_string(),
+            signature_algorithm: EGRESS_SIGNATURE_ALGORITHM.to_string(),
             public_key: None,
             certificate_chain: Vec::new(),
         }
@@ -275,32 +324,44 @@ impl EgressCertificate {
         self.content.witness_verification = verification;
     }
 
-    /// Sign the certificate
-    pub fn sign(&mut self, _private_key: &str) -> Result<(), Box<dyn Error>> {
-        let content_json = serde_json::to_string(&self.content)?;
-        let mut hasher = Sha256::new();
-        hasher.update(content_json.as_bytes());
-        let hash = hasher.finalize();
+    /// Versioned, domain-separated signature input for this content type.
+    fn signature_input(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let confidence = self.content.non_interference_verdict.confidence;
+        if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
+            return Err("invalid non-interference confidence".into());
+        }
+        let mut bytes = EGRESS_SIGNATURE_DOMAIN.to_vec();
+        write_sorted_json(&serde_json::to_value(&self.content)?, &mut bytes)?;
+        Ok(bytes)
+    }
 
-        // In a real implementation, this would use proper cryptographic signing
-        // For now, we'll create a simple hash-based signature
-        self.signature = Some(format!("sig_{:x}", hash));
+    /// Sign with an actual Ed25519 private key. This authenticates the
+    /// content; it does not establish that its policy claims are true.
+    pub fn sign(&mut self, signing_key: &SigningKey) -> Result<(), Box<dyn Error>> {
+        let signature = signing_key.sign(&self.signature_input()?);
+        self.signature_algorithm = EGRESS_SIGNATURE_ALGORITHM.to_string();
+        self.signature = Some(encode_hex(&signature.to_bytes()));
+        self.public_key = Some(encode_hex(signing_key.verifying_key().as_bytes()));
+        // This format does not implement certificate-chain verification.
+        self.certificate_chain.clear();
         Ok(())
     }
 
-    /// Verify the certificate signature
-    pub fn verify_signature(&self) -> Result<bool, Box<dyn Error>> {
-        if let Some(signature) = &self.signature {
-            let content_json = serde_json::to_string(&self.content)?;
-            let mut hasher = Sha256::new();
-            hasher.update(content_json.as_bytes());
-            let hash = hasher.finalize();
-            let expected_signature = format!("sig_{:x}", hash);
-
-            Ok(signature == &expected_signature)
-        } else {
-            Ok(false)
+    /// Authenticate against an independently provisioned verification key.
+    /// The embedded key is an identity hint, never a source of trust.
+    /// Legacy unkeyed digests and unsupported chain formats are rejected.
+    pub fn verify_signature(&self, trusted_key: &VerifyingKey) -> Result<bool, Box<dyn Error>> {
+        if self.signature_algorithm != EGRESS_SIGNATURE_ALGORITHM
+            || !self.certificate_chain.is_empty()
+            || self.public_key.as_deref() != Some(encode_hex(trusted_key.as_bytes()).as_str())
+        {
+            return Ok(false);
         }
+        let Some(bytes) = self.signature.as_deref().and_then(decode_hex::<64>) else {
+            return Ok(false);
+        };
+        let signature = Signature::from_bytes(&bytes);
+        Ok(trusted_key.verify_strict(&self.signature_input()?, &signature).is_ok())
     }
 
     /// Get certificate hash for transparency log
@@ -487,9 +548,33 @@ mod tests {
             "policy-hash-456".to_string(),
         );
 
-        assert!(cert.sign("private-key").is_ok());
+        let key = SigningKey::from_bytes(&[7; 32]);
+        let unrelated = SigningKey::from_bytes(&[8; 32]);
+        assert!(!cert.verify_signature(&key.verifying_key()).unwrap());
+        cert.sign(&key).unwrap();
         assert!(cert.signature.is_some());
-        assert!(cert.verify_signature().unwrap());
+        assert!(cert.verify_signature(&key.verifying_key()).unwrap());
+        assert!(!cert.verify_signature(&unrelated.verifying_key()).unwrap());
+
+        let mut tampered = cert.clone();
+        tampered.content.permission_evidence.permit_decision = "accept".into();
+        assert!(!tampered.verify_signature(&key.verifying_key()).unwrap());
+
+        let mut forged = cert.clone();
+        forged.sign(&unrelated).unwrap();
+        assert!(!forged.verify_signature(&key.verifying_key()).unwrap());
+
+        let mut legacy = cert.clone();
+        legacy.signature_algorithm = "sha256".into();
+        legacy.signature = Some(format!("sig_{}", legacy.get_certificate_hash()));
+        assert!(!legacy.verify_signature(&key.verifying_key()).unwrap());
+
+        let mut malformed = cert.clone();
+        malformed.signature = Some("zz".repeat(64));
+        assert!(!malformed.verify_signature(&key.verifying_key()).unwrap());
+        let mut untrusted_chain = cert.clone();
+        untrusted_chain.certificate_chain.push("unverified".into());
+        assert!(!untrusted_chain.verify_signature(&key.verifying_key()).unwrap());
     }
 
     #[test]
@@ -534,15 +619,25 @@ mod tests {
     }
 
     #[test]
-    fn test_egress_certificate_dsse_signature() {
+    fn test_egress_certificate_ed25519_signature() {
         let mut cert = EgressCertificate::new(
             "session-1".to_string(),
             "bundle-1".to_string(),
             "plan-hash-123".to_string(),
             "policy-hash-456".to_string(),
         );
-        assert!(cert.sign("private-key").is_ok());
-        assert!(cert.verify_signature().unwrap());
+        let key = SigningKey::from_bytes(&[9; 32]);
+        cert.content.permission_evidence.abac_attributes =
+            HashMap::from([("a".into(), "1".into()), ("b".into(), "2".into())]);
+        cert.sign(&key).unwrap();
+        let encoded = serde_json::to_string(&cert).unwrap();
+        let mut imported: EgressCertificate = serde_json::from_str(&encoded).unwrap();
+        assert!(imported.verify_signature(&key.verifying_key()).unwrap());
+        imported.content.permission_evidence.abac_attributes =
+            HashMap::from([("b".into(), "2".into()), ("a".into(), "1".into())]);
+        assert!(imported.verify_signature(&key.verifying_key()).unwrap());
+        imported.content.permission_evidence.abac_attributes.insert("a".into(), "3".into());
+        assert!(!imported.verify_signature(&key.verifying_key()).unwrap());
     }
 
     #[test]
