@@ -19,7 +19,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@apollo/server": "^4.9.0",
+    "@apollo/server": "^5.5.0",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@prisma/client": "^5.0.0",
     "axios": "^1.20.0",
