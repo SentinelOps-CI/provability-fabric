@@ -196,6 +196,112 @@ jobs:
           print("No database-backed storage, signing, or proof validity is claimed.")
           PY
 
+      - name: Verify configured production image access and tenant isolation
+        run: |
+          set -euo pipefail
+          fixture_dir="$(mktemp -d "$RUNNER_TEMP/evidence-access.XXXXXX")"
+          cleanup() {
+            docker rm -f evidence-service-ci-auth >/dev/null 2>&1 || true
+            rm -rf "$fixture_dir"
+          }
+          trap cleanup EXIT
+          export FIXTURE_DIR="$fixture_dir"
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import secrets
+
+          root = Path(os.environ["FIXTURE_DIR"])
+          tokens = {}
+          entries = []
+          for name, tenant, read, write in [
+              ("a", "tenant-a", True, True),
+              ("b", "tenant-b", True, True),
+              ("reader", "tenant-a", True, False),
+              ("writer", "tenant-a", False, True),
+          ]:
+              raw = secrets.token_bytes(32)
+              tokens[name] = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+              entries.append(dict(tenant=tenant, token_sha256=hashlib.sha256(raw).hexdigest(),
+                                  read=read, write=write))
+          for filename, data in [("access.json", entries), ("tokens.json", tokens)]:
+              fd = os.open(root / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+              with os.fdopen(fd, "w") as f:
+                  json.dump(data, f)
+          PY
+          docker run --detach --rm --name evidence-service-ci-auth \
+            --publish 127.0.0.1:18005:8004 \
+            --env DATABASE_URL= \
+            --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
+            --env EVIDENCE_ACCESS_FILE=/run/evidence-access.json \
+            --mount "type=bind,src=$fixture_dir/access.json,dst=/run/evidence-access.json,readonly" \
+            evidence-service-ci:local
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          tokens = json.loads((Path(os.environ["FIXTURE_DIR"]) / "tokens.json").read_text())
+          base = "http://127.0.0.1:18005/api/v1"
+
+          def call(path, method="GET", payload=None, token=None, expected=200):
+              headers = {"Content-Type": "application/json"}
+              if token is not None:
+                  headers["Authorization"] = "Bearer " + tokens[token]
+              data = None if payload is None else json.dumps(payload).encode()
+              req = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(req, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              assert status == expected, f"{method} {path}: HTTP {status}, expected {expected}"
+              return json.loads(body)
+
+          for _ in range(30):
+              try:
+                  assert call("/health")["service"] == "evidence-service"
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("configured evidence image did not become reachable")
+
+          certificate = {
+              "bundle_id": "bundle", "policy_hash": "policy", "proof_hash": "proof",
+              "automata_hash": "automata", "labeler_hash": "labeler", "ni_claim": "fixture",
+              "ni_monitor": "inapplicable", "sidecar_build": "fixture",
+              "tenant_id": "tenant-a", "session_id": "shared-session",
+              "timestamp": "2026-01-01T00:00:00Z",
+          }
+          call("/evidence/cert", "POST", certificate, expected=401)
+          call("/evidence/cert", "POST", certificate, "reader", 403)
+          call("/evidence/cert", "POST", certificate, "b", 403)
+          call("/evidence/cert", "POST", certificate, "a", 201)
+          call("/evidence/cert", "POST", {**certificate, "tenant_id": "tenant-b"}, "b", 201)
+          call("/evidence/search", "POST", {}, expected=401)
+          call("/evidence/search", "POST", {}, "writer", 403)
+          call("/evidence/search", "POST", {"tenant_id": "tenant-b"}, "a", 403)
+          for token, tenant in [("a", "tenant-a"), ("b", "tenant-b")]:
+              result = call("/evidence/search", "POST", {}, token)
+              assert result["total"] == 1 and len(result["certificates"]) == 1, result
+              assert result["certificates"][0]["tenant_id"] == tenant, result
+              record = call("/evidence/cert/shared-session", token=token)
+              assert record["tenant_id"] == tenant and not record.get("sig"), record
+          call("/compliance/packet", "POST", {"tenant_id": "tenant-b"}, "a", 403)
+          packet = call("/compliance/packet", "POST", {}, "reader")
+          assert packet["tenant_id"] == "tenant-a" and len(packet["certificates"]) == 1, packet
+          assert "Recorded accept rate:" in packet["conformance"], packet
+          print("Configured image: authenticated storage, tenant isolation and permission controls observed.")
+          print("Filesystem-only image fixture; database controls are exercised separately in Go tests.")
+          PY
+
       - name: Remove disposable evidence-service container
         if: always()
         run: |
