@@ -573,8 +573,8 @@ func (s *EvidenceService) prepareCertificate(cert CertV1) (CertV1, error) {
 		if err != nil {
 			return CertV1{}, fmt.Errorf("encode certificate for signing: %w", err)
 		}
-		var claims map[string]interface{}
-		if err := json.Unmarshal(encoded, &claims); err != nil {
+		claims, err := decodeEvidenceObject(encoded)
+		if err != nil {
 			return CertV1{}, fmt.Errorf("decode certificate for signing: %w", err)
 		}
 		canonical, err := marshalCanonicalJSON(claims)
@@ -1111,9 +1111,25 @@ func (s *EvidenceService) healthHandler(c *gin.Context) {
 }
 
 func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
-	var req CertValidationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// Retain original bytes for both supported request forms. Decoding into
+	// CertV1 here would discard unknown fields and round extension numbers.
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, maxEvidenceJSONBytes))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or oversized validation request"})
+		return
+	}
+	if _, err := decodeEvidenceObject(body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ambiguous or unsupported validation JSON"})
+		return
+	}
+	var req struct {
+		Raw     json.RawMessage `json:"raw"`
+		Cert    json.RawMessage `json:"cert"`
+		JWKSURL string          `json:"jwks_url"`
+		PEMPub  string          `json:"pem_pub"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid validation request"})
 		return
 	}
 	// An attacker could sign arbitrary claims with their own key and submit
@@ -1133,23 +1149,22 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 	}
 
 	var raw []byte
+	if len(req.Raw) != 0 && len(req.Cert) != 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provide exactly one certificate payload"})
+		return
+	}
 	if len(req.Raw) != 0 {
 		raw = req.Raw
-	} else if req.Cert != nil {
-		b, err := json.Marshal(req.Cert)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid cert object"})
-			return
-		}
-		raw = b
+	} else if len(req.Cert) != 0 {
+		raw = req.Cert
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing cert payload"})
 		return
 	}
 
 	// Parse generically to inspect signature field
-	var generic map[string]interface{}
-	if err := json.Unmarshal(raw, &generic); err != nil {
+	generic, err := decodeEvidenceObject(raw)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 		return
 	}
@@ -1293,7 +1308,11 @@ func writeCanonicalJSON(buf *bytes.Buffer, v interface{}) error {
 		buf.WriteByte(']')
 		return nil
 	case json.Number:
-		buf.WriteString(string(t))
+		b, err := canonicalEvidenceNumber(t)
+		if err != nil {
+			return err
+		}
+		buf.Write(b)
 		return nil
 	case string, float64, float32, bool, int, int64, nil:
 		b, err := json.Marshal(t)
@@ -1307,8 +1326,8 @@ func writeCanonicalJSON(buf *bytes.Buffer, v interface{}) error {
 		if err != nil {
 			return err
 		}
-		var vv interface{}
-		if err := json.Unmarshal(b, &vv); err != nil {
+		vv, err := decodeEvidenceValue(b)
+		if err != nil {
 			return err
 		}
 		return writeCanonicalJSON(buf, vv)

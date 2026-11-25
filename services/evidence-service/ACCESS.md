@@ -44,3 +44,10 @@ comparison is deliberately tied to the supported PostgreSQL schema and
 must be qualified against each supported PostgreSQL version.
 Existing Compose and Kubernetes deployments need an explicit migration and
 restricted runtime role provisioning step before release.
+
+Signature validation accepts one original JSON object (`raw` or `cert`).
+Duplicate keys, lossy numeric aliases, invalid UTF-8, replacement characters,
+excessive nesting and oversized input are rejected. Representable decimal
+values retain the existing Go canonical encoding; this is not RFC 8785
+conformance. Historical payloads outside this restricted domain need explicit
+migration. Signature verification does not establish proof validity.
