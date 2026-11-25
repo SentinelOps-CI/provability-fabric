@@ -24,12 +24,12 @@ jobs:
         working-directory: services/api-gateway
     steps:
       - name: Checkout exact source revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up module-compatible Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: services/api-gateway/go.mod
           cache-dependency-path: services/api-gateway/go.sum
