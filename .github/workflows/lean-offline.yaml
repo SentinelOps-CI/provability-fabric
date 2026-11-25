@@ -51,6 +51,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Test bounded mathlib retrieval control flow
+        run: python3 -m unittest discover -s tests -p test_vendor_mathlib_cache.py
+
       - name: Cache Lean toolchain
         uses: actions/cache@v4
         with:
@@ -83,6 +86,18 @@ jobs:
           # require a vendored mathlib tree (lake package still declares mathlib).
           echo "compiling MicroInterp.lean with lean (no mathlib import)"
           lean Runtime/MicroInterp.lean
+
+      - name: Check HTTP response accumulation invariant
+        working-directory: core/lean-libs
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean -DwarningAsError=true Runtime/ResponseBound.lean | tee /tmp/pf-response-bound-axioms.txt
+          if grep -Fq sorryAx /tmp/pf-response-bound-axioms.txt; then
+            echo "Unproved response-bound obligation"
+            exit 1
+          fi
+          grep -Fq 'PF.Runtime.ResponseBound.collect_sound' /tmp/pf-response-bound-axioms.txt
 
       - name: Scoped sorry scan (enforced + Runtime)
         run: |

@@ -279,11 +279,20 @@ jobs:
       - name: Install benchmark dependencies
         run: pip install psutil
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
 
       - name: Build sidecar watcher
-        run: cargo build --release --bin sidecar-watcher --manifest-path runtime/sidecar-watcher/Cargo.toml
+        env:
+          RUSTUP_TOOLCHAIN: "1.98.1"
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          cargo build --locked --release --bin sidecar-watcher --manifest-path runtime/sidecar-watcher/Cargo.toml
+          git diff --exit-code -- Cargo.lock
 
       - name: Run performance benchmarks
         env:
@@ -329,8 +338,10 @@ jobs:
           # gosec v2.30.0 needs Go 1.25 or newer; avoid an implicit toolchain download.
           go-version: "1.26"
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
 
       - name: Install Syft
         run: |
@@ -345,6 +356,8 @@ jobs:
           syft version
 
       - name: Install cargo-audit
+        env:
+          RUSTUP_TOOLCHAIN: "1.98.1"
         run: cargo install cargo-audit --locked
 
       - name: Run Trivy vulnerability scanner
