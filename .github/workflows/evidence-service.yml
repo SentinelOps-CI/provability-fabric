@@ -19,9 +19,19 @@ jobs:
   evidence-service-build-and-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - postgres: "15"
+            backend: postgres
+          - postgres: "16"
+            backend: postgres
+          - postgres: "16"
+            backend: filesystem
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_USER: evidence_ci
           POSTGRES_PASSWORD: evidence_ci_fixture_only
@@ -197,6 +207,9 @@ jobs:
           PY
 
       - name: Verify configured production image access and tenant isolation
+        env:
+          BACKEND: ${{ matrix.backend }}
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
           fixture_dir="$(mktemp -d "$RUNNER_TEMP/evidence-access.XXXXXX")"
@@ -236,9 +249,28 @@ jobs:
               with os.fdopen(fd, "w") as f:
                   json.dump(data, f)
           PY
+          export DATABASE_URL=""
+          network=(--publish 127.0.0.1:18005:18005)
+          if [[ "$BACKEND" == postgres ]]; then
+            # Administrative migration is a one-shot invocation of the actual image.
+            docker run --rm --network host --entrypoint /root/main \
+              --env EVIDENCE_MIGRATION_DATABASE_URL=postgres://evidence_ci:evidence_ci_fixture_only@127.0.0.1:15432/evidence_ci?sslmode=disable \
+              evidence-service-ci:local --migrate
+            password="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+            echo "::add-mask::$password"
+            docker exec -i "$POSTGRES_CONTAINER" psql -X -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -v "runtime_password=$password" <<'SQL'
+          CREATE ROLE evidence_image_runtime LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'runtime_password';
+          GRANT USAGE ON SCHEMA public TO evidence_image_runtime;
+          GRANT SELECT, INSERT ON certificates TO evidence_image_runtime;
+          SQL
+            export DATABASE_URL="postgres://evidence_image_runtime:$password@127.0.0.1:15432/evidence_ci?sslmode=disable"
+            echo "::add-mask::$DATABASE_URL"
+            network=(--network host)
+          fi
           docker run --detach --rm --name evidence-service-ci-auth \
-            --publish 127.0.0.1:18005:8004 \
-            --env DATABASE_URL= \
+            "${network[@]}" --env DATABASE_URL \
+            --env PORT=18005 \
             --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
             --env EVIDENCE_ACCESS_FILE=/run/evidence-access.json \
             --mount "type=bind,src=$fixture_dir/access.json,dst=/run/evidence-access.json,readonly" \
@@ -270,7 +302,10 @@ jobs:
 
           for _ in range(30):
               try:
-                  assert call("/health")["service"] == "evidence-service"
+                  health = call("/health")
+                  assert health["service"] == "evidence-service"
+                  expected_db = "connected" if os.environ["BACKEND"] == "postgres" else "disconnected"
+                  assert health["database"] == expected_db, health
                   break
               except (URLError, TimeoutError):
                   time.sleep(1)
@@ -303,8 +338,18 @@ jobs:
           assert packet["tenant_id"] == "tenant-a" and len(packet["certificates"]) == 1, packet
           assert "Recorded accept rate:" in packet["conformance"], packet
           print("Configured image: authenticated storage, tenant isolation and permission controls observed.")
-          print("Filesystem-only image fixture; database controls are exercised separately in Go tests.")
+          print("Observed storage backend:", os.environ["BACKEND"])
           PY
+          if [[ "$BACKEND" == postgres ]]; then
+            # Check persisted rows independently of HTTP results using the admin
+            # fixture. The runtime identity must see none outside a tenant tx.
+            actual="$(docker exec "$POSTGRES_CONTAINER" psql -XAt -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -c "SELECT count(*) FROM certificates WHERE session_id = 'shared-session' AND tenant_id IN ('tenant-a','tenant-b')")"
+            test "$actual" = 2
+            actual="$(docker exec "$POSTGRES_CONTAINER" psql -XAt -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -c 'SET ROLE evidence_image_runtime; SELECT count(*) FROM certificates;' | tail -n 1)"
+            test "$actual" = 0
+          fi
 
       - name: Remove disposable evidence-service container
         if: always()
