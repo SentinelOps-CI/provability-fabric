@@ -58,7 +58,8 @@ pub mod generated {
 }
 
 // Re-export common types from generated code
-pub use generated::{egress::*, kernel::*, plan::*, receipt::*, safety_case::*};
+// The protobuf files share one package; access wire types through `generated`.
+// SDK convenience types retain their existing top-level names.
 
 #[cfg(test)]
 mod tests {

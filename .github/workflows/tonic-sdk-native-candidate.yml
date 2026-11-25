@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Tonic SDK native resolution candidate
+on:
+  push:
+    branches: [security/tonic-sdk-native-candidate-20261125]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler pkg-config libssl-dev
+      - name: Resolve exact SDK transport versions
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-sdk-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-sdk-locked.json
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          versions = {}
+          for p in tomllib.loads(Path("Cargo.lock").read_text())["package"]:
+              versions.setdefault(p["name"], set()).add(p["version"])
+          for name, version in [("tonic","0.12.3"),("tonic-build","0.12.3"),
+              ("reqwest","0.12.28"),("wasmtime","36.0.22"),("sqlx","0.8.6"),
+              ("tokio","1.53.3"),("openssl","0.10.80"),("kube","0.98.0"),
+              ("actix-web","4.20.0"),("actix-http","3.22.0"),("time","0.3.47")]:
+              assert versions.get(name) == {version}, (name, versions.get(name))
+          PY
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock
+          git hash-object Cargo.lock
+          cp Cargo.lock /tmp/pf-sdk-resolved.lock
+      - name: Preserve resolver lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: tonic-sdk-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Compile generated clients and execute real RPC regression
+        run: |
+          set -euo pipefail
+          cargo test --locked -p provability-fabric-core-sdk-rust --lib -- --nocapture
+          cargo test --locked -p provability-fabric-core-sdk-rust --doc
+          cmp /tmp/pf-sdk-resolved.lock Cargo.lock

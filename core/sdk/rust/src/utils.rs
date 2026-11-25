@@ -255,8 +255,7 @@ pub fn generate_random_string(length: usize) -> String {
 /// Generate a secure random string
 pub fn generate_secure_random_string(length: usize) -> Result<String> {
     use rand::{distributions::Alphanumeric, Rng};
-    let mut rng = rand::rngs::OsRng::new()
-        .map_err(|_| Error::internal("Failed to initialize secure RNG"))?;
+    let rng = rand::rngs::OsRng;
     
     Ok(rng
         .sample_iter(&Alphanumeric)
