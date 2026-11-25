@@ -39,6 +39,7 @@ impl MomentsAccountant {
     /// Add a query to the accountant
     pub fn add_query(&mut self, epsilon: f64, delta: f64) -> Result<()> {
         let (next_epsilon, next_delta) = self.proposed_totals(epsilon, delta)?;
+        validate_cost(next_epsilon, next_delta)?;
         let query = Query {
             epsilon,
             delta,
@@ -164,9 +165,9 @@ impl EpsilonGuard {
             return Err(anyhow!("Privacy configuration unavailable"));
         };
 
-        let config_map = api
-            .get("privacy-config")
-            .await
+        let config_map = tokio::time::timeout(
+            std::time::Duration::from_secs(5), api.get("privacy-config"))
+            .await.context("Privacy ConfigMap request timed out")?
             .context("Failed to get privacy ConfigMap")?;
 
         let data = config_map
@@ -204,15 +205,8 @@ impl EpsilonGuard {
             .entry(tenant_id.to_string())
             .or_insert_with(|| MomentsAccountant::new(0.0, 0.0));
 
-        if accountant.is_exhausted(config.epsilon_limit, config.delta_limit) {
-            warn!(
-                "Privacy budget exhausted for tenant {} (reset every {}h)",
-                tenant_id, config.reset_period_hours
-            );
-            return Ok(false);
-        }
-
-        // Check if adding this query would exceed budget
+        // A zero-cost coordinate is permitted at its limit (in particular,
+        // pure DP with delta = 0). Positive costs must fit both limits.
         let (test_epsilon, test_delta) = accountant.proposed_totals(query_epsilon, query_delta)?;
 
         if test_epsilon > config.epsilon_limit || test_delta > config.delta_limit {
@@ -394,6 +388,35 @@ mod tests {
         assert!(!guard.check_query("tenant", f64::MIN_POSITIVE, 0.0).await.unwrap());
         assert!(guard.load_configs().await.is_err());
         assert!(guard.check_query("tenant", 0.0, 0.0).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_privacy_charges_respect_both_limits() {
+        let guard = Arc::new(EpsilonGuard {
+            config_map_api: None,
+            accountants: Arc::new(RwLock::new(HashMap::new())),
+            configs: Arc::new(RwLock::new(HashMap::new())),
+        });
+        guard.configs.write().await.insert("tenant".into(), PrivacyConfig {
+            tenant_id: "tenant".into(), epsilon_limit: 1.0, delta_limit: 0.0,
+            reset_period_hours: 24,
+        });
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..16 {
+            let guard = guard.clone();
+            tasks.spawn(async move { guard.check_query("tenant", 0.125, 0.0).await.unwrap() });
+        }
+        let mut accepted = 0;
+        while let Some(result) = tasks.join_next().await {
+            if result.unwrap() {
+                accepted += 1;
+            }
+        }
+        assert_eq!(accepted, 8);
+        assert_eq!(guard.get_remaining_budget("tenant").await.unwrap(), (0.0, 0.0));
+        assert!(guard.check_query("tenant", 0.0, 0.0).await.unwrap());
+        assert!(!guard.check_query("tenant", 0.0, f64::MIN_POSITIVE).await.unwrap());
+        assert_eq!(guard.accountants.read().await["tenant"].queries.len(), 9);
     }
 
     #[test]

@@ -11,6 +11,9 @@ on:
       - '**/Cargo.toml'
       - 'Cargo.lock'
       - 'runtime/egress-firewall/Dockerfile'
+      - 'runtime/sidecar-watcher/src/**'
+      - 'core/lean-libs/Runtime/PrivacyCharge.lean'
+      - 'core/lean-libs/Runtime/IFCGrant.lean'
       - '.github/workflows/reqwest-migration-candidate.yml'
 
 permissions:
@@ -45,6 +48,20 @@ jobs:
           fi
           cmp /tmp/pf-dfa-matrix.tsv runtime/sidecar-watcher/tests/fixtures/dfa_lean_matrix.tsv
           test "$(wc -l < /tmp/pf-dfa-matrix.tsv)" -eq 40
+      - name: Check abstract privacy budget and IFC grant obligations
+        run: |
+          set -euo pipefail
+          lean -DwarningAsError=true core/lean-libs/Runtime/PrivacyCharge.lean | tee /tmp/pf-privacy-axioms.txt
+          lean -DwarningAsError=true core/lean-libs/Runtime/IFCGrant.lean | tee /tmp/pf-ifc-axioms.txt
+          if grep -Fq sorryAx /tmp/pf-privacy-axioms.txt /tmp/pf-ifc-axioms.txt; then
+            exit 1
+          fi
+          for theorem in accepted_bounded accepted_monotone rejected_unchanged; do
+            grep -F "PF.Runtime.PrivacyCharge.$theorem" /tmp/pf-privacy-axioms.txt
+          done
+          for theorem in grant_monotone grant_exact other_key_unchanged clear_denies; do
+            grep -F "PF.Runtime.IFCGrant.$theorem" /tmp/pf-ifc-axioms.txt
+          done
   resolve-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -110,7 +127,13 @@ jobs:
           assert "1.0.12" in versions.get("webpki-roots", set())
           new_h2 = [tuple(map(int, v.split("."))) for v in versions.get("h2", set()) if v.startswith("0.4.")]
           assert new_h2 and all(v >= (0, 4, 16) for v in new_h2), new_h2
-          # Kubernetes, Actix and Tonic still have legacy HTTP/TLS paths.
+          assert versions.get("kube") == {"0.98.0"}, versions.get("kube")
+          assert versions.get("k8s-openapi") == {"0.24.0"}, versions.get("k8s-openapi")
+          assert all(v.startswith("0.23.") for v in versions.get("rustls", set()))
+          assert "0.21.12" not in versions.get("rustls", set())
+          assert "0.101.7" not in versions.get("rustls-webpki", set())
+          assert "0.25.4" not in versions.get("webpki-roots", set())
+          # Actix, Tonic and the metrics exporter still have older HTTP paths.
           PY
           git diff --exit-code -- Cargo.lock
           cp Cargo.lock /tmp/pf-reqwest-resolved.lock
@@ -136,6 +159,7 @@ jobs:
           cargo test --locked -p sidecar-watcher --lib egress_cert::tests::
           cargo test --locked -p sidecar-watcher --test dfa_equiv
           cargo test --locked -p sidecar-watcher --test ni_monitor_egress
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher privacy::epsilon_guard::tests:: -- --nocapture
           cargo test --locked -p sidecar-watcher --bin sidecar-watcher test_local_ni_verdict_does_not_establish_permission_evidence
       - name: Qualify migrated HTTP interfaces over loopback
         if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
