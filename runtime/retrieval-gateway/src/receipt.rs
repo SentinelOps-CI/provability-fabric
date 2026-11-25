@@ -409,6 +409,19 @@ mod tests {
         let signed = issuer.sign_receipt(&sample_receipt()).await.unwrap();
         assert!(ReceiptValidator::validate_receipt(&signed).await.unwrap());
 
+        // The signature must bind the full unsigned numeric field values.
+        let mut altered = signed.clone();
+        altered.query_time_ms += 1_u64 << 32;
+        assert!(!issuer.verify_receipt(&altered).unwrap());
+        assert!(!ReceiptValidator::validate_receipt(&altered).await.unwrap());
+
+        if let Ok(offset) = usize::try_from(1_u64 << 32) {
+            let mut altered = signed.clone();
+            altered.result_count += offset;
+            assert!(!issuer.verify_receipt(&altered).unwrap());
+            assert!(!ReceiptValidator::validate_receipt(&altered).await.unwrap());
+        }
+
         let unrelated_issuer = ReceiptSigner {
             signing_key: SigningKey::from_bytes(&[29_u8; 32]),
             key_id: "unrelated".into(),
