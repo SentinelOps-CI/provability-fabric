@@ -52,11 +52,13 @@
     "result_count": {
       "type": "integer",
       "minimum": 0,
+      "maximum": 2147483647,
       "description": "Number of results returned"
     },
     "query_time_ms": {
       "type": "integer",
       "minimum": 0,
+      "maximum": 2147483647,
       "description": "Query execution time in milliseconds"
     },
     "sign_alg": {
