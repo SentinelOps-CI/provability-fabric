@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Legacy HTTP transport native candidate
+on:
+  push:
+    branches: [security/legacy-http2-remediation-candidate-20261125]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev libseccomp-dev protobuf-compiler
+      - name: Resolve and verify dependency removal
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-http-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-http-locked.json
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          packages = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          versions = {}
+          for package in packages:
+              versions.setdefault(package["name"], set()).add(package["version"])
+          for name in ("actix-web", "actix-http", "metrics-exporter-prometheus"):
+              assert name not in versions, (name, versions.get(name))
+          for name, version in [("reqwest","0.12.28"),("wasmtime","36.0.22"),
+              ("sqlx","0.8.6"),("tokio","1.53.3"),("openssl","0.10.80"),
+              ("kube","0.98.0"),("k8s-openapi","0.24.0"),("url","2.5.9"),
+              ("anyhow","1.0.103"),("time","0.3.47")]:
+              assert versions.get(name) == {version}, (name, versions.get(name))
+          print("Remaining h2 versions:", versions.get("h2"))
+          PY
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock
+          git hash-object Cargo.lock
+          cp Cargo.lock /tmp/pf-http-resolved.lock
+      - name: Preserve native lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-http-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Test HTTP/1.1 and HTTP/2 on actual firewall socket
+        run: |
+          set -euo pipefail
+          cargo test --locked -p egress-firewall --no-default-features -- --nocapture
+          cargo test --locked -p egress-firewall -- --nocapture
+          cargo test --locked -p kms-proxy -p tool-broker --bins
+          cmp /tmp/pf-http-resolved.lock Cargo.lock
+      - name: Build production firewall image
+        run: |
+          set -euo pipefail
+          docker build -f runtime/egress-firewall/Dockerfile -t pf-firewall-http:ci .
+          docker run --rm --entrypoint /bin/sh pf-firewall-http:ci -ec 'test -x /app/egress-firewall'
+          cmp /tmp/pf-http-resolved.lock Cargo.lock
