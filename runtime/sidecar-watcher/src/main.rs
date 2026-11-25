@@ -285,8 +285,15 @@ impl Watcher {
         })
     }
 
-    fn process_action(&mut self, action: &Action) -> Result<bool> {
+    async fn process_action(&mut self, action: &Action) -> Result<bool> {
         self.metrics.total_actions.inc();
+
+        // Reject partial privacy claims prior to mutating monitor state.
+        if action.privacy_epsilon.is_some() != action.privacy_delta.is_some() {
+            self.metrics.privacy_violations.inc();
+            self.log_violation("Incomplete privacy cost");
+            return Ok(false);
+        }
 
         // 1. DFA Step Evaluation (if DFA is loaded)
         if let Some(ref mut dfa) = self.dfa_interpreter {
@@ -341,14 +348,13 @@ impl Watcher {
 
         // 3. Permission Epochs (existing budget checks)
         if let (Some(epsilon), Some(delta)) = (action.privacy_epsilon, action.privacy_delta) {
-            let allowed = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.block_on(self.epsilon_guard.check_query(
-                    &self.tenant_id,
-                    epsilon,
-                    delta,
-                ))?
-            } else {
-                return Err(anyhow::anyhow!("async runtime required for privacy checks"));
+            let allowed = match self.epsilon_guard.check_query(&self.tenant_id, epsilon, delta).await {
+                Ok(allowed) => allowed,
+                Err(e) => {
+                    self.metrics.privacy_violations.inc();
+                    self.log_violation(&format!("Privacy check unavailable: {e}"));
+                    return Ok(false);
+                }
             };
 
             if !allowed {
@@ -362,14 +368,14 @@ impl Watcher {
         }
 
         // Update privacy budget metric from guard (store epsilon * 1000)
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            if let Ok((remaining_epsilon, _)) =
-                handle.block_on(self.epsilon_guard.get_remaining_budget(&self.tenant_id))
-            {
-                self.metrics
-                    .privacy_budget_remaining
-                    .set((remaining_epsilon * 1000.0) as i64);
-            }
+        if let Ok((remaining_epsilon, _)) =
+            self.epsilon_guard.get_remaining_budget(&self.tenant_id).await
+        {
+            self.metrics
+                .privacy_budget_remaining
+                .set((remaining_epsilon * 1000.0) as i64);
+        } else {
+            self.metrics.privacy_budget_remaining.set(0);
         }
 
         // 4. Witness Checks (existing budget and spam checks)
@@ -646,7 +652,7 @@ impl Watcher {
         for line in lines {
             if line.contains("\"action\"") {
                 if let Ok(action) = serde_json::from_str::<Action>(&line) {
-                    if let Err(e) = self.process_action(&action) {
+                    if let Err(e) = self.process_action(&action).await {
                         error!("Failed to process action: {}", e);
                     }
                 }
@@ -708,7 +714,7 @@ async fn main() -> Result<()> {
 
     let watcher = Watcher::new().await?;
 
-    // Load privacy configurations (will log a warning in dev mode without K8s)
+    // Failed configuration loading leaves privacy charges unavailable.
     if let Err(e) = watcher.epsilon_guard.load_configs().await {
         warn!("Failed to load privacy configs: {}", e);
     }

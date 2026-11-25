@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-/// Moments Accountant for differential privacy budget tracking
+/// Legacy-named accountant using additive composition, not a moments accountant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MomentsAccountant {
     pub epsilon: f64,
@@ -38,18 +38,23 @@ impl MomentsAccountant {
 
     /// Add a query to the accountant
     pub fn add_query(&mut self, epsilon: f64, delta: f64) -> Result<()> {
+        let (next_epsilon, next_delta) = self.proposed_totals(epsilon, delta)?;
         let query = Query {
             epsilon,
             delta,
             timestamp: chrono::Utc::now(),
         };
         self.queries.push(query);
-
-        // Update cumulative epsilon using composition
-        self.epsilon += epsilon;
-        self.delta += delta;
+        self.epsilon = next_epsilon;
+        self.delta = next_delta;
 
         Ok(())
+    }
+
+    fn proposed_totals(&self, epsilon: f64, delta: f64) -> Result<(f64, f64)> {
+        validate_cost(epsilon, delta)?;
+        validate_cost(self.epsilon, self.delta)?;
+        Ok((upper_sum(self.epsilon, epsilon)?, upper_sum(self.delta, delta)?))
     }
 
     /// Check if budget is exhausted
@@ -65,6 +70,31 @@ impl MomentsAccountant {
     }
 }
 
+fn validate_cost(epsilon: f64, delta: f64) -> Result<()> {
+    if !epsilon.is_finite() || epsilon < 0.0 || !delta.is_finite() || !(0.0..=1.0).contains(&delta) {
+        return Err(anyhow!("Invalid privacy cost or accumulator"));
+    }
+    Ok(())
+}
+
+// Round the sum upward only if the round-to-nearest result underestimates
+// the exact sum of the binary64 operands. FastTwoSum uses ordered magnitudes.
+// This conservatively accounts for represented inputs, not real-number
+// interpretations of decimal input or proof of the mechanism's DP claim.
+fn upper_sum(a: f64, b: f64) -> Result<f64> {
+    let (large, small) = if a >= b { (a, b) } else { (b, a) };
+    let sum = large + small;
+    if !sum.is_finite() {
+        return Err(anyhow!("Privacy cost overflow"));
+    }
+    let residual = small - (sum - large);
+    let upper = if residual > 0.0 { sum.next_up() } else { sum };
+    if !upper.is_finite() {
+        return Err(anyhow!("Privacy cost overflow"));
+    }
+    Ok(upper)
+}
+
 /// Privacy budget configuration for a tenant
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyConfig {
@@ -74,10 +104,19 @@ pub struct PrivacyConfig {
     pub reset_period_hours: u32,
 }
 
-/// Epsilon guard for enforcing differential privacy budgets
+impl PrivacyConfig {
+    fn validate(&self, key: &str) -> Result<()> {
+        validate_cost(self.epsilon_limit, self.delta_limit)?;
+        if key.is_empty() || self.tenant_id != key || self.reset_period_hours == 0 {
+            return Err(anyhow!("Invalid privacy configuration identity or reset period"));
+        }
+        Ok(())
+    }
+}
+
+/// Process-local additive privacy budget guard. No restart-safe or distributed
+/// accounting guarantee is provided.
 pub struct EpsilonGuard {
-    /// Optional Kubernetes client; None when running outside a cluster/dev mode
-    kube_client: Option<Client>,
     /// Optional ConfigMap API; None when running outside a cluster/dev mode
     config_map_api: Option<Api<ConfigMap>>,
     accountants: Arc<RwLock<HashMap<String, MomentsAccountant>>>,
@@ -85,45 +124,44 @@ pub struct EpsilonGuard {
 }
 
 impl EpsilonGuard {
-    /// Create a new guard. Falls back to "dev mode" if Kubernetes is not available.
+    /// Create a guard. Missing Kubernetes configuration denies privacy charges.
     pub async fn new() -> Result<Self> {
-        let (kube_client, config_map_api) =
+        let config_map_api =
             match tokio::time::timeout(std::time::Duration::from_secs(2), Client::try_default())
                 .await
             {
                 Ok(Ok(client)) => {
                     let api: Api<ConfigMap> = Api::default_namespaced(client.clone());
-                    (Some(client), Some(api))
+                    Some(api)
                 }
                 Ok(Err(e)) => {
                     warn!(
-                        "Kubernetes not detected; EpsilonGuard running in dev mode: {}",
+                        "Kubernetes not detected; privacy charges unavailable: {}",
                         e
                     );
-                    (None, None)
+                    None
                 }
                 Err(_) => {
                     warn!(
-                        "Kubernetes client init timed out; EpsilonGuard running in dev mode"
+                        "Kubernetes client init timed out; privacy charges unavailable"
                     );
-                    (None, None)
+                    None
                 }
             };
 
         Ok(Self {
-            kube_client,
             config_map_api,
             accountants: Arc::new(RwLock::new(HashMap::new())),
             configs: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
-    /// Load privacy configurations from ConfigMap (no-op in dev mode)
+    /// Load a complete configuration snapshot, denying charges after a failed refresh.
     pub async fn load_configs(&self) -> Result<()> {
+        let mut configs = self.configs.write().await;
+        configs.clear();
         let Some(api) = &self.config_map_api else {
-            // dev mode: nothing to load
-            warn!("privacy/epsilon_guard: skipping ConfigMap load (dev mode)");
-            return Ok(());
+            return Err(anyhow!("Privacy configuration unavailable"));
         };
 
         let config_map = api
@@ -135,14 +173,14 @@ impl EpsilonGuard {
             .data
             .ok_or_else(|| anyhow!("No data in privacy ConfigMap"))?;
 
-        let mut configs = self.configs.write().await;
-
+        let mut snapshot = HashMap::new();
         for (tenant_id, config_json) in &data {
             let config: PrivacyConfig = serde_json::from_str(config_json)
-                .context(format!("Failed to parse config for tenant {}", tenant_id))?;
-            configs.insert(tenant_id.clone(), config);
+                .with_context(|| format!("Failed to parse config for tenant {}", tenant_id))?;
+            config.validate(tenant_id)?;
+            snapshot.insert(tenant_id.clone(), config);
         }
-
+        *configs = snapshot;
         info!("Loaded {} privacy configurations", configs.len());
         Ok(())
     }
@@ -154,21 +192,11 @@ impl EpsilonGuard {
         query_epsilon: f64,
         query_delta: f64,
     ) -> Result<bool> {
-        // Determine mode
-        let dev_mode = self.kube_client.is_none();
-
-        // Get tenant configuration
+        validate_cost(query_epsilon, query_delta)?;
         let configs = self.configs.read().await;
-        let config = match configs.get(tenant_id) {
-            Some(c) => c,
-            None if dev_mode => {
-                // No config and no K8s -> allow in dev mode
-                return Ok(true);
-            }
-            None => {
-                return Err(anyhow!("No privacy config for tenant {}", tenant_id));
-            }
-        };
+        let config = configs.get(tenant_id)
+            .ok_or_else(|| anyhow!("No privacy config for tenant {}", tenant_id))?;
+        config.validate(tenant_id)?;
 
         // Get or create accountant for tenant
         let mut accountants = self.accountants.write().await;
@@ -185,8 +213,7 @@ impl EpsilonGuard {
         }
 
         // Check if adding this query would exceed budget
-        let test_epsilon = accountant.epsilon + query_epsilon;
-        let test_delta = accountant.delta + query_delta;
+        let (test_epsilon, test_delta) = accountant.proposed_totals(query_epsilon, query_delta)?;
 
         if test_epsilon > config.epsilon_limit || test_delta > config.delta_limit {
             warn!(
@@ -213,14 +240,10 @@ impl EpsilonGuard {
 
     /// Get remaining budget for a tenant
     pub async fn get_remaining_budget(&self, tenant_id: &str) -> Result<(f64, f64)> {
-        let dev_mode = self.kube_client.is_none();
         let configs = self.configs.read().await;
-
-        let config = match configs.get(tenant_id) {
-            Some(c) => c,
-            None if dev_mode => return Ok((f64::INFINITY, f64::INFINITY)),
-            None => return Err(anyhow!("No privacy config for tenant {}", tenant_id)),
-        };
+        let config = configs.get(tenant_id)
+            .ok_or_else(|| anyhow!("No privacy config for tenant {}", tenant_id))?;
+        config.validate(tenant_id)?;
 
         let accountants = self.accountants.read().await;
         let default_accountant = MomentsAccountant::new(0.0, 0.0);
@@ -335,7 +358,6 @@ mod tests {
         let config = kube::Config::new(format!("http://{address}").parse().unwrap());
         let client = Client::try_from(config).unwrap();
         let guard = EpsilonGuard {
-            kube_client: Some(client.clone()),
             config_map_api: Some(Api::default_namespaced(client)),
             accountants: Arc::new(RwLock::new(HashMap::new())),
             configs: Arc::new(RwLock::new(HashMap::new())),
@@ -346,6 +368,43 @@ mod tests {
         assert!(!guard.check_query("fixture-tenant", 0.6, 0.06).await.unwrap());
         assert!(guard.check_query("unknown-tenant", 0.1, 0.01).await.is_err());
         task.abort();
+    }
+
+    #[tokio::test]
+    async fn test_privacy_missing_config_and_invalid_costs_fail_closed() {
+        let guard = EpsilonGuard {
+            config_map_api: None,
+            accountants: Arc::new(RwLock::new(HashMap::new())),
+            configs: Arc::new(RwLock::new(HashMap::new())),
+        };
+        assert!(guard.check_query("tenant", 0.1, 0.01).await.is_err());
+        assert!(guard.get_remaining_budget("tenant").await.is_err());
+        guard.configs.write().await.insert("tenant".into(), PrivacyConfig {
+            tenant_id: "tenant".into(), epsilon_limit: 1.0, delta_limit: 0.5,
+            reset_period_hours: 24,
+        });
+        for (epsilon, delta) in [
+            (-0.1, 0.0), (f64::NAN, 0.0), (f64::INFINITY, 0.0),
+            (0.1, -0.1), (0.1, f64::NAN), (0.1, 1.1),
+        ] {
+            assert!(guard.check_query("tenant", epsilon, delta).await.is_err());
+        }
+        assert!(guard.accountants.read().await.is_empty());
+        assert!(guard.check_query("tenant", 1.0, 0.25).await.unwrap());
+        assert!(!guard.check_query("tenant", f64::MIN_POSITIVE, 0.0).await.unwrap());
+        assert!(guard.load_configs().await.is_err());
+        assert!(guard.check_query("tenant", 0.0, 0.0).await.is_err());
+    }
+
+    #[test]
+    fn test_upper_sum_does_not_drop_small_positive_charges() {
+        assert_eq!(upper_sum(1.0, f64::MIN_POSITIVE).unwrap(), 1.0f64.next_up());
+        assert_eq!(upper_sum(0.25, 0.25).unwrap(), 0.5);
+        assert_eq!(upper_sum(0.0, 0.25).unwrap(), 0.25);
+        assert!(upper_sum(f64::MAX, f64::MAX).is_err());
+        let mut accountant = MomentsAccountant::new(0.0, 0.0);
+        assert!(accountant.add_query(-1.0, 0.0).is_err());
+        assert!(accountant.queries.is_empty());
     }
 
     #[tokio::test]
