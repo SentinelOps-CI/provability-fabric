@@ -35,5 +35,12 @@ Database operations bind tenant identity with transaction-local `set_config`.
 Reads use a repeatable-read, read-only transaction for count and result queries.
 Database searches with no tenant are refused. The restricted-role integration
 fixture separates schema administration from runtime operations and checks
-pooled-connection reuse. Production startup still performs schema DDL; a
-separately provisioned migration identity is a remaining deployment obligation.
+pooled-connection reuse. Runtime startup now validates schema and privileges without performing DDL.
+Run the binary with `--migrate` and `EVIDENCE_MIGRATION_DATABASE_URL` using a
+separate administrative identity. Grant the runtime role only schema USAGE
+and certificate SELECT/INSERT, with no ownership or RLS bypass privileges.
+Startup rejects additional or altered RLS policies. The policy expression
+comparison is deliberately tied to the supported PostgreSQL schema and
+must be qualified against each supported PostgreSQL version.
+Existing Compose and Kubernetes deployments need an explicit migration and
+restricted runtime role provisioning step before release.

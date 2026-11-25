@@ -130,4 +130,3 @@ func evidenceScope(credential *evidenceCredential, requestedTenant string, write
 	}
 	return credential.tenant, true
 }
-

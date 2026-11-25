@@ -94,10 +94,16 @@ func TestEvidencePostgresHTTPAccessBindsTenantAndPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 	dsn.User = url.UserPassword(role, password)
-	db, err := sql.Open("postgres", dsn.String())
+	t.Setenv("DATABASE_URL", dsn.String())
+	t.Setenv("EVIDENCE_STORAGE_PATH", t.TempDir())
+	t.Setenv("EVIDENCE_ACCESS_FILE", "")
+	t.Setenv("EVIDENCE_TRUSTED_JWKS_URL", "")
+	t.Setenv("CERT_SIGNER_BACKEND", "")
+	started, err := NewEvidenceService()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("restricted runtime startup failed: %v", err)
 	}
+	db := started.db
 	t.Cleanup(func() { _ = db.Close() })
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -109,6 +115,15 @@ func TestEvidencePostgresHTTPAccessBindsTenantAndPermission(t *testing.T) {
 		t.Fatalf("restricted role has unexpected privileges: %v", err)
 	}
 	testEvidenceHTTPAccess(t, db, admin)
+
+	// The administrator is intentionally separate from the runtime identity.
+	t.Setenv("DATABASE_URL", os.Getenv("EVIDENCE_TEST_DATABASE_URL"))
+	if service, err := NewEvidenceService(); err == nil || service != nil {
+		if service != nil && service.db != nil {
+			_ = service.db.Close()
+		}
+		t.Fatal("privileged runtime identity was accepted")
+	}
 }
 
 func testEvidenceHTTPAccess(t *testing.T, db, admin *sql.DB) {

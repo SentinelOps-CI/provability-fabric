@@ -284,13 +284,13 @@ func NewEvidenceService() (*EvidenceService, error) {
 		service.signer = signer
 	}
 
-	// A reachable database with an invalid RLS schema is unsafe to use.
-	// Do not claim a successful startup and fall back after a DDL failure.
-	if err := service.initializeSchema(); err != nil {
+	// Runtime startup only inspects an already migrated schema. It must
+	// never perform DDL or connect as a table owner / RLS-bypass role.
+	if err := service.validateRuntimeDatabase(); err != nil {
 		if db != nil {
 			_ = db.Close()
 		}
-		return nil, fmt.Errorf("initialize certificate database schema: %w", err)
+		return nil, fmt.Errorf("validate certificate runtime database: %w", err)
 	}
 
 	return service, nil
@@ -1403,6 +1403,16 @@ func fetchEd25519KeysFromJWKSWithClient(client *http.Client, endpoint string) ([
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--migrate" {
+		if err := migrateEvidenceDatabase(); err != nil {
+			log.Fatalf("Evidence database migration failed: %v", err)
+		}
+		log.Print("Evidence database migration completed")
+		return
+	}
+	if len(os.Args) != 1 {
+		log.Fatal("usage: evidence-service [--migrate]")
+	}
 	// Initialize service
 	service, err := NewEvidenceService()
 	if err != nil {

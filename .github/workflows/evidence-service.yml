@@ -201,8 +201,12 @@ jobs:
           set -euo pipefail
           fixture_dir="$(mktemp -d "$RUNNER_TEMP/evidence-access.XXXXXX")"
           cleanup() {
-            docker rm -f evidence-service-ci-auth >/dev/null 2>&1 || true
-            rm -rf "$fixture_dir"
+            local status=0
+            if docker container inspect evidence-service-ci-auth >/dev/null 2>&1; then
+              docker rm -f evidence-service-ci-auth >/dev/null || status=$?
+            fi
+            rm -rf "$fixture_dir" || status=$?
+            return "$status"
           }
           trap cleanup EXIT
           export FIXTURE_DIR="$fixture_dir"
