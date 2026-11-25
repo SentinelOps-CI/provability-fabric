@@ -84,6 +84,9 @@ func TestEvidenceStrictSignatureBoundary(t *testing.T) {
 	}
 	call("{\"raw\":"+string(payload)+",\"cert\":"+string(payload)+"}", 400, false)
 	call("{\"raw\":"+string(payload)+",\"raw\":"+string(payload)+"}", 400, false)
+	call("{\"raw\":"+string(payload)+",\"RAW\":"+string(payload)+"}", 400, false)
+	call("{\"RAW\":"+string(payload)+"}", 400, false)
+	call("{\"raw\":"+string(payload)+",\"pem_pub\":null}", 400, false)
 	for _, raw := range []string{`{"raw":{"value":"\ud800"}}`, `{"raw":null}`, `{"raw":{}} {}`} {
 		call(raw, 400, false)
 	}

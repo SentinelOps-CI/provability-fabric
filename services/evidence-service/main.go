@@ -1118,24 +1118,42 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or oversized validation request"})
 		return
 	}
-	if _, err := decodeEvidenceObject(body); err != nil {
+	request, err := decodeEvidenceObject(body)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ambiguous or unsupported validation JSON"})
 		return
 	}
-	var req struct {
-		Raw     json.RawMessage `json:"raw"`
-		Cert    json.RawMessage `json:"cert"`
-		JWKSURL string          `json:"jwks_url"`
-		PEMPub  string          `json:"pem_pub"`
+	// Exact field names avoid encoding/json's case-insensitive struct
+	// field matching at the request trust boundary.
+	for key := range request {
+		switch key {
+		case "raw", "cert", "jwks_url", "pem_pub":
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown validation request field"})
+			return
+		}
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid validation request"})
-		return
+	var pemPub, jwksURL string
+	if value, present := request["pem_pub"]; present {
+		var ok bool
+		pemPub, ok = value.(string)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid verifier key field"})
+			return
+		}
+	}
+	if value, present := request["jwks_url"]; present {
+		var ok bool
+		jwksURL, ok = value.(string)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JWKS field"})
+			return
+		}
 	}
 	// An attacker could sign arbitrary claims with their own key and submit
 	// that key as pem_pub. Signature-valid means trusted issuer verification,
 	// never just self-consistency under a request-provided public key.
-	if strings.TrimSpace(req.PEMPub) != "" {
+	if strings.TrimSpace(pemPub) != "" {
 		writeError(c, http.StatusBadRequest, "UNTRUSTED_VERIFIER_KEY",
 			"Caller-supplied verification keys are not accepted",
 			"Configure an operator-controlled trusted JWKS before validating signatures", "")
@@ -1143,29 +1161,23 @@ func (s *EvidenceService) verifyCertHandler(c *gin.Context) {
 	}
 	// Callers cannot make the evidence service fetch arbitrary origins. A
 	// request JWKS URL is usable only if the deployment explicitly pinned it.
-	if err := s.approveJWKSURL(req.JWKSURL); err != nil {
+	if err := s.approveJWKSURL(jwksURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unapproved JWKS endpoint"})
 		return
 	}
 
-	var raw []byte
-	if len(req.Raw) != 0 && len(req.Cert) != 0 {
+	payload, rawPresent := request["raw"]
+	structured, certPresent := request["cert"]
+	if rawPresent == certPresent {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provide exactly one certificate payload"})
 		return
 	}
-	if len(req.Raw) != 0 {
-		raw = req.Raw
-	} else if len(req.Cert) != 0 {
-		raw = req.Cert
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing cert payload"})
-		return
+	if certPresent {
+		payload = structured
 	}
-
-	// Parse generically to inspect signature field
-	generic, err := decodeEvidenceObject(raw)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+	generic, ok := payload.(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "certificate payload must be an object"})
 		return
 	}
 
