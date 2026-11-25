@@ -858,7 +858,10 @@ func (s *EvidenceService) generateAuditProof(certs []CertV1) (string, error) {
 	// Generate hash chain of certificates
 	var hashes []string
 	for _, cert := range certs {
-		certData, _ := json.Marshal(cert)
+		certData, err := json.Marshal(cert)
+		if err != nil {
+			return "", fmt.Errorf("encode certificate for diagnostic digest: %w", err)
+		}
 		hash := fmt.Sprintf("%x", sha256.Sum256(certData))
 		hashes = append(hashes, hash)
 	}
@@ -883,7 +886,8 @@ func (s *EvidenceService) generateAuditProof(certs []CertV1) (string, error) {
 func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 	var report strings.Builder
 
-	report.WriteString("# Compliance Conformance Report\n\n")
+	report.WriteString("# Certificate Claims Summary\n\n")
+	report.WriteString("This diagnostic summarizes stored assertions; it does not establish independent proof validity or compliance.\n\n")
 	report.WriteString(fmt.Sprintf("Generated: %s\n", time.Now().Format(time.RFC3339)))
 	report.WriteString(fmt.Sprintf("Total Certificates: %d\n\n", len(certs)))
 
@@ -903,21 +907,23 @@ func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 
 	report.WriteString("\n## Policy Distribution\n\n")
 	for hash, count := range policyHashes {
-		report.WriteString(fmt.Sprintf("- Policy %s: %d certificates\n", hash[:16], count))
+		// Identifiers are currently only validated as nonempty strings.
+		report.WriteString(fmt.Sprintf("- Policy %q: %d certificates\n", hash, count))
 	}
 
 	// Compliance summary
-	report.WriteString("\n## Compliance Summary\n\n")
+	report.WriteString("\n## Recorded Monitor Outcomes\n\n")
 	acceptCount := niMonitorCounts["accept"]
 	totalCount := len(certs)
 
 	if totalCount > 0 {
 		complianceRate := float64(acceptCount) / float64(totalCount) * 100
-		report.WriteString(fmt.Sprintf("- Compliance Rate: %.2f%%\n", complianceRate))
+		report.WriteString(fmt.Sprintf("- Recorded accept rate: %.2f%%\n", complianceRate))
 		report.WriteString(fmt.Sprintf("- Total Decisions: %d\n", totalCount))
 		report.WriteString(fmt.Sprintf("- Accepted: %d\n", acceptCount))
 		report.WriteString(fmt.Sprintf("- Rejected: %d\n", niMonitorCounts["reject"]))
 		report.WriteString(fmt.Sprintf("- Errors: %d\n", niMonitorCounts["error"]))
+		report.WriteString(fmt.Sprintf("- Inapplicable: %d\n", niMonitorCounts["inapplicable"]))
 	}
 
 	return report.String()
