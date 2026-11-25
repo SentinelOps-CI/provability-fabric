@@ -370,7 +370,7 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 	// A configured database is an authoritative persistence backend.
 	// Never report a filesystem-only issuance when its database write fails.
 	if s.db != nil {
-		if err := s.storeCertInDB(prepared); err != nil {
+		if err := s.storeCertInDB(ctx, prepared); err != nil {
 			return fmt.Errorf("database certificate storage failed: %w", err)
 		}
 	}
@@ -408,7 +408,7 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 
 	if s.db != nil {
 		// Database search
-		certs, count, err := s.searchCertsInDB(req)
+		certs, count, err := s.searchCertsInDB(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("database certificate search failed: %w", err)
 		}
@@ -511,7 +511,12 @@ func (s *EvidenceService) validateCertificate(cert CertV1) error {
 }
 
 // storeCertInDB stores certificate in PostgreSQL
-func (s *EvidenceService) storeCertInDB(cert CertV1) error {
+func (s *EvidenceService) storeCertInDB(ctx context.Context, cert CertV1) error {
+	tx, err := s.beginTenantTx(ctx, cert.TenantID, false)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	query := `
 		INSERT INTO certificates (
 			bundle_id, policy_hash, proof_hash, automata_hash, labeler_hash,
@@ -525,13 +530,16 @@ func (s *EvidenceService) storeCertInDB(cert CertV1) error {
 		return err
 	}
 
-	_, err = s.db.Exec(query,
+	_, err = tx.ExecContext(ctx, query,
 		cert.BundleID, cert.PolicyHash, cert.ProofHash, cert.AutomataHash,
 		cert.LabelerHash, cert.NIClaim, cert.NIMonitor, cert.SidecarBuild,
 		cert.TenantID, cert.SessionID, cert.Timestamp, string(certData),
 	)
 
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // prepareCertificate normalizes the stored fields and signs those exact bytes.
@@ -646,7 +654,12 @@ func (s *EvidenceService) writeCertInFS(cert CertV1) error {
 }
 
 // searchCertsInDB searches certificates in database
-func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int, error) {
+func (s *EvidenceService) searchCertsInDB(ctx context.Context, req CertSearchRequest) ([]CertV1, int, error) {
+	tx, err := s.beginTenantTx(ctx, req.TenantID, true)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
 	// Build dynamic query
 	var conditions []string
 	var args []interface{}
@@ -696,7 +709,7 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM certificates %s", whereClause)
 	var total int
-	err := s.db.QueryRow(countQuery, args...).Scan(&total)
+	err = tx.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -710,7 +723,7 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 
 	args = append(args, req.Limit, req.Offset)
 
-	rows, err := s.db.Query(dataQuery, args...)
+	rows, err := tx.QueryContext(ctx, dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -737,6 +750,12 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 		return nil, 0, fmt.Errorf("iterate certificate rows: %w", err)
 	}
 
+	if err := rows.Close(); err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
 	return certificates, total, nil
 }
 

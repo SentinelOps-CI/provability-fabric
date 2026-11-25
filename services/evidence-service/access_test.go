@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,15 +68,50 @@ func TestEvidenceAccessConfiguration(t *testing.T) {
 }
 
 func TestEvidenceHTTPAccessBindsTenantAndPermission(t *testing.T) {
-	testEvidenceHTTPAccess(t, nil)
+	testEvidenceHTTPAccess(t, nil, nil)
 }
 
 func TestEvidencePostgresHTTPAccessBindsTenantAndPermission(t *testing.T) {
-	db := openDisposablePostgres(t)
-	testEvidenceHTTPAccess(t, db)
+	admin := openDisposablePostgres(t)
+	if err := (&EvidenceService{db: admin}).initializeSchema(); err != nil {
+		t.Fatal(err)
+	}
+	role := "evidence_http_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	password := uuid.NewString()
+	if _, err := admin.Exec("CREATE ROLE " + role + " LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD '" + password + "'"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := admin.Exec("DROP OWNED BY " + role + "; DROP ROLE " + role); err != nil {
+			t.Errorf("remove restricted fixture role: %v", err)
+		}
+	})
+	if _, err := admin.Exec("GRANT USAGE ON SCHEMA public TO " + role + "; GRANT SELECT, INSERT ON certificates TO " + role); err != nil {
+		t.Fatal(err)
+	}
+	dsn, err := url.Parse(os.Getenv("EVIDENCE_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dsn.User = url.UserPassword(role, password)
+	db, err := sql.Open("postgres", dsn.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	if err := db.Ping(); err != nil {
+		t.Fatal(err)
+	}
+	var bypass bool
+	if err := db.QueryRow("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user").Scan(&bypass); err != nil || bypass {
+		t.Fatalf("restricted role has unexpected privileges: %v", err)
+	}
+	testEvidenceHTTPAccess(t, db, admin)
 }
 
-func testEvidenceHTTPAccess(t *testing.T, db *sql.DB) {
+func testEvidenceHTTPAccess(t *testing.T, db, admin *sql.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	tenantA, tenantB := "access-a-"+uuid.NewString(), "access-b-"+uuid.NewString()
@@ -86,11 +122,8 @@ func testEvidenceHTTPAccess(t *testing.T, db *sql.DB) {
 	_, unknownToken := evidenceTestCredential(t, tenantA, true, true)
 	service := &EvidenceService{db: db, storagePath: t.TempDir(), access: []evidenceCredential{a, b, reader, writer}}
 	if db != nil {
-		if err := service.initializeSchema(); err != nil {
-			t.Fatal(err)
-		}
 		t.Cleanup(func() {
-			if _, err := db.Exec("DELETE FROM certificates WHERE tenant_id IN ($1, $2)", tenantA, tenantB); err != nil {
+			if _, err := admin.Exec("DELETE FROM certificates WHERE tenant_id IN ($1, $2)", tenantA, tenantB); err != nil {
 				t.Errorf("remove disposable HTTP isolation records: %v", err)
 			}
 		})
@@ -170,7 +203,11 @@ func testEvidenceHTTPAccess(t *testing.T, db *sql.DB) {
 	if db != nil {
 		// Both tenants' rows exist in the real database. Introduce a
 		// deliberately inconsistent stored record and require a failed query.
-		if _, err := db.Exec("UPDATE certificates SET cert_data = jsonb_set(cert_data, '{tenant_id}', to_jsonb($1::text)) WHERE tenant_id = $2", tenantB, tenantA); err != nil {
+		var count int
+		if err := db.QueryRow("SELECT COUNT(*) FROM certificates").Scan(&count); err != nil || count != 0 {
+			t.Fatalf("tenant escaped transaction into pooled connection: count=%d err=%v", count, err)
+		}
+		if _, err := admin.Exec("UPDATE certificates SET cert_data = jsonb_set(cert_data, '{tenant_id}', to_jsonb($1::text)) WHERE tenant_id = $2", tenantB, tenantA); err != nil {
 			t.Fatal(err)
 		}
 		call("POST", "/search", tokenA, empty, 500)

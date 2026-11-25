@@ -30,3 +30,10 @@ This is an intentionally incompatible draft for issue #345. Existing clients,
 deployment provisioning, TLS termination, database permissions, and proof
 provenance must be reconciled before release. Access tests are not evidence
 of independent certificate issuance authority.
+
+Database operations bind tenant identity with transaction-local `set_config`.
+Reads use a repeatable-read, read-only transaction for count and result queries.
+Database searches with no tenant are refused. The restricted-role integration
+fixture separates schema administration from runtime operations and checks
+pooled-connection reuse. Production startup still performs schema DDL; a
+separately provisioned migration identity is a remaining deployment obligation.
