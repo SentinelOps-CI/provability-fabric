@@ -39,7 +39,9 @@ theorem scope_sound (c : Credential) (requested : Option Nat) (write : Bool)
 theorem scope_complete (c : Credential) (requested : Option Nat) (write : Bool)
     (h : permitted c requested write) :
     scope (some c) requested write = some c.tenant := by
-  simpa [scope, permitted] using h
+  have hp : (if write then c.write else c.read) = true ∧
+      (requested = none ∨ requested = some c.tenant) := h
+  simp [scope, hp]
 
 theorem cross_tenant_denied (c : Credential) (other : Nat) (write : Bool)
     (h : other ≠ c.tenant) :
