@@ -113,11 +113,21 @@ func (s *EvidenceService) authorizeEvidence(c *gin.Context, requestedTenant stri
 			"Missing or invalid evidence credential", "Supply an authorized bearer credential", "")
 		return "", false
 	}
-	if (write && !credential.write) || (!write && !credential.read) ||
-		(requestedTenant != "" && requestedTenant != credential.tenant) {
+	tenant, ok := evidenceScope(credential, requestedTenant, write)
+	if !ok {
 		writeError(c, http.StatusForbidden, "EVIDENCE_ACCESS_DENIED",
 			"Credential does not authorize the requested tenant or operation", "Use the authorized tenant and permission", "")
 		return "", false
 	}
+	return tenant, true
+}
+
+// evidenceScope is the authorization decision after credential recognition.
+func evidenceScope(credential *evidenceCredential, requestedTenant string, write bool) (string, bool) {
+	if credential == nil || (write && !credential.write) || (!write && !credential.read) ||
+		(requestedTenant != "" && requestedTenant != credential.tenant) {
+		return "", false
+	}
 	return credential.tenant, true
 }
+
