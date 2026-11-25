@@ -116,7 +116,7 @@ pub struct OptimizedDFA {
     start_state: StateId,
     current_state: StateId,
     accepting_states: HashSet<StateId>,
-    transitions: HashMap<StateId, HashMap<String, StateId>>,
+    transitions: Vec<(StateId, Vec<(String, StateId)>)>,
     rate_limiters: HashMap<String, LegacyRateLimiter>,
 }
 
@@ -188,11 +188,18 @@ impl OptimizedDFA {
     pub fn from_table(table: DFATable) -> Result<Self, Box<dyn Error>> {
         DFAInterpreter::from_table(table.clone())
             .validate().map_err(std::io::Error::other)?;
-        let mut transitions: HashMap<StateId, HashMap<String, StateId>> = HashMap::new();
+        // Sorted sparse rows avoid repeated hashing while retaining exact
+        // symbol equality and memory proportional to the policy size.
+        let mut rows: std::collections::BTreeMap<StateId, Vec<(String, StateId)>> =
+            std::collections::BTreeMap::new();
         for transition in table.transitions {
-            transitions.entry(transition.from_state).or_default()
-                .insert(transition.event, transition.to_state);
+            rows.entry(transition.from_state).or_default()
+                .push((transition.event, transition.to_state));
         }
+        let transitions = rows.into_iter().map(|(state, mut edges)| {
+            edges.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+            (state, edges)
+        }).collect();
         let rate_limiters = table.rate_limits.into_iter().map(|limit| {
             (limit.tool, LegacyRateLimiter::new(limit.window_ms, limit.bound))
         }).collect();
@@ -209,7 +216,19 @@ impl OptimizedDFA {
     /// Borrowed exact-symbol lookup. None denotes a missing transition.
     #[inline]
     pub fn step(&self, state: StateId, event: &str) -> Option<StateId> {
-        self.transitions.get(&state)?.get(event).copied()
+        let rows = &self.transitions;
+        let row = if rows.len() <= 8 {
+            rows.iter().find(|(id, _)| *id == state)?
+        } else {
+            &rows[rows.binary_search_by_key(&state, |(id, _)| *id).ok()?]
+        };
+        let edges = &row.1;
+        if edges.len() <= 8 {
+            edges.iter().find(|(symbol, _)| symbol == event).map(|(_, to)| *to)
+        } else {
+            let index = edges.binary_search_by(|(symbol, _)| symbol.as_str().cmp(event)).ok()?;
+            Some(edges[index].1)
+        }
     }
 
     /// Rejected events change neither state nor rate-limit history.
@@ -249,7 +268,7 @@ impl OptimizedDFA {
             || !self.accepting_states.is_subset(&self.states)
             || self.transitions.iter().any(|(from, edges)| {
                 !self.states.contains(from)
-                    || edges.values().any(|to| !self.states.contains(to))
+                    || edges.iter().any(|(_, to)| !self.states.contains(to))
             })
         {
             return Err("Invalid indexed DFA state".to_string());
@@ -558,6 +577,38 @@ mod tests {
         assert_eq!(dfa.process_event(event, 2000).unwrap_err(), "Rate limit exceeded");
         assert_eq!(dfa.current_state(), 1);
         assert!(dfa.process_event(event, 2001).is_ok());
+    }
+
+    #[test]
+    fn test_sparse_sorted_rows_match_exact_reference() {
+        // Exercise both sides of the small-row threshold and sparse IDs.
+        let states: Vec<u32> = (0..20).map(|n| n * 1009).collect();
+        let mut transitions = Vec::new();
+        for (n, &state) in states.iter().enumerate() {
+            for k in 0..(n % 13 + 1) {
+                transitions.push(Transition {
+                    from_state: state,
+                    event: format!("event-{k:02}"),
+                    to_state: states[(n+k+1) % states.len()],
+                });
+            }
+        }
+        transitions.reverse();
+        let table = DFATable {
+            states: states.clone(),
+            start: states[0],
+            accepting: states.clone(),
+            transitions: transitions.clone(),
+            rate_limits: vec![],
+        };
+        let dfa = OptimizedDFA::from_table(table).unwrap();
+        for state in states.into_iter().chain([u32::MAX, 17]) {
+            for event in (0..15).map(|k| format!("event-{k:02}")).chain(["event".into(), "EVENT-00".into()]) {
+                let expected = transitions.iter().find(|t| t.from_state == state && t.event == event)
+                    .map(|t| t.to_state);
+                assert_eq!(dfa.step(state, &event), expected);
+            }
+        }
     }
 
     #[test]
