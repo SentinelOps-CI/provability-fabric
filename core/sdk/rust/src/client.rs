@@ -32,7 +32,7 @@ impl AuthInterceptor {
 }
 
 impl Interceptor for AuthInterceptor {
-    fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
+    fn call(&mut self, mut request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, tonic::Status> {
         if let Some(token) = &self.auth_token {
             request.metadata_mut().insert("authorization", token.clone());
         }

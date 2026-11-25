@@ -332,7 +332,6 @@ impl From<Status> for Error {
             Code::Unavailable => Error::Unavailable(status.message().to_string()),
             Code::DataLoss => Error::Internal("Data loss".to_string()),
             Code::Unauthenticated => Error::Authentication(status.message().to_string()),
-            _ => Error::Status(status),
         }
     }
 }
