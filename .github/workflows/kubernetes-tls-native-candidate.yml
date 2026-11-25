@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Kubernetes TLS native resolution candidate
+on:
+  push:
+    branches: [security/kubernetes-tls-native-candidate-20261125]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native build requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libseccomp-dev pkg-config libssl-dev protobuf-compiler
+      - name: Resolve only the required dependency changes
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-kube-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-kube-locked.json
+          python3 - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+          data = json.loads(Path("/tmp/pf-kube-locked.json").read_text())
+          pkgs = {p["id"]: p for p in data["packages"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          versions = {}
+          for p in tomllib.loads(Path("Cargo.lock").read_text())["package"]:
+              versions.setdefault(p["name"], set()).add(p["version"])
+          for name, version in [
+              ("kube", "0.98.0"), ("k8s-openapi", "0.24.0"),
+              ("wasmtime", "36.0.22"), ("sqlx", "0.8.6"), ("tokio", "1.53.3"),
+              ("openssl", "0.10.80"), ("actix-web", "4.20.0"),
+              ("actix-http", "3.22.0"), ("reqwest", "0.12.28"),
+              ("url", "2.5.9"), ("anyhow", "1.0.103"), ("time", "0.3.47"),
+          ]:
+              assert versions.get(name) == {version}, (name, versions.get(name))
+          assert "0.21.12" not in versions.get("rustls", set()), versions.get("rustls")
+          assert "0.101.7" not in versions.get("rustls-webpki", set()), versions.get("rustls-webpki")
+          assert all(v.startswith("0.23.") for v in versions.get("rustls", set()))
+          assert "0.25.4" not in versions.get("webpki-roots", set())
+          kube = next(p for p in pkgs.values() if p["name"] == "kube-client")
+          reachable = set()
+          stack = [kube["id"]]
+          while stack:
+              current = stack.pop()
+              if current in reachable:
+                  continue
+              reachable.add(current)
+              stack.extend(n["pkg"] for n in nodes[current]["deps"])
+          assert not any(pkgs[i]["name"] == "hyper" and pkgs[i]["version"].startswith("0.14.") for i in reachable)
+          print("Kubernetes transport path and protected dependency versions checked.")
+          PY
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock
+          git hash-object Cargo.lock
+      - name: Preserve native resolved lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Qualify Kubernetes ConfigMap path
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/pf-kube-resolved.lock
+          cargo test --locked -p sidecar-watcher --lib privacy::epsilon_guard::tests:: -- --nocapture
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher privacy::epsilon_guard::tests:: -- --nocapture
+          cargo test --locked -p sidecar-watcher --lib --bins --no-fail-fast
+          cmp /tmp/pf-kube-resolved.lock Cargo.lock
