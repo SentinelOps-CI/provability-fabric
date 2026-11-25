@@ -141,6 +141,11 @@ jobs:
               "session_id": "session-1",
               "timestamp": "2026-01-01T00:00:00Z",
           }
+          # This image deliberately has no access credentials configured.
+          call("/evidence/cert", method="POST", payload=certificate, expected=503)
+          call("/evidence/search", method="POST", payload={}, expected=503)
+          call("/evidence/cert/shared-session", expected=503)
+          call("/compliance/packet", method="POST", payload={}, expected=503)
           for field in ("tenant_id", "session_id"):
               unsafe = {**certificate, field: "../outside"}
               rejected = call(

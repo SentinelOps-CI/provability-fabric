@@ -21,7 +21,8 @@ import (
 func TestCompliancePacketDownloadFailsClosedWithoutPersistedPacket(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	storage := t.TempDir()
-	service := &EvidenceService{storagePath: storage}
+	credential, token := evidenceTestCredential(t, "disposable-tenant", true, false)
+	service := &EvidenceService{storagePath: storage, access: []evidenceCredential{credential}}
 	router := gin.New()
 	router.POST("/api/v1/compliance/packet", service.buildPacketHandler)
 	router.GET("/api/v1/compliance/packet/:id", service.downloadPacketHandler)
@@ -29,6 +30,7 @@ func TestCompliancePacketDownloadFailsClosedWithoutPersistedPacket(t *testing.T)
 	build := httptest.NewRequest(http.MethodPost, "/api/v1/compliance/packet",
 		bytes.NewBufferString(`{"tenant_id":"disposable-tenant"}`))
 	build.Header.Set("Content-Type", "application/json")
+	build.Header.Set("Authorization", token)
 	built := httptest.NewRecorder()
 	router.ServeHTTP(built, build)
 	if built.Code != http.StatusOK {

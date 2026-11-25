@@ -195,10 +195,15 @@ type EvidenceService struct {
 	signer          Signer
 	trustedJWKSURL  string
 	trustedJWKSKeys []ed25519.PublicKey
+	access          []evidenceCredential
 }
 
 // NewEvidenceService creates a new evidence service instance
 func NewEvidenceService() (*EvidenceService, error) {
+	access, err := loadEvidenceAccess(os.Getenv("EVIDENCE_ACCESS_FILE"))
+	if err != nil {
+		return nil, fmt.Errorf("load evidence access configuration: %w", err)
+	}
 	// An explicitly configured database is a required persistence backend.
 	// Filesystem-only development is reserved for installations without a
 	// DATABASE_URL setting.
@@ -264,6 +269,7 @@ func NewEvidenceService() (*EvidenceService, error) {
 		schemaData:      schemaData,
 		trustedJWKSURL:  trustedJWKSURL,
 		trustedJWKSKeys: trustedJWKSKeys,
+		access:          access,
 	}
 
 	// A configured, unusable signer must never silently produce unsigned records.
@@ -722,6 +728,9 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 			return nil, 0, fmt.Errorf("decode stored certificate row: %w", err)
 		}
 
+		if req.TenantID != "" && cert.TenantID != req.TenantID {
+			return nil, 0, fmt.Errorf("stored certificate tenant does not match query scope")
+		}
 		certificates = append(certificates, cert)
 	}
 	if err := rows.Err(); err != nil {
@@ -952,6 +961,16 @@ func (s *EvidenceService) storeCertHandler(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "INVALID_CERTIFICATE", err.Error(), "Correct certificate fields and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_CERTIFICATE")
 		return
 	}
+	if _, ok := s.authorizeEvidence(c, cert.TenantID, true); !ok {
+		return
+	}
+	// Authenticated storage access is not independent proof verification.
+	if s.signer != nil {
+		writeError(c, http.StatusServiceUnavailable, "EVIDENCE_ISSUANCE_UNAVAILABLE",
+			"Authenticated evidence provenance verification is not implemented",
+			"Use a separately qualified issuance path", "")
+		return
+	}
 	if err := s.StoreCertificate(c.Request.Context(), cert); err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_STORE_FAILED", err.Error(), "Check storage and retry", "https://docs.sentinelops.dev/error-catalog#CERT_STORE_FAILED")
 		return
@@ -971,6 +990,11 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Use nonnegative limit and offset values", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
+	tenant, ok := s.authorizeEvidence(c, req.TenantID, false)
+	if !ok {
+		return
+	}
+	req.TenantID = tenant
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
@@ -983,8 +1007,13 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 func (s *EvidenceService) getCertHandler(c *gin.Context) {
 	certID := c.Param("id")
 
-	// Search by ID (simplified)
+	tenant, ok := s.authorizeEvidence(c, "", false)
+	if !ok {
+		return
+	}
+	// Search by ID within the authenticated tenant.
 	req := CertSearchRequest{
+		TenantID:  tenant,
 		SessionID: certID,
 		Limit:     1,
 	}
@@ -1010,6 +1039,11 @@ func (s *EvidenceService) buildPacketHandler(c *gin.Context) {
 		return
 	}
 
+	tenant, ok := s.authorizeEvidence(c, req.TenantID, false)
+	if !ok {
+		return
+	}
+	req.TenantID = tenant
 	packet, err := s.BuildCompliancePacket(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
