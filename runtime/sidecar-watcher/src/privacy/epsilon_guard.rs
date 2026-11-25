@@ -310,6 +310,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_kubernetes_configmap_over_loopback() {
+        use axum::{routing::get, Json, Router};
+        use serde_json::json;
+
+        // Exercise the actual Kubernetes HTTP client and typed ConfigMap
+        // decoding without access to any live cluster or credentials.
+        let configuration = json!({
+            "tenant_id": "fixture-tenant", "epsilon_limit": 1.0,
+            "delta_limit": 0.1, "reset_period_hours": 24
+        }).to_string();
+        let response = json!({
+            "apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "privacy-config", "namespace": "default"},
+            "data": {"fixture-tenant": configuration}
+        });
+        let app = Router::new().route(
+            "/api/v1/namespaces/default/configmaps/privacy-config",
+            get(move || { let body = response.clone(); async move { Json(body) } }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let config = kube::Config::new(format!("http://{address}").parse().unwrap());
+        let client = Client::try_from(config).unwrap();
+        let guard = EpsilonGuard {
+            kube_client: Some(client.clone()),
+            config_map_api: Some(Api::default_namespaced(client)),
+            accountants: Arc::new(RwLock::new(HashMap::new())),
+            configs: Arc::new(RwLock::new(HashMap::new())),
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(5), guard.load_configs())
+            .await.unwrap().unwrap();
+        assert!(guard.check_query("fixture-tenant", 0.5, 0.05).await.unwrap());
+        assert!(!guard.check_query("fixture-tenant", 0.6, 0.06).await.unwrap());
+        assert!(guard.check_query("unknown-tenant", 0.1, 0.01).await.is_err());
+        task.abort();
+    }
+
+    #[tokio::test]
     async fn test_epsilon_guard_budget_exhaustion() {
         let guard = EpsilonGuard::new().await.unwrap();
         let mut configs = guard.configs.write().await;
