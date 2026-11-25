@@ -24,10 +24,10 @@ jobs:
         working-directory: services/spec-service
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up module-compatible Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: services/spec-service/go.mod
           cache-dependency-path: services/spec-service/go.sum

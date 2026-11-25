@@ -70,7 +70,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -100,7 +100,7 @@ jobs:
       # so CI behavior stays aligned with the reference implementation. Override with CI_PAT if the default
       # GITHUB_TOKEN lacks cross-repo read on forks.
       - name: Checkout SentinelOps-CI/provability-fabric as action source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: SentinelOps-CI/provability-fabric
           path: ci-src
@@ -110,7 +110,7 @@ jobs:
         run: bash scripts/check_docker_context.sh
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -126,7 +126,7 @@ jobs:
           python tools/ci/trust_fire_evidence.py select --output "$GITHUB_OUTPUT"
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -403,7 +403,7 @@ jobs:
 
       - name: Upload TRUST-FIRE execution evidence (including failures)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trust-fire-report-${{ github.run_id }}
           path: trust-fire-report.json
@@ -425,10 +425,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout reviewed TRUST-FIRE gate
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download trust-fire artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: trust-fire-report-${{ github.run_id }}
 

@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -46,7 +46,7 @@ jobs:
           python scripts/bench.py --count 100000 --output perf-results.json
 
       - name: Upload performance results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: perf-results-${{ github.run_number }}
           path: perf-results.json
@@ -63,7 +63,7 @@ jobs:
 
       - name: Deploy to gh-pages
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./perf

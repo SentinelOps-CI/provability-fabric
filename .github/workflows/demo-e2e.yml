@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 65
     steps:
     - name: Checkout exact revision
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -85,7 +85,7 @@ jobs:
 
     - name: Upload scoped synthetic contract evidence
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: full-profile-contract-evidence
         path: artifacts/full-profile-contract.json
