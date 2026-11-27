@@ -29,19 +29,20 @@ pub struct AccessReceipt {
 }
 
 impl AccessReceipt {
-    fn to_payload(&self) -> AccessReceiptPayload {
-        AccessReceiptPayload {
+    // Reject values not exactly representable by the signed payload's integer types.
+    fn to_payload(&self) -> Result<AccessReceiptPayload> {
+        Ok(AccessReceiptPayload {
             receipt_id: self.receipt_id.clone(),
             tenant: self.tenant.clone(),
             subject_id: self.subject_id.clone(),
             query_hash: self.query_hash.clone(),
             index_shard: self.index_shard.clone(),
-            timestamp: self.timestamp as i64,
+            timestamp: i64::try_from(self.timestamp).context("receipt timestamp exceeds i64")?,
             result_hash: self.result_hash.clone(),
-            result_count: self.result_count as i32,
-            query_time_ms: self.query_time_ms as i32,
+            result_count: i32::try_from(self.result_count).context("receipt result_count exceeds i32")?,
+            query_time_ms: i32::try_from(self.query_time_ms).context("receipt query_time_ms exceeds i32")?,
             signature: String::new(),
-        }
+        })
     }
 }
 
@@ -105,7 +106,7 @@ impl ReceiptSigner {
 
     /// Sign a receipt with Ed25519 over the pf-dsse canonical payload.
     pub async fn sign_receipt(&self, receipt: &AccessReceipt) -> Result<AccessReceipt> {
-        let payload = receipt.to_payload();
+        let payload = receipt.to_payload()?;
         let canonical = canonical_receipt_payload(&payload)
             .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
         let signature = self.signing_key.sign(&canonical);
@@ -117,7 +118,7 @@ impl ReceiptSigner {
 
     /// Build a DSSE envelope for the receipt (cross-language verification contract).
     pub fn dsse_envelope(&self, receipt: &AccessReceipt) -> Result<Envelope> {
-        let payload = receipt.to_payload();
+        let payload = receipt.to_payload()?;
         let canonical = canonical_receipt_payload(&payload)
             .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
         let signature = self.signing_key.sign(&canonical);
@@ -148,7 +149,10 @@ impl ReceiptSigner {
             Ok(bytes) => bytes,
             Err(_) => return Ok(false),
         };
-        let payload = receipt.to_payload();
+        let payload = match receipt.to_payload() {
+            Ok(payload) => payload,
+            Err(_) => return Ok(false),
+        };
         let canonical = canonical_receipt_payload(&payload)
             .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
         let signature = Signature::from_bytes(&signature_bytes);
@@ -184,7 +188,10 @@ impl ReceiptValidator {
             return Ok(false);
         }
 
-        let payload = receipt.to_payload();
+        let payload = match receipt.to_payload() {
+            Ok(payload) => payload,
+            Err(_) => return Ok(false),
+        };
         let canonical = canonical_receipt_payload(&payload)
             .map_err(|e| anyhow::anyhow!("canonical receipt payload: {e}"))?;
         // verify_envelope always verifies against PF_TRUST_ROOT_PEM. The
@@ -354,6 +361,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_receipt_numeric_fields_preserve_canonical_representation() {
+        let signer = ReceiptSigner {
+            signing_key: SigningKey::from_bytes(&[31_u8; 32]),
+            key_id: "numeric-boundary-fixture".into(),
+        };
+        let mut boundary = sample_receipt();
+        boundary.result_count = i32::MAX as usize;
+        boundary.query_time_ms = i32::MAX as u64;
+        let signed_boundary = signer.sign_receipt(&boundary).await.unwrap();
+        assert!(signer.verify_receipt(&signed_boundary).unwrap());
+        assert!(signer.dsse_envelope(&boundary).is_ok());
+
+        let signed = signer.sign_receipt(&sample_receipt()).await.unwrap();
+        let mut oversized = signed.clone();
+        oversized.query_time_ms = (i32::MAX as u64) + 1;
+        assert!(signer.sign_receipt(&oversized).await.is_err());
+        assert!(signer.dsse_envelope(&oversized).is_err());
+        assert!(!signer.verify_receipt(&oversized).unwrap());
+        assert!(!ReceiptValidator::validate_receipt(&oversized).await.unwrap());
+
+        oversized = signed.clone();
+        oversized.result_count = (i32::MAX as usize) + 1;
+        assert!(signer.sign_receipt(&oversized).await.is_err());
+        assert!(signer.dsse_envelope(&oversized).is_err());
+        assert!(!signer.verify_receipt(&oversized).unwrap());
+        assert!(!ReceiptValidator::validate_receipt(&oversized).await.unwrap());
+
+        oversized = signed;
+        oversized.timestamp = (i64::MAX as u64) + 1;
+        assert!(signer.sign_receipt(&oversized).await.is_err());
+        assert!(signer.dsse_envelope(&oversized).is_err());
+        assert!(!signer.verify_receipt(&oversized).unwrap());
+        assert!(!ReceiptValidator::validate_receipt(&oversized).await.unwrap());
+    }
+
+    #[tokio::test]
     async fn test_external_validator_never_accepts_disabled_dsse_mode() {
         let _env_guard = RECEIPT_TEST_ENV.lock().unwrap_or_else(|e| e.into_inner());
         let fixtures = crypto_fixtures_dir();
@@ -365,6 +408,19 @@ mod tests {
         let issuer = ReceiptSigner::new().await.unwrap();
         let signed = issuer.sign_receipt(&sample_receipt()).await.unwrap();
         assert!(ReceiptValidator::validate_receipt(&signed).await.unwrap());
+
+        // The signature must bind the full unsigned numeric field values.
+        let mut altered = signed.clone();
+        altered.query_time_ms += 1_u64 << 32;
+        assert!(!issuer.verify_receipt(&altered).unwrap());
+        assert!(!ReceiptValidator::validate_receipt(&altered).await.unwrap());
+
+        if let Ok(offset) = usize::try_from(1_u64 << 32) {
+            let mut altered = signed.clone();
+            altered.result_count += offset;
+            assert!(!issuer.verify_receipt(&altered).unwrap());
+            assert!(!ReceiptValidator::validate_receipt(&altered).await.unwrap());
+        }
 
         let unrelated_issuer = ReceiptSigner {
             signing_key: SigningKey::from_bytes(&[29_u8; 32]),
