@@ -12,7 +12,7 @@ reqwest = { version = "0.11", features = ["json"] }
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-chrono = { version = "0.4", features = ["serde"] }
+time = { version = "=0.3.47", features = ["parsing"] }
 ed25519-dalek = "=2.2.0"
 uuid = { version = "1.0", features = ["v4"] }
 base64 = "0.21"
