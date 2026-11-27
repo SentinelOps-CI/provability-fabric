@@ -785,6 +785,34 @@ mod tests {
     use crate::{MpcSignatureResult, PerformanceMetrics, AuditInfo, ConsensusInfo, ComplianceVerification};
     
     #[tokio::test]
+    async fn legacy_audit_hash_preserves_timestamp_bytes() {
+        let manager = AuditManager::new(ComplianceLevel::Basic).await.unwrap();
+        let timestamp = UtcTimestamp::parse("2023-11-14T23:13:20.100+01:00").unwrap();
+        let event_data = AuditEventData {
+            details: HashMap::new(),
+            performance_metrics: Some(AuditPerformanceMetrics {
+                latency_us: 5, memory_usage_bytes: 8, cpu_usage_percent: 0.0,
+                network_io_bytes: 0, metrics_timestamp: timestamp,
+            }),
+            security_context: SecurityContext {
+                initiator: "fixture".into(), auth_method: "fixture".into(), source_ip: None,
+                security_level: SecurityLevel::Standard,
+                encryption_details: EncryptionDetails {
+                    algorithm: "fixture".into(), key_id: "fixture-key".into(), context: HashMap::new(),
+                },
+            },
+            regulatory_context: RegulatoryContext {
+                applicable_regulations: vec![], jurisdiction: "fixture".into(),
+                requirements_met: vec![], outstanding_requirements: vec![], alerts: vec![],
+            },
+        };
+        // Independent Python hashlib + compact JSON reference, using empty maps
+        // to avoid assuming that the legacy HashMap serializer is canonical.
+        assert_eq!(manager.calculate_entry_hash("entry-fixture", &timestamp, &event_data, "previous-fixture").unwrap(),
+                   "8994c9ef0a8d55fbb77d6434f9a83d639fbab753bb4388cd5de625d990cf8d38");
+    }
+
+    #[tokio::test]
     async fn test_audit_manager_creation() {
         let audit_manager = AuditManager::new(ComplianceLevel::Basic).await;
         assert!(audit_manager.is_ok());
