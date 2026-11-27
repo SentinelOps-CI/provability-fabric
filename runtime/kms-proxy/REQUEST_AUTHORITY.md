@@ -58,3 +58,21 @@ signing by Vault. The production issuer, credential provisioning and rotation,
 sidecar migration, live Vault signing and independent signature verification
 require separate qualification before deployment. The existing Rust HTTP
 dependency advisories are tracked separately in #315.
+
+## Timestamp implementation migration
+
+The candidate uses pinned `time 0.3.47` and accepts the supported RFC 3339
+domain (UTC years 0000–9999, at most nine fractional digits, no leap seconds).
+Offsets normalize to UTC; JSON serialization uses Z and 0, 3, 6 or 9
+fractional digits. The signature input continues to encode signed Unix seconds
+and unsigned nanoseconds, not the textual spelling of the timestamp.
+The freshness interval is closed at both zero and 60 seconds and evaluated
+at nanosecond precision.
+
+Four frozen signature vectors were generated independently with Python
+`struct.pack` and `cryptography` Ed25519. The Rust tests compare SHA-256 of
+the exact signed bytes, verify the independent signatures, and check the
+serialized request round trip. The cases cover nonzero UTC offset, negative
+Unix seconds, absent data and empty data. The fixture issuer key is public,
+deterministic test material only. Native checks of the migrated implementation
+are pending.
