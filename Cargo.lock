@@ -2119,7 +2119,6 @@ dependencies = [
  "anyhow",
  "axum",
  "base64 0.21.7",
- "chrono",
  "jsonwebtoken",
  "reqwest",
  "serde",
@@ -3084,7 +3083,6 @@ name = "provability-fabric-core-sdk-rust"
 version = "1.0.0"
 dependencies = [
  "base64 0.21.7",
- "chrono",
  "criterion",
  "hex",
  "lazy_static",
@@ -3096,6 +3094,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
+ "time",
  "tokio",
  "tokio-stream",
  "tokio-test",
@@ -4203,7 +4202,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "chrono",
  "prometheus-client 0.20.0",
  "reqwest",
  "serde",
