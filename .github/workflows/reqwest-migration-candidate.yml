@@ -15,6 +15,7 @@ on:
       - 'core/sdk/rust/**'
       - 'core/lean-libs/Runtime/PrivacyCharge.lean'
       - 'core/lean-libs/Runtime/IFCGrant.lean'
+      - 'core/lean-libs/Runtime/BoundedFIFO.lean'
       - '.github/workflows/reqwest-migration-candidate.yml'
 
 permissions:
@@ -62,6 +63,16 @@ jobs:
           done
           for theorem in grant_monotone grant_exact other_key_unchanged clear_denies; do
             grep -F "PF.Runtime.IFCGrant.$theorem" /tmp/pf-ifc-axioms.txt
+          done
+      - name: Check bounded FIFO obligations
+        run: |
+          set -euo pipefail
+          lean -DwarningAsError=true core/lean-libs/Runtime/BoundedFIFO.lean | tee /tmp/pf-fifo-axioms.txt
+          if grep -Fq sorryAx /tmp/pf-fifo-axioms.txt; then
+            exit 1
+          fi
+          for theorem in enqueue_bounded enqueue_appends full_rejected dequeue_fifo empty_dequeue; do
+            grep -F "PF.Runtime.BoundedFIFO.$theorem" /tmp/pf-fifo-axioms.txt
           done
   resolve-and-test:
     runs-on: ubuntu-latest
