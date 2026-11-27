@@ -1,0 +1,45 @@
+name: KMS request authority
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/kms-proxy/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/kms-request-authority.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/kms-proxy/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/kms-request-authority.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  kms-request-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile and execute native authority and provider transport tests
+        run: |
+          cargo test --locked -p kms-proxy
+          cargo build --locked -p kms-proxy
+          git diff --exit-code -- Cargo.lock
+      - name: Verify direct dependency boundary
+        run: |
+          cargo tree --locked -p kms-proxy --depth 1 --prefix none > "$RUNNER_TEMP/kms-deps.txt"
+          cat "$RUNNER_TEMP/kms-deps.txt"
+          grep -Eq '^ed25519-dalek v2\.2\.0([[:space:]]|$)' "$RUNNER_TEMP/kms-deps.txt"
+          if grep -q '^redis v' "$RUNNER_TEMP/kms-deps.txt"; then
+            echo "Unexpected Redis dependency at KMS authority boundary" >&2
+            exit 1
+          fi
+          git diff --exit-code -- Cargo.lock
