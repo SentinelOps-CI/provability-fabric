@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use chrono::Utc;
+use mpc_fintech::UtcTimestamp;
 use tokio::sync::Semaphore;
 use tracing::{info, warn, error};
 use mpc_fintech::{
@@ -624,7 +624,7 @@ fn create_test_transaction(transaction_id: &str, tx_type: TransactionType, amoun
         to_account: format!("ACCOUNT-{}-DEST", transaction_id),
         amount,
         currency: "USD".to_string(),
-        timestamp: Utc::now(),
+        timestamp: UtcTimestamp::now(),
         metadata: HashMap::new(),
         compliance_flags: ComplianceFlags {
             requires_kyc: amount > 1000000, // $10,000
