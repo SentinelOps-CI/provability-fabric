@@ -13,8 +13,10 @@ its unpadded base64url representation over a protected channel and place the
 lowercase hexadecimal SHA-256 digest of the original bytes in the file.
 Clients send `Authorization: Bearer <token>` through authenticated TLS.
 
-Duplicate digests, malformed configuration and entries with no permissions
-are rejected. Missing configuration leaves protected operations unavailable.
+Duplicate digests, duplicate or case-aliased keys, malformed configuration and
+entries with no permissions are rejected. Each entry must explicitly specify
+all four fields, including both boolean permissions. The file is limited to
+1 MiB. Missing configuration leaves protected operations unavailable.
 Missing or invalid credentials are rejected; mismatched tenant or permission
 is forbidden. Omitted search tenant filters are replaced with the
 authenticated tenant. Rotation requires replacing the operator file and

@@ -54,7 +54,13 @@ func TestEvidenceAccessConfiguration(t *testing.T) {
 		strings.Replace(string(valid), "tenant-a", "../outside", 1),
 		strings.Replace(string(valid), entry.TokenSHA256, "bad", 1),
 		strings.Replace(string(valid), `"read":true`, `"read":false`, 1),
-		strings.Replace(string(valid), `"read":true`, `"unknown":true`, 1)} {
+		strings.Replace(string(valid), `"read":true`, `"unknown":true`, 1),
+		strings.Replace(string(valid), `"read":true`, `"read":false,"read":true`, 1),
+		strings.Replace(string(valid), `"read":true`, `"READ":true`, 1),
+		strings.Replace(string(valid), `"read":true`, `"read":null`, 1),
+		strings.Replace(string(valid), `"write":false`, `"write":null`, 1),
+		strings.Replace(string(valid), `,"write":false`, "", 1),
+		strings.Repeat(" ", (1<<20)+1) + string(valid)} {
 		if err := os.WriteFile(path, []byte(invalid), 0600); err != nil {
 			t.Fatal(err)
 		}

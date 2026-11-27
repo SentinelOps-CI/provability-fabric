@@ -3,12 +3,10 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,21 +36,40 @@ func loadEvidenceAccess(path string) ([]evidenceCredential, error) {
 	if path == "" {
 		return nil, nil // Protected routes are unavailable until provisioned.
 	}
-	raw, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("read credential configuration: %w", err)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var entries []evidenceAccessEntry
-	if err := decoder.Decode(&entries); err != nil {
+	defer file.Close()
+	const maxAccessBytes = 1 << 20
+	raw, err := io.ReadAll(io.LimitReader(file, maxAccessBytes+1))
+	if err != nil || len(raw) > maxAccessBytes {
+		return nil, fmt.Errorf("invalid or oversized credential configuration")
+	}
+	value, err := decodeEvidenceValue(raw)
+	if err != nil {
 		return nil, fmt.Errorf("invalid credential configuration JSON")
 	}
-	if err := decoder.Decode(new(interface{})); err != io.EOF {
-		return nil, fmt.Errorf("unexpected trailing credential configuration")
-	}
-	if len(entries) == 0 {
+	items, ok := value.([]interface{})
+	if !ok || len(items) == 0 {
 		return nil, fmt.Errorf("credential configuration must contain entries")
+	}
+	entries := make([]evidenceAccessEntry, 0, len(items))
+	for i, item := range items {
+		obj, ok := item.(map[string]interface{})
+		if !ok || len(obj) != 4 {
+			return nil, fmt.Errorf("invalid credential entry fields at entry %d", i)
+		}
+		tenant, tenantOK := obj["tenant"].(string)
+		digest, digestOK := obj["token_sha256"].(string)
+		read, readOK := obj["read"].(bool)
+		write, writeOK := obj["write"].(bool)
+		if !tenantOK || !digestOK || !readOK || !writeOK {
+			return nil, fmt.Errorf("invalid credential entry types at entry %d", i)
+		}
+		entries = append(entries, evidenceAccessEntry{
+			Tenant: tenant, TokenSHA256: digest, Read: read, Write: write,
+		})
 	}
 	credentials := make([]evidenceCredential, 0, len(entries))
 	seen := make(map[[sha256.Size]byte]bool)
