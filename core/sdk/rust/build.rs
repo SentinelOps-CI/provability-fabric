@@ -2,7 +2,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
         .build_server(true)
         .build_client(true)
-        .compile(
+        .compile_protos(
             &[
                 "../../../api/v1/plan.proto",
                 "../../../api/v1/kernel.proto",

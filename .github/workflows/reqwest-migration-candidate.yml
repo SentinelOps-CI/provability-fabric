@@ -12,6 +12,7 @@ on:
       - 'Cargo.lock'
       - 'runtime/egress-firewall/Dockerfile'
       - 'runtime/sidecar-watcher/src/**'
+      - 'core/sdk/rust/**'
       - 'core/lean-libs/Runtime/PrivacyCharge.lean'
       - 'core/lean-libs/Runtime/IFCGrant.lean'
       - '.github/workflows/reqwest-migration-candidate.yml'
@@ -135,7 +136,9 @@ jobs:
           assert "0.25.4" not in versions.get("webpki-roots", set())
           for name in ("actix-web", "actix-http", "metrics-exporter-prometheus"):
               assert name not in versions, (name, versions.get(name))
-          # The SDK Tonic path still retains older HTTP/2.
+          assert versions.get("h2") == {"0.4.20"}, versions.get("h2")
+          assert versions.get("hyper") == {"1.8.1"}, versions.get("hyper")
+          assert versions.get("tonic") == {"0.12.3"}, versions.get("tonic")
           PY
           git diff --exit-code -- Cargo.lock
           cp Cargo.lock /tmp/pf-reqwest-resolved.lock
@@ -162,6 +165,9 @@ jobs:
           cargo test --locked -p sidecar-watcher --test dfa_equiv
           cargo test --locked -p sidecar-watcher --test ni_monitor_egress
           cargo test --locked -p sidecar-watcher --bin sidecar-watcher privacy::epsilon_guard::tests:: -- --nocapture
+          cargo test --locked -p provability-fabric-core-sdk-rust --lib
+          cargo test --locked -p provability-fabric-core-sdk-rust --doc
+          cargo test --locked -p provability-fabric-core-sdk-rust --no-default-features --lib
           cargo test --locked -p sidecar-watcher --bin sidecar-watcher test_local_ni_verdict_does_not_establish_permission_evidence
       - name: Qualify migrated HTTP interfaces over loopback
         if: ${{ !cancelled() && steps.compile.outcome == 'success' }}
