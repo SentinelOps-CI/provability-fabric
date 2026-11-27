@@ -13,4 +13,4 @@ serde_yaml = "0.9"
 sha2 = "0.10"
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.10"

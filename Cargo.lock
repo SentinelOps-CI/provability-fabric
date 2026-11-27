@@ -785,7 +785,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ce977bea95e49cc352bf8253719d872d27486e56f91b5491e20a827ab2c1a16"
 dependencies = [
  "ambient-authority",
- "rand 0.8.5",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -2792,7 +2792,7 @@ dependencies = [
 name = "labeler"
 version = "0.1.0"
 dependencies = [
- "rand 0.8.5",
+ "rand 0.10.2",
  "regex",
  "serde",
  "serde_json",
@@ -3246,7 +3246,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.8",
  "smallvec",
  "zeroize",
 ]
@@ -3799,7 +3799,7 @@ dependencies = [
  "criterion",
  "ed25519-dalek",
  "futures",
- "rand 0.8.5",
+ "rand 0.10.2",
  "sidecar-watcher",
  "tokio",
 ]
@@ -3872,9 +3872,9 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -4212,7 +4212,7 @@ dependencies = [
  "http 0.2.12",
  "mime",
  "mime_guess",
- "rand 0.8.5",
+ "rand 0.8.8",
  "thiserror 1.0.69",
 ]
 
@@ -4608,7 +4608,7 @@ dependencies = [
  "pf-dsse",
  "prometheus-client 0.22.3",
  "proptest",
- "rand 0.8.5",
+ "rand 0.10.2",
  "reqwest",
  "serde",
  "serde_cbor",
@@ -4863,7 +4863,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.8.8",
  "rsa",
  "serde",
  "sha1 0.10.6",
@@ -4902,7 +4902,7 @@ dependencies = [
  "md-5",
  "memchr",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "sha2",
@@ -5376,7 +5376,7 @@ dependencies = [
  "indexmap 1.9.3",
  "pin-project",
  "pin-project-lite",
- "rand 0.8.5",
+ "rand 0.8.8",
  "slab",
  "tokio",
  "tokio-util",
@@ -6179,7 +6179,7 @@ dependencies = [
  "memfd",
  "memoffset",
  "paste",
- "rand 0.8.5",
+ "rand 0.8.8",
  "rustix 0.38.44",
  "sptr",
  "wasm-encoder 0.36.2",
