@@ -184,7 +184,7 @@ impl KmsProxy {
             input: base64::engine::general_purpose::STANDARD.encode(data),
         };
 
-        let response = client
+        let mut response = client
             .post(&url)
             .header("X-Vault-Token", &self.vault_token)
             .header("Content-Type", "application/json")
@@ -193,7 +193,16 @@ impl KmsProxy {
             .await?;
 
         if response.status().is_success() {
-            let vault_response: VaultSignResponse = response.json().await?;
+            // Bound the provider response independently of request size.
+            const MAX_PROVIDER_RESPONSE_BYTES: usize = 64 * 1024;
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response.chunk().await? {
+                if chunk.len() > MAX_PROVIDER_RESPONSE_BYTES - bytes.len() {
+                    return Err(anyhow::anyhow!("Vault response exceeds supported size"));
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            let vault_response: VaultSignResponse = serde_json::from_slice(&bytes)?;
             let signature = vault_response.data.signature;
             if !valid_vault_signature_format(&signature) {
                 return Err(anyhow::anyhow!("Vault returned an invalid signature representation"));
