@@ -139,11 +139,12 @@ def main():
         vault_url = f"http://127.0.0.1:{free_port()}"
         proxy_url = "http://127.0.0.1:8082"
         # No production credentials or ambient Vault configuration are inherited.
-        env = {k: os.environ[k] for k in ("PATH", "HOME", "LANG") if k in os.environ}
+        env = {k: os.environ[k] for k in ("PATH", "LANG") if k in os.environ}
+        env["HOME"] = str(root)
         vault = proxy = None
         with (root / "vault.log").open("wb") as vault_log, (root / "proxy.log").open("wb") as proxy_log:
             try:
-                vault = subprocess.Popen([str(vault_bin), "server", "-dev",
+                vault = subprocess.Popen([str(vault_bin), "server", "-dev", "-dev-no-store-token",
                                           f"-dev-listen-address={vault_url.removeprefix('http://')}",
                                           f"-dev-root-token-id={root_token}"],
                                          env=env, stdout=vault_log, stderr=subprocess.STDOUT)
