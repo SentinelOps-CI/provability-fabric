@@ -4637,7 +4637,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
- "chrono",
  "clap",
  "futures",
  "hex",
@@ -4648,6 +4647,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
