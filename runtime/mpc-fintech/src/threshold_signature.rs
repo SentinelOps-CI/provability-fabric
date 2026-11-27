@@ -3,8 +3,8 @@
 
 //! Threshold Signature Scheme for High-Performance Financial MPC
 //! 
-//! This module implements optimized threshold signatures using ECDSA and EdDSA
-//! with sub-millisecond latency targets for financial transaction processing.
+//! This demonstration uses mock threshold signatures and simulated key shares.
+//! It does not implement a secure threshold cryptographic protocol.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, debug};
 use sha2::{Sha256, Digest};
 
-use crate::FinancialTransaction;
+use crate::{FinancialTransaction, UtcTimestamp};
 
 /// Threshold signature implementation
 pub struct ThresholdSigner {
@@ -63,7 +63,7 @@ pub struct SignatureMetadata {
     /// Participating parties
     pub parties: Vec<u32>,
     /// Signature timestamp
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
     /// Signature round number
     pub round: u32,
     /// Performance metrics
@@ -259,7 +259,7 @@ impl ThresholdSigner {
             metadata: SignatureMetadata {
                 algorithm: SignatureAlgorithm::EcdsaSecp256k1,
                 parties: signature_result.participating_parties,
-                timestamp: chrono::Utc::now(),
+                timestamp: UtcTimestamp::now(),
                 round: 1,
                 performance: performance_metrics,
             },
@@ -607,7 +607,7 @@ mod tests {
             to_account: "account-002".to_string(),
             amount: 1000000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -637,7 +637,7 @@ mod tests {
             to_account: "account-004".to_string(),
             amount: 5000000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -664,7 +664,7 @@ mod tests {
             to_account: "account-cache-2".to_string(),
             amount: 100000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: false,
