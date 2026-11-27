@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use crate::UtcTimestamp;
 use tracing::{info, debug, warn, error};
 
 use crate::{PerformanceConfig, PerformanceMetrics};
@@ -48,7 +48,7 @@ pub struct PerformanceCheckpoint {
     /// Checkpoint name
     pub name: String,
     /// Timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Elapsed time since operation start
     pub elapsed_us: u64,
     /// Memory usage at checkpoint
@@ -76,7 +76,7 @@ pub struct ResourceUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceSnapshot {
     /// Snapshot timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// System performance metrics
     pub system_metrics: SystemMetrics,
     /// Operation statistics
@@ -97,7 +97,7 @@ pub struct SystemMetrics {
     /// Error rates
     pub error_rates: ErrorRates,
     /// Timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 /// Latency percentile measurements
@@ -194,7 +194,7 @@ pub struct PerformanceAlert {
     /// Alert message
     pub message: String,
     /// Timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Affected metrics
     pub affected_metrics: Vec<String>,
     /// Recommended actions
@@ -265,7 +265,7 @@ impl PerformanceMonitor {
                     computation_percent: 0.0,
                     timeout_percent: 0.0,
                 },
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             },
         })
     }
@@ -304,7 +304,7 @@ impl PerformanceMonitor {
             let elapsed = tracker.start_time.elapsed();
             let checkpoint = PerformanceCheckpoint {
                 name: checkpoint_name.to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
                 elapsed_us: elapsed.as_micros() as u64,
                 memory_usage_bytes,
                 metrics: additional_metrics,
@@ -373,7 +373,7 @@ impl PerformanceMonitor {
         self.system_metrics.resource_utilization.network_percent = 
             (metrics.network_latency_us as f64 / metrics.total_latency_us as f64) * 100.0;
         
-        self.system_metrics.timestamp = Utc::now();
+        self.system_metrics.timestamp = UtcTimestamp::now();
         
         Ok(())
     }
@@ -482,7 +482,7 @@ impl PerformanceMonitor {
             severity: severity.clone(),
             alert_type,
             message: message.clone(),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             affected_metrics,
             recommended_actions,
         };
@@ -521,7 +521,7 @@ impl PerformanceMonitor {
     /// Take performance snapshot for historical analysis
     pub async fn take_snapshot(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let snapshot = PerformanceSnapshot {
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             system_metrics: self.system_metrics.clone(),
             operation_stats: OperationStatistics {
                 total_operations: 0, // Would be tracked in real implementation

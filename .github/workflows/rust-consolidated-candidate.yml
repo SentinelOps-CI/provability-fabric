@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Consolidated Rust dependency candidate
+
+on:
+  pull_request:
+    branches: [security/sidecar-timestamp-wire-20261127, main]
+    paths:
+      - '**/Cargo.toml'
+      - 'Cargo.lock'
+      - 'runtime/**'
+      - 'core/lean-libs/Runtime/**'
+      - '.github/workflows/rust-consolidated-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-graph:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check exact locked workspace graph and residual Chrono edge
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --all-features --format-version 1 > "$RUNNER_TEMP/consolidated-metadata.json"
+          python3 - <<'PY'
+          import json, os, tomllib
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          meta = json.loads((root / "consolidated-metadata.json").read_text())
+          packages = {p["id"]: p for p in meta["packages"]}
+          nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
+          locked = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          expected = {"kube": "4.2.1", "kube-client": "4.2.1", "k8s-openapi": "0.28.0",
+                      "reqwest": "0.12.28", "wasmtime": "36.0.22", "sqlx": "0.8.6",
+                      "time": "0.3.47"}
+          for name, version in expected.items():
+              assert {p["version"] for p in locked if p["name"] == name} == {version}, name
+          chrono = {i for i, p in packages.items() if p["name"] == "chrono"}
+          assert len(chrono) == 1, chrono
+          direct = {packages[i]["name"] for i, n in nodes.items() if any(d["pkg"] in chrono for d in n["deps"])}
+          assert direct == {"kms-proxy"}, direct
+          for name in ["attestor", "tool-broker", "mpc-fintech", "sidecar-watcher", "kube-client"]:
+              roots = [i for i, p in packages.items() if p["name"] == name]
+              assert len(roots) == 1, (name, roots)
+              todo, seen = roots, set()
+              while todo:
+                  i = todo.pop()
+                  if i in seen:
+                      continue
+                  seen.add(i)
+                  todo.extend(d["pkg"] for d in nodes[i]["deps"])
+              assert not seen & chrono, name
+          print("Four migrated workspace closures and Kubernetes are Chrono-free; KMS remains separate")
+          PY
+          git diff --exit-code -- Cargo.lock
+          sha256sum Cargo.lock
+      - name: Compile and test combined timestamp consumers
+        run: |
+          set -euo pipefail
+          cargo test --locked -p attestor -p tool-broker -p mpc-fintech -p sidecar-watcher --all-features --lib --bins --no-fail-fast
+          cargo build --locked -p attestor -p tool-broker -p mpc-fintech -p sidecar-watcher --all-features --bins
+          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
+          git diff --exit-code -- Cargo.lock
+      - name: Repeat isolated Kubernetes trust-root experiment
+        run: python3 scripts/test_kube_ca_isolation.py
+      - name: Preserve native locked graph
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-rust-lock
+          path: Cargo.lock
+          if-no-files-found: error
+
+  advisory-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run unchanged full workspace policy
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable

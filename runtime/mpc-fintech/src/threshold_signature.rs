@@ -3,8 +3,8 @@
 
 //! Threshold Signature Scheme for High-Performance Financial MPC
 //! 
-//! This module implements optimized threshold signatures using ECDSA and EdDSA
-//! with sub-millisecond latency targets for financial transaction processing.
+//! This demonstration uses mock threshold signatures and simulated key shares.
+//! It does not implement a secure threshold cryptographic protocol.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, debug};
 use sha2::{Sha256, Digest};
 
-use crate::FinancialTransaction;
+use crate::{FinancialTransaction, UtcTimestamp};
 
 /// Threshold signature implementation
 pub struct ThresholdSigner {
@@ -63,7 +63,7 @@ pub struct SignatureMetadata {
     /// Participating parties
     pub parties: Vec<u32>,
     /// Signature timestamp
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
     /// Signature round number
     pub round: u32,
     /// Performance metrics
@@ -259,7 +259,7 @@ impl ThresholdSigner {
             metadata: SignatureMetadata {
                 algorithm: SignatureAlgorithm::EcdsaSecp256k1,
                 parties: signature_result.participating_parties,
-                timestamp: chrono::Utc::now(),
+                timestamp: UtcTimestamp::now(),
                 round: 1,
                 performance: performance_metrics,
             },
@@ -578,6 +578,28 @@ mod tests {
     use crate::{TransactionType, ComplianceFlags};
     
     #[tokio::test]
+    async fn legacy_transaction_signing_payload_preserves_unix_seconds() {
+        let signer = ThresholdSigner::new(2, 3).await.unwrap();
+        for (wire, expected) in [
+            ("1969-12-31T23:59:59.999999999Z", "895a1ed401ae46e25c6ccf6e37a42b1eef972bdbc2bd4d2e9e31987078f0b624"),
+            ("2023-11-14T23:13:20.100+01:00", "c124f53daa06d210c224f7f87512434ad2047eadad00afb08d2c304d274b45a3"),
+        ] {
+            let transaction = FinancialTransaction {
+                transaction_id: "fixture".into(), transaction_type: TransactionType::Payment,
+                from_account: "A".into(), to_account: "B".into(), amount: 100, currency: "USD".into(),
+                timestamp: UtcTimestamp::parse(wire).unwrap(), metadata: HashMap::new(),
+                compliance_flags: ComplianceFlags {
+                    requires_kyc: false, requires_aml: false, high_value: false,
+                    cross_border: false, sanctions_screening: false,
+                },
+            };
+            let payload = signer.serialize_transaction_for_signing(&transaction).unwrap();
+            // Independent Python compact JSON and SHA-256 reference.
+            assert_eq!(format!("{:x}", Sha256::digest(payload)), expected);
+        }
+    }
+
+    #[tokio::test]
     async fn test_threshold_signer_creation() {
         let signer = ThresholdSigner::new(3, 5).await;
         assert!(signer.is_ok());
@@ -607,7 +629,7 @@ mod tests {
             to_account: "account-002".to_string(),
             amount: 1000000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -637,7 +659,7 @@ mod tests {
             to_account: "account-004".to_string(),
             amount: 5000000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -664,7 +686,7 @@ mod tests {
             to_account: "account-cache-2".to_string(),
             amount: 100000,
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: std::collections::HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: false,

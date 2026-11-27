@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Provability-Fabric Contributors
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use std::sync::Arc;
+use crate::utc_timestamp::UtcTimestamp;
 
 /// Represents a human approval request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,9 +22,18 @@ pub struct ApprovalRequest {
     pub status: ApprovalStatus,
     pub approver_id: Option<String>,
     pub approval_notes: Option<String>,
+    #[serde(default)]
+    pub approval_votes: Vec<ApprovalVote>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// Recorded vote from an approver identity already checked by the caller.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApprovalVote {
+    pub approver_id: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ApprovalStatus {
     Pending,
     Approved,
@@ -125,389 +133,256 @@ impl Default for ApprovalConfig {
     }
 }
 
-/// Main approval manager
+/// Inputs to the finite transition relation. Authorization and quorum are
+/// computed under the same lock as the request and approver registry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Event { Approve, Deny, Observe }
+
+fn transition(status: ApprovalStatus, fresh: bool, authorized: bool, quorum: bool, event: Event) -> ApprovalStatus {
+    use ApprovalStatus::*;
+    if status != Pending { return status; }
+    if !fresh { return Expired; }
+    if !authorized { return Pending; }
+    match event {
+        Event::Approve if quorum => Approved,
+        Event::Deny => Denied,
+        _ => Pending,
+    }
+}
+
+fn valid_risk(risk: f64) -> bool {
+    risk.is_finite() && (0.0..=1.0).contains(&risk)
+}
+
+fn fresh(request: &ApprovalRequest, now: UtcTimestamp) -> bool {
+    match (UtcTimestamp::parse(&request.created_at), UtcTimestamp::parse(&request.expires_at)) {
+        (Some(created), Some(expires)) => created <= now && now < expires,
+        _ => false,
+    }
+}
+
+fn observe(request: &mut ApprovalRequest, now: UtcTimestamp) {
+    request.status = transition(request.status, fresh(request, now), false, false, Event::Observe);
+}
+
+fn permitted(approver: &Approver, request: &ApprovalRequest) -> bool {
+    if approver.approver_id.is_empty() || approver.approver_id == "system" ||
+       !valid_risk(request.risk_score) || request.risk_score != request.tool_call.risk_score {
+        return false;
+    }
+    let risk = match request.risk_score {
+        r if r < 0.3 => ApprovalPermission::LowRisk,
+        r if r < 0.7 => ApprovalPermission::MediumRisk,
+        r if r < 0.9 => ApprovalPermission::HighRisk,
+        _ => ApprovalPermission::CriticalRisk,
+    };
+    let permissions = &approver.permissions;
+    let tenant = request.session_id.split(':').next().unwrap_or("");
+    !tenant.is_empty() &&
+    (permissions.contains(&risk) || permissions.contains(&ApprovalPermission::CriticalRisk)) &&
+    permissions.iter().any(|p| matches!(p, ApprovalPermission::AllTools) ||
+        matches!(p, ApprovalPermission::SpecificTools(tools) if tools.contains(&request.tool_call.tool_name))) &&
+    permissions.iter().any(|p| matches!(p, ApprovalPermission::AllTenants) ||
+        matches!(p, ApprovalPermission::SpecificTenants(tenants) if tenants.iter().any(|t| t == tenant)))
+}
+
+#[derive(Default)]
+struct ApprovalState {
+    requests: HashMap<String, ApprovalRequest>,
+    approvers: HashMap<String, Approver>,
+}
+
+/// Process-local approval bookkeeping. Terminal decisions are immutable.
+/// The caller is responsible for authenticating approver identities; this
+/// manager does not issue execution permits or provide persistent audit storage.
 pub struct ApprovalManager {
     config: ApprovalConfig,
-    pending_requests: Arc<RwLock<HashMap<String, ApprovalRequest>>>,
-    approvers: Arc<RwLock<HashMap<String, Approver>>>,
-    approval_history: Arc<RwLock<Vec<ApprovalRequest>>>,
+    state: RwLock<ApprovalState>,
 }
 
 impl ApprovalManager {
     pub fn new(config: ApprovalConfig) -> Self {
-        Self {
-            config,
-            pending_requests: Arc::new(RwLock::new(HashMap::new())),
-            approvers: Arc::new(RwLock::new(HashMap::new())),
-            approval_history: Arc::new(RwLock::new(Vec::new())),
-        }
+        Self { config, state: RwLock::new(ApprovalState::default()) }
     }
 
-    /// Create a new approval request
-    pub async fn create_approval_request(&self, tool_call: ToolCall, risk_score: f64, reason: String) -> Result<String> {
-        let request_id = Uuid::new_v4().to_string();
-        let expires_at = Utc::now() + chrono::Duration::minutes(self.config.default_timeout_minutes as i64);
+    fn required_votes(&self, risk: f64) -> usize {
+        if self.config.require_multiple_approvers_for_high_risk && risk >= 0.7 { 2 } else { 1 }
+    }
 
-        let approval_request = ApprovalRequest {
+    pub async fn create_approval_request(&self, tool_call: ToolCall, risk_score: f64, reason: String) -> Result<String> {
+        if !valid_risk(risk_score) || risk_score != tool_call.risk_score {
+            return Err(anyhow!("Invalid or inconsistent approval risk"));
+        }
+        if tool_call.session_id.split(':').next().unwrap_or("").is_empty() ||
+           tool_call.tool_name.is_empty() || tool_call.call_id.is_empty() {
+            return Err(anyhow!("Missing approval request identity"));
+        }
+        if self.config.default_timeout_minutes == 0 ||
+           (self.config.max_approvers_per_request as usize) < self.required_votes(risk_score) {
+            return Err(anyhow!("Invalid approval timeout or quorum configuration"));
+        }
+        let mut state = self.state.write().await;
+        let now = UtcTimestamp::now();
+        let expires = now.checked_add_minutes(self.config.default_timeout_minutes)
+            .ok_or_else(|| anyhow!("Approval deadline outside supported domain"))?;
+        let request_id = Uuid::new_v4().to_string();
+        if state.requests.contains_key(&request_id) {
+            return Err(anyhow!("Duplicate approval request identifier"));
+        }
+        let mut request = ApprovalRequest {
             request_id: request_id.clone(),
             session_id: tool_call.session_id.clone(),
             tool_call,
             risk_score,
             reason,
-            created_at: Utc::now().to_rfc3339(),
-            expires_at: expires_at.to_rfc3339(),
+            created_at: now.to_rfc3339()?,
+            expires_at: expires.to_rfc3339()?,
             status: ApprovalStatus::Pending,
             approver_id: None,
             approval_notes: None,
+            approval_votes: Vec::new(),
         };
-
-        // Store the request
-        {
-            let mut requests = self.pending_requests.write().await;
-            requests.insert(request_id.clone(), approval_request.clone());
-        }
-
-        // Auto-approve low risk requests if configured
         if self.config.auto_approve_low_risk && risk_score < 0.3 {
-            self.auto_approve_request(&request_id).await?;
-        } else {
-            // Send notifications
-            self.send_approval_notifications(&approval_request).await?;
+            request.status = transition(request.status, fresh(&request, now), true, true, Event::Approve);
+            if request.status == ApprovalStatus::Approved {
+                request.approver_id = Some("system".into());
+                request.approval_notes = Some("Auto-approved for low risk".into());
+            }
         }
-
+        let pending = request.status == ApprovalStatus::Pending;
+        state.requests.insert(request_id.clone(), request);
+        drop(state);
+        if pending && !self.config.notification_channels.is_empty() {
+            // The existing repository has no notification transport. Do not
+            // report a successful email, Slack message or webhook delivery.
+            warn!("Approval request recorded; notification transport unavailable: {}", request_id);
+        }
         info!("Created approval request: {}", request_id);
         Ok(request_id)
     }
 
-    /// Approve a request
+    /// Returns true only when this call completes a new approval. A first
+    /// vote below quorum is recorded, but returns false (still pending).
     pub async fn approve_request(&self, request_id: &str, approver_id: &str, notes: Option<String>) -> Result<bool> {
-        let mut requests = self.pending_requests.write().await;
-        
-        if let Some(request) = requests.get_mut(request_id) {
-            // Check if approver has permission
-            if !self.can_approver_approve(approver_id, request).await? {
-                return Ok(false);
-            }
-
-            // Check if request is still pending
-            if request.status != ApprovalStatus::Pending {
-                warn!("Request {} is not pending (status: {:?})", request_id, request.status);
-                return Ok(false);
-            }
-
-            // Check if request has expired
-            if let Ok(expires_at) = DateTime::parse_from_rfc3339(&request.expires_at) {
-                if Utc::now() > expires_at {
-                    request.status = ApprovalStatus::Expired;
-                    return Ok(false);
-                }
-            }
-
-            // Update request
-            request.status = ApprovalStatus::Approved;
-            request.approver_id = Some(approver_id.to_string());
+        let mut state = self.state.write().await;
+        let ApprovalState { requests, approvers } = &mut *state;
+        let Some(request) = requests.get_mut(request_id) else { return Ok(false); };
+        let now = UtcTimestamp::now();
+        observe(request, now);
+        if request.status != ApprovalStatus::Pending { return Ok(false); }
+        let authorized = approvers.get(approver_id).is_some_and(|a| permitted(a, request));
+        if !authorized { return Ok(false); }
+        // Re-evaluate prior votes against the current registry. The write
+        // lock prevents revocation/configuration races during this decision.
+        let mut votes = std::mem::take(&mut request.approval_votes);
+        votes.retain(|v| approvers.get(&v.approver_id).is_some_and(|a| permitted(a, request)));
+        request.approval_votes = votes;
+        if request.approval_votes.iter().any(|v| v.approver_id == approver_id) ||
+           request.approval_votes.len() >= self.config.max_approvers_per_request as usize {
+            return Ok(false);
+        }
+        request.approval_votes.push(ApprovalVote { approver_id: approver_id.to_owned(), notes: notes.clone() });
+        let quorum = request.approval_votes.len() >= self.required_votes(request.risk_score);
+        request.status = transition(request.status, fresh(request, now), authorized, quorum, Event::Approve);
+        if request.status == ApprovalStatus::Approved {
+            request.approver_id = Some(approver_id.to_owned());
             request.approval_notes = notes;
-
-            // Move to history
-            let request_clone = request.clone();
-            drop(requests);
-            
-            {
-                let mut history = self.approval_history.write().await;
-                history.push(request_clone);
-            }
-
-            info!("Request {} approved by {}", request_id, approver_id);
+            info!("Request {} approved", request_id);
             Ok(true)
         } else {
-            warn!("Request {} not found", request_id);
             Ok(false)
         }
     }
 
-    /// Deny a request
     pub async fn deny_request(&self, request_id: &str, approver_id: &str, notes: Option<String>) -> Result<bool> {
-        let mut requests = self.pending_requests.write().await;
-        
-        if let Some(request) = requests.get_mut(request_id) {
-            // Check if approver has permission
-            if !self.can_approver_approve(approver_id, request).await? {
-                return Ok(false);
-            }
-
-            // Check if request is still pending
-            if request.status != ApprovalStatus::Pending {
-                warn!("Request {} is not pending (status: {:?})", request_id, request.status);
-                return Ok(false);
-            }
-
-            // Update request
-            request.status = ApprovalStatus::Denied;
-            request.approver_id = Some(approver_id.to_string());
+        let mut state = self.state.write().await;
+        let ApprovalState { requests, approvers } = &mut *state;
+        let Some(request) = requests.get_mut(request_id) else { return Ok(false); };
+        let now = UtcTimestamp::now();
+        observe(request, now);
+        if request.status != ApprovalStatus::Pending { return Ok(false); }
+        let authorized = approvers.get(approver_id).is_some_and(|a| permitted(a, request));
+        request.status = transition(request.status, fresh(request, now), authorized, false, Event::Deny);
+        if request.status == ApprovalStatus::Denied {
+            request.approver_id = Some(approver_id.to_owned());
             request.approval_notes = notes;
-
-            // Move to history
-            let request_clone = request.clone();
-            drop(requests);
-            
-            {
-                let mut history = self.approval_history.write().await;
-                history.push(request_clone);
-            }
-
-            info!("Request {} denied by {}", request_id, approver_id);
-            Ok(true)
-        } else {
-            warn!("Request {} not found", request_id);
-            Ok(false)
-        }
-    }
-
-    /// Check if an approver can approve a specific request
-    async fn can_approver_approve(&self, approver_id: &str, request: &ApprovalRequest) -> Result<bool> {
-        let approvers = self.approvers.read().await;
-        
-        if let Some(approver) = approvers.get(approver_id) {
-            // Check risk level permissions
-            let risk_permission = match request.risk_score {
-                r if r < 0.3 => ApprovalPermission::LowRisk,
-                r if r < 0.7 => ApprovalPermission::MediumRisk,
-                r if r < 0.9 => ApprovalPermission::HighRisk,
-                _ => ApprovalPermission::CriticalRisk,
-            };
-
-            if !approver.permissions.contains(&risk_permission) && 
-               !approver.permissions.contains(&ApprovalPermission::CriticalRisk) {
-                return Ok(false);
-            }
-
-            // Check tool permissions
-            let tool_name = &request.tool_call.tool_name;
-            let has_tool_permission = approver.permissions.iter().any(|p| {
-                matches!(p, ApprovalPermission::AllTools) ||
-                matches!(p, ApprovalPermission::SpecificTools(tools) if tools.contains(tool_name))
-            });
-
-            if !has_tool_permission {
-                return Ok(false);
-            }
-
-            // Check tenant permissions
-            let tenant_id = &request.session_id.split(':').next().unwrap_or("default");
-            let has_tenant_permission = approver.permissions.iter().any(|p| {
-                matches!(p, ApprovalPermission::AllTenants) ||
-                matches!(p, ApprovalPermission::SpecificTenants(tenants) if tenants.contains(&tenant_id.to_string()))
-            });
-
-            if !has_tenant_permission {
-                return Ok(false);
-            }
-
-            Ok(true)
-        } else {
-            warn!("Approver {} not found", approver_id);
-            Ok(false)
-        }
-    }
-
-    /// Auto-approve a request (for low-risk operations)
-    async fn auto_approve_request(&self, request_id: &str) -> Result<bool> {
-        let mut requests = self.pending_requests.write().await;
-        
-        if let Some(request) = requests.get_mut(request_id) {
-            request.status = ApprovalStatus::Approved;
-            request.approver_id = Some("system".to_string());
-            request.approval_notes = Some("Auto-approved for low risk".to_string());
-
-            // Move to history
-            let request_clone = request.clone();
-            drop(requests);
-            
-            {
-                let mut history = self.approval_history.write().await;
-                history.push(request_clone);
-            }
-
-            info!("Request {} auto-approved", request_id);
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    /// Send approval notifications
-    async fn send_approval_notifications(&self, request: &ApprovalRequest) -> Result<()> {
-        for channel in &self.config.notification_channels {
-            match channel.as_str() {
-                "email" => self.send_email_notification(request).await?,
-                "slack" => self.send_slack_notification(request).await?,
-                "webhook" => self.send_webhook_notification(request).await?,
-                _ => warn!("Unknown notification channel: {}", channel),
-            }
-        }
-        Ok(())
-    }
-
-    /// Send email notification
-    async fn send_email_notification(&self, request: &ApprovalRequest) -> Result<()> {
-        // Implementation would integrate with email service
-        info!("Email notification sent for request: {}", request.request_id);
-        Ok(())
-    }
-
-    /// Send Slack notification
-    async fn send_slack_notification(&self, request: &ApprovalRequest) -> Result<()> {
-        // Implementation would integrate with Slack API
-        info!("Slack notification sent for request: {}", request.request_id);
-        Ok(())
-    }
-
-    /// Send webhook notification
-    async fn send_webhook_notification(&self, request: &ApprovalRequest) -> Result<()> {
-        // Implementation would send HTTP POST to configured webhook
-        info!("Webhook notification sent for request: {}", request.request_id);
-        Ok(())
-    }
-
-    /// Get approval status
     pub async fn get_approval_status(&self, request_id: &str) -> Result<Option<ApprovalStatus>> {
-        let requests = self.pending_requests.read().await;
-        
-        if let Some(request) = requests.get(request_id) {
-            // Check if expired
-            if let Ok(expires_at) = DateTime::parse_from_rfc3339(&request.expires_at) {
-                if Utc::now() > expires_at {
-                    return Ok(Some(ApprovalStatus::Expired));
-                }
-            }
-            Ok(Some(request.status.clone()))
-        } else {
-            Ok(None)
-        }
+        let mut state = self.state.write().await;
+        let now = UtcTimestamp::now();
+        Ok(state.requests.get_mut(request_id).map(|request| {
+            observe(request, now);
+            request.status
+        }))
     }
 
-    /// Get pending requests
     pub async fn get_pending_requests(&self) -> Vec<ApprovalRequest> {
-        let requests = self.pending_requests.read().await;
-        requests.values().cloned().collect()
+        let mut state = self.state.write().await;
+        let now = UtcTimestamp::now();
+        for request in state.requests.values_mut() { observe(request, now); }
+        state.requests.values().filter(|r| r.status == ApprovalStatus::Pending).cloned().collect()
     }
 
-    /// Get approval history
+    /// Historical decisions are not evidence of a currently valid execution permit.
     pub async fn get_approval_history(&self, limit: Option<usize>) -> Vec<ApprovalRequest> {
-        let history = self.approval_history.read().await;
-        let mut history_vec = history.clone();
-        history_vec.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-        
-        if let Some(limit) = limit {
-            history_vec.truncate(limit);
-        }
-        
-        history_vec
+        let mut state = self.state.write().await;
+        let now = UtcTimestamp::now();
+        for request in state.requests.values_mut() { observe(request, now); }
+        let mut history: Vec<_> = state.requests.values().filter(|r| r.status != ApprovalStatus::Pending).cloned().collect();
+        history.sort_by(|a, b| UtcTimestamp::parse(&b.created_at).cmp(&UtcTimestamp::parse(&a.created_at))
+            .then_with(|| a.request_id.cmp(&b.request_id)));
+        if let Some(limit) = limit { history.truncate(limit); }
+        history
     }
 
-    /// Add an approver
     pub async fn add_approver(&self, approver: Approver) -> Result<()> {
-        let mut approvers = self.approvers.write().await;
-        approvers.insert(approver.approver_id.clone(), approver);
+        if approver.approver_id.is_empty() || approver.approver_id == "system" {
+            return Err(anyhow!("Invalid or reserved approver identifier"));
+        }
+        let mut state = self.state.write().await;
+        let id = approver.approver_id.clone();
+        // Replacing a registry entry invalidates its pending votes, even
+        // if the replacement happens to have the same permissions.
+        for request in state.requests.values_mut().filter(|r| r.status == ApprovalStatus::Pending) {
+            request.approval_votes.retain(|v| v.approver_id != id);
+        }
+        state.approvers.insert(id, approver);
         Ok(())
     }
 
-    /// Remove an approver
     pub async fn remove_approver(&self, approver_id: &str) -> Result<()> {
-        let mut approvers = self.approvers.write().await;
-        approvers.remove(approver_id);
+        let mut state = self.state.write().await;
+        state.approvers.remove(approver_id);
+        for request in state.requests.values_mut().filter(|r| r.status == ApprovalStatus::Pending) {
+            request.approval_votes.retain(|v| v.approver_id != approver_id);
+        }
         Ok(())
     }
 
-    /// Get all approvers
     pub async fn get_approvers(&self) -> Vec<Approver> {
-        let approvers = self.approvers.read().await;
-        approvers.values().cloned().collect()
+        self.state.read().await.approvers.values().cloned().collect()
     }
 
-    /// Clean up expired requests
+    /// Mark newly expired requests; never remove or rewrite a terminal decision.
     pub async fn cleanup_expired_requests(&self) -> Result<usize> {
-        let mut requests = self.pending_requests.write().await;
-        let mut expired_count = 0;
-        let mut expired_requests = Vec::new();
-
-        for (request_id, request) in requests.iter() {
-            if let Ok(expires_at) = DateTime::parse_from_rfc3339(&request.expires_at) {
-                if Utc::now() > expires_at {
-                    expired_requests.push(request_id.clone());
-                    expired_count += 1;
-                }
+        let mut state = self.state.write().await;
+        let now = UtcTimestamp::now();
+        let mut count = 0;
+        for request in state.requests.values_mut() {
+            let prior = request.status;
+            observe(request, now);
+            if prior == ApprovalStatus::Pending && request.status == ApprovalStatus::Expired {
+                count += 1;
             }
         }
-
-        for request_id in expired_requests {
-            if let Some(mut request) = requests.remove(&request_id) {
-                request.status = ApprovalStatus::Expired;
-                let mut history = self.approval_history.write().await;
-                history.push(request);
-            }
-        }
-
-        if expired_count > 0 {
-            info!("Cleaned up {} expired requests", expired_count);
-        }
-
-        Ok(expired_count)
+        Ok(count)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_create_approval_request() {
-        let config = ApprovalConfig::default();
-        let manager = ApprovalManager::new(config);
-
-        let tool_call = ToolCall {
-            call_id: "test-1".to_string(),
-            session_id: "session-1".to_string(),
-            tool_name: "test_tool".to_string(),
-            parameters: HashMap::new(),
-            risk_score: 0.5,
-            kernel_decision: None,
-            timestamp: Utc::now().to_rfc3339(),
-        };
-
-        let request_id = manager.create_approval_request(
-            tool_call,
-            0.5,
-            "Test reason".to_string()
-        ).await.unwrap();
-
-        let status = manager.get_approval_status(&request_id).await.unwrap();
-        assert_eq!(status, Some(ApprovalStatus::Pending));
-    }
-
-    #[tokio::test]
-    async fn test_auto_approve_low_risk() {
-        let mut config = ApprovalConfig::default();
-        config.auto_approve_low_risk = true;
-        let manager = ApprovalManager::new(config);
-
-        let tool_call = ToolCall {
-            call_id: "test-2".to_string(),
-            session_id: "session-2".to_string(),
-            tool_name: "test_tool".to_string(),
-            parameters: HashMap::new(),
-            risk_score: 0.1,
-            kernel_decision: None,
-            timestamp: Utc::now().to_rfc3339(),
-        };
-
-        let request_id = manager.create_approval_request(
-            tool_call,
-            0.1,
-            "Low risk test".to_string()
-        ).await.unwrap();
-
-        let status = manager.get_approval_status(&request_id).await.unwrap();
-        assert_eq!(status, Some(ApprovalStatus::Approved));
-    }
-} 
+mod tests;
