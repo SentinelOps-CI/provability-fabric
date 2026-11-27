@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Candidate-only native resolver; replace with locked validation after importing its lockfile.
+# Native validation of the imported Cargo-generated candidate lockfile.
 name: Patched Kubernetes client candidate
 
 on:
@@ -29,10 +29,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
           toolchain: "1.98.1"
-      - name: Native Cargo resolution
+      - name: Verify locked native Cargo graph
         run: |
           set -euo pipefail
-          cargo update -p kube --precise 4.2.1
           cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/kube-metadata.json"
           python3 - <<'PY'
           import json
@@ -66,6 +65,7 @@ jobs:
           print("Patched client and explicit Rustls dependency closure validated")
           PY
           sha256sum Cargo.lock
+          git diff --exit-code -- Cargo.lock
       - name: Preserve native candidate lockfile
         uses: actions/upload-artifact@v4
         with:
