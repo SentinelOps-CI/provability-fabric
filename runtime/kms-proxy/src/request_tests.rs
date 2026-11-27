@@ -22,7 +22,7 @@ async fn signed(proxy: &Arc<KmsProxy>, value: &KmsRequest) -> (StatusCode, serde
 
 #[tokio::test]
 async fn absent_authority_and_absent_credentials_never_grant_signing() {
-    let input = signed_fixture(Utc::now());
+    let input = signed_fixture(UtcTimestamp::now());
     let (status, body) = signed(&Arc::new(proxy(None)), &input).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(body["success"], false);
@@ -37,7 +37,7 @@ async fn absent_authority_and_absent_credentials_never_grant_signing() {
 #[tokio::test]
 async fn provider_absence_is_failure_and_cannot_warm_authorization() {
     let p = Arc::new(proxy(Some(fixture_authority())));
-    let mut input = signed_fixture(Utc::now());
+    let mut input = signed_fixture(UtcTimestamp::now());
     let (status, body) = signed(&p, &input).await;
     assert_eq!(status, StatusCode::BAD_GATEWAY);
     assert_eq!(body["success"], false);
@@ -58,7 +58,7 @@ async fn unsupported_operations_and_invalid_input_fail_explicitly() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     let (status, _) = request(&p, "/kms/sign", Body::from(vec![0; MAX_REQUEST_BODY_BYTES + 1])).await;
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
-    let mut input = signed_fixture(Utc::now());
+    let mut input = signed_fixture(UtcTimestamp::now());
     input.operation = "decrypt".into();
     assert_eq!(signed(&p, &input).await.0, StatusCode::BAD_REQUEST);
     input.operation = "sign".into();
@@ -117,18 +117,18 @@ async fn authenticated_provider_transport_and_rejection_controls() {
     p.vault_token = "isolated-test-token".into();
     let p = Arc::new(p);
 
-    let (status, body) = signed(&p, &signed_fixture(Utc::now())).await;
+    let (status, body) = signed(&p, &signed_fixture(UtcTimestamp::now())).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["success"], true);
     assert_eq!(body["result"], "vault:v1:ZmFrZQ==");
-    let mut altered = signed_fixture(Utc::now());
+    let mut altered = signed_fixture(UtcTimestamp::now());
     altered.data = Some("tampered".into());
     assert_eq!(signed(&p, &altered).await.0, StatusCode::FORBIDDEN);
     altered.attestation_token = None;
     assert_eq!(signed(&p, &altered).await.0, StatusCode::FORBIDDEN);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     for _ in 0..3 {
-        let (status, body) = signed(&p, &signed_fixture(Utc::now())).await;
+        let (status, body) = signed(&p, &signed_fixture(UtcTimestamp::now())).await;
         assert_eq!(status, StatusCode::BAD_GATEWAY);
         assert_eq!(body["success"], false);
         assert!(body["result"].is_null());
