@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Chrono direct dependency reduction
+on:
+  push:
+    branches: [security/chrono-direct-reduction-20261127]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler pkg-config libssl-dev
+      - name: Resolve only direct timestamp dependency changes
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-time-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-time-locked.json
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          packages = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          by_name = {p["name"]: p for p in packages}
+          parents = {p["name"] for p in packages if any(d.split()[0] == "chrono" for d in p.get("dependencies", []))}
+          expected = {"attestor", "k8s-openapi", "kms-proxy", "kube-client", "kube-core", "mpc-fintech", "sidecar-watcher", "tool-broker"}
+          assert parents == expected, parents
+          for name in ("jwks-manager", "telemetry-service", "provability-fabric-core-sdk-rust"):
+              assert not any(d.split()[0] == "chrono" for d in by_name[name].get("dependencies", []))
+          for name, version in [("h2","0.4.20"),("hyper","1.8.1"),("tonic","0.12.3"),
+              ("reqwest","0.12.28"),("wasmtime","36.0.22"),("sqlx","0.8.6"),
+              ("tokio","1.53.3"),("openssl","0.10.80"),("kube","0.98.0"),
+              ("k8s-openapi","0.24.0"),("time","0.3.47")]:
+              assert {p["version"] for p in packages if p["name"] == name} == {version}, name
+          print("Remaining Chrono parents:", sorted(parents))
+          PY
+          git diff --stat -- Cargo.lock
+          git diff -- Cargo.lock
+          git hash-object Cargo.lock
+          cp Cargo.lock /tmp/pf-time-resolved.lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrono-direct-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Verify timestamp formats and runtime services
+        run: |
+          set -euo pipefail
+          cargo test --locked -p provability-fabric-core-sdk-rust --lib -- --nocapture
+          cargo test --locked -p provability-fabric-core-sdk-rust --doc
+          cargo test --locked -p jwks-manager -p telemetry-service --bins
+          cmp /tmp/pf-time-resolved.lock Cargo.lock

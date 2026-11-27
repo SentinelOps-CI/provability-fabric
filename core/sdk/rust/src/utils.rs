@@ -78,9 +78,9 @@ pub fn validate_hash(hash: &str) -> bool {
 
 /// Validate timestamp format
 pub fn validate_timestamp(timestamp: &str) -> bool {
-    use chrono::DateTime;
-    DateTime::parse_from_rfc3339(timestamp).is_ok() || 
-    DateTime::parse_from_rfc2822(timestamp).is_ok() ||
+    use time::{format_description::well_known::{Rfc2822, Rfc3339}, OffsetDateTime};
+    OffsetDateTime::parse(timestamp, &Rfc3339).is_ok() ||
+    OffsetDateTime::parse(timestamp, &Rfc2822).is_ok() ||
     timestamp.parse::<i64>().is_ok()
 }
 
@@ -461,6 +461,23 @@ mod tests {
         assert_eq!(format_bytes(1024), "1.00 KB");
         assert_eq!(format_bytes(1048576), "1.00 MB");
         assert_eq!(format_bytes(500), "500 B");
+    }
+
+    #[test]
+    fn test_timestamp_formats() {
+        for value in [
+            "2026-11-27T15:00:00Z", "2026-11-27T15:00:00.123456789Z",
+            "2026-11-28T00:00:00+09:00", "Fri, 27 Nov 2026 15:00:00 +0000",
+            "0", "-1", "9223372036854775807", "-9223372036854775808",
+        ] {
+            assert!(validate_timestamp(value), "rejected {value}");
+        }
+        for value in [
+            "", "2026-02-30T15:00:00Z", "2026-11-27T25:00:00Z",
+            "2026-11-27T15:00:00", "9223372036854775808", "not-a-timestamp",
+        ] {
+            assert!(!validate_timestamp(value), "accepted {value}");
+        }
     }
 
     #[test]
