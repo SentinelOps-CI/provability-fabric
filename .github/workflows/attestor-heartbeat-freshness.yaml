@@ -50,7 +50,33 @@ jobs:
           set -euo pipefail
           target/debug/attestor > "$RUNNER_TEMP/attestor.log" 2>&1 &
           pid=$!
-          trap 'kill "$pid" 2>/dev/null || true; cat "$RUNNER_TEMP/attestor.log"' EXIT
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if kill -0 "$pid" 2>/dev/null; then
+              if ! kill "$pid"; then
+                echo "Failed to terminate attestor process" >&2
+                status=1
+              fi
+              if wait "$pid"; then
+                :
+              else
+                child_status=$?
+                if [ "$child_status" -ne 143 ]; then
+                  echo "Unexpected attestor exit: $child_status" >&2
+                  status=1
+                fi
+              fi
+            else
+              echo "Attestor exited before cleanup" >&2
+              status=1
+            fi
+            if ! cat "$RUNNER_TEMP/attestor.log"; then
+              status=1
+            fi
+            exit "$status"
+          }
+          trap cleanup EXIT
           python3 - <<'PY'
           import json
           import os
