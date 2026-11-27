@@ -238,6 +238,22 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn exact_nanosecond_authorization_boundaries() {
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 250_000_000).unwrap();
+        let authority = fixture_authority();
+        for (seconds, nanos, expected) in [
+            (1_699_999_940, 249_999_999, false),
+            (1_699_999_940, 250_000_000, true),
+            (1_699_999_940, 250_000_001, true),
+            (1_700_000_000, 250_000_000, true),
+            (1_700_000_000, 250_000_001, false),
+        ] {
+            let request = signed_fixture(UtcTimestamp::from_timestamp(seconds, nanos).unwrap());
+            assert_eq!(authority.validate_at(&request, now).valid, expected, "{seconds}.{nanos}");
+        }
+    }
+
+    #[test]
     fn independently_generated_signature_vectors_preserve_wire_bytes() {
         // Generated independently using Python struct.pack and cryptography's
         // Ed25519 implementation. Deterministic test-only issuer; never deployed.
