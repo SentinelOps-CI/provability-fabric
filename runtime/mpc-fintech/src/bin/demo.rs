@@ -7,7 +7,7 @@
 //! services with real-world scenarios and comprehensive audit trails.
 
 use std::collections::HashMap;
-use chrono::Utc;
+use mpc_fintech::UtcTimestamp;
 use tracing::{info, error};
 use mpc_fintech::{
     MpcFinancialService, MpcFinancialConfig, FinancialTransaction, 
@@ -96,7 +96,7 @@ async fn run_standard_payment_demo(mpc_service: &MpcFinancialService) -> Result<
         to_account: "CHECKING-987654321".to_string(),
         amount: 250000, // $2,500.00
         currency: "USD".to_string(),
-        timestamp: Utc::now(),
+        timestamp: UtcTimestamp::now(),
         metadata: {
             let mut meta = HashMap::new();
             meta.insert("merchant".to_string(), "Coffee Shop Inc".to_string());
@@ -138,7 +138,7 @@ async fn run_high_value_transfer_demo(mpc_service: &MpcFinancialService) -> Resu
         to_account: "BUSINESS-789123456".to_string(),
         amount: 150000000, // $1,500,000.00
         currency: "USD".to_string(),
-        timestamp: Utc::now(),
+        timestamp: UtcTimestamp::now(),
         metadata: {
             let mut meta = HashMap::new();
             meta.insert("purpose".to_string(), "real_estate_purchase".to_string());
@@ -182,7 +182,7 @@ async fn run_securities_trade_demo(mpc_service: &MpcFinancialService) -> Result<
         to_account: "BROKERAGE-EU-002".to_string(),
         amount: 500000000, // $5,000,000.00
         currency: "USD".to_string(),
-        timestamp: Utc::now(),
+        timestamp: UtcTimestamp::now(),
         metadata: {
             let mut meta = HashMap::new();
             meta.insert("security_type".to_string(), "equity".to_string());
@@ -228,7 +228,7 @@ async fn run_derivative_settlement_demo(mpc_service: &MpcFinancialService) -> Re
         to_account: "CLEARING-MEMBER-002".to_string(),
         amount: 2500000000, // $25,000,000.00
         currency: "USD".to_string(),
-        timestamp: Utc::now(),
+        timestamp: UtcTimestamp::now(),
         metadata: {
             let mut meta = HashMap::new();
             meta.insert("derivative_type".to_string(), "interest_rate_swap".to_string());
@@ -310,7 +310,7 @@ async fn run_compliance_analysis(mpc_service: &MpcFinancialService) -> Result<()
                     info!("   - {:?}: {:?} at {}", 
                           entry.event_type, 
                           entry.compliance_verification.status,
-                          entry.timestamp.format("%H:%M:%S%.3f"));
+                          entry.timestamp.clock_time_millis());
                 }
             },
             Err(e) => {

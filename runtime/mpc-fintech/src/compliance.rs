@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use crate::UtcTimestamp;
 use tracing::{info, debug};
 
 use crate::{ComplianceLevel, FinancialTransaction};
@@ -88,9 +88,9 @@ struct CachedValidation {
     /// Validation result
     result: ValidationResult,
     /// Cache timestamp
-    timestamp: DateTime<Utc>,
+    timestamp: UtcTimestamp,
     /// Cache expiry
-    expires_at: DateTime<Utc>,
+    expires_at: UtcTimestamp,
 }
 
 /// Validation result for a compliance rule
@@ -105,7 +105,7 @@ pub struct ValidationResult {
     /// Evidence collected
     pub evidence: Vec<Evidence>,
     /// Validation timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Validator information
     pub validator_info: ValidatorInfo,
 }
@@ -120,7 +120,7 @@ pub struct Evidence {
     /// Evidence source
     pub source: String,
     /// Evidence timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 /// Types of evidence
@@ -180,7 +180,7 @@ pub struct ComplianceAssessment {
     /// Required actions
     pub required_actions: Vec<RequiredAction>,
     /// Assessment timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Assessor information
     pub assessor: String,
 }
@@ -208,7 +208,7 @@ pub struct RequiredAction {
     /// Action description
     pub description: String,
     /// Action deadline
-    pub deadline: Option<DateTime<Utc>>,
+    pub deadline: Option<UtcTimestamp>,
     /// Responsible party
     pub responsible_party: String,
     /// Action priority
@@ -508,7 +508,7 @@ impl ComplianceValidator {
                     required_actions.push(RequiredAction {
                         action_type: ActionType::AdditionalVerification,
                         description: format!("Address compliance violation: {}", rule.rule_name),
-                        deadline: Some(Utc::now() + chrono::Duration::hours(24)),
+                        deadline: Some(UtcTimestamp::now().checked_add_hours(24).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "compliance deadline outside supported domain"))?),
                         responsible_party: "compliance_officer".to_string(),
                         priority: match rule.severity {
                             RuleSeverity::Critical => ActionPriority::Critical,
@@ -555,7 +555,7 @@ impl ComplianceValidator {
             rule_results,
             risk_score,
             required_actions,
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             assessor: "mpc_compliance_validator".to_string(),
         };
         
@@ -608,9 +608,9 @@ impl ComplianceValidator {
                     "currency": transaction.currency
                 }),
                 source: "amount_validator".to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             }],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Amount Threshold Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -646,9 +646,9 @@ impl ComplianceValidator {
                     "high_value": transaction.compliance_flags.high_value
                 }),
                 source: "multi_party_validator".to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             }],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Multi-Party Authorization Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -674,9 +674,9 @@ impl ComplianceValidator {
                     "audit_components": ["mpc_signature", "performance_metrics", "compliance_verification"]
                 }),
                 source: "audit_trail_validator".to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             }],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Audit Trail Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -708,9 +708,9 @@ impl ComplianceValidator {
                     "meets_requirements": is_strong_encryption
                 }),
                 source: "encryption_validator".to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             }],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Encryption Requirement Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -727,7 +727,7 @@ impl ComplianceValidator {
             passed: true,
             details: "Account verification passed".to_string(),
             evidence: vec![],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Account Verification Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -743,7 +743,7 @@ impl ComplianceValidator {
             passed: true,
             details: "Geographic restrictions satisfied".to_string(),
             evidence: vec![],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Geographic Restriction Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -759,7 +759,7 @@ impl ComplianceValidator {
             passed: true,
             details: "Time restrictions satisfied".to_string(),
             evidence: vec![],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Time Restriction Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -775,7 +775,7 @@ impl ComplianceValidator {
             passed: true,
             details: "Data retention policies compliant".to_string(),
             evidence: vec![],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Data Retention Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -808,9 +808,9 @@ impl ComplianceValidator {
                     "large_amount": transaction.amount > 1000000
                 }),
                 source: "risk_assessment_validator".to_string(),
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
             }],
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             validator_info: ValidatorInfo {
                 name: "Risk Assessment Validator".to_string(),
                 version: "1.0.0".to_string(),
@@ -858,7 +858,7 @@ mod tests {
             to_account: "account-002".to_string(),
             amount: 50000, // $500
             currency: "USD".to_string(),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -888,7 +888,7 @@ mod tests {
             to_account: "account-002".to_string(),
             amount: 10000000, // $100,000
             currency: "USD".to_string(),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
