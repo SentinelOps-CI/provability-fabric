@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 
 /// Rate limit configuration for different tool types and tenants
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,7 +157,7 @@ pub struct RateLimitViolation {
     pub tool_name: String,
     pub violation_type: String,
     pub reason: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     pub current_usage: RateLimitUsage,
     pub limits: RateLimitInfo,
 }
@@ -505,7 +505,7 @@ impl RateLimiter {
             tool_name: tool_name.to_string(),
             violation_type: violation_type.to_string(),
             reason: reason.to_string(),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             current_usage: usage.clone(),
             limits: RateLimitInfo {
                 tool_limit: self.config.tool_limits.get(tool_name).cloned(),

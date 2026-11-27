@@ -10,10 +10,11 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 use metrics::{counter, histogram};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 
 mod ratelimit;
 mod approvals;
+mod utc_timestamp;
 
 #[cfg(test)]
 mod ratelimit_test;
@@ -66,7 +67,7 @@ struct ToolResult {
     result: Option<serde_json::Value>,
     error: Option<String>,
     execution_id: String,
-    timestamp: DateTime<Utc>,
+    timestamp: UtcTimestamp,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,7 +75,7 @@ struct Violation {
     violation_type: String,
     reason: String,
     tool_call: ToolCall,
-    timestamp: DateTime<Utc>,
+    timestamp: UtcTimestamp,
 }
 
 /// Optional per-call context (JWT / explicit tenant override).
@@ -290,7 +291,7 @@ impl ToolBroker {
         ctx: Option<&ExecutionContext>,
     ) -> Result<ToolResult> {
         let start_time = Instant::now();
-        let timestamp = Utc::now();
+        let timestamp = UtcTimestamp::now();
 
         let approved_steps = self.approved_steps.read().await;
         let plan_steps = approved_steps.get(plan_id);
@@ -359,7 +360,7 @@ impl ToolBroker {
         ctx: Option<&ExecutionContext>,
     ) -> Result<ToolResult> {
         let execution_id = Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
+        let timestamp = UtcTimestamp::now();
 
         let tenant_id = match self.resolve_tenant_id(plan_id, step, ctx).await {
             Ok(id) => id,
@@ -416,7 +417,7 @@ impl ToolBroker {
                     parameters: step.args.clone(),
                     risk_score,
                     kernel_decision: None,
-                    timestamp: Utc::now().to_rfc3339(),
+                    timestamp: UtcTimestamp::now().to_rfc3339()?,
                 };
 
                 let approval_id = self
