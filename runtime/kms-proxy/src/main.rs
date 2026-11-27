@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use base64::Engine;
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 use hyper::{
     body::HttpBody,
     service::{make_service_fn, service_fn},
@@ -16,6 +16,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 mod authority;
+mod utc_timestamp;
 use authority::RequestAuthority;
 
 #[cfg(test)]
@@ -26,7 +27,7 @@ struct AttestationToken {
     token: String,
     pod_identity: String,
     policy_hash: String,
-    timestamp: DateTime<Utc>,
+    timestamp: UtcTimestamp,
     signature: String,
 }
 
@@ -44,7 +45,7 @@ struct KmsResponse {
     result: Option<String>,
     error: Option<String>,
     operation_id: String,
-    timestamp: DateTime<Utc>,
+    timestamp: UtcTimestamp,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -125,7 +126,7 @@ impl KmsProxy {
 
     async fn process_kms_request(&self, request: KmsRequest) -> (StatusCode, KmsResponse) {
         let operation_id = Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
+        let timestamp = UtcTimestamp::now();
         let failure = |status, message: &str| (status, KmsResponse {
             success: false,
             result: None,
