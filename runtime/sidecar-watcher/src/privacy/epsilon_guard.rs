@@ -364,6 +364,42 @@ mod tests {
         task.abort();
     }
 
+    /// Executed explicitly in the isolated TLS fixture workflow. Ordinary
+    /// developer test runs do not provision a second system trust anchor.
+    #[tokio::test]
+    #[ignore = "requires isolated TLS endpoints and system CA fixture"]
+    async fn test_kubernetes_configmap_configured_ca_is_exclusive() {
+        let ca = std::fs::read(std::env::var("PF_KUBE_TEST_CA_DER").unwrap()).unwrap();
+        let trusted = std::env::var("PF_KUBE_TEST_TRUSTED_URL").unwrap();
+        let unrelated = std::env::var("PF_KUBE_TEST_UNRELATED_URL").unwrap();
+
+        async fn guard(url: &str, ca: Option<Vec<Vec<u8>>>) -> EpsilonGuard {
+            let mut config = kube::Config::new(url.parse().unwrap());
+            config.root_cert = ca;
+            config.accept_invalid_certs = false;
+            let client = Client::try_from(config).unwrap();
+            EpsilonGuard {
+                config_map_api: Some(Api::default_namespaced(client)),
+                accountants: Arc::new(RwLock::new(HashMap::new())),
+                configs: Arc::new(RwLock::new(HashMap::new())),
+            }
+        }
+
+        // Confirm the unrelated root really is trusted by the default
+        // transport. Otherwise the rejection below would be vacuous.
+        let system = guard(&unrelated, None).await;
+        system.load_configs().await.expect("system CA positive control");
+        assert!(system.check_query("fixture-tenant", 0.25, 0.01).await.unwrap());
+
+        let explicit = guard(&trusted, Some(vec![ca.clone()])).await;
+        explicit.load_configs().await.expect("configured CA positive control");
+        assert!(explicit.check_query("fixture-tenant", 0.25, 0.01).await.unwrap());
+
+        let wrong = guard(&unrelated, Some(vec![ca])).await;
+        assert!(wrong.load_configs().await.is_err(), "unrelated system root was accepted");
+        assert!(wrong.check_query("fixture-tenant", 0.0, 0.0).await.is_err());
+    }
+
     #[tokio::test]
     async fn test_privacy_missing_config_and_invalid_costs_fail_closed() {
         let guard = EpsilonGuard {
