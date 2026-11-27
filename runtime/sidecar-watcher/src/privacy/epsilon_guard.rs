@@ -2,6 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 use anyhow::{anyhow, Context, Result};
+use sidecar_watcher::utc_timestamp::UtcTimestamp;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,7 @@ pub struct MomentsAccountant {
 pub struct Query {
     pub epsilon: f64,
     pub delta: f64,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 impl MomentsAccountant {
@@ -43,7 +44,7 @@ impl MomentsAccountant {
         let query = Query {
             epsilon,
             delta,
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
         };
         self.queries.push(query);
         self.epsilon = next_epsilon;
