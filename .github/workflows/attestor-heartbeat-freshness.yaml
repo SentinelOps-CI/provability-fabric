@@ -1,0 +1,123 @@
+name: Attestor heartbeat freshness
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/attestor/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/attestor-heartbeat-freshness.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/attestor/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/attestor-heartbeat-freshness.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and execute locked native tests
+        run: |
+          cargo test --locked -p attestor
+          cargo build --locked -p attestor
+          git diff --exit-code -- Cargo.lock
+      - name: Test real Redis-backed HTTP service
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          REDIS_CONTAINER: ${{ job.services.redis.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/debug/attestor > "$RUNNER_TEMP/attestor.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat "$RUNNER_TEMP/attestor.log"' EXIT
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import time
+          import urllib.error
+          import urllib.request
+
+          base = "http://127.0.0.1:8080"
+
+          def request(path, body=None):
+              data = None if body is None else json.dumps(body).encode()
+              req = urllib.request.Request(base + path, data=data,
+                                           headers={"Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=3) as response:
+                      return response.status, response.read()
+              except urllib.error.HTTPError as error:
+                  return error.code, error.read()
+
+          def heartbeat(name, stamp):
+              return {"capsule_hash": name, "timestamp": stamp, "metrics": {
+                  "total_actions": 0, "violations": 0, "assumption_violations": 0,
+                  "running_spend": 0.0, "budget_limit": 1.0, "spam_score_limit": 1.0}}
+
+          def read(name):
+              status, data = request("/liveness/" + name)
+              assert status == 200, status
+              return json.loads(data)
+
+          def inject(name, data):
+              subprocess.run(["docker", "exec", os.environ["REDIS_CONTAINER"],
+                              "redis-cli", "SETEX", "heartbeat:" + name, "30",
+                              json.dumps(data)], check=True, capture_output=True, text=True)
+
+          for attempt in range(40):
+              try:
+                  if request("/health")[0] == 200:
+                      break
+              except (OSError, urllib.error.URLError):
+                  pass
+              time.sleep(0.25)
+          else:
+              raise RuntimeError("attestor did not become healthy")
+
+          now = int(time.time())
+          assert request("/heartbeat", heartbeat("valid", now))[0] == 200
+          original = read("valid")
+          assert original["alive"] is True, original
+          for stamp in [now + 3600, -(2**63), 2**63 - 1]:
+              assert request("/heartbeat", heartbeat("valid", stamp))[0] == 400
+              current = read("valid")
+              assert current["last_heartbeat"] == original["last_heartbeat"], current
+          assert request("/heartbeat", heartbeat("stale", now - 60))[0] == 200
+          assert read("stale")["alive"] is False
+          assert read("missing")["alive"] is False
+
+          # Exercise the read-side guard independently of HTTP ingress.
+          for name, data in [
+              ("future", heartbeat("future", now + 3600)),
+              ("overflow", heartbeat("overflow", 2**63 - 1)),
+              ("underflow", heartbeat("underflow", -(2**63))),
+              ("wrong", heartbeat("different", now)),
+              ("malformed", {"timestamp": now}),
+          ]:
+              inject(name, data)
+              result = read(name)
+              assert result["alive"] is False, (name, result)
+          print("Redis-backed HTTP heartbeat positive and negative controls passed")
+          PY
