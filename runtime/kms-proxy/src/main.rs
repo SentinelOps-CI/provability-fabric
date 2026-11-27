@@ -1,5 +1,4 @@
-// KMS proxy for attestation and key handling; some structs and methods are reserved for future use.
-#![allow(dead_code, unused_variables)]
+// KMS signing proxy with independently verified request authorization.
 
 use anyhow::Result;
 use base64::Engine;
@@ -10,17 +9,17 @@ use hyper::{
     Body, Request, Response, Server, StatusCode,
 };
 use metrics::{counter, histogram};
-use redis::AsyncCommands;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 mod authority;
 use authority::RequestAuthority;
+
+#[cfg(test)]
+mod request_tests;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct AttestationToken {
@@ -33,7 +32,7 @@ struct AttestationToken {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct KmsRequest {
-    operation: String, // "encrypt", "decrypt", "sign", "verify"
+    operation: String, // only sign is implemented
     key_id: String,
     data: Option<String>,
     attestation_token: Option<AttestationToken>,
@@ -58,18 +57,6 @@ struct AttestationValidation {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct VaultAuthResponse {
-    auth: VaultAuth,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct VaultAuth {
-    client_token: String,
-    lease_duration: u64,
-    renewable: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 struct VaultSignRequest {
     input: String,
 }
@@ -86,9 +73,6 @@ struct VaultSignData {
 
 struct KmsProxy {
     authority: Option<RequestAuthority>,
-    kek_cache: Arc<RwLock<HashMap<String, String>>>, // KEK handle cache
-    redis_client: Option<redis::Client>,
-    cache_ttl_seconds: u64,
     vault_client: Option<Client>,
     vault_url: String,
     vault_token: String,
@@ -96,17 +80,6 @@ struct KmsProxy {
 
 impl KmsProxy {
     fn new() -> Self {
-        // Initialize Redis client if available
-        let redis_client = std::env::var("REDIS_URL")
-            .ok()
-            .and_then(|url| redis::Client::open(url).ok());
-
-        if redis_client.is_some() {
-            info!("Redis caching enabled for KMS proxy");
-        } else {
-            warn!("Redis not available, using in-memory cache only");
-        }
-
         // Only an independently provisioned issuer grants request authority.
         let authority = match RequestAuthority::from_env() {
             Ok(value) => Some(value),
@@ -137,9 +110,6 @@ impl KmsProxy {
 
         Self {
             authority,
-            kek_cache: Arc::new(RwLock::new(HashMap::new())),
-            redis_client,
-            cache_ttl_seconds: 60, // 60 second cache validity
             vault_client,
             vault_url,
             vault_token,
@@ -188,60 +158,6 @@ impl KmsProxy {
             }),
             Err(_) => failure(StatusCode::BAD_GATEWAY, "Trusted signing provider unavailable or failed"),
         }
-    }
-
-    async fn get_kek_handle(&self, policy_hash: &str) -> Result<String> {
-        let start_time = std::time::Instant::now();
-
-        // Check in-memory cache first
-        let kek_cache = self.kek_cache.read().await;
-        if let Some(handle) = kek_cache.get(policy_hash) {
-            counter!("kms_cache_hit", 1);
-            let latency = start_time.elapsed();
-            histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-            return Ok(handle.clone());
-        }
-        drop(kek_cache);
-
-        // Check Redis cache
-        if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                let cache_key = format!("kek:{}", policy_hash);
-                if let Ok(Some(handle)) = conn.get::<_, Option<String>>(&cache_key).await {
-                    // Update in-memory cache
-                    let mut kek_cache = self.kek_cache.write().await;
-                    kek_cache.insert(policy_hash.to_string(), handle.clone());
-
-                    counter!("kms_cache_hit", 1);
-                    let latency = start_time.elapsed();
-                    histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-                    return Ok(handle);
-                }
-            }
-        }
-
-        // Fetch from KMS (simulated)
-        let kek_handle = format!("kek-{}", Uuid::new_v4());
-
-        // Cache the result
-        let mut kek_cache = self.kek_cache.write().await;
-        kek_cache.insert(policy_hash.to_string(), kek_handle.clone());
-
-        // Also cache in Redis if available
-        if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                let cache_key = format!("kek:{}", policy_hash);
-                let _: Result<(), redis::RedisError> = conn
-                    .set_ex(&cache_key, &kek_handle, self.cache_ttl_seconds)
-                    .await;
-            }
-        }
-
-        counter!("kms_cache_miss", 1);
-        let latency = start_time.elapsed();
-        histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-
-        Ok(kek_handle)
     }
 
     /// Sign through the explicitly configured Vault transit service.
@@ -392,7 +308,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    let server = Server::bind(&addr).serve(make_svc);
+    let server = Server::try_bind(&addr)?.serve(make_svc);
 
     info!("KMS Proxy listening on {}", addr);
 
