@@ -79,3 +79,72 @@ jobs:
           cargo test --locked -p sidecar-watcher --lib
       - name: Execute explicit Kubernetes trust-root isolation controls
         run: python3 scripts/test_kube_ca_isolation.py
+
+  advisory-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run unchanged workspace advisory and license policy
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
+
+  release-queue-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Measure optimized FIFO implementations
+        run: |
+          set -euo pipefail
+          lscpu > "$RUNNER_TEMP/queue-runner.txt"
+          rustc -Vv >> "$RUNNER_TEMP/queue-runner.txt"
+          cargo run --locked --release -p sidecar-watcher --example queue_performance_diagnostic > "$RUNNER_TEMP/queue-samples.csv"
+          python3 - <<'PY'
+          import csv
+          import os
+          import statistics
+          from collections import defaultdict
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          groups = defaultdict(list)
+          with (root / "queue-samples.csv").open(newline="") as stream:
+              for row in csv.DictReader(stream):
+                  groups[row["implementation"], row["allocation_state"]].append(
+                      (int(row["round"]), int(row["push_ns"]), int(row["pop_ns"])))
+          expected = {(implementation, state) for implementation in
+                      ("production", "std_mutex", "parking_lot_reference", "sequential_control")
+                      for state in ("fresh", "warm")}
+          assert set(groups) == expected, groups.keys()
+          for key, samples in sorted(groups.items()):
+              assert sorted(r for r, _, _ in samples) == list(range(31)), key
+              for name, index in (("push", 1), ("pop", 2)):
+                  ns = sorted(sample[index] for sample in samples)
+                  assert all(n > 0 for n in ns), key
+                  print(key, name, "median_ns", statistics.median(ns), "p90_ns", ns[27],
+                        "min_ns", ns[0], "max_ns", ns[-1], "under_1ms", sum(n < 1_000_000 for n in ns))
+          PY
+          git diff --exit-code -- Cargo.lock
+      - name: Preserve all timing observations
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-queue-diagnostic
+          path: |
+            ${{ runner.temp }}/queue-samples.csv
+            ${{ runner.temp }}/queue-runner.txt
+          if-no-files-found: error
+      - name: Execute unchanged release latency gate
+        run: cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --nocapture
