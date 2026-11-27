@@ -97,10 +97,14 @@ def main():
             with endpoint(explicit_cert, explicit_key) as trusted, endpoint(system_cert, system_key) as unrelated:
                 env = dict(os.environ, PF_KUBE_TEST_CA_DER=str(der),
                            PF_KUBE_TEST_TRUSTED_URL=trusted, PF_KUBE_TEST_UNRELATED_URL=unrelated)
-                subprocess.run(["cargo", "test", "--locked", "-p", "sidecar-watcher",
+                completed = subprocess.run(["cargo", "test", "--locked", "-p", "sidecar-watcher",
                                 "--lib", "privacy::epsilon_guard::tests::test_kubernetes_configmap_configured_ca_is_exclusive",
                                 "--", "--ignored", "--exact", "--nocapture"],
-                               env=env, check=True)
+                               env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                print(completed.stdout, end="")
+                completed.check_returncode()
+                if "running 1 test" not in completed.stdout or "1 passed; 0 failed" not in completed.stdout:
+                    raise RuntimeError("Expected exactly one native TLS isolation test")
         finally:
             run("sudo", "rm", installed)
             run("sudo", "update-ca-certificates")
