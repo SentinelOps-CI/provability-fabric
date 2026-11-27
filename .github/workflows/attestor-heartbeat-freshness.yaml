@@ -82,9 +82,15 @@ jobs:
               return json.loads(data)
 
           def inject(name, data):
-              subprocess.run(["docker", "exec", os.environ["REDIS_CONTAINER"],
-                              "redis-cli", "SETEX", "heartbeat:" + name, "30",
-                              json.dumps(data)], check=True, capture_output=True, text=True)
+              command = ["docker", "exec", os.environ["REDIS_CONTAINER"], "redis-cli"]
+              key = "heartbeat:" + name
+              encoded = json.dumps(data)
+              result = subprocess.run(command + ["SETEX", key, "30", encoded],
+                                      check=True, capture_output=True, text=True)
+              assert result.stdout.strip() == "OK", result.stdout
+              stored = subprocess.run(command + ["--raw", "GET", key],
+                                      check=True, capture_output=True, text=True)
+              assert json.loads(stored.stdout) == data, stored.stdout
 
           for attempt in range(40):
               try:
@@ -109,6 +115,8 @@ jobs:
           assert read("missing")["alive"] is False
 
           # Exercise the read-side guard independently of HTTP ingress.
+          inject("direct-valid", heartbeat("direct-valid", int(time.time())))
+          assert read("direct-valid")["alive"] is True
           for name, data in [
               ("future", heartbeat("future", now + 3600)),
               ("overflow", heartbeat("overflow", 2**63 - 1)),
