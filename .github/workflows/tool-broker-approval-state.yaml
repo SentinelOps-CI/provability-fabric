@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Tool broker approval state
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/tool-broker/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'lean-toolchain'
+      - 'core/lean-libs/Runtime/ApprovalTransition.lean'
+      - '.github/workflows/tool-broker-approval-state.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/tool-broker/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'lean-toolchain'
+      - 'core/lean-libs/Runtime/ApprovalTransition.lean'
+      - '.github/workflows/tool-broker-approval-state.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  approval-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile and execute locked native tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p tool-broker
+          cargo build --locked -p tool-broker
+          cargo tree --locked -p tool-broker --prefix none > "$RUNNER_TEMP/broker-deps.txt"
+          if grep -q '^chrono v' "$RUNNER_TEMP/broker-deps.txt"; then
+            echo "Unexpected Chrono dependency in tool broker closure" >&2
+            exit 1
+          fi
+          grep -Eq '^time v0\.3\.47([[:space:]]|$)' "$RUNNER_TEMP/broker-deps.txt"
+          git diff --exit-code -- Cargo.lock
+      - name: Provision repository Lean toolchain
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          TOOLCHAIN=$(tr -d '\n\r' < lean-toolchain)
+          "$HOME/.elan/bin/elan" toolchain install "$TOOLCHAIN"
+          "$HOME/.elan/bin/elan" override set "$TOOLCHAIN"
+      - name: Check abstract proof obligations and export transition table
+        run: |
+          set -euo pipefail
+          lean --version
+          lean -DwarningAsError=true --run core/lean-libs/Runtime/ApprovalTransition.lean "$RUNNER_TEMP/approval-transitions.tsv" | tee "$RUNNER_TEMP/approval-axioms.txt"
+          for theorem in terminal_immutable stale_pending_expires approval_requires_all fresh_quorum_approves denial_requires_authority observe_never_grants; do
+            grep -F "PF.Runtime.ApprovalTransition.$theorem" "$RUNNER_TEMP/approval-axioms.txt"
+          done
+          if grep -Fq sorryAx "$RUNNER_TEMP/approval-axioms.txt"; then
+            exit 1
+          fi
+          test "$(wc -l < "$RUNNER_TEMP/approval-transitions.tsv")" -eq 120
+      - name: Compare Rust state transitions against the complete Lean reference
+        run: |
+          set -euo pipefail
+          export PF_APPROVAL_LEAN_TABLE="$RUNNER_TEMP/approval-transitions.tsv"
+          cargo test --locked -p tool-broker --bin tool-broker approvals::tests::lean_transition_correspondence -- --ignored --exact --nocapture | tee "$RUNNER_TEMP/approval-correspondence.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/approval-correspondence.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/approval-correspondence.txt"
+          git diff --exit-code -- Cargo.lock
+      - name: Preserve proof and correspondence records
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-broker-approval-transition-evidence
+          path: |
+            ${{ runner.temp }}/approval-transitions.tsv
+            ${{ runner.temp }}/approval-axioms.txt
+            ${{ runner.temp }}/approval-correspondence.txt
+            ${{ runner.temp }}/broker-deps.txt
+          if-no-files-found: error
