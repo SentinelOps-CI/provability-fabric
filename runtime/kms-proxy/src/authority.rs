@@ -238,6 +238,42 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn independently_generated_signature_vectors_preserve_wire_bytes() {
+        // Generated independently using Python struct.pack and cryptography's
+        // Ed25519 implementation. Deterministic test-only issuer; never deployed.
+        let authority = fixture_authority();
+        assert_eq!(STANDARD.encode(authority.key.to_bytes()), "+kg0FH9uaQw2k+/2EzYEZAPNiuKhTzGzxAc1hWkjlWU=");
+        let cases = [
+            ("2023-11-14T23:13:20.250+01:00", Some("test message"),
+             "5d17888cb113df25e91db06d7b815148d539722190c37ab4d5e602e9e71b2972",
+             "zcR8evZPWgDNC4a3Bjo36XYdl0AerIuYcUBpJCoFt85kn4P+XeZR/Rl3/yiFjEGFsXVHxnjSvGwRCgomsE25CA=="),
+            ("1969-12-31T23:59:59.999999999Z", Some("test message"),
+             "3d6d08d9af52abe785180009df79835973f41629737a655042a6ce4c6662d23b",
+             "xY0uDcwfGzWqTO0XXnrE+clDJx2BDMB3GoyX6IXVoBWC3HC7YE/g0AkELYgcSScxZMGfRodGL3V20AUXj3jNCg=="),
+            ("2023-11-14T22:13:20Z", None,
+             "3df09ad7f26f290a1f9d08d0b3864edeee6f21868f87799585e8f0aec8e7ad77",
+             "25/exVr0V9E7Jjazu5gdAtEHRVcjVbPZ3Uq7ex4TlPIuyYpsnCPznay6bAesrLQ8AZWWc6afxRU+dN8zWHbLCQ=="),
+            ("2023-11-14T22:13:20Z", Some(""),
+             "ac467899b5dcefb0b8d48e3f9c1f337cbb6d1742472ebde7005af4d66c5d9843",
+             "lnJj3DpH/kTWsEuYN1+RWVVK8kmzJXZt7vjLqiCoUzybFk9p1Y8TR8YNtXt2b/8OZHg8QOWh1WeUgxkSAHcUCA=="),
+        ];
+        use sha2::{Digest, Sha256};
+        for (wire, data, expected_hash, signature) in cases {
+            let instant = UtcTimestamp::parse(wire).unwrap();
+            let mut request = signed_fixture(instant);
+            request.data = data.map(str::to_owned);
+            request.attestation_token.as_mut().unwrap().signature = signature.into();
+            let token = request.attestation_token.as_ref().unwrap();
+            let message = signed_request_bytes("isolated-test", &request, token).unwrap();
+            assert_eq!(hex::encode(Sha256::digest(message)), expected_hash);
+            assert!(authority.validate_at(&request, instant).valid);
+            // Confirm the new serializer preserves the signed instant.
+            let decoded: KmsRequest = serde_json::from_str(&serde_json::to_string(&request).unwrap()).unwrap();
+            assert!(authority.validate_at(&decoded, instant).valid);
+        }
+    }
+
+    #[test]
     fn malformed_configuration_is_rejected() {
         let key = STANDARD.encode(fixture_key().verifying_key().to_bytes());
         assert!(RequestAuthority::from_config("bad", "a", "p", "pod").is_err());
