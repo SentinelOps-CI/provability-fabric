@@ -293,7 +293,8 @@ services:
     build:
       context: .
       dockerfile: runtime/wasm-sandbox/Dockerfile
-    entrypoint: ["wasm-sandbox", "--help"]
+    entrypoint: ["wasm-sandbox"]
+    command: ["--help"]
     restart: "no"
 
   # Console Web UI (full stack only). Browser uses same-origin /api → nginx → api-gateway.

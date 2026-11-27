@@ -59,7 +59,7 @@ def test_go_dsse_verify() -> None:
 def test_rust_dsse_verify() -> None:
     dsse_rs = REPO_ROOT / "core" / "crypto" / "dsse-rs"
     subprocess.run(
-        ["cargo", "build", "--quiet", "--bin", "dsse-verify", "-p", "pf-dsse"],
+        ["cargo", "build", "--locked", "--quiet", "--bin", "dsse-verify", "-p", "pf-dsse"],
         cwd=REPO_ROOT,
         env=_env(),
         check=True,
@@ -101,7 +101,7 @@ def test_cross_lang_outputs_match() -> None:
     go_result = _run(["go", "run", "./cmd/dsse-verify", str(ENVELOPE)], cwd=dsse_dir)
 
     subprocess.run(
-        ["cargo", "build", "--quiet", "--bin", "dsse-verify", "-p", "pf-dsse"],
+        ["cargo", "build", "--locked", "--quiet", "--bin", "dsse-verify", "-p", "pf-dsse"],
         cwd=REPO_ROOT,
         env=_env(),
         check=True,

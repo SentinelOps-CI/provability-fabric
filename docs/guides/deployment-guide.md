@@ -706,7 +706,8 @@ Docker Compose profiles:
 | _(default)_ | `docker compose up` | `runtime-sidecar` (as `runtime-sidecar`) |
 | `ledger` | `docker compose --profile ledger up` | + `ledger` |
 | `enforcement` | `docker compose --profile enforcement up` | + `egress-firewall` |
-| `full` | `docker compose --profile full up` | + ledger, enforcement, retrieval-gateway, tool-broker, wasm-sandbox, console, demos, monitoring |
+| `full` | `docker compose --profile full up` | + ledger, enforcement, retrieval-gateway, tool-broker, console, demos, monitoring |
+| `tools` | `docker compose --profile tools run --rm wasm-sandbox --help` | One-shot sandbox CLI; no long-running service |
 
 ### Component inventory
 
@@ -717,7 +718,7 @@ Docker Compose profiles:
 | `egress-firewall` | Egress PII/secrets filtering | **wired** (`enforcement` / `full`) | `cargo build -p egress-firewall` |
 | `retrieval-gateway` | Retrieval receipts + ABAC | **wired** (`full`) | `cargo build -p retrieval-gateway` |
 | `tool-broker` | Tool plan broker (demo binary) | **wired** (`full`, batch) | `cargo build -p tool-broker` |
-| `wasm-sandbox` | WASM adapter sandbox CLI | **wired** (`full`, CLI via `compose run`) | `cargo build -p wasm-sandbox` |
+| `wasm-sandbox` | Restricted import-free core WebAssembly CLI (no WASI or host capability access) | **wired** (`tools`, CLI via `compose run`) | `cargo build --locked -p wasm-sandbox` |
 | `labeler` | Proof-carrying JSON path labeler (library) | standalone | `cargo test -p labeler` |
 | `admission-controller` | K8s admission webhook | standalone | `cd runtime/admission-controller && go build .` |
 | `attestor` | TEE attestation helper | standalone | `cargo build -p attestor` |

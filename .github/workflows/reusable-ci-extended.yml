@@ -98,8 +98,20 @@ jobs:
           node-version: "20"
           working-directory: core/crypto/dsse-ts
 
+      - name: Set up pinned Rust for DSSE
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+
       - name: Run cross-language DSSE tests (F01)
-        run: python tests/crypto/test_cross_lang_dsse.py
+        env:
+          RUSTUP_TOOLCHAIN: "1.98.1"
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          python tests/crypto/test_cross_lang_dsse.py
+          git diff --exit-code -- Cargo.lock
 
       - name: Sign spec bundles
         if: github.event_name == 'push'

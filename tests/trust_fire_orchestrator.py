@@ -103,7 +103,7 @@ class TrustFireOrchestrator:
 
             # Run malicious adapter test
             adapter_cmd = [
-                "python",
+                sys.executable,
                 "tests/security/malicious_adapter_test.py",
                 "--registry-path",
                 "registry",
@@ -113,14 +113,13 @@ class TrustFireOrchestrator:
 
             print(f"Executing: {' '.join(adapter_cmd)}")
 
-            # Simulate adapter test execution
-            print("✅ Phase 3 completed successfully")
+            result = subprocess.run(adapter_cmd, check=False, timeout=1600)
             self.phase_results["phase3"] = {
-                "status": "PASS",
-                "prohibited_syscalls_detected": True,
-                "sandbox_logs_found": True,
+                "status": "PASS" if result.returncode == 0 else "FAIL",
+                "exit_code": result.returncode,
+                "scope": "executable sandbox controls",
             }
-            return True
+            return result.returncode == 0
 
         except Exception as e:
             print(f"❌ Phase 3 failed: {e}")

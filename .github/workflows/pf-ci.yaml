@@ -346,6 +346,10 @@ jobs:
       - name: Run TRUST-FIRE Phase 3 (Malicious Adapter Sandbox)
         id: phase_3
         if: contains(fromJSON(steps.phase_selection.outputs.phase_ids), '3')
+        env:
+          # Use the toolchain already installed by the setup action; avoid
+          # implicit rust-toolchain.toml component installation at execution.
+          RUSTUP_TOOLCHAIN: ${{ env.RUST_VERSION }}
         # ci-honesty: justified #275 - keep collecting other phase outcomes and
         # the failure artifact; the later explicit validation gate fails closed.
         continue-on-error: true
