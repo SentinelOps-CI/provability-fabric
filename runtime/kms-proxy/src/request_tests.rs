@@ -149,6 +149,38 @@ async fn real_axum_listener_enforces_authorization_and_routes() {
     task.abort();
 }
 
+#[tokio::test]
+async fn request_body_deadline_rejects_stalled_stream() {
+    let stalled = futures::stream::pending::<Result<axum::body::Bytes, std::io::Error>>();
+    let body = Body::from_stream(stalled);
+    let result = read_body_with_deadline(body, std::time::Duration::from_millis(25)).await;
+    assert_eq!(result.unwrap_err(), StatusCode::REQUEST_TIMEOUT);
+    assert_eq!(read_body_with_deadline(Body::from("ready"), std::time::Duration::from_secs(1))
+        .await.unwrap(), b"ready");
+}
+
+#[tokio::test]
+async fn exhausted_handler_capacity_refuses_work_and_reopens() {
+    let state = HttpState {
+        proxy: Arc::new(proxy(None)),
+        slots: Arc::new(tokio::sync::Semaphore::new(MAX_IN_FLIGHT_REQUESTS)),
+    };
+    let mut slots = Vec::new();
+    for _ in 0..MAX_IN_FLIGHT_REQUESTS {
+        slots.push(state.slots.clone().try_acquire_owned().unwrap());
+    }
+    let request = || axum::http::Request::builder().method(Method::POST)
+        .uri("/kms/sign").body(Body::from("{}")).unwrap();
+    let response = dispatch(State(state.clone()), request()).await;
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    drop(slots.pop().unwrap());
+    let response = dispatch(State(state.clone()), request()).await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(state.slots.available_permits(), 1);
+    drop(slots);
+    assert_eq!(state.slots.available_permits(), MAX_IN_FLIGHT_REQUESTS);
+}
+
 #[test]
 fn endpoint_and_key_constraints() {
     for endpoint in ["https://vault.example", "http://127.0.0.1:8200"] {
