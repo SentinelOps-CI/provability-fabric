@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: Apache-2.0
+# Candidate-only native resolver; replace with locked validation after importing its lockfile.
+name: Patched Kubernetes client candidate
+
+on:
+  pull_request:
+    branches:
+      - security/reqwest-direct-migration-20261124
+    paths:
+      - 'runtime/sidecar-watcher/**'
+      - 'Cargo.lock'
+      - 'scripts/test_kube_ca_isolation.py'
+      - '.github/workflows/kube-patched-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      RUSTUP_TOOLCHAIN: "1.98.1"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Native Cargo resolution
+        run: |
+          set -euo pipefail
+          cargo update -p kube --precise 4.2.1
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/kube-metadata.json"
+          python3 - <<'PY'
+          import json
+          import os
+          import tomllib
+          from pathlib import Path
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "kube-metadata.json").read_text())
+          packages = {p["id"]: p for p in data["packages"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          versions = {}
+          for p in tomllib.loads(Path("Cargo.lock").read_text())["package"]:
+              versions.setdefault(p["name"], set()).add(p["version"])
+          for name, expected in [("kube", "4.2.1"), ("kube-client", "4.2.1"),
+                                 ("kube-core", "4.2.1"), ("k8s-openapi", "0.28.0"),
+                                 ("reqwest", "0.12.28"), ("wasmtime", "36.0.22"),
+                                 ("sqlx", "0.8.6"), ("time", "0.3.47")]:
+              assert versions.get(name) == {expected}, (name, versions.get(name))
+          client = next(i for i,p in packages.items() if p["name"] == "kube-client")
+          assert "rustls-tls" in nodes[client]["features"]
+          assert "ring" in nodes[client]["features"]
+          assert "openssl-tls" not in nodes[client]["features"]
+          seen = set()
+          todo = [client]
+          while todo:
+              node = todo.pop()
+              if node in seen:
+                  continue
+              seen.add(node)
+              todo.extend(d["pkg"] for d in nodes[node]["deps"])
+          assert not any(packages[i]["name"] == "chrono" for i in seen), "Chrono in kube-client closure"
+          print("Patched client and explicit Rustls dependency closure validated")
+          PY
+          sha256sum Cargo.lock
+      - name: Preserve native candidate lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: kube-patched-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Execute privacy guard and sidecar tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher privacy::epsilon_guard::tests:: -- --nocapture
+          cargo test --locked -p sidecar-watcher --lib
+      - name: Execute explicit Kubernetes trust-root isolation controls
+        run: python3 scripts/test_kube_ca_isolation.py
