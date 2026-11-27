@@ -13,11 +13,10 @@ tokio = { version = "1.0", features = ["full", "rt-multi-thread", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
-time = { version = "0.3", features = ["formatting"] }
+time = { version = "=0.3.47", features = ["formatting", "parsing"] }
 tracing-subscriber = "0.3"
 prometheus-client = "0.22"
 reqwest = { version = "=0.12.28", features = ["json"] }
-chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
 sha2 = "0.10"
 axum = { version = "=0.7.9", features = ["http2"] }

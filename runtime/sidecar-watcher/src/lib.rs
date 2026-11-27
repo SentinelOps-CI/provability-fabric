@@ -32,6 +32,7 @@ pub mod safety_case;
 pub mod scheduler;
 pub mod snapshot_storage;
 pub mod time_util;
+pub mod utc_timestamp;
 pub mod witness;
 
 use anyhow::Result;

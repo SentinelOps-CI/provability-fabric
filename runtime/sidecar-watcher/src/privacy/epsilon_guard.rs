@@ -2,6 +2,7 @@
 // Copyright 2025 Provability-Fabric Contributors
 
 use anyhow::{anyhow, Context, Result};
+use sidecar_watcher::utc_timestamp::UtcTimestamp;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,7 @@ pub struct MomentsAccountant {
 pub struct Query {
     pub epsilon: f64,
     pub delta: f64,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 impl MomentsAccountant {
@@ -43,7 +44,7 @@ impl MomentsAccountant {
         let query = Query {
             epsilon,
             delta,
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
         };
         self.queries.push(query);
         self.epsilon = next_epsilon;
@@ -453,6 +454,28 @@ mod tests {
         assert!(guard.check_query("tenant", 0.0, 0.0).await.unwrap());
         assert!(!guard.check_query("tenant", 0.0, f64::MIN_POSITIVE).await.unwrap());
         assert_eq!(guard.accountants.read().await["tenant"].queries.len(), 9);
+    }
+
+    #[test]
+    fn test_privacy_query_timestamp_wire_contract() {
+        let legacy = r#"{"epsilon":0.25,"delta":0.01,"timestamp":"2023-11-14T22:13:20.100Z"}"#;
+        let decoded: Query = serde_json::from_str(legacy).unwrap();
+        assert_eq!(decoded.timestamp.timestamp(), 1_700_000_000);
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), legacy);
+        let offset = legacy.replace("22:13:20.100Z", "23:13:20.100+01:00");
+        assert_eq!(serde_json::from_str::<Query>(&offset).unwrap().timestamp, decoded.timestamp);
+        for malformed in ["2023-02-30T00:00:00Z", "2016-12-31T23:59:60Z", "2023-11-14T22:13:20.1234567891Z"] {
+            assert!(serde_json::from_str::<Query>(&legacy.replace("2023-11-14T22:13:20.100Z", malformed)).is_err());
+        }
+        let mut accountant = MomentsAccountant::new(0.0, 0.0);
+        accountant.add_query(0.25, 0.01).unwrap();
+        assert_eq!(accountant.queries.len(), 1);
+        assert_eq!(accountant.epsilon, 0.25);
+        assert_eq!(accountant.delta, 0.01);
+        let encoded = serde_json::to_string(&accountant).unwrap();
+        let roundtrip: MomentsAccountant = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(roundtrip.queries[0].timestamp, accountant.queries[0].timestamp);
+        assert_eq!((roundtrip.epsilon, roundtrip.delta), (0.25, 0.01));
     }
 
     #[test]

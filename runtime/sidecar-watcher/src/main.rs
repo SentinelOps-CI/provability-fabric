@@ -42,6 +42,7 @@ use sidecar_watcher::egress_cert::{
 };
 use sidecar_watcher::env_config;
 use sidecar_watcher::time_util;
+use sidecar_watcher::utc_timestamp::UtcTimestamp;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Action {
@@ -208,9 +209,6 @@ struct Watcher {
     // HTTP
     http_client: Client,
 
-    // KMS integration
-    kms_proxy_url: String,
-    signing_key_id: String,
 }
 
 impl Watcher {
@@ -260,10 +258,6 @@ impl Watcher {
         let tenant_id = env::var("TENANT_ID").unwrap_or_default();
         let ledger_url =
             env::var("LEDGER_URL").unwrap_or_else(|_| "http://localhost:4000".to_string());
-        let kms_proxy_url =
-            env::var("KMS_PROXY_URL").unwrap_or_else(|_| "http://kms-proxy:8082".to_string());
-        let signing_key_id = env::var("SIGNING_KEY_ID")
-            .unwrap_or_else(|_| "provability-fabric-signing-key".to_string());
         let http_client = Client::new();
 
         Ok(Self {
@@ -280,8 +274,6 @@ impl Watcher {
             tenant_id,
             ledger_url,
             http_client,
-            kms_proxy_url,
-            signing_key_id,
         })
     }
 
@@ -446,10 +438,14 @@ impl Watcher {
     }
 
     fn log_violation(&self, reason: &str) {
+        let Some(timestamp) = UtcTimestamp::now().legacy_offset_wire() else {
+            error!("Guard trip timestamp outside supported domain: {}", reason);
+            return;
+        };
         let trip = GuardTrip {
             event: "guard_trip".to_string(),
             reason: reason.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp,
         };
 
         warn!("Guard trip: {}", reason);
@@ -476,12 +472,16 @@ impl Watcher {
 
         info!("ni_monitor status for prefix {}: {}", prefix_id, status_str);
 
+        let Some(timestamp) = UtcTimestamp::now().legacy_offset_wire() else {
+            error!("NI monitor timestamp outside supported domain");
+            return;
+        };
         // Log to file for audit trail
         let status_event = serde_json::json!({
             "event": "ni_monitor_status",
             "prefix_id": prefix_id,
             "status": status_str,
-            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "timestamp": timestamp,
             "theorem_reference": "ni-bridge",
             "global_ni_claim": "global_non_interference"
         });
@@ -559,48 +559,6 @@ impl Watcher {
         self.metrics.replay_pass_rate.set(pass_rate as i64);
     }
 
-    /// Sign data using KMS proxy
-    async fn sign_with_kms(&self, data: &str) -> Result<String> {
-        let start_time = Instant::now();
-
-        let request_body = serde_json::json!({
-            "operation": "sign",
-            "key_id": self.signing_key_id,
-            "data": data,
-            "attestation_token": {
-                "token": std::env::var("ATTESTATION_TOKEN").unwrap_or_else(|_| "test-attestation-token".to_string()),
-                "pod_identity": self.tenant_id,
-                "policy_hash": self.spec_sig,
-                "timestamp": chrono::Utc::now(),
-                "signature": std::env::var("ATTESTATION_SIG").unwrap_or_else(|_| "test-attestation-sig".to_string())
-            }
-        });
-
-        let response = self
-            .http_client
-            .post(format!("{}/kms/sign", self.kms_proxy_url))
-            .json(&request_body)
-            .send()
-            .await?;
-
-        let duration = start_time.elapsed();
-
-        if response.status().is_success() {
-            let kms_response: serde_json::Value = response.json().await?;
-            if let Some(result) = kms_response.get("result").and_then(|r| r.as_str()) {
-                info!("Successfully signed data with KMS in {:?}", duration);
-                Ok(result.to_string())
-            } else {
-                Err(anyhow::anyhow!("Invalid KMS response format"))
-            }
-        } else {
-            Err(anyhow::anyhow!(
-                "KMS signing failed with status: {}",
-                response.status()
-            ))
-        }
-    }
-
     async fn publish_usage_metrics(&self) -> Result<()> {
         // Allow disabling by leaving LEDGER_URL empty
         if self.ledger_url.trim().is_empty() {
@@ -611,7 +569,7 @@ impl Watcher {
             tenant_id: self.tenant_id.clone(),
             cpu_ms: 100,     // Mock CPU usage
             net_bytes: 1024, // Mock network usage
-            ts: chrono::Utc::now().to_rfc3339(),
+            ts: UtcTimestamp::now().legacy_offset_wire().ok_or_else(|| anyhow::anyhow!("Usage timestamp outside supported domain"))?,
         };
 
         let resp = self
@@ -797,7 +755,7 @@ async fn main() -> Result<()> {
             loop {
                 let body = serde_json::json!({
                     "capsule_hash": capsule_hash,
-                    "timestamp": chrono::Utc::now().timestamp(),
+                    "timestamp": UtcTimestamp::now().timestamp(),
                     "metrics": {
                         "total_actions": 0u64,
                         "violations": 0u64,

@@ -4008,7 +4008,6 @@ dependencies = [
  "arc-swap",
  "axum",
  "blake3",
- "chrono",
  "ed25519-dalek",
  "jsonschema",
  "k8s-openapi",
