@@ -35,11 +35,16 @@ jobs:
           git diff --exit-code -- Cargo.lock
       - name: Verify direct dependency boundary
         run: |
-          cargo tree --locked -p kms-proxy --depth 1 --prefix none > "$RUNNER_TEMP/kms-deps.txt"
+          cargo tree --locked -p kms-proxy --prefix none > "$RUNNER_TEMP/kms-deps.txt"
           cat "$RUNNER_TEMP/kms-deps.txt"
           grep -Eq '^ed25519-dalek v2\.2\.0([[:space:]]|$)' "$RUNNER_TEMP/kms-deps.txt"
           if grep -q '^redis v' "$RUNNER_TEMP/kms-deps.txt"; then
             echo "Unexpected Redis dependency at KMS authority boundary" >&2
             exit 1
           fi
+          if grep -q '^chrono v' "$RUNNER_TEMP/kms-deps.txt"; then
+            echo "Unexpected Chrono dependency in KMS closure" >&2
+            exit 1
+          fi
+          grep -Eq '^time v0\.3\.47([[:space:]]|$)' "$RUNNER_TEMP/kms-deps.txt"
           git diff --exit-code -- Cargo.lock
