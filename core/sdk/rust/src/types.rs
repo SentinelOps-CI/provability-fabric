@@ -61,12 +61,22 @@ impl Timestamp {
 
     /// Check if the timestamp is in the future
     pub fn is_future(&self) -> bool {
-        self.0 > Self::now().0
+        self.is_future_at(Self::now())
+    }
+
+    /// Compare against an explicit reference instant.
+    pub fn is_future_at(&self, reference: Self) -> bool {
+        self.0 > reference.0
     }
 
     /// Check if the timestamp is in the past
     pub fn is_past(&self) -> bool {
-        self.0 < Self::now().0
+        self.is_past_at(Self::now())
+    }
+
+    /// Compare against an explicit reference instant.
+    pub fn is_past_at(&self, reference: Self) -> bool {
+        self.0 < reference.0
     }
 
     /// Check if the timestamp has expired (is in the past)
@@ -583,8 +593,14 @@ mod tests {
     #[test]
     fn test_timestamp() {
         let now = Timestamp::now();
-        assert!(!now.is_expired());
-        assert!(now.is_future() || now.is_past()); // One must be true
+        // Equality is a third case: a timestamp at the current second
+        // is neither past nor future. Test the strict comparison at a
+        // fixed reference instant, independently of wall-clock scheduling.
+        let fixed = Timestamp::from_secs(100);
+        assert!(!fixed.is_future_at(fixed));
+        assert!(!fixed.is_past_at(fixed));
+        assert!(Timestamp::from_secs(101).is_future_at(fixed));
+        assert!(Timestamp::from_secs(99).is_past_at(fixed));
 
         let future = Timestamp::from_secs(now.as_secs() + 3600);
         assert!(future.is_future());

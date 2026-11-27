@@ -10,7 +10,7 @@ on:
       - "**/Cargo.lock"
       - "deny.toml"
   pull_request:
-    branches: [main]
+    branches: [main, security/rust-combined-remediation-20261124]
     paths:
       - "**/Cargo.toml"
       - "**/Cargo.lock"

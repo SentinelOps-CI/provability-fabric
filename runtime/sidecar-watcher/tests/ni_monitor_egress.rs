@@ -3,6 +3,7 @@
  * Copyright 2025 Provability-Fabric Contributors
  */
 
+use ed25519_dalek::SigningKey;
 use sidecar_watcher::egress_cert::{EgressCertificate, WitnessVerification};
 use sidecar_watcher::ni_monitor::{
     NIEvent, NIMonitor, NIMonitorConfig, SecurityLabel,
@@ -17,7 +18,7 @@ fn sample_ni_event() -> NIEvent {
         user_id: "user_123".to_string(),
         operation: "read".to_string(),
         input_labels: vec![SecurityLabel::Internal],
-        output_labels: vec![SecurityLabel::Public],
+        output_labels: vec![SecurityLabel::Internal],
         data_paths: vec!["$.data".to_string()],
         metadata: HashMap::new(),
     }
@@ -28,6 +29,15 @@ fn test_ni_monitor_accepts_valid_event() {
     let mut monitor = NIMonitor::new(NIMonitorConfig::default());
     let result = monitor.monitor_event(sample_ni_event());
     assert!(result.is_ok(), "expected NI monitor to accept valid event");
+}
+
+#[test]
+fn test_ni_monitor_rejects_downward_flow() {
+    let mut monitor = NIMonitor::new(NIMonitorConfig::default());
+    let mut event = sample_ni_event();
+    event.output_labels = vec![SecurityLabel::Public];
+    assert!(monitor.monitor_event(event).is_err());
+    assert_eq!(monitor.get_stats().violation_count, 1);
 }
 
 #[test]
@@ -45,8 +55,13 @@ fn test_egress_certificate_sign_and_verify() {
         witness_hash: "witness".to_string(),
         verification_time_ms: 1,
     };
-    assert!(cert.sign("private-key").is_ok());
-    assert!(cert.verify_signature().unwrap());
+    let key = SigningKey::from_bytes(&[11; 32]);
+    let unrelated = SigningKey::from_bytes(&[12; 32]);
+    cert.sign(&key).unwrap();
+    assert!(cert.verify_signature(&key.verifying_key()).unwrap());
+    assert!(!cert.verify_signature(&unrelated.verifying_key()).unwrap());
+    cert.content.witness_verification.merkle_path_valid = false;
+    assert!(!cert.verify_signature(&key.verifying_key()).unwrap());
 }
 
 #[test]

@@ -2,7 +2,7 @@
 
 use tonic::transport::{Channel, Endpoint};
 use tonic::metadata::MetadataValue;
-use tonic::service::Interceptor;
+use tonic::service::{Interceptor, interceptor::InterceptedService};
 use std::time::Duration;
 
 use crate::error::{Error, Result};
@@ -10,33 +10,42 @@ use crate::generated::{
     policy_kernel_service_client::PolicyKernelServiceClient,
     access_receipt_service_client::AccessReceiptServiceClient,
     egress_firewall_service_client::EgressFirewallServiceClient,
-    safety_case_service_client::SafetyCaseClient,
+    safety_case_service_client::SafetyCaseServiceClient,
 };
 
 /// Authentication interceptor for adding auth headers
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AuthInterceptor {
-    auth_token: MetadataValue<tonic::metadata::Ascii>,
+    auth_token: Option<MetadataValue<tonic::metadata::Ascii>>,
 }
 
 impl AuthInterceptor {
     pub fn new(token: String) -> Result<Self> {
-        let auth_token = MetadataValue::try_from(format!("Bearer {}", token))?;
-        Ok(Self { auth_token })
+        if token.is_empty() || token.bytes().any(|byte| byte.is_ascii_whitespace()) {
+            return Err(Error::auth("Invalid bearer token"));
+        }
+        let mut auth_token = MetadataValue::try_from(format!("Bearer {}", token))
+            .map_err(|_| Error::auth("Invalid bearer metadata"))?;
+        auth_token.set_sensitive(true);
+        Ok(Self { auth_token: Some(auth_token) })
     }
 }
 
 impl Interceptor for AuthInterceptor {
-    fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
-        request.metadata_mut().insert("authorization", self.auth_token.clone());
+    fn call(&mut self, mut request: tonic::Request<()>) -> std::result::Result<tonic::Request<()>, tonic::Status> {
+        if let Some(token) = &self.auth_token {
+            request.metadata_mut().insert("authorization", token.clone());
+        }
         Ok(request)
     }
 }
 
+pub type SdkChannel = InterceptedService<Channel, AuthInterceptor>;
+
 /// Policy Kernel client for plan validation and enforcement
 #[derive(Clone)]
 pub struct PolicyKernelClient {
-    client: PolicyKernelServiceClient<Channel>,
+    client: PolicyKernelServiceClient<SdkChannel>,
 }
 
 impl PolicyKernelClient {
@@ -48,7 +57,7 @@ impl PolicyKernelClient {
             .connect()
             .await?;
 
-        let client = PolicyKernelServiceClient::new(channel);
+        let client = PolicyKernelServiceClient::with_interceptor(channel, AuthInterceptor::default());
         Ok(Self { client })
     }
 
@@ -57,21 +66,20 @@ impl PolicyKernelClient {
         let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
-            .intercept_with(AuthInterceptor::new(auth_token)?)
             .connect()
             .await?;
 
-        let client = PolicyKernelServiceClient::new(channel);
+        let client = PolicyKernelServiceClient::with_interceptor(channel, AuthInterceptor::new(auth_token)?);
         Ok(Self { client })
     }
 
     /// Get the underlying gRPC client
-    pub fn client(&self) -> &PolicyKernelServiceClient<Channel> {
+    pub fn client(&self) -> &PolicyKernelServiceClient<SdkChannel> {
         &self.client
     }
 
     /// Get a mutable reference to the underlying gRPC client
-    pub fn client_mut(&mut self) -> &mut PolicyKernelServiceClient<Channel> {
+    pub fn client_mut(&mut self) -> &mut PolicyKernelServiceClient<SdkChannel> {
         &mut self.client
     }
 }
@@ -79,7 +87,7 @@ impl PolicyKernelClient {
 /// Access Receipt client for data access verification
 #[derive(Clone)]
 pub struct AccessReceiptClient {
-    client: AccessReceiptServiceClient<Channel>,
+    client: AccessReceiptServiceClient<SdkChannel>,
 }
 
 impl AccessReceiptClient {
@@ -91,7 +99,7 @@ impl AccessReceiptClient {
             .connect()
             .await?;
 
-        let client = AccessReceiptServiceClient::new(channel);
+        let client = AccessReceiptServiceClient::with_interceptor(channel, AuthInterceptor::default());
         Ok(Self { client })
     }
 
@@ -100,21 +108,20 @@ impl AccessReceiptClient {
         let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
-            .intercept_with(AuthInterceptor::new(auth_token)?)
             .connect()
             .await?;
 
-        let client = AccessReceiptServiceClient::new(channel);
+        let client = AccessReceiptServiceClient::with_interceptor(channel, AuthInterceptor::new(auth_token)?);
         Ok(Self { client })
     }
 
     /// Get the underlying gRPC client
-    pub fn client(&self) -> &AccessReceiptServiceClient<Channel> {
+    pub fn client(&self) -> &AccessReceiptServiceClient<SdkChannel> {
         &self.client
     }
 
     /// Get a mutable reference to the underlying gRPC client
-    pub fn client_mut(&mut self) -> &mut AccessReceiptServiceClient<Channel> {
+    pub fn client_mut(&mut self) -> &mut AccessReceiptServiceClient<SdkChannel> {
         &mut self.client
     }
 }
@@ -122,7 +129,7 @@ impl AccessReceiptClient {
 /// Egress Firewall client for content scanning
 #[derive(Clone)]
 pub struct EgressFirewallClient {
-    client: EgressFirewallServiceClient<Channel>,
+    client: EgressFirewallServiceClient<SdkChannel>,
 }
 
 impl EgressFirewallClient {
@@ -134,7 +141,7 @@ impl EgressFirewallClient {
             .connect()
             .await?;
 
-        let client = EgressFirewallServiceClient::new(channel);
+        let client = EgressFirewallServiceClient::with_interceptor(channel, AuthInterceptor::default());
         Ok(Self { client })
     }
 
@@ -143,21 +150,20 @@ impl EgressFirewallClient {
         let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
-            .intercept_with(AuthInterceptor::new(auth_token)?)
             .connect()
             .await?;
 
-        let client = EgressFirewallServiceClient::new(channel);
+        let client = EgressFirewallServiceClient::with_interceptor(channel, AuthInterceptor::new(auth_token)?);
         Ok(Self { client })
     }
 
     /// Get the underlying gRPC client
-    pub fn client(&self) -> &EgressFirewallServiceClient<Channel> {
+    pub fn client(&self) -> &EgressFirewallServiceClient<SdkChannel> {
         &self.client
     }
 
     /// Get a mutable reference to the underlying gRPC client
-    pub fn client_mut(&mut self) -> &mut EgressFirewallServiceClient<Channel> {
+    pub fn client_mut(&mut self) -> &mut EgressFirewallServiceClient<SdkChannel> {
         &mut self.client
     }
 }
@@ -165,7 +171,7 @@ impl EgressFirewallClient {
 /// Safety Case client for AI system validation
 #[derive(Clone)]
 pub struct SafetyCaseClient {
-    client: SafetyCaseClient<Channel>,
+    client: SafetyCaseServiceClient<SdkChannel>,
 }
 
 impl SafetyCaseClient {
@@ -177,7 +183,7 @@ impl SafetyCaseClient {
             .connect()
             .await?;
 
-        let client = SafetyCaseClient::new(channel);
+        let client = SafetyCaseServiceClient::with_interceptor(channel, AuthInterceptor::default());
         Ok(Self { client })
     }
 
@@ -186,21 +192,20 @@ impl SafetyCaseClient {
         let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(Duration::from_secs(30))
             .connect_timeout(Duration::from_secs(10))
-            .intercept_with(AuthInterceptor::new(auth_token)?)
             .connect()
             .await?;
 
-        let client = SafetyCaseClient::new(channel);
+        let client = SafetyCaseServiceClient::with_interceptor(channel, AuthInterceptor::new(auth_token)?);
         Ok(Self { client })
     }
 
     /// Get the underlying gRPC client
-    pub fn client(&self) -> &SafetyCaseClient<Channel> {
+    pub fn client(&self) -> &SafetyCaseServiceClient<SdkChannel> {
         &self.client
     }
 
     /// Get a mutable reference to the underlying gRPC client
-    pub fn client_mut(&mut self) -> &mut SafetyCaseClient<Channel> {
+    pub fn client_mut(&mut self) -> &mut SafetyCaseServiceClient<SdkChannel> {
         &mut self.client
     }
 }
@@ -301,69 +306,65 @@ impl ClientBuilder {
 
     /// Build a Policy Kernel client
     pub async fn build_policy_kernel_client(self, addr: &str) -> Result<PolicyKernelClient> {
-        let mut endpoint = Endpoint::from_shared(addr.to_string())?
+        let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(self.config.request_timeout)
             .connect_timeout(self.config.connect_timeout)
-            .max_message_size(self.config.max_message_size);
-
+            .connect().await?;
+        let mut client = PolicyKernelServiceClient::with_interceptor(channel, AuthInterceptor::default())
+            .max_decoding_message_size(self.config.max_message_size)
+            .max_encoding_message_size(self.config.max_message_size);
         if self.config.enable_compression {
-            endpoint = endpoint.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+            client = client.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
                 .send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
-
-        let channel = endpoint.connect().await?;
-        let client = PolicyKernelServiceClient::new(channel);
         Ok(PolicyKernelClient { client })
     }
 
     /// Build an Access Receipt client
     pub async fn build_access_receipt_client(self, addr: &str) -> Result<AccessReceiptClient> {
-        let mut endpoint = Endpoint::from_shared(addr.to_string())?
+        let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(self.config.request_timeout)
             .connect_timeout(self.config.connect_timeout)
-            .max_message_size(self.config.max_message_size);
-
+            .connect().await?;
+        let mut client = AccessReceiptServiceClient::with_interceptor(channel, AuthInterceptor::default())
+            .max_decoding_message_size(self.config.max_message_size)
+            .max_encoding_message_size(self.config.max_message_size);
         if self.config.enable_compression {
-            endpoint = endpoint.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+            client = client.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
                 .send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
-
-        let channel = endpoint.connect().await?;
-        let client = AccessReceiptServiceClient::new(channel);
         Ok(AccessReceiptClient { client })
     }
 
     /// Build an Egress Firewall client
     pub async fn build_egress_firewall_client(self, addr: &str) -> Result<EgressFirewallClient> {
-        let mut endpoint = Endpoint::from_shared(addr.to_string())?
+        let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(self.config.request_timeout)
             .connect_timeout(self.config.connect_timeout)
-            .max_message_size(self.config.max_message_size);
-
+            .connect().await?;
+        let mut client = EgressFirewallServiceClient::with_interceptor(channel, AuthInterceptor::default())
+            .max_decoding_message_size(self.config.max_message_size)
+            .max_encoding_message_size(self.config.max_message_size);
         if self.config.enable_compression {
-            endpoint = endpoint.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+            client = client.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
                 .send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
-
-        let channel = endpoint.connect().await?;
-        let client = EgressFirewallServiceClient::new(channel);
         Ok(EgressFirewallClient { client })
     }
 
     /// Build a Safety Case client
     pub async fn build_safety_case_client(self, addr: &str) -> Result<SafetyCaseClient> {
-        let mut endpoint = Endpoint::from_shared(addr.to_string())?
+        let channel = Endpoint::from_shared(addr.to_string())?
             .timeout(self.config.request_timeout)
             .connect_timeout(self.config.connect_timeout)
-            .max_message_size(self.config.max_message_size);
-
+            .connect().await?;
+        let mut client = SafetyCaseServiceClient::with_interceptor(channel, AuthInterceptor::default())
+            .max_decoding_message_size(self.config.max_message_size)
+            .max_encoding_message_size(self.config.max_message_size);
         if self.config.enable_compression {
-            endpoint = endpoint.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+            client = client.accept_compressed(tonic::codec::CompressionEncoding::Gzip)
                 .send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
-
-        let channel = endpoint.connect().await?;
-        let client = SafetyCaseClient::new(channel);
         Ok(SafetyCaseClient { client })
     }
 }
@@ -398,5 +399,69 @@ mod tests {
         assert_eq!(builder.config.request_timeout, config.request_timeout);
         assert_eq!(builder.config.max_message_size, config.max_message_size);
         assert_eq!(builder.config.enable_compression, config.enable_compression);
+    }
+}
+
+#[cfg(test)]
+mod rpc_tests {
+    use super::*;
+    use crate::generated::{self as wire, access_receipt_service_server::{AccessReceiptService, AccessReceiptServiceServer}};
+    use tonic::{Request, Response, Status};
+    use tokio_stream::wrappers::TcpListenerStream;
+
+    #[derive(Default)]
+    struct Fixture;
+
+    #[tonic::async_trait]
+    impl AccessReceiptService for Fixture {
+        async fn create_receipt(&self, _: Request<wire::CreateReceiptRequest>) -> std::result::Result<Response<wire::CreateReceiptResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn verify_receipt(&self, _: Request<wire::VerifyReceiptRequest>) -> std::result::Result<Response<wire::VerifyReceiptResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn revoke_receipt(&self, _: Request<wire::RevokeReceiptRequest>) -> std::result::Result<Response<wire::RevokeReceiptResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn get_receipt(&self, _: Request<wire::GetReceiptRequest>) -> std::result::Result<Response<wire::GetReceiptResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn list_receipts(&self, _: Request<wire::ListReceiptsRequest>) -> std::result::Result<Response<wire::ListReceiptsResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn batch_verify_receipts(&self, _: Request<wire::BatchVerifyReceiptsRequest>) -> std::result::Result<Response<wire::BatchVerifyReceiptsResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn get_receipt_stats(&self, _: Request<wire::GetReceiptStatsRequest>) -> std::result::Result<Response<wire::GetReceiptStatsResponse>, Status> {
+            Err(Status::unimplemented("fixture"))
+        }
+        async fn health_check(&self, request: Request<wire::HealthCheckRequest>) -> std::result::Result<Response<wire::HealthCheckResponse>, Status> {
+            if request.metadata().get("authorization").and_then(|v| v.to_str().ok()) != Some("Bearer fixture-token") {
+                return Err(Status::unauthenticated("missing or invalid fixture authorization"));
+            }
+            Ok(Response::new(wire::HealthCheckResponse {
+                version: "fixture".into(), ..Default::default()
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_real_grpc_authorization_and_dispatch() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(AccessReceiptServiceServer::new(Fixture))
+                .serve_with_incoming(TcpListenerStream::new(listener)).await.unwrap();
+        });
+        let addr = format!("http://{address}");
+        let mut unauth = AccessReceiptClient::new(&addr).await.unwrap();
+        let failure = unauth.client_mut().health_check(wire::HealthCheckRequest::default()).await.unwrap_err();
+        assert_eq!(failure.code(), tonic::Code::Unauthenticated);
+        let mut auth = AccessReceiptClient::new_with_auth(&addr, "fixture-token".into()).await.unwrap();
+        let response = auth.client_mut().health_check(wire::HealthCheckRequest::default()).await.unwrap().into_inner();
+        assert_eq!(response.version, "fixture");
+        assert!(AuthInterceptor::new("bad\nvalue".into()).is_err());
+        server.abort();
     }
 }

@@ -15,7 +15,7 @@
  */
 
 use serde_json;
-use sidecar_watcher::dfa::{DFAInterpreter, DFATable, RateLimit, Transition};
+use sidecar_watcher::dfa::{DFAInterpreter, DFATable, OptimizedDFA, RateLimit, Transition};
 use std::fs;
 use std::path::Path;
 
@@ -193,185 +193,145 @@ mod property_tests {
     }
 }
 
-/// Integration test for round-trip equivalence with 5k seeded traces
-#[test]
-fn test_round_trip_equivalence_5k() {
-    let table = DFATable {
-        states: vec![0, 1, 2, 3, 4],
-        start: 0,
-        accepting: vec![0, 2, 4],
-        transitions: vec![
-            Transition {
-                from_state: 0,
-                event: "call(tool1,hash1)".to_string(),
-                to_state: 1,
-            },
-            Transition {
-                from_state: 1,
-                event: "log(hash2)".to_string(),
-                to_state: 2,
-            },
-            Transition {
-                from_state: 2,
-                event: "declassify(high,low,item1)".to_string(),
-                to_state: 3,
-            },
-            Transition {
-                from_state: 3,
-                event: "emit(plan1)".to_string(),
-                to_state: 4,
-            },
-            Transition {
-                from_state: 4,
-                event: "retrieve(source1,receipt1)".to_string(),
-                to_state: 0,
-            },
-            Transition {
-                from_state: 0,
-                event: "call(tool2,hash3)".to_string(),
-                to_state: 2,
-            },
-            Transition {
-                from_state: 2,
-                event: "call(tool3,hash4)".to_string(),
-                to_state: 4,
-            },
-        ],
-        rate_limits: vec![
-            RateLimit {
-                tool: "tool1".to_string(),
-                window_ms: 1000,
-                bound: 5,
-            },
-            RateLimit {
-                tool: "tool2".to_string(),
-                window_ms: 5000,
-                bound: 20,
-            },
-            RateLimit {
-                tool: "egress".to_string(),
-                window_ms: 60000,
-                bound: 100,
-            },
-            RateLimit {
-                tool: "declassify".to_string(),
-                window_ms: 300000,
-                bound: 10,
-            },
-            RateLimit {
-                tool: "retrieve".to_string(),
-                window_ms: 3600000,
-                bound: 50,
-            },
-        ],
-    };
-
-    // Generate 5000 test traces for comprehensive testing
-    let traces = generate_seeded_traces(42, 5000);
-    let mismatches = 0;
-    let mut total_traces = 0;
-
-    for (i, trace) in traces.iter().enumerate() {
-        total_traces += 1;
-        let (final_state, _accepted, violations) = run_rust_interpreter(&table, trace);
-
-        // Verify basic properties
-        assert!(final_state < 5, "Invalid final state: {}", final_state);
-
-        // Check that violations are reasonable
-        for violation in &violations {
-            assert!(
-                violation.contains("Rate limit exceeded") || violation.contains("Transition error"),
-                "Unexpected violation in trace {}: {}",
-                i,
-                violation
-            );
-        }
-
-        // In a real test, we would compare with Lean reference output
-        // For now, we just count total traces processed
-        if i % 1000 == 0 {
-            println!("Processed {} traces...", i);
-        }
+/// Table-scanning reference for exact transitions and closed rate windows.
+/// This is a Rust reference comparison, not Lean equivalence evidence.
+fn compare_against_reference(table: &DFATable, events: &[(String, u64)]) -> (usize, usize) {
+    let mut legacy = DFAInterpreter::from_table(table.clone());
+    let mut indexed = OptimizedDFA::from_table(table.clone()).unwrap();
+    let mut state = table.start;
+    let mut histories: Vec<Vec<u64>> = vec![Vec::new(); table.rate_limits.len()];
+    let mut accepted = 0;
+    let mut denied = 0;
+    for (event, time) in events {
+        let next = table.transitions.iter()
+            .find(|edge| edge.from_state == state && edge.event == *event)
+            .map(|edge| edge.to_state);
+        assert_eq!(indexed.step(state, event), next);
+        let limited = table.rate_limits.iter().enumerate().any(|(i, limit)| {
+            event.contains(&limit.tool) && histories[i].iter()
+                .filter(|t| **t >= time.saturating_sub(limit.window_ms as u64))
+                .count() >= limit.bound as usize
+        });
+        let expected = if limited {
+            Err("Rate limit exceeded".to_string())
+        } else if let Some(next) = next {
+            state = next;
+            for (i, limit) in table.rate_limits.iter().enumerate() {
+                if event.contains(&limit.tool) {
+                    histories[i].push(*time);
+                    histories[i].retain(|t| *t >= time.saturating_sub(limit.window_ms as u64));
+                }
+            }
+            Ok(true)
+        } else {
+            Err(format!("No transition for state {} with event {}", state, event))
+        };
+        assert_eq!(legacy.process_event(event, *time), expected);
+        assert_eq!(indexed.process_event(event, *time), expected);
+        assert_eq!(legacy.current_state(), state);
+        assert_eq!(indexed.current_state(), state);
+        assert_eq!(legacy.is_accepting(), table.accepting.contains(&state));
+        assert_eq!(indexed.is_accepting(state), table.accepting.contains(&state));
+        if expected.is_ok() { accepted += 1; } else { denied += 1; }
     }
-
-    assert_eq!(
-        mismatches, 0,
-        "Found {} mismatches with Lean reference across {} traces",
-        mismatches, total_traces
-    );
-    assert_eq!(
-        total_traces, 5000,
-        "Expected 5000 traces, got {}",
-        total_traces
-    );
+    (accepted, denied)
 }
 
-/// Integration test for round-trip equivalence with 100 traces (backward compatibility)
-#[test]
-fn test_round_trip_equivalence_100() {
-    let table = DFATable {
-        states: vec![0, 1, 2],
-        start: 0,
-        accepting: vec![0, 1, 2],
+fn reference_table() -> DFATable {
+    DFATable {
+        states: vec![900, 42, 7, 256],
+        start: 42,
+        accepting: vec![42, 900],
         transitions: vec![
-            Transition {
-                from_state: 0,
-                event: "call(tool1,hash1)".to_string(),
-                to_state: 1,
-            },
-            Transition {
-                from_state: 1,
-                event: "log(hash2)".to_string(),
-                to_state: 2,
-            },
-            Transition {
-                from_state: 2,
-                event: "emit(plan1)".to_string(),
-                to_state: 0,
-            },
+            Transition { from_state: 42, event: "call(tool1,hash1)".into(), to_state: 7 },
+            Transition { from_state: 7, event: "call(tool2,hash1)".into(), to_state: 256 },
+            Transition { from_state: 7, event: "call(tool1,hash1)".into(), to_state: 7 },
+            Transition { from_state: 256, event: "log(hash1)".into(), to_state: 900 },
+            Transition { from_state: 256, event: "log(hash2)".into(), to_state: 42 },
+            Transition { from_state: 900, event: "emit(plan1)".into(), to_state: 42 },
         ],
-        rate_limits: vec![
-            RateLimit {
-                tool: "tool1".to_string(),
-                window_ms: 1000,
-                bound: 10,
-            },
-            RateLimit {
-                tool: "egress".to_string(),
-                window_ms: 5000,
-                bound: 1024,
-            },
-        ],
-    };
+        rate_limits: vec![RateLimit { tool: "tool1".into(), window_ms: 1000, bound: 2 }],
+    }
+}
 
-    // Generate 100 test traces
-    let traces = generate_seeded_traces(42, 100);
-    let mismatches = 0;
-
-    for (i, trace) in traces.iter().enumerate() {
-        let (final_state, accepted, violations) = run_rust_interpreter(&table, trace);
-
-        // In a real test, we would compare with Lean reference output
-        // For now, just verify basic properties
-        assert!(final_state < 3, "Invalid final state: {}", final_state);
-        assert!(accepted, "Trace {} should be accepting", i);
-
-        // Check that violations are reasonable
-        for violation in &violations {
-            assert!(
-                violation.contains("Rate limit exceeded") || violation.contains("Transition error"),
-                "Unexpected violation: {}",
-                violation
-            );
+/// The candidate CI independently regenerates this complete matrix with
+/// Lean. This test binds each expected transition to both Rust interpreters.
+#[test]
+fn test_lean_reference_matrix() {
+    let table = reference_table();
+    let indexed = OptimizedDFA::from_table(table.clone()).unwrap();
+    let mut seen = std::collections::HashSet::new();
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for line in include_str!("fixtures/dfa_lean_matrix.tsv").lines() {
+        let fields: Vec<_> = line.split('\t').collect();
+        assert_eq!(fields.len(), 3);
+        let state: u32 = fields[0].parse().unwrap();
+        let event = fields[1];
+        assert!(seen.insert((state, event)), "duplicate matrix case");
+        let expected = if fields[2] == "reject" {
+            rejected += 1;
+            None
+        } else {
+            accepted += 1;
+            Some(fields[2].parse::<u32>().unwrap())
+        };
+        assert_eq!(indexed.step(state, event), expected, "state={state} event={event}");
+        if table.states.contains(&state) {
+            let mut initial = table.clone();
+            initial.start = state;
+            // Isolate transition semantics from rate-limit history.
+            initial.rate_limits.clear();
+            let mut legacy = DFAInterpreter::from_table(initial);
+            let result = legacy.process_event(event, 0);
+            assert_eq!(result.is_ok(), expected.is_some());
+            assert_eq!(legacy.current_state(), expected.unwrap_or(state));
+        } else {
+            assert!(expected.is_none());
         }
     }
+    assert_eq!((seen.len(), accepted, rejected), (40, 6, 34));
+}
 
-    assert_eq!(
-        mismatches, 0,
-        "Found {} mismatches with Lean reference",
-        mismatches
-    );
+#[test]
+fn test_indexed_reference_equivalence_5k() {
+    let table = reference_table();
+    let alphabet = [
+        "call(tool1,hash1)", "call(tool2,hash1)", "call(tool1,hash2)",
+        "log(hash1)", "log(hash2)", "emit(plan1)", "emit(plan2)", "unknown",
+    ];
+    let mut seed = 42u64;
+    let mut totals = (0, 0);
+    for _ in 0..5000 {
+        let mut trace = Vec::new();
+        for i in 0..24 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let event = alphabet[(seed >> 32) as usize % alphabet.len()];
+            trace.push((event.to_string(), 1000 + i * 150));
+        }
+        let (accepted, denied) = compare_against_reference(&table, &trace);
+        totals.0 += accepted;
+        totals.1 += denied;
+    }
+    assert_eq!(totals.0 + totals.1, 120_000);
+    assert!(totals.0 > 0 && totals.1 > 0);
+}
+
+#[test]
+fn test_indexed_reference_rate_limit_boundary_and_distinct_symbols() {
+    let table = reference_table();
+    let trace = [
+        ("call(tool1,hash1)", 1000), ("call(tool1,hash1)", 1500),
+        ("call(tool1,hash1)", 2000), ("call(tool1,hash1)", 2001),
+        ("call(tool2,hash1)", 2002), ("log(hash2)", 2003),
+        ("log(hash1)", 2004), ("call(tool1,hash2)", 4000),
+        ("call(tool1,hash1)", 4001), ("call(tool2,hash1)", 4002),
+        ("log(hash1)", 4003), ("emit(plan1)", 4004),
+    ].into_iter().map(|(event, time)| (event.to_string(), time)).collect::<Vec<_>>();
+    assert_eq!(compare_against_reference(&table, &trace), (9, 3));
+    let mut invalid = table.clone();
+    invalid.transitions.push(invalid.transitions[0].clone());
+    assert!(OptimizedDFA::from_table(invalid).is_err());
 }
 
 /// Test for deny-wins semantics

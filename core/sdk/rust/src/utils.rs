@@ -62,7 +62,7 @@ pub fn validate_uuid(uuid: &str) -> bool {
             r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         ).unwrap();
     }
-    UUID_REGEX.is_match(uuid.to_lowercase())
+    UUID_REGEX.is_match(&uuid.to_ascii_lowercase())
 }
 
 /// Validate hash format
@@ -73,14 +73,14 @@ pub fn validate_hash(hash: &str) -> bool {
             r"^(sha256|sha512|blake3):[a-f0-9]{64,128}$"
         ).unwrap();
     }
-    HASH_REGEX.is_match(hash.to_lowercase())
+    HASH_REGEX.is_match(&hash.to_ascii_lowercase())
 }
 
 /// Validate timestamp format
 pub fn validate_timestamp(timestamp: &str) -> bool {
-    use chrono::{DateTime, Utc};
-    DateTime::parse_from_rfc3339(timestamp).is_ok() || 
-    DateTime::parse_from_rfc2822(timestamp).is_ok() ||
+    use time::{format_description::well_known::{Rfc2822, Rfc3339}, OffsetDateTime};
+    OffsetDateTime::parse(timestamp, &Rfc3339).is_ok() ||
+    OffsetDateTime::parse(timestamp, &Rfc2822).is_ok() ||
     timestamp.parse::<i64>().is_ok()
 }
 
@@ -95,19 +95,22 @@ pub fn parse_duration(duration_str: &str) -> Result<Duration> {
             'h' => {
                 let hours: u64 = current_number.parse()
                     .map_err(|_| Error::invalid_argument("Invalid hours format"))?;
-                total_seconds += hours * 3600;
+                total_seconds = hours.checked_mul(3600).and_then(|value| total_seconds.checked_add(value))
+                    .ok_or_else(|| Error::invalid_argument("Duration overflow"))?;
                 current_number.clear();
             }
             'm' => {
                 let minutes: u64 = current_number.parse()
                     .map_err(|_| Error::invalid_argument("Invalid minutes format"))?;
-                total_seconds += minutes * 60;
+                total_seconds = minutes.checked_mul(60).and_then(|value| total_seconds.checked_add(value))
+                    .ok_or_else(|| Error::invalid_argument("Duration overflow"))?;
                 current_number.clear();
             }
             's' => {
                 let seconds: u64 = current_number.parse()
                     .map_err(|_| Error::invalid_argument("Invalid seconds format"))?;
-                total_seconds += seconds;
+                total_seconds = seconds.checked_mul(1).and_then(|value| total_seconds.checked_add(value))
+                    .ok_or_else(|| Error::invalid_argument("Duration overflow"))?;
                 current_number.clear();
             }
             _ => return Err(Error::invalid_argument("Invalid duration format")),
@@ -154,8 +157,11 @@ where
     Fut: std::future::Future<Output = std::result::Result<T, E>>,
     E: std::fmt::Debug,
 {
+    if max_attempts == 0 {
+        return Err(Error::invalid_argument("Retry attempts must be positive"));
+    }
     let mut attempt = 1;
-    let mut delay = base_delay;
+    let mut delay = base_delay.min(max_delay);
     
     loop {
         match operation().await {
@@ -171,7 +177,7 @@ where
                 tokio::time::sleep(delay).await;
                 
                 attempt += 1;
-                delay = std::cmp::min(delay * 2, max_delay);
+                delay = delay.saturating_mul(2).min(max_delay);
             }
         }
     }
@@ -221,25 +227,34 @@ pub fn format_bytes(bytes: u64) -> String {
 /// Convert human-readable bytes to u64
 pub fn parse_bytes(bytes_str: &str) -> Result<u64> {
     let bytes_str = bytes_str.trim();
-    let (number_str, unit) = bytes_str.split_at(
-        bytes_str.chars()
-            .position(|c| !c.is_ascii_digit() && c != '.')
+    let (number, unit) = bytes_str.split_at(
+        bytes_str.bytes().position(|b| !b.is_ascii_digit() && b != b'.')
             .unwrap_or(bytes_str.len())
     );
-    
-    let number: f64 = number_str.parse()
-        .map_err(|_| Error::invalid_argument("Invalid number format"))?;
-    
-    let multiplier = match unit.to_uppercase().as_str() {
+    let multiplier: u128 = match unit.trim().to_ascii_uppercase().as_str() {
         "B" | "" => 1,
-        "KB" => 1024,
-        "MB" => 1024 * 1024,
-        "GB" => 1024 * 1024 * 1024,
-        "TB" => 1024 * 1024 * 1024 * 1024,
+        "KB" => 1 << 10,
+        "MB" => 1 << 20,
+        "GB" => 1 << 30,
+        "TB" => 1 << 40,
         _ => return Err(Error::invalid_argument("Invalid unit format")),
     };
-    
-    Ok((number * multiplier as f64) as u64)
+    let invalid = || Error::invalid_argument("Invalid or overflowing byte count");
+    let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
+    if whole.is_empty() && fraction.is_empty() || fraction.len() > 38 ||
+        !whole.bytes().chain(fraction.bytes()).all(|b| b.is_ascii_digit()) {
+        return Err(invalid());
+    }
+    let integer: u128 = if whole.is_empty() { 0 } else { whole.parse().map_err(|_| invalid())? };
+    let integer_bytes = integer.checked_mul(multiplier).ok_or_else(invalid)?;
+    // Fractional bytes are rounded down, as in the original conversion.
+    let fractional_bytes = if fraction.is_empty() { 0 } else {
+        let numerator: u128 = fraction.parse().map_err(|_| invalid())?;
+        let denominator = 10u128.checked_pow(fraction.len() as u32).ok_or_else(invalid)?;
+        numerator.checked_mul(multiplier).ok_or_else(invalid)? / denominator
+    };
+    u64::try_from(integer_bytes.checked_add(fractional_bytes).ok_or_else(invalid)?)
+        .map_err(|_| invalid())
 }
 
 /// Generate a random string
@@ -254,24 +269,36 @@ pub fn generate_random_string(length: usize) -> String {
 
 /// Generate a secure random string
 pub fn generate_secure_random_string(length: usize) -> Result<String> {
-    use rand::{distributions::Alphanumeric, Rng};
-    let mut rng = rand::rngs::OsRng::new()
-        .map_err(|_| Error::internal("Failed to initialize secure RNG"))?;
-    
-    Ok(rng
-        .sample_iter(&Alphanumeric)
-        .take(length)
-        .map(char::from)
-        .collect())
+    use rand::RngCore;
+    const ALPHABET: &[u8; 62] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::rngs::OsRng;
+    let mut output = String::new();
+    output.try_reserve_exact(length).map_err(|_| Error::internal("Random string allocation failed"))?;
+    let mut bytes = [0u8; 64];
+    while output.len() < length {
+        rng.try_fill_bytes(&mut bytes).map_err(|_| Error::internal("Secure RNG failed"))?;
+        for byte in bytes {
+            // 248 is a multiple of 62: rejection sampling avoids modulo bias.
+            if byte < 248 {
+                output.push(ALPHABET[(byte % 62) as usize] as char);
+                if output.len() == length { break; }
+            }
+        }
+    }
+    Ok(output)
 }
 
 /// Truncate string to specified length
 pub fn truncate_string(s: &str, max_length: usize) -> String {
     if s.len() <= max_length {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_length - 3])
+        return s.to_string();
     }
+    if max_length < 3 {
+        return ".".repeat(max_length);
+    }
+    let mut end = max_length - 3;
+    while !s.is_char_boundary(end) { end -= 1; }
+    format!("{}...", &s[..end])
 }
 
 /// Escape special characters in string
@@ -437,18 +464,42 @@ mod tests {
     }
 
     #[test]
+    fn test_timestamp_formats() {
+        for value in [
+            "2026-11-27T15:00:00Z", "2026-11-27T15:00:00.123456789Z",
+            "2026-11-28T00:00:00+09:00", "Fri, 27 Nov 2026 15:00:00 +0000",
+            "0", "-1", "9223372036854775807", "-9223372036854775808",
+        ] {
+            assert!(validate_timestamp(value), "rejected {value}");
+        }
+        for value in [
+            "", "2026-02-30T15:00:00Z", "2026-11-27T25:00:00Z",
+            "2026-11-27T15:00:00", "9223372036854775808", "not-a-timestamp",
+        ] {
+            assert!(!validate_timestamp(value), "accepted {value}");
+        }
+    }
+
+    #[test]
     fn test_parse_bytes() {
         assert_eq!(parse_bytes("1 KB").unwrap(), 1024);
         assert_eq!(parse_bytes("1.5 MB").unwrap(), 1572864);
         assert_eq!(parse_bytes("500 B").unwrap(), 500);
         
         assert!(parse_bytes("invalid").is_err());
+        assert_eq!(parse_bytes("1 TB").unwrap(), 1u64 << 40);
+        assert_eq!(parse_bytes("18446744073709551615 B").unwrap(), u64::MAX);
+        assert!(parse_bytes("18446744073709551616 B").is_err());
+        assert!(parse_duration("18446744073709551615h").is_err());
+        assert!(parse_duration("18446744073709551615s1s").is_err());
     }
 
     #[test]
     fn test_truncate_string() {
         assert_eq!(truncate_string("Hello World", 8), "Hello...");
         assert_eq!(truncate_string("Short", 10), "Short");
+        assert_eq!(truncate_string("éééé", 4), "...");
+        assert_eq!(truncate_string("long", 1), ".");
     }
 
     #[test]
@@ -478,12 +529,11 @@ mod tests {
     async fn test_retry_with_backoff() {
         let mut attempts = 0;
         let result = retry_with_backoff(
-            || async {
+            || {
                 attempts += 1;
-                if attempts < 3 {
-                    Err("temporary failure")
-                } else {
-                    Ok("success")
+                let attempt = attempts;
+                async move {
+                    if attempt < 3 { Err("temporary failure") } else { Ok("success") }
                 }
             },
             3,

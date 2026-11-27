@@ -129,9 +129,16 @@ impl AsyncSigningPipeline {
         &self,
         request: SigningRequest,
     ) -> Result<(), Box<mpsc::error::SendError<SigningRequest>>> {
+        // Reserve capacity first: cancellation or a closed channel must not
+        // increment counters for requests that were never admitted.
+        let permit = match self.request_tx.reserve().await {
+            Ok(permit) => permit,
+            Err(_) => return Err(Box::new(mpsc::error::SendError(request))),
+        };
         self.metrics.total_requests.fetch_add(1, Ordering::Relaxed);
         self.metrics.queue_size.fetch_add(1, Ordering::Relaxed);
-        self.request_tx.send(request).await.map_err(Box::new)
+        permit.send(request);
+        Ok(())
     }
 
     /// Get signing result
@@ -368,39 +375,24 @@ impl BatchVerifier {
 
         // Spawn the batch processing worker
         tokio::spawn(async move {
-            let mut pending_requests: Vec<VerificationRequest> = Vec::new();
-            let mut last_batch_time = Instant::now();
-
-            while let Some(request) = rx.recv().await {
-                pending_requests.push(request);
-
-                let should_process = pending_requests.len() >= config.batch_size
-                    || last_batch_time.elapsed() >= config.batch_timeout;
-
-                if should_process && !pending_requests.is_empty() {
-                    let batch = std::mem::take(&mut pending_requests);
-                    last_batch_time = Instant::now();
-
-                    // Process batch in parallel
-                    let results =
-                        Self::process_batch_parallel(batch, config.max_parallel_batches).await;
-
-                    // Send results back
-                    for result in results {
-                        if result_tx.send(result).await.is_err() {
-                            break;
-                        }
+            // The deadline is measured from the first request in each batch.
+            // Do not wait for another request to notice an expired deadline.
+            while let Some(first) = rx.recv().await {
+                let mut batch = vec![first];
+                let deadline = tokio::time::Instant::now() + config.batch_timeout;
+                while batch.len() < config.batch_size.max(1) {
+                    match tokio::time::timeout_at(deadline, rx.recv()).await {
+                        Ok(Some(request)) => batch.push(request),
+                        Ok(None) | Err(_) => break,
                     }
                 }
-            }
 
-            // Process any remaining requests
-            if !pending_requests.is_empty() {
                 let results =
-                    Self::process_batch_parallel(pending_requests, config.max_parallel_batches)
-                        .await;
+                    Self::process_batch_parallel(batch, config.max_parallel_batches.max(1)).await;
                 for result in results {
-                    let _ = result_tx.send(result).await;
+                    if result_tx.send(result).await.is_err() {
+                        return;
+                    }
                 }
             }
         });
@@ -669,10 +661,24 @@ mod tests {
         assert!(result.is_ok());
 
         // Wait for results
-        let results = verifier.wait_for_results(Duration::from_millis(100)).await;
-        assert!(!results.is_empty());
+        let results = verifier.wait_for_results(Duration::from_secs(1)).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].request_id, "test_id");
+        assert!(results[0].valid);
+        assert!(results[0].error.is_none());
 
-        // Clean up
+        // A tampered message must also produce a result on the partial-batch
+        // deadline, and must not inherit the previous request's validity.
+        verifier
+            .verify_signature(b"tampered".to_vec(), signature, verifying_key, "bad_id".into())
+            .await
+            .unwrap();
+        let results = verifier.wait_for_results(Duration::from_secs(1)).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].request_id, "bad_id");
+        assert!(!results[0].valid);
+        assert!(results[0].error.is_some());
+
         verifier.stop().await;
     }
 
@@ -814,42 +820,50 @@ mod tests {
             backpressure_threshold: 8,
         };
 
-        let pipeline = AsyncSigningPipeline::new(config);
-
-        // Generate test data
-        let mut rng = OsRng;
-        let signing_key = SigningKey::generate(&mut rng);
-
-        // Fill up the queue
-        for i in 0..15 {
-            let cert_core = CertCore {
-                content_hash: [i as u8; 32],
-                timestamp: 1000 + i,
-                issuer: format!("issuer_{}", i),
-                subject: format!("subject_{}", i),
-                request_id: format!("request_{}", i),
-            };
-
-            let request = SigningRequest {
-                cert_core,
-                signing_key: signing_key.clone(),
-                priority: 0,
-            };
-
-            let result = pipeline.submit_request(request).await;
-            if i < 10 {
-                assert!(result.is_ok());
-            } else {
-                // Should fail due to full queue
-                assert!(result.is_err());
-            }
+        // Hold the receiver ourselves so the queue cannot drain concurrently.
+        // submit_request is a waiting API, not a try_send API.
+        let (request_tx, mut request_rx) = mpsc::channel(config.max_queue_size);
+        let (_result_tx, result_rx) = mpsc::channel(config.max_queue_size);
+        let pipeline = AsyncSigningPipeline {
+            request_tx,
+            result_rx,
+            config,
+            metrics: Arc::new(SigningMetrics::default()),
+            running: Arc::new(RwLock::new(true)),
+        };
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let request = SigningRequest {
+            cert_core: CertCore {
+                content_hash: [1; 32],
+                timestamp: 1000,
+                issuer: "issuer".into(),
+                subject: "subject".into(),
+                request_id: "request".into(),
+            },
+            signing_key,
+            priority: 0,
+        };
+        for _ in 0..10 {
+            pipeline.submit_request(request.clone()).await.unwrap();
         }
-
-        // Check backpressure
         assert!(pipeline.is_under_backpressure());
+        assert_eq!(pipeline.get_metrics().queue_size, 10);
+        assert!(timeout(Duration::from_millis(20), pipeline.submit_request(request.clone()))
+            .await
+            .is_err());
+        assert_eq!(pipeline.get_metrics().total_requests, 10);
+        assert_eq!(pipeline.get_metrics().queue_size, 10);
 
-        // Clean up
-        pipeline.stop().await;
+        // Free capacity and confirm the next submission is admitted.
+        request_rx.recv().await.unwrap();
+        pipeline.metrics.queue_size.fetch_sub(1, Ordering::Relaxed);
+        timeout(Duration::from_secs(1), pipeline.submit_request(request.clone()))
+            .await.unwrap().unwrap();
+        assert_eq!(pipeline.get_metrics().total_requests, 11);
+        assert_eq!(pipeline.get_metrics().queue_size, 10);
+        drop(request_rx);
+        assert!(pipeline.submit_request(request).await.is_err());
+        assert_eq!(pipeline.get_metrics().total_requests, 11);
     }
 
     #[tokio::test]

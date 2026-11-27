@@ -3,7 +3,7 @@ name: Egress Firewall Cookie-free Build
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/rust-combined-remediation-20261124]
     paths:
       - 'runtime/egress-firewall/**'
       - 'Cargo.toml'
@@ -43,13 +43,13 @@ jobs:
           data = json.loads(Path("/tmp/pf-cookie-metadata.json").read_text())
           packages = data["packages"]
           assert not any(p["name"] == "cookie" and p["version"] == "0.16.2" for p in packages)
-          ids = {p["id"] for p in packages if p["name"] == "actix-web"}
-          assert len(ids) == 1
-          nodes = [n for n in data["resolve"]["nodes"] if n["id"] in ids]
-          assert len(nodes) == 1
-          features = set(nodes[0]["features"])
-          assert not features.intersection({"cookies", "secure-cookies", "default"})
-          assert {"macros", "compress-brotli", "compress-gzip", "compress-zstd", "http2"} <= features
+          assert not any(p["name"] in {"actix-web", "actix-http"} for p in packages)
+          workspace = {p["name"]: p["id"] for p in packages if p["id"] in data["workspace_members"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          firewall = nodes[workspace["egress-firewall"]]
+          axum = [d["pkg"] for d in firewall["deps"] if d["name"] == "axum"]
+          assert len(axum) == 1
+          assert "http2" in nodes[axum[0]]["features"]
           PY
       - name: Test fallback and default configurations
         run: |

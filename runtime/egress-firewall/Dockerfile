@@ -17,6 +17,14 @@ COPY . .
 RUN cargo +1.99.1 build --locked --release -p egress-firewall \
     --no-default-features --features mimalloc
 
+# Retain the upstream agreement for the embedded certificate-root data.
+RUN set -eu; \
+    mkdir -p /app/third-party-licenses; \
+    set -- "${CARGO_HOME:-/usr/local/cargo}"/registry/src/*/webpki-roots-1.0.12/LICENSE; \
+    test "$#" -eq 1; \
+    test -s "$1"; \
+    cp "$1" /app/third-party-licenses/webpki-roots-1.0.12.LICENSE
+
 # Runtime stage
 FROM alpine:3.19
 
@@ -36,6 +44,7 @@ WORKDIR /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/egress-firewall ./
+COPY --from=builder /app/third-party-licenses/ /usr/share/doc/egress-firewall/third-party-licenses/
 
 # Copy policy files
 COPY runtime/egress-firewall/policies/ ./policies/

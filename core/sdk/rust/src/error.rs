@@ -11,11 +11,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// gRPC transport error
     #[error("gRPC transport error: {0}")]
-    Transport(#[from] tonic::transport::Error),
+    Transport(#[source] tonic::transport::Error),
 
     /// gRPC status error
     #[error("gRPC status error: {0}")]
-    Status(#[from] Status),
+    Status(#[source] Status),
 
     /// Authentication error
     #[error("Authentication error: {0}")]
@@ -35,7 +35,7 @@ pub enum Error {
 
     /// Serialization error
     #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    Serialization(#[source] serde_json::Error),
 
     /// Timeout error
     #[error("Operation timed out after {0:?}")]
@@ -332,7 +332,6 @@ impl From<Status> for Error {
             Code::Unavailable => Error::Unavailable(status.message().to_string()),
             Code::DataLoss => Error::Internal("Data loss".to_string()),
             Code::Unauthenticated => Error::Authentication(status.message().to_string()),
-            _ => Error::Status(status),
         }
     }
 }

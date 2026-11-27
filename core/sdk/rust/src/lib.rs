@@ -13,7 +13,10 @@
 //!
 //! # Quick Start
 //!
-//! ```rust
+//! The example requires running services at the indicated addresses. Native
+//! loopback RPC behavior is exercised separately by the SDK regression suite.
+//!
+//! ```rust,no_run
 //! use provability_fabric_core_sdk_rust::{
 //!     PolicyKernelClient,
 //!     AccessReceiptClient,
@@ -58,7 +61,8 @@ pub mod generated {
 }
 
 // Re-export common types from generated code
-pub use generated::{egress::*, kernel::*, plan::*, receipt::*, safety_case::*};
+// The protobuf files share one package; access wire types through `generated`.
+// SDK convenience types retain their existing top-level names.
 
 #[cfg(test)]
 mod tests {

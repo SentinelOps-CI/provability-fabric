@@ -4,10 +4,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use axum::{body::Body, http::Response, Router};
 use prometheus_client::{
     encoding::text::encode,
     metrics::{counter::Counter, gauge::Gauge, histogram::Histogram},
@@ -36,12 +33,12 @@ mod privacy;
 
 use dfa::DFAInterpreter;
 use ni_monitor::{
-    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus, SecurityLabel,
+    NIEvent, NIMonitor, NIMonitorConfig, NIMonitorStatus,
 };
 use privacy::epsilon_guard::EpsilonGuard;
 use sidecar_watcher::assumption::{Assumption, AssumptionMonitor};
 use sidecar_watcher::egress_cert::{
-    BridgeGuarantee, EgressCertificate, PermissionEvidence, ProofHashes as CertProofHashes,
+    BridgeGuarantee, EgressCertificate, ProofHashes as CertProofHashes,
 };
 use sidecar_watcher::env_config;
 use sidecar_watcher::time_util;
@@ -242,15 +239,13 @@ impl Watcher {
                     info!("Loaded DFA from {}", path);
                     Some(interpreter)
                 }
-                Err(e) => {
-                    warn!("Failed to load DFA from {}: {}", path, e);
-                    None
-                }
+                Err(e) => anyhow::bail!("Failed to load configured DFA from {}: {}", path, e),
             },
-            Err(_) => {
+            Err(env::VarError::NotPresent) => {
                 info!("No DFA_PATH specified, DFA evaluation disabled");
                 None
             }
+            Err(e) => anyhow::bail!("Invalid DFA_PATH: {}", e),
         };
 
         let spec_sig = env::var("SPEC_SIG").unwrap_or_default();
@@ -290,8 +285,15 @@ impl Watcher {
         })
     }
 
-    fn process_action(&mut self, action: &Action) -> Result<bool> {
+    async fn process_action(&mut self, action: &Action) -> Result<bool> {
         self.metrics.total_actions.inc();
+
+        // Reject partial privacy claims prior to mutating monitor state.
+        if action.privacy_epsilon.is_some() != action.privacy_delta.is_some() {
+            self.metrics.privacy_violations.inc();
+            self.log_violation("Incomplete privacy cost");
+            return Ok(false);
+        }
 
         // 1. DFA Step Evaluation (if DFA is loaded)
         if let Some(ref mut dfa) = self.dfa_interpreter {
@@ -319,9 +321,11 @@ impl Watcher {
             session_id: self.tenant_id.clone(),
             user_id: "system".to_string(),
             operation: action.action_type.clone(),
-            input_labels: vec![SecurityLabel::Internal], // Default input label
-            output_labels: vec![SecurityLabel::Public],  // Default output label
-            data_paths: vec!["$.data".to_string()],
+            // The observed log line contains no authenticated classifications
+            // or field paths. Missing evidence must not be replaced by labels.
+            input_labels: Vec::new(),
+            output_labels: Vec::new(),
+            data_paths: Vec::new(),
             metadata: std::collections::HashMap::new(),
         };
 
@@ -344,14 +348,13 @@ impl Watcher {
 
         // 3. Permission Epochs (existing budget checks)
         if let (Some(epsilon), Some(delta)) = (action.privacy_epsilon, action.privacy_delta) {
-            let allowed = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.block_on(self.epsilon_guard.check_query(
-                    &self.tenant_id,
-                    epsilon,
-                    delta,
-                ))?
-            } else {
-                return Err(anyhow::anyhow!("async runtime required for privacy checks"));
+            let allowed = match self.epsilon_guard.check_query(&self.tenant_id, epsilon, delta).await {
+                Ok(allowed) => allowed,
+                Err(e) => {
+                    self.metrics.privacy_violations.inc();
+                    self.log_violation(&format!("Privacy check unavailable: {e}"));
+                    return Ok(false);
+                }
             };
 
             if !allowed {
@@ -365,14 +368,14 @@ impl Watcher {
         }
 
         // Update privacy budget metric from guard (store epsilon * 1000)
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            if let Ok((remaining_epsilon, _)) =
-                handle.block_on(self.epsilon_guard.get_remaining_budget(&self.tenant_id))
-            {
-                self.metrics
-                    .privacy_budget_remaining
-                    .set((remaining_epsilon * 1000.0) as i64);
-            }
+        if let Ok((remaining_epsilon, _)) =
+            self.epsilon_guard.get_remaining_budget(&self.tenant_id).await
+        {
+            self.metrics
+                .privacy_budget_remaining
+                .set((remaining_epsilon * 1000.0) as i64);
+        } else {
+            self.metrics.privacy_budget_remaining.set(0);
         }
 
         // 4. Witness Checks (existing budget and spam checks)
@@ -403,7 +406,7 @@ impl Watcher {
         let cert_start_time = Instant::now();
         let Some(certificate) = self.generate_egress_certificate(action) else {
             self.metrics.cert_issuance_failures.inc();
-            self.log_violation("egress certificate denied: missing or placeholder evidence hashes");
+            self.log_violation("egress certificate denied: missing verified authorization or proof evidence");
             return Ok(false);
         };
         let cert_duration = cert_start_time.elapsed();
@@ -491,10 +494,9 @@ impl Watcher {
 
     /// Generate egress certificate with PAB hashes
     ///
-    /// This method creates an egress certificate that includes the proof carries code
-    /// hashes from the PAB, providing cryptographic verification of the system's
-    /// correctness without requiring Lean proof execution at runtime.
-    fn generate_egress_certificate(&self, action: &Action) -> Option<EgressCertificate> {
+    /// Configured hashes identify artifacts; they do not verify their proofs.
+    /// The log ingestion path has no trusted permission/witness producer yet.
+    fn generate_egress_certificate(&self, _action: &Action) -> Option<EgressCertificate> {
         let session_id = self.tenant_id.clone();
         let bundle_id = format!("bundle_{}", self.spec_sig);
         let plan_hash = env_config::resolve_evidence_hash("PLAN_HASH", "test-plan-hash").ok()?;
@@ -518,43 +520,10 @@ impl Watcher {
         };
         cert.add_proof_hashes(proof_hashes);
 
-        // Add permission evidence from NI monitor state
-        let monni_statuses = self.ni_monitor.get_monni_status();
-        let path_witness_ok = monni_statuses
-            .values()
-            .all(|s| matches!(s, NIMonitorStatus::Accept | NIMonitorStatus::Inapplicable));
-        let label_derivation_ok = path_witness_ok;
+        // Do not derive permission, Merkle witness, label derivation or epoch
+        // from a local NI verdict. Leave these at their fail-closed defaults
+        // until a trusted producer verifies them for this specific action.
         let bridge = self.ni_monitor.generate_bridge_guarantee();
-        let permit_decision = if path_witness_ok && label_derivation_ok && bridge.local_checks_ok {
-            "accept"
-        } else {
-            "reject"
-        }
-        .to_string();
-
-        let permission_evidence = PermissionEvidence {
-            permit_decision,
-            path_witness_ok,
-            label_derivation_ok,
-            epoch: 1,
-            principal_id: "system".to_string(),
-            action_type: action.action_type.clone(),
-            resource_id: env_config::resolve_evidence_hash(
-                env_config::EVIDENCE_RESOURCE_ID_ENV,
-                "test-resource-id",
-            )
-            .ok()?,
-            field_path: None,
-            abac_attributes: std::collections::HashMap::new(),
-            session_attributes: std::collections::HashMap::new(),
-            scope: Some(self.tenant_id.clone()),
-            tenant: self.tenant_id.clone(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        };
-        cert.add_permission_evidence(permission_evidence);
 
         // Add bridge guarantee from NI monitor checks
         let bridge_guarantee = BridgeGuarantee {
@@ -566,6 +535,9 @@ impl Watcher {
         };
         cert.content.bridge_guarantee = bridge_guarantee;
 
+        if !certificate_evidence_complete(&cert) {
+            return None;
+        }
         Some(cert)
     }
 
@@ -680,7 +652,7 @@ impl Watcher {
         for line in lines {
             if line.contains("\"action\"") {
                 if let Ok(action) = serde_json::from_str::<Action>(&line) {
-                    if let Err(e) = self.process_action(&action) {
+                    if let Err(e) = self.process_action(&action).await {
                         error!("Failed to process action: {}", e);
                     }
                 }
@@ -697,22 +669,43 @@ impl Watcher {
     }
 }
 
-async fn metrics_handler(
-    _req: Request<Body>,
-    registry: Arc<Registry>,
-) -> Result<Response<Body>, hyper::Error> {
+/// Necessary evidence conditions, not a verifier of externally supplied data.
+/// This helper is used only on the internally assembled certificate candidate.
+fn certificate_evidence_complete(cert: &EgressCertificate) -> bool {
+    let evidence = &cert.content.permission_evidence;
+    let witness = &cert.content.witness_verification;
+    let bridge = &cert.content.bridge_guarantee;
+    evidence.permit_decision == "accept"
+        && evidence.path_witness_ok
+        && evidence.label_derivation_ok
+        && witness.merkle_path_valid
+        && witness.field_commit_valid
+        && witness.label_derivation_valid
+        && bridge.local_checks_ok
+        && bridge.proof_verification
+}
+
+async fn metrics_handler(registry: Arc<Registry>) -> Response<Body> {
     let mut buffer = String::new();
     if encode(&mut buffer, &registry).is_err() {
-        return Ok(Response::builder()
+        return Response::builder()
             .status(500)
             .body(Body::from("metrics encode failed"))
-            .unwrap_or_else(|_| Response::new(Body::empty())));
+            .expect("static metrics response");
     }
 
-    Ok(Response::builder()
+    Response::builder()
         .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
         .body(Body::from(buffer))
-        .unwrap_or_else(|_| Response::new(Body::empty())))
+        .expect("static metrics response")
+}
+
+// Preserve the previous metrics server's path-independent dispatch.
+fn metrics_router(registry: Arc<Registry>) -> Router {
+    Router::new().fallback(move || {
+        let registry = registry.clone();
+        async move { metrics_handler(registry).await }
+    })
 }
 
 #[tokio::main]
@@ -721,7 +714,7 @@ async fn main() -> Result<()> {
 
     let watcher = Watcher::new().await?;
 
-    // Load privacy configurations (will log a warning in dev mode without K8s)
+    // Failed configuration loading leaves privacy charges unavailable.
     if let Err(e) = watcher.epsilon_guard.load_configs().await {
         warn!("Failed to load privacy configs: {}", e);
     }
@@ -732,15 +725,8 @@ async fn main() -> Result<()> {
     // Start Prometheus /metrics server using the registry from Watcher
     let registry = watcher.registry.clone();
     let metrics_addr = SocketAddr::from(([0, 0, 0, 0], 9090));
-    let make_svc = make_service_fn(move |_conn| {
-        let registry = registry.clone();
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| {
-                metrics_handler(req, registry.clone())
-            }))
-        }
-    });
-    let metrics_server = Server::bind(&metrics_addr).serve(make_svc);
+    let metrics_listener = tokio::net::TcpListener::bind(metrics_addr).await?;
+    let metrics_server = axum::serve(metrics_listener, metrics_router(registry));
     info!("Metrics server listening on {}", metrics_addr);
 
     // Start HTTP health server on PORT (default 8006)
@@ -860,6 +846,37 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_metrics_http_loopback() {
+        let mut registry = Registry::default();
+        let metrics = Metrics::new(&mut registry);
+        metrics.total_actions.inc();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, metrics_router(Arc::new(registry))).await.unwrap();
+        });
+        let client = Client::builder().no_proxy().timeout(Duration::from_secs(5)).build().unwrap();
+        let response = client.get(format!("http://{addr}/metrics")).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+        assert!(response.text().await.unwrap().contains("# EOF"));
+        server.abort();
+    }
+
+    #[test]
+    fn test_local_ni_verdict_does_not_establish_permission_evidence() {
+        let mut cert = EgressCertificate::new(
+            "session".into(), "bundle".into(), "plan".into(), "policy".into(),
+        );
+        assert!(!certificate_evidence_complete(&cert));
+        cert.content.bridge_guarantee.local_checks_ok = true;
+        cert.content.bridge_guarantee.proof_verification = true;
+        assert!(!certificate_evidence_complete(&cert));
+        cert.content.permission_evidence.permit_decision = "accept".into();
+        assert!(!certificate_evidence_complete(&cert));
+    }
 
     // Note: Watcher::new() is async; this test is only illustrative and
     // not compiled in release builds.

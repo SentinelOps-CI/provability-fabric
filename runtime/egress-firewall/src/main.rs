@@ -1,4 +1,9 @@
-use actix_web::{web, App, HttpServer, HttpResponse, HttpRequest, Error};
+use axum::{
+    extract::{DefaultBodyLimit, State, rejection::JsonRejection},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -1329,39 +1334,39 @@ impl EgressFirewall {
     }
 }
 
-/// HTTP handlers
+/// Keep malformed requests and policy failures outside the egress pipeline.
 async fn egress_handler(
-    _req: HttpRequest,
-    payload: web::Json<EgressRequest>,
-    firewall: web::Data<EgressFirewall>,
-) -> Result<HttpResponse, Error> {
-    let response = firewall.process_egress(payload.into_inner()).await
-        .map_err(actix_web::error::ErrorBadRequest)?;
-
-    Ok(HttpResponse::Ok().json(response))
+    State(firewall): State<Arc<EgressFirewall>>,
+    payload: Result<Json<EgressRequest>, JsonRejection>,
+) -> Result<Json<EgressResponse>, (StatusCode, String)> {
+    let Json(request) = payload.map_err(|error| {
+        let status = match error.status() {
+            StatusCode::PAYLOAD_TOO_LARGE => StatusCode::PAYLOAD_TOO_LARGE,
+            _ => StatusCode::BAD_REQUEST,
+        };
+        (status, error.body_text())
+    })?;
+    firewall.process_egress(request).await
+        .map(Json)
+        .map_err(|error| (StatusCode::BAD_REQUEST, error))
 }
 
-async fn health_handler() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Ok().json(serde_json::json!({
+async fn health_handler() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
         "status": "healthy",
-        "timestamp": SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    })))
+        "timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    }))
 }
 
-fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.route("/egress", web::post().to(egress_handler))
-        // GET + HEAD: Docker/wget --spider uses HEAD and must not 404.
-        .service(
-            web::resource("/health")
-                .route(web::get().to(health_handler))
-                .route(web::head().to(health_handler)),
-        );
+fn firewall_router(firewall: Arc<EgressFirewall>) -> Router {
+    Router::new()
+        .route("/egress", post(egress_handler))
+        .route("/health", get(health_handler))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
+        .with_state(firewall)
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     // Initialize firewall
     let mut firewall = EgressFirewall::new("http://localhost:8080".to_string());
@@ -1395,59 +1400,53 @@ async fn main() -> std::io::Result<()> {
     // Set signing key
     firewall.set_signing_key(b"test_signing_key".to_vec());
 
-    let firewall_data = web::Data::new(firewall);
-
-    // Start HTTP server
-    HttpServer::new(move || {
-        App::new()
-            .app_data(firewall_data.clone())
-            .configure(configure_routes)
-    })
-    // Bind on all interfaces so Docker healthchecks and peer services can reach us.
-    .bind(("0.0.0.0", 8081))?
-    .run()
-    .await
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", 8081)).await?;
+    axum::serve(listener, firewall_router(Arc::new(firewall))).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[actix_web::test]
-    async fn http_routes_work_without_cookie_support() {
-        use actix_web::{http::StatusCode, test as http_test};
-
-        let app = http_test::init_service(
-            App::new()
-                .app_data(web::Data::new(EgressFirewall::new(
-                    "http://127.0.0.1:1".to_string(),
-                )))
-                .configure(configure_routes),
-        )
-        .await;
-
-        let request = http_test::TestRequest::get().uri("/health").to_request();
-        let response = http_test::call_service(&app, request).await;
-        assert_eq!(response.status(), StatusCode::OK);
-        let body: serde_json::Value = http_test::read_body_json(response).await;
-        assert_eq!(body["status"], "healthy");
-        assert!(body["timestamp"].as_u64().is_some());
-
-        let request = http_test::TestRequest::default()
-            .method(actix_web::http::Method::HEAD)
-            .uri("/health")
-            .to_request();
-        let response = http_test::call_service(&app, request).await;
-        assert_eq!(response.status(), StatusCode::OK);
-
-        // Reject invalid JSON at the extractor before any egress.
-        let request = http_test::TestRequest::post()
-            .uri("/egress")
-            .insert_header(("content-type", "application/json"))
-            .set_payload("{")
-            .to_request();
-        let response = http_test::call_service(&app, request).await;
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    #[tokio::test]
+    async fn test_http_routes_on_both_protocols() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let app = firewall_router(Arc::new(EgressFirewall::new(
+            "http://127.0.0.1:1".to_string(),
+        )));
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let base = format!("http://{addr}");
+        for h2 in [false, true] {
+            let builder = reqwest::Client::builder().no_proxy().timeout(Duration::from_secs(5));
+            let client = if h2 { builder.http2_prior_knowledge() } else { builder.http1_only() }.build().unwrap();
+            let response = client.get(format!("{base}/health")).send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.version(), if h2 { reqwest::Version::HTTP_2 } else { reqwest::Version::HTTP_11 });
+            let body: serde_json::Value = response.json().await.unwrap();
+            assert_eq!(body["status"], "healthy");
+            assert!(body["timestamp"].as_u64().is_some());
+            let response = client.head(format!("{base}/health")).send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert!(response.bytes().await.unwrap().is_empty());
+            for body in ["{", "{}"] {
+                let response = client.post(format!("{base}/egress"))
+                    .header("content-type", "application/json").body(body)
+                    .send().await.unwrap();
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            }
+            let response = client.post(format!("{base}/egress"))
+                .json(&serde_json::json!({"text":"fixture","tenant":"unknown",
+                    "subject_id":"test","context":{},"streaming":false}))
+                .send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            assert!(response.text().await.unwrap().contains("No policy found for tenant"));
+            let response = client.post(format!("{base}/egress"))
+                .header("content-type", "application/json")
+                .body(" ".repeat(2 * 1024 * 1024 + 1)).send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        }
+        task.abort();
     }
 
     #[tokio::test]

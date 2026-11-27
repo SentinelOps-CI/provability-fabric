@@ -8,7 +8,7 @@ license = "Apache-2.0"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "=0.12.28", features = ["json"] }
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
@@ -18,9 +18,8 @@ base64 = "0.21"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
-hyper = { version = "0.14", features = ["full"] }
+axum = { version = "=0.7.9", features = ["http2"] }
 tower = "0.4"
 tower-http = { version = "0.4", features = ["cors", "trace"] }
 redis = { version = "0.27", features = ["tokio-comp"] }
 metrics = "0.21"
-metrics-exporter-prometheus = "0.12" 
