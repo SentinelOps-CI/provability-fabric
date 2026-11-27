@@ -23,10 +23,10 @@ trait Queue {
 
 impl Queue for LockFreeRingBuffer<usize> {
     fn push(&mut self, item: usize) -> Result<(), usize> {
-        LockFreeRingBuffer::push(self, item)
+        LockFreeRingBuffer::push(black_box(&*self), item)
     }
     fn pop(&mut self) -> Option<usize> {
-        LockFreeRingBuffer::pop(self)
+        LockFreeRingBuffer::pop(black_box(&*self))
     }
 }
 
@@ -111,7 +111,7 @@ fn main() {
     for round in 0..ROUNDS {
         for warm in [false, true] {
             for offset in 0..names.len() {
-                let kind = (round + offset + usize::from(warm)) % names.len();
+                let kind = (round + offset + if warm { 1 } else { 0 }) % names.len();
                 let (push, pop) = match kind {
                     0 => sample(LockFreeRingBuffer::new(CAPACITY), warm),
                     1 => sample(StdMutexQueue(Mutex::new(VecDeque::with_capacity(CAPACITY))), warm),
