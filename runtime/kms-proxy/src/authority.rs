@@ -7,7 +7,7 @@
 use super::{AttestationToken, AttestationValidation, KmsRequest};
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use chrono::{DateTime, TimeDelta, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 use ed25519_dalek::{Signature, VerifyingKey};
 use std::collections::HashSet;
 
@@ -58,16 +58,14 @@ impl RequestAuthority {
     }
 
     pub fn validate(&self, request: &KmsRequest) -> AttestationValidation {
-        self.validate_at(request, Utc::now())
+        self.validate_at(request, UtcTimestamp::now())
     }
 
-    fn validate_at(&self, request: &KmsRequest, now: DateTime<Utc>) -> AttestationValidation {
+    fn validate_at(&self, request: &KmsRequest, now: UtcTimestamp) -> AttestationValidation {
         let Some(token) = &request.attestation_token else {
             return denied("Attestation token required");
         };
-        let token_fresh = token.timestamp.timestamp_subsec_nanos() < 1_000_000_000
-            && token.timestamp <= now
-            && now.signed_duration_since(token.timestamp) <= TimeDelta::seconds(MAX_AGE_SECONDS);
+        let token_fresh = token.timestamp.is_fresh_at(now, MAX_AGE_SECONDS);
         let policy_hash_match = self.policies.contains(&token.policy_hash);
         let pod_identity_valid = self.pods.contains(&token.pod_identity);
 
@@ -163,7 +161,7 @@ pub(crate) mod tests {
         ).unwrap()
     }
 
-    pub(crate) fn signed_fixture(now: DateTime<Utc>) -> KmsRequest {
+    pub(crate) fn signed_fixture(now: UtcTimestamp) -> KmsRequest {
         let mut request = KmsRequest {
             operation: "sign".into(),
             key_id: "test-key".into(),
@@ -184,7 +182,7 @@ pub(crate) mod tests {
 
     #[test]
     fn exact_request_passes_and_every_mutation_fails() {
-        let now = DateTime::from_timestamp(1_700_000_000, 250_000_000).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 250_000_000).unwrap();
         let authority = fixture_authority();
         assert!(authority.validate_at(&signed_fixture(now), now).valid);
         let changes: [fn(&mut KmsRequest); 9] = [
@@ -195,7 +193,7 @@ pub(crate) mod tests {
             |r| r.attestation_token.as_mut().unwrap().token = "other-id".into(),
             |r| r.attestation_token.as_mut().unwrap().pod_identity = "pod-b".into(),
             |r| r.attestation_token.as_mut().unwrap().policy_hash = "policy-b".into(),
-            |r| r.attestation_token.as_mut().unwrap().timestamp -= TimeDelta::milliseconds(1),
+            |r| { let token = r.attestation_token.as_mut().unwrap(); token.timestamp = token.timestamp.checked_add_millis(-1).unwrap(); },
             |r| r.attestation_token.as_mut().unwrap().signature = "sig_placeholder".into(),
         ];
         for mutate in changes {
@@ -210,20 +208,20 @@ pub(crate) mod tests {
 
     #[test]
     fn freshness_is_checked_on_every_request_at_subsecond_boundaries() {
-        let now = DateTime::from_timestamp(1_700_000_000, 250_000_000).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 250_000_000).unwrap();
         let authority = fixture_authority();
         for (offset, expected) in [(0, true), (-60_000, true), (-60_001, false), (1, false)] {
-            let request = signed_fixture(now + TimeDelta::milliseconds(offset));
+            let request = signed_fixture(now.checked_add_millis(offset).unwrap());
             assert_eq!(authority.validate_at(&request, now).valid, expected, "offset {offset}");
         }
         let request = signed_fixture(now);
         assert!(authority.validate_at(&request, now).valid);
-        assert!(!authority.validate_at(&request, now + TimeDelta::milliseconds(60_001)).valid);
+        assert!(!authority.validate_at(&request, now.checked_add_millis(60_001).unwrap()).valid);
     }
 
     #[test]
     fn wrong_issuer_audience_and_disallowed_claims_fail_even_with_valid_signatures() {
-        let now = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 0).unwrap();
         let authority = fixture_authority();
         let mut request = signed_fixture(now);
         sign_fixture(&mut request, "other-deployment", &fixture_key());
