@@ -13,6 +13,7 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
+ed25519-dalek = "=2.2.0"
 uuid = { version = "1.0", features = ["v4"] }
 base64 = "0.21"
 sha2 = "0.10"
@@ -21,6 +22,5 @@ hex = "0.4"
 hyper = { version = "0.14", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.4", features = ["cors", "trace"] }
-redis = { version = "0.27", features = ["tokio-comp"] }
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12" 
