@@ -248,6 +248,8 @@ fn valid_vault_signature_format(value: &str) -> bool {
 }
 
 const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
+const REQUEST_BODY_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+const MAX_IN_FLIGHT_REQUESTS: usize = 32;
 
 async fn read_bounded_body(body: Body) -> std::result::Result<Vec<u8>, StatusCode> {
     let mut collected = Vec::new();
@@ -260,6 +262,12 @@ async fn read_bounded_body(body: Body) -> std::result::Result<Vec<u8>, StatusCod
         collected.extend_from_slice(&chunk);
     }
     Ok(collected)
+}
+
+async fn read_body_with_deadline(body: Body, deadline: std::time::Duration) -> std::result::Result<Vec<u8>, StatusCode> {
+    tokio::time::timeout(deadline, read_bounded_body(body))
+        .await
+        .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
 }
 
 fn json_response(status: StatusCode, value: serde_json::Value) -> Response<Body> {
@@ -288,7 +296,7 @@ async fn handle_request(
         "/kms/sign" => {}
         _ => return error_response(StatusCode::NOT_FOUND, "Endpoint not supported"),
     }
-    let bytes = match read_bounded_body(req.into_body()).await {
+    let bytes = match read_body_with_deadline(req.into_body(), REQUEST_BODY_DEADLINE).await {
         Ok(bytes) => bytes,
         Err(status) => return error_response(status, "Invalid or oversized request body"),
     };
@@ -306,10 +314,26 @@ async fn handle_request(
     }
 }
 
+#[derive(Clone)]
+struct HttpState {
+    proxy: Arc<KmsProxy>,
+    slots: Arc<tokio::sync::Semaphore>,
+}
+
+async fn dispatch(State(state): State<HttpState>, req: Request) -> Response<Body> {
+    // Refuse excess work instead of queueing an unbounded set of bodies.
+    // This is a handler-level concurrency limit, not a TCP or RSS bound.
+    let Ok(_slot) = state.slots.clone().try_acquire_owned() else {
+        return error_response(StatusCode::SERVICE_UNAVAILABLE, "KMS request capacity exhausted");
+    };
+    handle_request(req, state.proxy).await
+}
+
 fn app(proxy: Arc<KmsProxy>) -> Router {
-    Router::new().fallback(|State(proxy): State<Arc<KmsProxy>>, req: Request| async move {
-        handle_request(req, proxy).await
-    }).with_state(proxy)
+    Router::new().fallback(dispatch).with_state(HttpState {
+        proxy,
+        slots: Arc::new(tokio::sync::Semaphore::new(MAX_IN_FLIGHT_REQUESTS)),
+    })
 }
 
 #[tokio::main]
