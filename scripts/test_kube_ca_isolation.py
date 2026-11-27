@@ -98,7 +98,7 @@ def main():
                 env = dict(os.environ, PF_KUBE_TEST_CA_DER=str(der),
                            PF_KUBE_TEST_TRUSTED_URL=trusted, PF_KUBE_TEST_UNRELATED_URL=unrelated)
                 completed = subprocess.run(["cargo", "test", "--locked", "-p", "sidecar-watcher",
-                                "--lib", "privacy::epsilon_guard::tests::test_kubernetes_configmap_configured_ca_is_exclusive",
+                                "--bin", "sidecar-watcher", "privacy::epsilon_guard::tests::test_kubernetes_configmap_configured_ca_is_exclusive",
                                 "--", "--ignored", "--exact", "--nocapture"],
                                env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 print(completed.stdout, end="")
