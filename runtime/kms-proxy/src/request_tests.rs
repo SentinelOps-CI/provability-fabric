@@ -99,7 +99,8 @@ async fn authenticated_provider_transport_and_rejection_controls() {
                         // Synthetic provider response: transport fixture, not a Vault signature proof.
                         0 => json_response(StatusCode::OK, serde_json::json!({"data":{"signature":"vault:v1:ZmFrZQ=="}})),
                         1 => json_response(StatusCode::SERVICE_UNAVAILABLE, serde_json::json!({})),
-                        _ => json_response(StatusCode::OK, serde_json::json!({"data":{"signature":"mock_signature_fake"}})),
+                        2 => json_response(StatusCode::OK, serde_json::json!({"data":{"signature":"mock_signature_fake"}})),
+                        _ => json_response(StatusCode::OK, serde_json::json!({"data":{"signature":"A".repeat(65_537)}})),
                     };
                     Ok::<_, hyper::Error>(response)
                 }
@@ -126,13 +127,13 @@ async fn authenticated_provider_transport_and_rejection_controls() {
     altered.attestation_token = None;
     assert_eq!(signed(&p, &altered).await.0, StatusCode::FORBIDDEN);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
-    for _ in 0..2 {
+    for _ in 0..3 {
         let (status, body) = signed(&p, &signed_fixture(Utc::now())).await;
         assert_eq!(status, StatusCode::BAD_GATEWAY);
         assert_eq!(body["success"], false);
         assert!(body["result"].is_null());
     }
-    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
     task.abort();
 }
 
