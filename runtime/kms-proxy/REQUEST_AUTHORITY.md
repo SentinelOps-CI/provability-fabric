@@ -76,3 +76,19 @@ serialized request round trip. The cases cover nonzero UTC offset, negative
 Unix seconds, absent data and empty data. The fixture issuer key is public,
 deterministic test material only. Native checks of the migrated implementation
 are pending.
+
+## Consolidated transport candidate
+
+This branch ports the authority implementation to Axum 0.7.9 and Reqwest
+0.12.28, retaining the exact signed-request encoding and timestamp codec.
+The HTTP request body is accumulated under the existing 2 MiB bound, including
+streamed chunks. The operator's Vault endpoint is parsed before path
+construction; environment-configured proxies and redirects are disabled for
+the provider client. Native loopback tests exercise the actual Axum listener
+as well as the synthetic provider fixture.
+
+The lockfile's KMS dependency edge is reconciled provisionally. Native Cargo
+must remove the now-unreachable Chrono package and verify that no registry
+version or checksum has changed before its artifact is imported. All
+deployment and independent issuer obligations remain open. This candidate
+must not be deployed merely because its dependency scan succeeds.
