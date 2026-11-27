@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Sidecar timestamp wire compatibility
+
+on:
+  pull_request:
+    branches: [security/kube-patched-client-20261127, main]
+    paths:
+      - 'runtime/sidecar-watcher/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/sidecar-timestamp-wire.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/sidecar-watcher/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/sidecar-timestamp-wire.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  timestamp-wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify locked dependency closure
+        run: |
+          set -euo pipefail
+          cargo tree --locked -p sidecar-watcher --all-features --prefix none > "$RUNNER_TEMP/sidecar-deps.txt"
+          if grep -q '^chrono v' "$RUNNER_TEMP/sidecar-deps.txt"; then
+            echo "Unexpected Chrono dependency in sidecar closure" >&2
+            exit 1
+          fi
+          grep -Eq '^time v0\.3\.47([[:space:]]|$)' "$RUNNER_TEMP/sidecar-deps.txt"
+          git diff --exit-code -- Cargo.lock
+      - name: Compile and execute native sidecar tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher --lib --bins --no-fail-fast
+          cargo build --locked -p sidecar-watcher --bins
+          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
+      - name: Verify timestamp regressions execute
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher --lib utc_timestamp::tests:: -- --nocapture | tee "$RUNNER_TEMP/sidecar-timestamp-tests.txt"
+          grep -F 'running 4 tests' "$RUNNER_TEMP/sidecar-timestamp-tests.txt"
+          grep -F '4 passed; 0 failed' "$RUNNER_TEMP/sidecar-timestamp-tests.txt"
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher privacy::epsilon_guard::tests::test_privacy_query_timestamp_wire_contract -- --exact --nocapture | tee "$RUNNER_TEMP/privacy-timestamp-test.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/privacy-timestamp-test.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/privacy-timestamp-test.txt"
+          git diff --exit-code -- Cargo.lock
+      - name: Requalify Kubernetes trust boundary
+        run: python3 scripts/test_kube_ca_isolation.py
