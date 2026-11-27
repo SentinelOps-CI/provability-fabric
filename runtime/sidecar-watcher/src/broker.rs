@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub struct ToolResult {
     pub result: Option<serde_json::Value>,
     pub error: Option<String>,
     pub execution_id: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,7 +59,7 @@ pub struct Violation {
     pub violation_type: String,
     pub reason: String,
     pub tool_call: ToolCall,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 pub struct BrokerIntegration {
@@ -120,7 +120,7 @@ impl BrokerIntegration {
 
     pub async fn execute_tool(&self, tool_call: &ToolCall) -> Result<ToolResult> {
         let execution_id = Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
+        let timestamp = UtcTimestamp::now();
 
         if !self.enforcement_mode {
             // In non-enforcement mode, allow all tool calls
