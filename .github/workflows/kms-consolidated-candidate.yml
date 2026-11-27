@@ -8,6 +8,7 @@ on:
     branches: [security/rust-final-consolidation-20261127]
     paths:
       - 'runtime/kms-proxy/**'
+      - 'scripts/test_kms_live_vault.py'
       - 'Cargo.lock'
       - '.github/workflows/kms-consolidated-candidate.yml'
 
@@ -75,6 +76,19 @@ jobs:
           cargo test --locked -p kms-proxy --bin kms-proxy request_tests::real_axum_listener_enforces_authorization_and_routes -- --exact --nocapture | tee "$RUNNER_TEMP/kms-listener.txt"
           grep -F 'running 1 test' "$RUNNER_TEMP/kms-listener.txt"
           grep -F '1 passed; 0 failed' "$RUNNER_TEMP/kms-listener.txt"
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Fetch checksum-pinned Vault fixture and test real signing
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp -d "$RUNNER_TEMP/pf-vault-bin.XXXXXX")"
+          trap 'rm -rf "$fixture"' EXIT
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 120 \
+            https://releases.hashicorp.com/vault/1.21.4/vault_1.21.4_linux_amd64.zip -o "$fixture/vault.zip"
+          printf '%s  %s\n' '889b681990fe221b884b7932fa9c9dd0ee9811b9349554f1aa287ab63c9f3dae' "$fixture/vault.zip" | sha256sum --check
+          unzip -q "$fixture/vault.zip" vault -d "$fixture"
+          "$fixture/vault" version
+          openssl version
+          PF_TEST_VAULT_BIN="$fixture/vault" python3 scripts/test_kms_live_vault.py
           cmp Cargo.lock "$RUNNER_TEMP/native.lock"
       - name: Apply unchanged advisory and license policy
         uses: EmbarkStudios/cargo-deny-action@v2
