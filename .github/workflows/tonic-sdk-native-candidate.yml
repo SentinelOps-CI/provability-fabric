@@ -35,8 +35,13 @@ jobs:
           for name, version in [("tonic","0.12.3"),("tonic-build","0.12.3"),
               ("reqwest","0.12.28"),("wasmtime","36.0.22"),("sqlx","0.8.6"),
               ("tokio","1.53.3"),("openssl","0.10.80"),("kube","0.98.0"),
-              ("actix-web","4.20.0"),("actix-http","3.22.0"),("time","0.3.47")]:
+              ("time","0.3.47")]:
               assert versions.get(name) == {version}, (name, versions.get(name))
+          for name in ("actix-web", "actix-http", "metrics-exporter-prometheus"):
+              assert name not in versions, (name, versions.get(name))
+          assert versions.get("h2") == {"0.4.20"}, versions.get("h2")
+          assert versions.get("hyper") == {"1.8.1"}, versions.get("hyper")
+          assert all(v.startswith("0.23.") for v in versions.get("rustls", set()))
           PY
           git diff --stat -- Cargo.lock
           git diff -- Cargo.lock
@@ -53,4 +58,5 @@ jobs:
           set -euo pipefail
           cargo test --locked -p provability-fabric-core-sdk-rust --lib -- --nocapture
           cargo test --locked -p provability-fabric-core-sdk-rust --doc
+          cargo test --locked -p provability-fabric-core-sdk-rust --no-default-features --lib
           cmp /tmp/pf-sdk-resolved.lock Cargo.lock

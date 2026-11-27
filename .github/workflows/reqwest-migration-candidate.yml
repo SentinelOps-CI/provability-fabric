@@ -110,7 +110,7 @@ jobs:
               versions.setdefault(p["name"], set()).add(p["version"])
           for name, version in [
               ("wasmtime", "36.0.22"), ("sqlx", "0.8.6"), ("tokio", "1.53.3"),
-              ("openssl", "0.10.80"), ("actix-web", "4.20.0"), ("actix-http", "3.22.0"),
+              ("openssl", "0.10.80"),
               ("url", "2.5.9"), ("anyhow", "1.0.103"), ("time", "0.3.47"),
               ("libseccomp", "0.4.0"), ("cookie", "0.18.3"),
           ]:
@@ -133,7 +133,9 @@ jobs:
           assert "0.21.12" not in versions.get("rustls", set())
           assert "0.101.7" not in versions.get("rustls-webpki", set())
           assert "0.25.4" not in versions.get("webpki-roots", set())
-          # Actix, Tonic and the metrics exporter still have older HTTP paths.
+          for name in ("actix-web", "actix-http", "metrics-exporter-prometheus"):
+              assert name not in versions, (name, versions.get(name))
+          # The SDK Tonic path still retains older HTTP/2.
           PY
           git diff --exit-code -- Cargo.lock
           cp Cargo.lock /tmp/pf-reqwest-resolved.lock

@@ -13,7 +13,10 @@
 //!
 //! # Quick Start
 //!
-//! ```rust
+//! The example requires running services at the indicated addresses. Native
+//! loopback RPC behavior is exercised separately by the SDK regression suite.
+//!
+//! ```rust,no_run
 //! use provability_fabric_core_sdk_rust::{
 //!     PolicyKernelClient,
 //!     AccessReceiptClient,
