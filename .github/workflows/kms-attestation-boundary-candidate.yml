@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+name: KMS attestation boundary native candidate
+on:
+  push:
+    branches: [security/kms-attestation-boundary-20261127]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Resolve and preserve native graph
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/pf-kms-metadata.json
+          cargo metadata --locked --format-version 1 > /tmp/pf-kms-locked.json
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          packages = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          for name, version in [("h2","0.4.20"),("hyper","1.8.1"),("tonic","0.12.3"),
+              ("reqwest","0.12.28"),("wasmtime","36.0.22"),("sqlx","0.8.6"),
+              ("tokio","1.53.3"),("openssl","0.10.80"),("kube","0.98.0")]:
+              assert {p["version"] for p in packages if p["name"] == name} == {version}, name
+          PY
+          git diff -- Cargo.lock
+          git hash-object Cargo.lock
+          cp Cargo.lock /tmp/pf-kms-resolved.lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kms-attestation-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Verify actual cryptographic authorization and provider call isolation
+        run: |
+          set -euo pipefail
+          cargo test --locked -p kms-proxy --bins -- --nocapture
+          cmp /tmp/pf-kms-resolved.lock Cargo.lock

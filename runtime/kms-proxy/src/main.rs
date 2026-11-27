@@ -4,6 +4,7 @@
 use anyhow::Result;
 use base64::Engine;
 use chrono::{DateTime, Utc};
+use ed25519_dalek::{Signature, VerifyingKey};
 use axum::{
     body::{Body, Bytes},
     extract::{DefaultBodyLimit, FromRequest, Request},
@@ -12,16 +13,14 @@ use axum::{
     Router,
 };
 use metrics::{counter, histogram};
-use redis::AsyncCommands;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 struct AttestationToken {
     token: String,
     pod_identity: String,
@@ -31,6 +30,7 @@ struct AttestationToken {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct KmsRequest {
     operation: String, // "encrypt", "decrypt", "sign", "verify"
     key_id: String,
@@ -95,398 +95,140 @@ struct KmsSignResponse {
     key_id: String,
 }
 
+/// Operator-provisioned authority for one explicit signing scope.
+/// This verifies an issuer's statement, not hardware attestation itself.
+struct AttestationAuthority {
+    key: VerifyingKey,
+    pod: String,
+    policy: String,
+    key_id: String,
+}
+
+impl AttestationAuthority {
+    fn from_environment() -> Option<Self> {
+        let key = std::env::var("KMS_ATTESTATION_PUBLIC_KEY").ok()?;
+        let raw: [u8; 32] = base64::engine::general_purpose::STANDARD.decode(&key).ok()?.try_into().ok()?;
+        let key = VerifyingKey::from_bytes(&raw).ok()?;
+        if key.is_weak() { return None; }
+        let pod = std::env::var("KMS_ALLOWED_POD_IDENTITY").ok()?;
+        let policy = std::env::var("KMS_ALLOWED_POLICY_HASH").ok()?;
+        let key_id = std::env::var("KMS_KEY_ID").ok()?;
+        if pod.is_empty() || policy.is_empty() || key_id.is_empty() ||
+            !key_id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_') {
+            return None;
+        }
+        Some(Self { key, pod, policy, key_id })
+    }
+
+    fn authorizes(&self, request: &KmsRequest, now: DateTime<Utc>) -> bool {
+        let Some(token) = &request.attestation_token else { return false };
+        let Some(data) = &request.data else { return false };
+        if token.token.is_empty() || token.pod_identity != self.pod ||
+            token.policy_hash != self.policy || request.key_id != self.key_id ||
+            request.operation != "sign" || token.timestamp > now ||
+            now.signed_duration_since(token.timestamp) > chrono::Duration::seconds(60) ||
+            token.timestamp.timestamp_subsec_nanos() >= 1_000_000_000 {
+            return false;
+        }
+        let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&token.signature) else { return false };
+        let Ok(signature) = Signature::from_slice(&bytes) else { return false };
+        self.key.verify_strict(&signing_transcript(token, &request.operation, &request.key_id, data), &signature).is_ok()
+    }
+}
+
+/// Versioned, length-framed transcript. Bind every input used for authorization
+/// and the exact operation, key and data dispatched to the signing provider.
+fn signing_transcript(token: &AttestationToken, operation: &str, key_id: &str, data: &str) -> Vec<u8> {
+    let mut message = b"PF-KMS-AUTHORIZATION-v1\0".to_vec();
+    for value in [&token.token[..], &token.pod_identity, &token.policy_hash, operation, key_id, data] {
+        message.extend_from_slice(&(value.len() as u64).to_be_bytes());
+        message.extend_from_slice(value.as_bytes());
+    }
+    message.extend_from_slice(&token.timestamp.timestamp().to_be_bytes());
+    message.extend_from_slice(&token.timestamp.timestamp_subsec_nanos().to_be_bytes());
+    message
+}
+
 struct KmsProxy {
-    attestation_cache: Arc<RwLock<HashMap<String, AttestationToken>>>,
-    kek_cache: Arc<RwLock<HashMap<String, String>>>, // KEK handle cache
-    redis_client: Option<redis::Client>,
-    cache_ttl_seconds: u64,
-    allowed_policy_hashes: Vec<String>,
-    allowed_pod_identities: Vec<String>,
+    authority: Option<AttestationAuthority>,
     vault_client: Option<Client>,
     vault_url: String,
     vault_token: String,
     kms_client: Option<Client>,
     kms_endpoint: String,
-    kms_key_id: String,
+}
+
+fn trusted_https_client(endpoint: &str) -> Option<Client> {
+    let url = reqwest::Url::parse(endpoint).ok()?;
+    if url.scheme() != "https" || url.host_str().is_none() ||
+        !url.username().is_empty() || url.password().is_some() ||
+        url.query().is_some() || url.fragment().is_some() {
+        return None;
+    }
+    Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .redirect(reqwest::redirect::Policy::none())
+        .build().ok()
 }
 
 impl KmsProxy {
     fn new() -> Self {
-        // Initialize Redis client if available
-        let redis_client = std::env::var("REDIS_URL")
-            .ok()
-            .and_then(|url| redis::Client::open(url).ok());
-
-        if redis_client.is_some() {
-            info!("Redis caching enabled for KMS proxy");
-        } else {
-            warn!("Redis not available, using in-memory cache only");
+        let authority = AttestationAuthority::from_environment();
+        if authority.is_none() {
+            warn!("KMS signing unavailable: operator authorization configuration missing or invalid");
         }
-
-        // Initialize Vault client if configured
-        let vault_url =
-            std::env::var("VAULT_URL").unwrap_or_else(|_| "http://localhost:8200".to_string());
+        let vault_url = std::env::var("VAULT_URL").unwrap_or_default();
         let vault_token = std::env::var("VAULT_TOKEN").unwrap_or_default();
-        let vault_client = if !vault_token.is_empty() {
-            info!("Vault integration enabled at {}", vault_url);
-            Some(Client::new())
-        } else {
-            warn!("Vault not configured, using mock signing");
-            None
-        };
-
-        // Initialize KMS client if configured
-        let kms_endpoint = std::env::var("KMS_ENDPOINT")
-            .unwrap_or_else(|_| "https://kms.aws.amazon.com".to_string());
-        let kms_key_id =
-            std::env::var("KMS_KEY_ID").unwrap_or_else(|_| "alias/provability-fabric".to_string());
-        let kms_client = if std::env::var("KMS_ENDPOINT").is_ok() {
-            info!("KMS integration enabled at {}", kms_endpoint);
-            Some(Client::new())
-        } else {
-            warn!("KMS not configured, using mock signing");
-            None
-        };
-
-        Self {
-            attestation_cache: Arc::new(RwLock::new(HashMap::new())),
-            kek_cache: Arc::new(RwLock::new(HashMap::new())),
-            redis_client,
-            cache_ttl_seconds: 60, // 60 second cache validity
-            allowed_policy_hashes: vec![
-                "default_policy_hash".to_string(),
-                "secure_policy_hash".to_string(),
-            ],
-            allowed_pod_identities: vec!["pod-secure-1".to_string(), "pod-secure-2".to_string()],
-            vault_client,
-            vault_url,
-            vault_token,
-            kms_client,
-            kms_endpoint,
-            kms_key_id,
-        }
-    }
-
-    async fn validate_attestation(&self, token: &AttestationToken) -> AttestationValidation {
-        let start_time = std::time::Instant::now();
-        let now = Utc::now();
-        let token_age = now.signed_duration_since(token.timestamp).num_seconds() as u64;
-
-        // Check Redis cache first
-        if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                let cache_key = format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
-                if let Ok(Some(cached)) = conn.get::<_, Option<String>>(&cache_key).await {
-                    if let Ok(validation) =
-                        serde_json::from_str::<AttestationValidation>(&cached)
-                    {
-                        counter!("kms_cache_hit", 1);
-                        let latency = start_time.elapsed();
-                        histogram!(
-                            "attestation_validation_duration_seconds",
-                            latency.as_secs_f64()
-                        );
-                        return validation;
-                    }
-                }
-            }
-        }
-
-        // Check in-memory cache
-        let cache_key = format!("{}:{}", token.policy_hash, token.pod_identity);
-        let attestation_cache = self.attestation_cache.read().await;
-        if let Some(cached_token) = attestation_cache.get(&cache_key) {
-            let token_age_cached = now
-                .signed_duration_since(cached_token.timestamp)
-                .num_seconds() as u64;
-            if token_age_cached <= self.cache_ttl_seconds {
-                counter!("kms_cache_hit", 1);
-                let latency = start_time.elapsed();
-                histogram!(
-                    "attestation_validation_duration_seconds",
-                    latency.as_secs_f64()
-                );
-                return AttestationValidation {
-                    valid: true,
-                    reason: "Valid cached attestation".to_string(),
-                    policy_hash_match: true,
-                    pod_identity_valid: true,
-                    token_fresh: true,
-                };
-            }
-        }
-        drop(attestation_cache);
-
-        // Perform validation
-        let token_fresh = token_age <= self.cache_ttl_seconds;
-        let policy_hash_match = self.allowed_policy_hashes.contains(&token.policy_hash);
-        let pod_identity_valid = self.allowed_pod_identities.contains(&token.pod_identity);
-        let signature_valid = self.verify_signature(token);
-
-        let valid = token_fresh && policy_hash_match && pod_identity_valid && signature_valid;
-
-        let reason = if !token_fresh {
-            "Token expired (older than 60 seconds)".to_string()
-        } else if !policy_hash_match {
-            "Policy hash not in allowed list".to_string()
-        } else if !pod_identity_valid {
-            "Pod identity not in allowed list".to_string()
-        } else if !signature_valid {
-            "Invalid signature".to_string()
-        } else {
-            "Valid attestation".to_string()
-        };
-
-        let validation = AttestationValidation {
-            valid,
-            reason: reason.clone(),
-            policy_hash_match,
-            pod_identity_valid,
-            token_fresh,
-        };
-
-        // Cache the result
-        if valid {
-            let cache_key = format!("{}:{}", token.policy_hash, token.pod_identity);
-            let mut attestation_cache = self.attestation_cache.write().await;
-            attestation_cache.insert(cache_key.clone(), token.clone());
-
-            // Also cache in Redis if available
-            if let Some(ref redis_client) = self.redis_client {
-                if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                    let redis_key =
-                        format!("attestation:{}:{}", token.policy_hash, token.pod_identity);
-                    let _: Result<(), redis::RedisError> = conn
-                        .set_ex(
-                            &redis_key,
-                            serde_json::to_string(&validation).unwrap(),
-                            self.cache_ttl_seconds,
-                        )
-                        .await;
-                }
-            }
-        }
-
-        counter!("kms_cache_miss", 1);
-        let latency = start_time.elapsed();
-        histogram!(
-            "attestation_validation_duration_seconds",
-            latency.as_secs_f64()
-        );
-
-        validation
-    }
-
-    fn verify_signature(&self, token: &AttestationToken) -> bool {
-        // In production, would verify cryptographic signature
-        // For now, just check that signature exists and has expected format
-        !token.signature.is_empty() && token.signature.starts_with("sig_")
+        let vault_client = if vault_token.is_empty() { None } else { trusted_https_client(&vault_url) };
+        let kms_endpoint = std::env::var("KMS_ENDPOINT").unwrap_or_default();
+        let kms_client = trusted_https_client(&kms_endpoint);
+        Self { authority, vault_client, vault_url, vault_token, kms_client, kms_endpoint }
     }
 
     async fn process_kms_request(&self, request: KmsRequest) -> KmsResponse {
         let operation_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now();
-
-        // Check if attestation token is required and provided
-        if let Some(token) = &request.attestation_token {
-            let validation = self.validate_attestation(token).await;
-
-            if !validation.valid {
-                error!("Attestation validation failed: {}", validation.reason);
-                return KmsResponse {
-                    success: false,
-                    result: None,
-                    error: Some(format!("Attestation failed: {}", validation.reason)),
-                    operation_id,
-                    timestamp,
-                };
-            }
-
-            // Cache the valid attestation
-            let mut cache = self.attestation_cache.write().await;
-            cache.insert(token.pod_identity.clone(), token.clone());
-            info!(
-                "Attestation validated and cached for pod: {}",
-                token.pod_identity
-            );
+        let result = if request.operation != "sign" {
+            Err(anyhow::anyhow!("Operation unavailable: no qualified implementation"))
+        } else if !self.authority.as_ref().map(|a| a.authorizes(&request, timestamp)).unwrap_or(false) {
+            Err(anyhow::anyhow!("Attestation authorization rejected"))
+        } else if let Some(data) = &request.data {
+            self.sign_with_kms(data, &request.key_id).await
         } else {
-            // Check if we have a cached attestation for this operation
-            // In a real implementation, we'd extract pod identity from request context
-            let cache = self.attestation_cache.read().await;
-            if cache.is_empty() {
-                error!("No attestation token provided and no cached attestation");
-                return KmsResponse {
-                    success: false,
-                    result: None,
-                    error: Some("Attestation token required".to_string()),
-                    operation_id,
-                    timestamp,
-                };
-            }
-        }
-
-        // Process KMS operation with real KMS/Vault integration
-        let result = match request.operation.as_str() {
-            "encrypt" => request
-                .data
-                .map(|data| format!("encrypted_{}", data)),
-            "decrypt" => request
-                .data
-                .map(|data| data.replace("encrypted_", "")),
-            "sign" => {
-                if let Some(data) = request.data {
-                    match self.sign_with_kms(&data, &request.key_id).await {
-                        Ok(signature) => Some(signature),
-                        Err(e) => {
-                            error!("KMS signing failed: {}", e);
-                            None
-                        }
-                    }
-                } else {
-                    None
-                }
-            }
-            "verify" => request
-                .data
-                .map(|_| "signature_valid".to_string()),
-            _ => None,
+            Err(anyhow::anyhow!("Missing data"))
         };
-
-        if result.is_some() {
-            info!(
-                "KMS operation '{}' completed successfully",
-                request.operation
-            );
-            KmsResponse {
-                success: true,
-                result,
-                error: None,
-                operation_id,
-                timestamp,
-            }
-        } else {
-            error!("KMS operation '{}' failed", request.operation);
-            KmsResponse {
-                success: false,
-                result: None,
-                error: Some("Invalid operation or missing data".to_string()),
-                operation_id,
-                timestamp,
+        match result {
+            Ok(signature) => KmsResponse { success: true, result: Some(signature), error: None, operation_id, timestamp },
+            Err(error) => {
+                warn!("KMS operation rejected: {}", error);
+                KmsResponse { success: false, result: None, error: Some(error.to_string()), operation_id, timestamp }
             }
         }
     }
 
-    async fn rotate_attestation_keys(&self) {
-        // In production, this would rotate the keys used for attestation verification
-        info!("Rotating attestation keys");
-
-        // Clear the cache to force fresh attestations
-        let mut cache = self.attestation_cache.write().await;
-        cache.clear();
-        info!("Attestation cache cleared");
-    }
-
-    async fn get_kek_handle(&self, policy_hash: &str) -> Result<String> {
-        let start_time = std::time::Instant::now();
-
-        // Check in-memory cache first
-        let kek_cache = self.kek_cache.read().await;
-        if let Some(handle) = kek_cache.get(policy_hash) {
-            counter!("kms_cache_hit", 1);
-            let latency = start_time.elapsed();
-            histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-            return Ok(handle.clone());
-        }
-        drop(kek_cache);
-
-        // Check Redis cache
-        if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                let cache_key = format!("kek:{}", policy_hash);
-                if let Ok(Some(handle)) = conn.get::<_, Option<String>>(&cache_key).await {
-                    // Update in-memory cache
-                    let mut kek_cache = self.kek_cache.write().await;
-                    kek_cache.insert(policy_hash.to_string(), handle.clone());
-
-                    counter!("kms_cache_hit", 1);
-                    let latency = start_time.elapsed();
-                    histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-                    return Ok(handle);
-                }
-            }
-        }
-
-        // Fetch from KMS (simulated)
-        let kek_handle = format!("kek-{}", Uuid::new_v4());
-
-        // Cache the result
-        let mut kek_cache = self.kek_cache.write().await;
-        kek_cache.insert(policy_hash.to_string(), kek_handle.clone());
-
-        // Also cache in Redis if available
-        if let Some(ref redis_client) = self.redis_client {
-            if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-                let cache_key = format!("kek:{}", policy_hash);
-                let _: Result<(), redis::RedisError> = conn
-                    .set_ex(&cache_key, &kek_handle, self.cache_ttl_seconds)
-                    .await;
-            }
-        }
-
-        counter!("kms_cache_miss", 1);
-        let latency = start_time.elapsed();
-        histogram!("kek_retrieval_duration_seconds", latency.as_secs_f64());
-
-        Ok(kek_handle)
-    }
-
-    /// Sign data using KMS/Vault
+    /// No fake signature or fallback after a selected provider fails.
     async fn sign_with_kms(&self, data: &str, key_id: &str) -> Result<String> {
-        let start_time = std::time::Instant::now();
-
-        // Try Vault first if configured
-        if let Some(ref client) = self.vault_client {
-            match self.sign_with_vault(client, data, key_id).await {
-                Ok(signature) => {
-                    counter!("kms_sign_success", 1, "provider" => "vault");
-                    let latency = start_time.elapsed();
-                    histogram!("kms_sign_duration_seconds", latency.as_secs_f64(), "provider" => "vault");
-                    return Ok(signature);
-                }
-                Err(e) => {
-                    warn!("Vault signing failed, falling back to KMS: {}", e);
-                }
-            }
+        let start = std::time::Instant::now();
+        let (result, provider) = if let Some(client) = &self.vault_client {
+            (self.sign_with_vault(client, data, key_id).await, "vault")
+        } else if let Some(client) = &self.kms_client {
+            (self.sign_with_remote_gateway(client, data, key_id).await, "gateway")
+        } else {
+            return Err(anyhow::anyhow!("No signing provider configured"));
+        };
+        histogram!("kms_sign_duration_seconds", start.elapsed().as_secs_f64(), "provider" => provider);
+        let signature = result?;
+        if signature.is_empty() {
+            return Err(anyhow::anyhow!("Signing provider returned an empty signature"));
         }
-
-        // Try KMS if configured
-        if let Some(ref client) = self.kms_client {
-            match self.sign_with_aws_kms(client, data, key_id).await {
-                Ok(signature) => {
-                    counter!("kms_sign_success", 1, "provider" => "aws_kms");
-                    let latency = start_time.elapsed();
-                    histogram!("kms_sign_duration_seconds", latency.as_secs_f64(), "provider" => "aws_kms");
-                    return Ok(signature);
-                }
-                Err(e) => {
-                    warn!("AWS KMS signing failed: {}", e);
-                }
-            }
-        }
-
-        // Fallback to mock signing for development
-        counter!("kms_sign_success", 1, "provider" => "mock");
-        let latency = start_time.elapsed();
-        histogram!("kms_sign_duration_seconds", latency.as_secs_f64(), "provider" => "mock");
-        Ok(format!(
-            "mock_signature_{}",
-            base64::engine::general_purpose::STANDARD.encode(data)
-        ))
+        counter!("kms_sign_success", 1, "provider" => provider);
+        Ok(signature)
     }
 
     /// Sign data using HashiCorp Vault
     async fn sign_with_vault(&self, client: &Client, data: &str, key_id: &str) -> Result<String> {
-        let url = format!("{}/v1/transit/sign/{}", self.vault_url, key_id);
+        let url = format!("{}/v1/transit/sign/{}", self.vault_url.trim_end_matches('/'), key_id);
 
         let request_body = VaultSignRequest {
             input: base64::engine::general_purpose::STANDARD.encode(data),
@@ -511,11 +253,9 @@ impl KmsProxy {
         }
     }
 
-    /// Sign data using AWS KMS
-    async fn sign_with_aws_kms(&self, client: &Client, data: &str, key_id: &str) -> Result<String> {
-        // In a real implementation, this would use AWS SDK for Rust
-        // For now, we'll simulate the AWS KMS signing process
-        let url = format!("{}/sign", self.kms_endpoint);
+    /// Invoke the configured remote signing gateway (not the AWS KMS API).
+    async fn sign_with_remote_gateway(&self, client: &Client, data: &str, key_id: &str) -> Result<String> {
+        let url = format!("{}/sign", self.kms_endpoint.trim_end_matches('/'));
 
         let request_body = KmsSignRequest {
             message: base64::engine::general_purpose::STANDARD.encode(data),
@@ -531,10 +271,13 @@ impl KmsProxy {
 
         if response.status().is_success() {
             let kms_response: KmsSignResponse = response.json().await?;
+            if kms_response.key_id != key_id {
+                return Err(anyhow::anyhow!("Signing gateway returned a different key identity"));
+            }
             Ok(kms_response.signature)
         } else {
             Err(anyhow::anyhow!(
-                "AWS KMS signing failed with status: {}",
+                "Signing gateway failed with status: {}",
                 response.status()
             ))
         }
@@ -545,23 +288,21 @@ async fn handle_request(
     req: Request,
     proxy: Arc<KmsProxy>,
 ) -> Result<Response<Body>, Response<Body>> {
-    let path = req.uri().path();
+    let path = req.uri().path().to_owned();
     let method = req.method();
 
-    match (method.as_str(), path) {
+    match (method.as_str(), path.as_str()) {
         ("POST", "/kms/encrypt")
         | ("POST", "/kms/decrypt")
         | ("POST", "/kms/sign")
         | ("POST", "/kms/verify") => {
             let body_bytes = Bytes::from_request(req, &()).await
                 .map_err(|rejection| rejection.into_response())?;
-            let kms_request: KmsRequest =
-                serde_json::from_slice(&body_bytes).unwrap_or_else(|_| KmsRequest {
-                    operation: "unknown".to_string(),
-                    key_id: "".to_string(),
-                    data: None,
-                    attestation_token: None,
-                });
+            let kms_request: KmsRequest = serde_json::from_slice(&body_bytes)
+                .map_err(|_| (axum::http::StatusCode::BAD_REQUEST, "Invalid KMS request").into_response())?;
+            if path.strip_prefix("/kms/") != Some(kms_request.operation.as_str()) {
+                return Err((axum::http::StatusCode::BAD_REQUEST, "Operation does not match route").into_response());
+            }
 
             let response = proxy.process_kms_request(kms_request).await;
             let response_json = serde_json::to_string(&response).unwrap();
@@ -572,16 +313,7 @@ async fn handle_request(
                 .unwrap())
         }
         ("POST", "/kms/rotate-keys") => {
-            proxy.rotate_attestation_keys().await;
-            let response = serde_json::json!({
-                "success": true,
-                "message": "Attestation keys rotated"
-            });
-
-            Ok(Response::builder()
-                .header("Content-Type", "application/json")
-                .body(Body::from(response.to_string()))
-                .unwrap())
+            Ok((axum::http::StatusCode::NOT_IMPLEMENTED, "Key rotation requires operator provisioning").into_response())
         }
         _ => {
             let response = serde_json::json!({
@@ -627,6 +359,86 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod http_transport_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_signed_request_binding_and_provider_dispatch() {
+        use ed25519_dalek::{Signer, SigningKey};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let issuer = SigningKey::from_bytes(&[19; 32]);
+        let authority = AttestationAuthority {
+            key: issuer.verifying_key(), pod: "fixture-pod".into(),
+            policy: "fixture-policy".into(), key_id: "fixture-key".into(),
+        };
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        let provider = Router::new().route("/sign", axum::routing::post(move |axum::Json(request): axum::Json<KmsSignRequest>| {
+            let observed = observed.clone();
+            async move {
+                assert_eq!(request.key_id, "fixture-key");
+                assert_eq!(base64::engine::general_purpose::STANDARD.decode(request.message).unwrap(), b"fixture-data");
+                observed.fetch_add(1, Ordering::SeqCst);
+                axum::Json(KmsSignResponse { signature: "fixture-provider-response".into(), key_id: request.key_id })
+            }
+        }));
+        let provider_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let provider_addr = provider_listener.local_addr().unwrap();
+        let upstream = tokio::spawn(async move { axum::serve(provider_listener, provider).await.unwrap() });
+        let client = Client::builder().no_proxy().timeout(std::time::Duration::from_secs(5)).build().unwrap();
+        let proxy = KmsProxy {
+            authority: Some(authority), vault_client: None, vault_url: String::new(), vault_token: String::new(),
+            kms_client: Some(client.clone()), kms_endpoint: format!("http://{provider_addr}"),
+        };
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, http_router(Arc::new(proxy))).await.unwrap() });
+        let mut request = KmsRequest {
+            operation: "sign".into(), key_id: "fixture-key".into(), data: Some("fixture-data".into()),
+            attestation_token: Some(AttestationToken {
+                token: "fixture-nonce".into(), pod_identity: "fixture-pod".into(),
+                policy_hash: "fixture-policy".into(), timestamp: Utc::now(), signature: String::new(),
+            }),
+        };
+        let token = request.attestation_token.as_mut().unwrap();
+        token.signature = base64::engine::general_purpose::STANDARD.encode(
+            issuer.sign(&signing_transcript(token, "sign", "fixture-key", "fixture-data")).to_bytes());
+        let valid = serde_json::to_value(&request).unwrap();
+        let url = format!("http://{addr}/kms/sign");
+        let response: serde_json::Value = client.post(&url).json(&valid).send().await.unwrap().json().await.unwrap();
+        assert_eq!(response["success"], true);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        for (field, value) in [
+            ("signature", serde_json::json!("sig_forged")),
+            ("pod_identity", serde_json::json!("other")),
+            ("policy_hash", serde_json::json!("other")),
+            ("token", serde_json::json!("different-nonce")),
+            ("timestamp", serde_json::json!((Utc::now() + chrono::Duration::seconds(10)).to_rfc3339())),
+            ("timestamp", serde_json::json!((Utc::now() - chrono::Duration::seconds(61)).to_rfc3339())),
+        ] {
+            let mut changed = valid.clone();
+            changed["attestation_token"][field] = value;
+            let response: serde_json::Value = client.post(&url).json(&changed).send().await.unwrap().json().await.unwrap();
+            assert_eq!(response["success"], false, "mutation: {field}");
+        }
+        for (field, value) in [
+            ("attestation_token", serde_json::Value::Null),
+            ("data", serde_json::json!("other-data")),
+            ("key_id", serde_json::json!("other-key")),
+        ] {
+            let mut changed = valid.clone();
+            changed[field] = value;
+            let response: serde_json::Value = client.post(&url).json(&changed).send().await.unwrap().json().await.unwrap();
+            assert_eq!(response["success"], false, "mutation: {field}");
+        }
+        let response = client.post(format!("http://{addr}/kms/encrypt")).json(&valid).send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 400);
+        let response = client.post(format!("http://{addr}/kms/rotate-keys")).send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 501);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        server.abort();
+        upstream.abort();
+    }
 
     #[tokio::test]
     async fn test_loopback_dispatch_and_body_limit() {
