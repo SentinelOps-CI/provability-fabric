@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+# Candidate-only native lockfile resolution. Replace resolution with locked
+# validation after importing the byte-verified Cargo artifact.
+name: Consolidated KMS authority candidate
+
+on:
+  pull_request:
+    branches: [security/rust-final-consolidation-20261127]
+    paths:
+      - 'runtime/kms-proxy/**'
+      - 'Cargo.lock'
+      - '.github/workflows/kms-consolidated-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve last Chrono removal using native Cargo
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/parent.lock"
+          cargo metadata --all-features --format-version 1 > "$RUNNER_TEMP/kms-consolidated-metadata.json"
+          python3 - <<'PY'
+          import json, os, tomllib
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          before = tomllib.loads((root / "parent.lock").read_text())["package"]
+          after = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          def registry(packages):
+              return {(p["name"], p["version"], p.get("source"), p.get("checksum"))
+                      for p in packages if "source" in p}
+          assert registry(after) <= registry(before), registry(after) - registry(before)
+          data = json.loads((root / "kms-consolidated-metadata.json").read_text())
+          packages = {p["id"]: p for p in data["packages"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          assert all(p["name"] != "chrono" for p in after), "Chrono remains locked"
+          assert all(p["name"] != "chrono" for p in packages.values()), "Chrono remains resolved"
+          for name, version in {"reqwest":"0.12.28", "kube":"4.2.1", "k8s-openapi":"0.28.0",
+                                "wasmtime":"36.0.22", "sqlx":"0.8.6", "time":"0.3.47",
+                                "ed25519-dalek":"2.2.0"}.items():
+              assert {p["version"] for p in after if p["name"] == name} == {version}, name
+          kms = next(i for i, p in packages.items() if p["name"] == "kms-proxy")
+          todo, seen = [kms], set()
+          while todo:
+              node = todo.pop()
+              if node in seen:
+                  continue
+              seen.add(node)
+              todo.extend(d["pkg"] for d in nodes[node]["deps"])
+          assert not any(packages[i]["name"] == "redis" for i in seen)
+          print("Workspace Chrono absent; KMS Redis absent; patched versions and registry checksums preserved")
+          PY
+          sha256sum Cargo.lock
+          cp Cargo.lock "$RUNNER_TEMP/native.lock"
+          cargo metadata --locked --all-features --format-version 1 > /dev/null
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Preserve native resolver lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-free-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Compile and execute native authority and transport tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p kms-proxy
+          cargo build --locked -p kms-proxy
+          cargo test --locked -p kms-proxy --bin kms-proxy request_tests::real_axum_listener_enforces_authorization_and_routes -- --exact --nocapture | tee "$RUNNER_TEMP/kms-listener.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/kms-listener.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/kms-listener.txt"
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Apply unchanged advisory and license policy
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
