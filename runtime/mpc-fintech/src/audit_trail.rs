@@ -3,12 +3,13 @@
 
 //! Comprehensive Audit Trail System for Financial MPC Operations
 //! 
-//! This module provides immutable, tamper-proof audit trails for all MPC operations
-//! with real-time compliance monitoring and regulatory reporting capabilities.
+//! This demonstration records process-local audit entries and illustrative
+//! compliance results. It does not establish tamper-proof or independently
+//! verified regulatory audit evidence.
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use crate::UtcTimestamp;
 use tracing::{info, debug, warn};
 use sha2::{Sha256, Digest};
 
@@ -36,7 +37,7 @@ pub struct AuditEntry {
     /// Operation that generated this entry
     pub operation_id: String,
     /// Entry timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Type of audit event
     pub event_type: AuditEventType,
     /// Detailed event data
@@ -111,7 +112,7 @@ pub struct AuditPerformanceMetrics {
     /// Network I/O in bytes
     pub network_io_bytes: usize,
     /// Timestamp when metrics were captured
-    pub metrics_timestamp: DateTime<Utc>,
+    pub metrics_timestamp: UtcTimestamp,
 }
 
 /// Security context for audit entries
@@ -176,7 +177,7 @@ pub struct RegulatoryAlert {
     /// Alert message
     pub message: String,
     /// Alert timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     /// Required actions
     pub required_actions: Vec<String>,
 }
@@ -202,7 +203,7 @@ pub struct ComplianceVerificationResult {
     /// Individual check results
     pub check_results: HashMap<String, CheckResult>,
     /// Verification timestamp
-    pub verification_timestamp: DateTime<Utc>,
+    pub verification_timestamp: UtcTimestamp,
     /// Verifier information
     pub verifier: String,
     /// Digital signature of verification
@@ -236,7 +237,7 @@ pub struct CheckResult {
     /// Evidence provided
     pub evidence: Option<String>,
     /// Check timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 /// Audit storage interface
@@ -244,7 +245,7 @@ trait AuditStorageInterface {
     async fn store_entry(&mut self, entry: &AuditEntry) -> Result<(), AuditError>;
     async fn retrieve_entries(&self, transaction_id: &str) -> Result<Vec<AuditEntry>, AuditError>;
     async fn verify_chain_integrity(&self) -> Result<bool, AuditError>;
-    async fn get_compliance_report(&self, start_date: DateTime<Utc>, end_date: DateTime<Utc>) -> Result<ComplianceReport, AuditError>;
+    async fn get_compliance_report(&self, start_date: UtcTimestamp, end_date: UtcTimestamp) -> Result<ComplianceReport, AuditError>;
 }
 
 /// Audit storage implementation
@@ -293,9 +294,9 @@ pub struct ComplianceReport {
     /// Report ID
     pub report_id: String,
     /// Report period start
-    pub period_start: DateTime<Utc>,
+    pub period_start: UtcTimestamp,
     /// Report period end
-    pub period_end: DateTime<Utc>,
+    pub period_end: UtcTimestamp,
     /// Total transactions processed
     pub total_transactions: u64,
     /// Compliance statistics
@@ -305,7 +306,7 @@ pub struct ComplianceReport {
     /// Performance summary
     pub performance_summary: PerformanceSummary,
     /// Report generation timestamp
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: UtcTimestamp,
 }
 
 /// Compliance statistics
@@ -427,7 +428,7 @@ impl AuditManager {
     /// Create audit entry for signature operation
     async fn create_signature_audit_entry(&self, signature_result: &MpcSignatureResult) -> Result<AuditEntry, AuditError> {
         let entry_id = uuid::Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
+        let timestamp = UtcTimestamp::now();
         
         // Create event data
         let mut event_details = HashMap::new();
@@ -513,7 +514,7 @@ impl AuditManager {
                         result: false,
                         details: format!("Validation error: {}", e),
                         evidence: None,
-                        timestamp: Utc::now(),
+                        timestamp: UtcTimestamp::now(),
                     });
                 }
             }
@@ -530,7 +531,7 @@ impl AuditManager {
         Ok(ComplianceVerificationResult {
             status,
             check_results,
-            verification_timestamp: Utc::now(),
+            verification_timestamp: UtcTimestamp::now(),
             verifier: "audit_manager".to_string(),
             verification_signature: None,
         })
@@ -589,10 +590,11 @@ impl AuditManager {
     }
     
     /// Calculate hash for audit entry
-    fn calculate_entry_hash(&self, entry_id: &str, timestamp: &DateTime<Utc>, event_data: &AuditEventData, previous_hash: &str) -> Result<String, AuditError> {
+    fn calculate_entry_hash(&self, entry_id: &str, timestamp: &UtcTimestamp, event_data: &AuditEventData, previous_hash: &str) -> Result<String, AuditError> {
         let mut hasher = Sha256::new();
         hasher.update(entry_id.as_bytes());
-        hasher.update(timestamp.to_rfc3339().as_bytes());
+        let wire = timestamp.legacy_offset_wire().ok_or_else(|| AuditError::SerializationError("timestamp outside supported domain".into()))?;
+        hasher.update(wire.as_bytes());
         hasher.update(previous_hash.as_bytes());
         
         // Hash event data
@@ -633,7 +635,7 @@ impl AuditManager {
             to_account: "validation-to".to_string(),
             amount: 0,
             currency: "USD".to_string(),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,
@@ -673,7 +675,7 @@ impl AuditStorage {
         Ok(true)
     }
     
-    async fn get_compliance_report(&self, _start_date: DateTime<Utc>, _end_date: DateTime<Utc>) -> Result<ComplianceReport, AuditError> {
+    async fn get_compliance_report(&self, _start_date: UtcTimestamp, _end_date: UtcTimestamp) -> Result<ComplianceReport, AuditError> {
         // Generate compliance report for the given period
         Ok(ComplianceReport {
             report_id: uuid::Uuid::new_v4().to_string(),
@@ -702,7 +704,7 @@ impl AuditStorage {
                 uptime_percent: 99.9,
                 error_rate_percent: 0.1,
             },
-            generated_at: Utc::now(),
+            generated_at: UtcTimestamp::now(),
         })
     }
 }
@@ -721,7 +723,7 @@ impl ComplianceValidator for SOXValidator {
             result: true,
             details: "SOX requirements met".to_string(),
             evidence: Some("Multi-party authorization and audit trail present".to_string()),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
         })
     }
 }
@@ -737,7 +739,7 @@ impl ComplianceValidator for PCIValidator {
             result: encryption_secure,
             details: if encryption_secure { "Strong encryption in use".to_string() } else { "Weak encryption detected".to_string() },
             evidence: Some(format!("Encryption: {}", context.encryption_details.algorithm)),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
         })
     }
 }
@@ -757,7 +759,7 @@ impl ComplianceValidator for BaselValidator {
             result: high_value_check,
             details: "Basel III risk management requirements".to_string(),
             evidence: Some("AML and sanctions screening verified".to_string()),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
         })
     }
 }
@@ -772,7 +774,7 @@ impl ComplianceValidator for GDPRValidator {
             result: privacy_compliant,
             details: "Data protection requirements".to_string(),
             evidence: Some("Encryption and access controls in place".to_string()),
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
         })
     }
 }
@@ -782,6 +784,34 @@ mod tests {
     use super::*;
     use crate::{MpcSignatureResult, PerformanceMetrics, AuditInfo, ConsensusInfo, ComplianceVerification};
     
+    #[tokio::test]
+    async fn legacy_audit_hash_preserves_timestamp_bytes() {
+        let manager = AuditManager::new(ComplianceLevel::Basic).await.unwrap();
+        let timestamp = UtcTimestamp::parse("2023-11-14T23:13:20.100+01:00").unwrap();
+        let event_data = AuditEventData {
+            details: HashMap::new(),
+            performance_metrics: Some(AuditPerformanceMetrics {
+                latency_us: 5, memory_usage_bytes: 8, cpu_usage_percent: 0.0,
+                network_io_bytes: 0, metrics_timestamp: timestamp,
+            }),
+            security_context: SecurityContext {
+                initiator: "fixture".into(), auth_method: "fixture".into(), source_ip: None,
+                security_level: SecurityLevel::Standard,
+                encryption_details: EncryptionDetails {
+                    algorithm: "fixture".into(), key_id: "fixture-key".into(), context: HashMap::new(),
+                },
+            },
+            regulatory_context: RegulatoryContext {
+                applicable_regulations: vec![], jurisdiction: "fixture".into(),
+                requirements_met: vec![], outstanding_requirements: vec![], alerts: vec![],
+            },
+        };
+        // Independent Python hashlib + compact JSON reference, using empty maps
+        // to avoid assuming that the legacy HashMap serializer is canonical.
+        assert_eq!(manager.calculate_entry_hash("entry-fixture", &timestamp, &event_data, "previous-fixture").unwrap(),
+                   "8994c9ef0a8d55fbb77d6434f9a83d639fbab753bb4388cd5de625d990cf8d38");
+    }
+
     #[tokio::test]
     async fn test_audit_manager_creation() {
         let audit_manager = AuditManager::new(ComplianceLevel::Basic).await;
@@ -809,7 +839,7 @@ mod tests {
             error: None,
             audit_info: AuditInfo {
                 parties: vec![0, 1, 2],
-                timestamp: Utc::now(),
+                timestamp: UtcTimestamp::now(),
                 input_hash: "input_hash".to_string(),
                 output_hash: "output_hash".to_string(),
                 consensus_info: ConsensusInfo {
@@ -823,7 +853,7 @@ mod tests {
                     aml_cleared: true,
                     sanctions_cleared: true,
                     regulatory_approved: true,
-                    verification_timestamp: Utc::now(),
+                    verification_timestamp: UtcTimestamp::now(),
                 },
             },
         };

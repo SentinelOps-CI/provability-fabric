@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
+use crate::UtcTimestamp;
 use tracing::{info, debug, warn};
 
 use crate::NetworkConfig;
@@ -93,7 +94,7 @@ pub struct NetworkStats {
     /// Network error rate
     pub error_rate_percent: f64,
     /// Statistics timestamp
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
 }
 
 impl NetworkManager {
@@ -114,7 +115,7 @@ impl NetworkManager {
                 avg_rtt_us: 0,
                 throughput_bps: 0,
                 error_rate_percent: 0.0,
-                timestamp: chrono::Utc::now(),
+                timestamp: UtcTimestamp::now(),
             })),
         };
         
@@ -279,7 +280,7 @@ impl NetworkManager {
         stats.avg_rtt_us = avg_rtt;
         stats.throughput_bps = total_bytes_sent; // Simplified calculation
         stats.error_rate_percent = error_rate;
-        stats.timestamp = chrono::Utc::now();
+        stats.timestamp = UtcTimestamp::now();
         
         stats.clone()
     }

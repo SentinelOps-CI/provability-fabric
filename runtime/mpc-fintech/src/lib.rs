@@ -3,14 +3,16 @@
 
 //! High-Performance Multi-Party Computation for Financial Services
 //! 
-//! This module provides a production-ready MPC implementation designed for
-//! complex financial workloads with extremely low latency requirements and
-//! comprehensive audit trails.
+//! This experimental module demonstrates financial MPC interfaces using
+//! simulated cryptographic and compliance operations. It is not a production
+//! signing, regulatory compliance, or audit-integrity implementation.
 
 // Workspace membership surfaces this scaffolding under `cargo clippy -D warnings`.
 // Private fields/methods are retained for the planned MPC control-plane surface.
 #![allow(dead_code)]
 
+pub mod utc_timestamp;
+pub use utc_timestamp::UtcTimestamp;
 pub mod threshold_signature;
 pub mod audit_trail;
 pub mod network;
@@ -142,7 +144,7 @@ pub struct FinancialTransaction {
     /// Currency code (ISO 4217)
     pub currency: String,
     /// Transaction timestamp
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
     /// Additional metadata
     pub metadata: HashMap<String, String>,
     /// Regulatory flags
@@ -225,7 +227,7 @@ pub struct AuditInfo {
     /// Participating parties
     pub parties: Vec<u32>,
     /// Operation timestamp
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: UtcTimestamp,
     /// Hash of input data
     pub input_hash: String,
     /// Hash of output data
@@ -261,7 +263,7 @@ pub struct ComplianceVerification {
     /// Regulatory approval status
     pub regulatory_approved: bool,
     /// Verification timestamp
-    pub verification_timestamp: chrono::DateTime<chrono::Utc>,
+    pub verification_timestamp: UtcTimestamp,
 }
 
 /// Main MPC Financial Service
@@ -521,7 +523,7 @@ impl MpcFinancialService {
         // Create audit information
         let audit_info = AuditInfo {
             parties: (0..self.config.party_count as u32).collect(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             input_hash: self.hash_transaction(transaction),
             output_hash: self.hash_signature(&signature_data),
             consensus_info: ConsensusInfo {
@@ -535,7 +537,7 @@ impl MpcFinancialService {
                 aml_cleared: transaction.compliance_flags.requires_aml,
                 sanctions_cleared: transaction.compliance_flags.sanctions_screening,
                 regulatory_approved: true,
-                verification_timestamp: chrono::Utc::now(),
+                verification_timestamp: UtcTimestamp::now(),
             },
         };
         
@@ -652,7 +654,7 @@ mod tests {
             to_account: "account-002".to_string(),
             amount: 1000000, // $10.00 in cents
             currency: "USD".to_string(),
-            timestamp: chrono::Utc::now(),
+            timestamp: UtcTimestamp::now(),
             metadata: HashMap::new(),
             compliance_flags: ComplianceFlags {
                 requires_kyc: true,

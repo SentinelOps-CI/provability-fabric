@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: Apache-2.0
+name: MPC timestamp wire compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/mpc-fintech/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/mpc-timestamp-wire.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/mpc-fintech/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/mpc-timestamp-wire.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  timestamp-wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute native MPC demonstration tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p mpc-fintech --all-features
+          cargo build --locked -p mpc-fintech --all-features --bins
+          git diff --exit-code -- Cargo.lock
+      - name: Verify exact legacy audit and transaction digest tests execute
+        run: |
+          set -euo pipefail
+          cargo test --locked -p mpc-fintech --lib audit_trail::tests::legacy_audit_hash_preserves_timestamp_bytes -- --exact --nocapture | tee "$RUNNER_TEMP/mpc-audit-hash.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/mpc-audit-hash.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/mpc-audit-hash.txt"
+          cargo test --locked -p mpc-fintech --lib threshold_signature::tests::legacy_transaction_signing_payload_preserves_unix_seconds -- --exact --nocapture | tee "$RUNNER_TEMP/mpc-signing-hash.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/mpc-signing-hash.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/mpc-signing-hash.txt"
+      - name: Verify Chrono-free dependency closure
+        run: |
+          set -euo pipefail
+          cargo tree --locked -p mpc-fintech --all-features --prefix none > "$RUNNER_TEMP/mpc-deps.txt"
+          if grep -q '^chrono v' "$RUNNER_TEMP/mpc-deps.txt"; then
+            echo "Unexpected Chrono dependency in MPC demonstration closure" >&2
+            exit 1
+          fi
+          grep -Eq '^time v0\.3\.47([[:space:]]|$)' "$RUNNER_TEMP/mpc-deps.txt"
+          git diff --exit-code -- Cargo.lock
