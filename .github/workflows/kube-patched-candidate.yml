@@ -147,4 +147,9 @@ jobs:
             ${{ runner.temp }}/queue-runner.txt
           if-no-files-found: error
       - name: Execute unchanged release latency gate
-        run: cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --nocapture
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --test-threads=1 --nocapture | tee "$RUNNER_TEMP/queue-gate.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/queue-gate.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/queue-gate.txt"
+          git diff --exit-code -- Cargo.lock
