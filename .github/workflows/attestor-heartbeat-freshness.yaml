@@ -41,6 +41,16 @@ jobs:
           cargo test --locked -p attestor
           cargo build --locked -p attestor
           git diff --exit-code -- Cargo.lock
+      - name: Verify attestor dependency closure
+        run: |
+          cargo tree --locked -p attestor --prefix none > "$RUNNER_TEMP/attestor-deps.txt"
+          cat "$RUNNER_TEMP/attestor-deps.txt"
+          if grep -q '^chrono v' "$RUNNER_TEMP/attestor-deps.txt"; then
+            echo "Unexpected Chrono dependency in attestor closure" >&2
+            exit 1
+          fi
+          grep -Eq '^time v0\.3\.47([[:space:]]|$)' "$RUNNER_TEMP/attestor-deps.txt"
+          git diff --exit-code -- Cargo.lock
       - name: Test real Redis-backed HTTP service
         env:
           REDIS_URL: redis://127.0.0.1:6379

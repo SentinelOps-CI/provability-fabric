@@ -1,11 +1,11 @@
 // Attestation types for Nitro/SEV and runtime policy; some are not yet used at runtime.
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RuntimeAttestation {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: UtcTimestamp,
     pub capsule_hash: String,
     pub policy_config: PolicyConfig,
     pub retention_status: RetentionStatus,
@@ -52,7 +52,7 @@ pub struct RetentionStatus {
 impl RuntimeAttestation {
     pub fn new(capsule_hash: String) -> Self {
         Self {
-            timestamp: Utc::now(),
+            timestamp: UtcTimestamp::now(),
             capsule_hash,
             policy_config: PolicyConfig::default(),
             retention_status: RetentionStatus::default(),

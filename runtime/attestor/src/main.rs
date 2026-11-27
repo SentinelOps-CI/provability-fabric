@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use chrono::{DateTime, Utc};
+use crate::utc_timestamp::UtcTimestamp;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -14,6 +14,7 @@ use tracing::{info, warn};
 mod attest;
 mod nitro;
 mod sev;
+mod utc_timestamp;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Heartbeat {
@@ -42,7 +43,7 @@ pub struct TerminateFrame {
 #[derive(Debug, Serialize)]
 pub struct LivenessResponse {
     pub alive: bool,
-    pub last_heartbeat: Option<DateTime<Utc>>,
+    pub last_heartbeat: Option<UtcTimestamp>,
     pub age_seconds: Option<i64>,
 }
 
@@ -60,11 +61,11 @@ impl LivenessResponse {
 
 /// Evaluate a claimed Unix-second timestamp against one sampled UTC clock.
 /// A future or unrepresentable claim is never evidence of liveness.
-fn heartbeat_liveness(timestamp: i64, now: DateTime<Utc>) -> LivenessResponse {
-    let Some(heartbeat_time) = DateTime::<Utc>::from_timestamp(timestamp, 0) else {
+fn heartbeat_liveness(timestamp: i64, now: UtcTimestamp) -> LivenessResponse {
+    let Some(heartbeat_time) = UtcTimestamp::from_timestamp(timestamp, 0) else {
         return LivenessResponse::unavailable();
     };
-    let age_seconds = now.signed_duration_since(heartbeat_time).num_seconds();
+    let age_seconds = now.signed_age_seconds(heartbeat_time);
     LivenessResponse {
         alive: heartbeat_time <= now && (0..HEARTBEAT_FRESHNESS_SECONDS).contains(&age_seconds),
         last_heartbeat: Some(heartbeat_time),
@@ -118,8 +119,8 @@ async fn handle_heartbeat(
     Json(heartbeat): Json<Heartbeat>,
 ) -> StatusCode {
     // Reject invalid or future claims before they can replace stored evidence.
-    let now = Utc::now();
-    match DateTime::<Utc>::from_timestamp(heartbeat.timestamp, 0) {
+    let now = UtcTimestamp::now();
+    match UtcTimestamp::from_timestamp(heartbeat.timestamp, 0) {
         Some(timestamp) if timestamp <= now => {}
         _ => return StatusCode::BAD_REQUEST,
     }
@@ -193,7 +194,7 @@ async fn handle_liveness(
         .as_deref()
         .and_then(|data| serde_json::from_str::<Heartbeat>(data).ok())
         .filter(|heartbeat| heartbeat.capsule_hash == hash)
-        .map(|heartbeat| heartbeat_liveness(heartbeat.timestamp, Utc::now()))
+        .map(|heartbeat| heartbeat_liveness(heartbeat.timestamp, UtcTimestamp::now()))
         .unwrap_or_else(LivenessResponse::unavailable);
     Json(result)
 }
@@ -206,7 +207,7 @@ mod tests {
 
     #[test]
     fn heartbeat_freshness_boundaries() {
-        let now = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 0).unwrap();
         for (offset, expected) in [(0, true), (-14, true), (-15, false), (-30, false), (1, false)] {
             let result = heartbeat_liveness(now.timestamp() + offset, now);
             assert_eq!(result.alive, expected, "offset {offset}");
@@ -216,7 +217,7 @@ mod tests {
 
     #[test]
     fn future_subsecond_age_truncation_does_not_grant_liveness() {
-        let now = DateTime::<Utc>::from_timestamp(1_700_000_000, 900_000_000).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 900_000_000).unwrap();
         let result = heartbeat_liveness(now.timestamp() + 1, now);
         assert_eq!(result.age_seconds, Some(0));
         assert!(!result.alive);
@@ -224,7 +225,7 @@ mod tests {
 
     #[test]
     fn unrepresentable_timestamps_are_unavailable() {
-        let now = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 0).unwrap();
         for timestamp in [i64::MIN, i64::MAX] {
             let result = heartbeat_liveness(timestamp, now);
             assert!(!result.alive);
@@ -235,7 +236,7 @@ mod tests {
 
     #[test]
     fn valid_heartbeat_preserves_wire_representation() {
-        let now = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+        let now = UtcTimestamp::from_timestamp(1_700_000_000, 0).unwrap();
         let result = heartbeat_liveness(now.timestamp(), now);
         assert_eq!(
             serde_json::to_value(result).unwrap(),
