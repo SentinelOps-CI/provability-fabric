@@ -578,6 +578,28 @@ mod tests {
     use crate::{TransactionType, ComplianceFlags};
     
     #[tokio::test]
+    async fn legacy_transaction_signing_payload_preserves_unix_seconds() {
+        let signer = ThresholdSigner::new(2, 3).await.unwrap();
+        for (wire, expected) in [
+            ("1969-12-31T23:59:59.999999999Z", "895a1ed401ae46e25c6ccf6e37a42b1eef972bdbc2bd4d2e9e31987078f0b624"),
+            ("2023-11-14T23:13:20.100+01:00", "c124f53daa06d210c224f7f87512434ad2047eadad00afb08d2c304d274b45a3"),
+        ] {
+            let transaction = FinancialTransaction {
+                transaction_id: "fixture".into(), transaction_type: TransactionType::Payment,
+                from_account: "A".into(), to_account: "B".into(), amount: 100, currency: "USD".into(),
+                timestamp: UtcTimestamp::parse(wire).unwrap(), metadata: HashMap::new(),
+                compliance_flags: ComplianceFlags {
+                    requires_kyc: false, requires_aml: false, high_value: false,
+                    cross_border: false, sanctions_screening: false,
+                },
+            };
+            let payload = signer.serialize_transaction_for_signing(&transaction).unwrap();
+            // Independent Python compact JSON and SHA-256 reference.
+            assert_eq!(format!("{:x}", Sha256::digest(payload)), expected);
+        }
+    }
+
+    #[tokio::test]
     async fn test_threshold_signer_creation() {
         let signer = ThresholdSigner::new(3, 5).await;
         assert!(signer.is_ok());
