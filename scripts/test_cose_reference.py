@@ -83,7 +83,7 @@ def main():
         check("trailing data", envelope + bytes([0]), fields, key, False)
         check("changed expected request", envelope, {**fields, "request_id": "different"}, key, False)
         check("changed expected hash", envelope, {**fields, "content_hash": "02" * 32}, key, False)
-        check("old algorithm header", envelope[:4] + bytes([0x27]) + envelope[5:], fields, key, False)
+        check("old algorithm header", envelope[:5] + bytes([0x27]) + envelope[6:], fields, key, False)
         check("private key as trust input", envelope, fields, wrong_private, False)
 
 
