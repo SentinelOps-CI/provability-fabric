@@ -168,8 +168,24 @@ mod integration_tests {
         let result = adapter.process_event(&expired_event);
         assert!(!result.allowed, "Expired context should be rejected");
         assert_eq!(result.permit_decision, "reject");
-        assert_eq!(result.reason, "Context epoch is outdated");
+        assert_eq!(result.reason, "Context epoch does not match current epoch");
         assert_eq!(result.epoch, 3); // Current epoch
+
+        // The same authorized request succeeds at the current epoch and is
+        // rejected at a future epoch. Revocation changes the epoch, not the role.
+        let mut fresh_event = expired_event.clone();
+        fresh_event.epoch = 3;
+        let fresh = adapter.process_event(&fresh_event);
+        assert!(fresh.allowed);
+        assert_eq!(fresh.permit_decision, "accept");
+        assert_eq!(fresh.epoch, 3);
+
+        fresh_event.epoch = 4;
+        let future = adapter.process_event(&fresh_event);
+        assert!(!future.allowed);
+        assert_eq!(future.permit_decision, "reject");
+        assert_eq!(future.reason, "Context epoch does not match current epoch");
+        assert_eq!(future.epoch, 3);
     }
 
     /// Test that revoked principals are blocked
@@ -246,12 +262,11 @@ mod integration_tests {
         };
 
         let result = adapter.process_event(&read_event);
-        // In high assurance mode, this should be denied due to missing attributes
-        // The exact behavior depends on the witness validation implementation
-        assert!(
-            result.allowed || !result.allowed,
-            "Result should be deterministic"
-        );
+        // There is no trusted witness or label-derivation verifier configured.
+        assert!(!result.allowed);
+        assert_eq!(result.permit_decision, "reject");
+        assert!(!result.path_witness_ok);
+        assert!(!result.label_derivation_ok);
     }
 
     /// Test shadow mode allows actions but logs violations
@@ -371,11 +386,11 @@ mod integration_tests {
         };
 
         let result = adapter.process_event(&read_event);
-        // Result should be deterministic based on current configuration
-        assert!(
-            result.allowed || !result.allowed,
-            "Result should be deterministic"
-        );
+        // A reader role and feature flag do not establish witness validity.
+        assert!(!result.allowed);
+        assert_eq!(result.permit_decision, "accept");
+        assert!(!result.path_witness_ok);
+        assert!(!result.label_derivation_ok);
     }
 
     /// Test comprehensive event processing pipeline
@@ -410,7 +425,7 @@ mod integration_tests {
                 resource_version: None,
                 field_path: None,
             },
-            // Valid document read
+            // Document read lacking verified witness and label derivation
             RuntimeEvent {
                 event_type: "read".to_string(),
                 user_id: "reader_1".to_string(),
@@ -449,9 +464,14 @@ mod integration_tests {
             .map(|event| adapter.process_event(event))
             .collect();
 
-        // Verify results (email and read depend on policy config; network call should be denied)
         assert_eq!(results.len(), 3);
+        assert!(results[0].allowed, "Authorized email call should proceed");
+        assert_eq!(results[0].permit_decision, "accept");
+        assert!(!results[1].allowed, "Read without verified evidence must be denied");
+        assert!(!results[1].path_witness_ok);
+        assert!(!results[1].label_derivation_ok);
         assert!(!results[2].allowed, "Network call should be denied");
+        assert_eq!(results[2].permit_decision, "reject");
 
         // Verify epoch consistency
         let current_epoch = adapter.get_current_epoch();
