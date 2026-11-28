@@ -70,9 +70,9 @@ mod tests {
     #[tokio::test]
     async fn health_handler_reports_current_utc_timestamp() {
         let Json(health) = health_handler().await.expect("healthy response");
-        let parsed = chrono::DateTime::parse_from_rfc3339(&health.timestamp)
+        let parsed = OffsetDateTime::parse(&health.timestamp, &Rfc3339)
             .expect("RFC3339 timestamp");
         assert_eq!(health.status, "healthy");
-        assert_eq!(parsed.offset().local_minus_utc(), 0);
+        assert_eq!(parsed.offset().whole_seconds(), 0);
     }
 }

@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Rand patch qualification
+
+on:
+  pull_request:
+    branches: [security/rust-final-consolidation-20261127, security/kms-authority-consolidated-20261127, main]
+    paths:
+      - '.github/workflows/rand-patch-candidate.yml'
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - 'deny.toml'
+
+permissions:
+  contents: read
+
+jobs:
+  locked-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native optional-feature prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libhyperscan-dev libclang-dev pkg-config protobuf-compiler libprotobuf-dev
+          protoc --version
+          pkg-config --modversion libhs
+          test -r /usr/include/google/protobuf/timestamp.proto
+          test -r /usr/include/google/protobuf/any.proto
+          protoc -I api --descriptor_set_out="$RUNNER_TEMP/pf-sdk-protos.pb" \
+            api/v1/plan.proto api/v1/kernel.proto api/v1/receipt.proto \
+            api/v1/egress.proto api/v1/safety_case.proto
+      - name: Confirm exact patched Rand versions and absence of suppression
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --all-features --format-version 1 > /dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          packages = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          assert {p["version"] for p in packages if p["name"] == "rand"} == {"0.8.6", "0.9.3", "0.10.4"}
+          assert "RUSTSEC-2026-0097" not in Path("deny.toml").read_text()
+          PY
+          git diff --exit-code -- Cargo.lock
+      - name: Apply full policy to committed graph
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
+      - name: Qualify affected production libraries and binaries
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher -p labeler -p retrieval-gateway --lib --bins --no-fail-fast
+          cargo check --locked --workspace --all-features --all-targets
+          git diff --exit-code -- Cargo.lock

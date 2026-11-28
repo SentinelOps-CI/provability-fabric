@@ -1,0 +1,156 @@
+# SPDX-License-Identifier: Apache-2.0
+# Native lockfile imported from run 46085025738; validate in locked mode.
+name: Consolidated KMS authority candidate
+
+on:
+  pull_request:
+    branches: [security/rust-final-consolidation-20261127, main]
+    paths:
+      - 'runtime/kms-proxy/**'
+      - 'scripts/test_kms_live_vault.py'
+      - 'runtime/sidecar-watcher/**'
+      - 'runtime/mpc-fintech/**'
+      - 'runtime/tool-broker/**'
+      - 'runtime/attestor/**'
+      - 'runtime/telemetry-service/**'
+      - 'runtime/jwks-manager/**'
+      - 'deny.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/kms-consolidated-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify imported Chrono-free native Cargo resolution
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/parent.lock"
+          cargo metadata --locked --all-features --format-version 1 > "$RUNNER_TEMP/kms-consolidated-metadata.json"
+          python3 - <<'PY'
+          import json, os, tomllib
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          before = tomllib.loads((root / "parent.lock").read_text())["package"]
+          after = tomllib.loads(Path("Cargo.lock").read_text())["package"]
+          def registry(packages):
+              return {(p["name"], p["version"], p.get("source"), p.get("checksum"))
+                      for p in packages if "source" in p}
+          assert registry(after) <= registry(before), registry(after) - registry(before)
+          data = json.loads((root / "kms-consolidated-metadata.json").read_text())
+          packages = {p["id"]: p for p in data["packages"]}
+          nodes = {n["id"]: n for n in data["resolve"]["nodes"]}
+          assert all(p["name"] != "chrono" for p in after), "Chrono remains locked"
+          assert all(p["name"] != "chrono" for p in packages.values()), "Chrono remains resolved"
+          for name, version in {"reqwest":"0.12.28", "kube":"4.2.1", "k8s-openapi":"0.28.0",
+                                "wasmtime":"36.0.22", "sqlx":"0.8.6", "time":"0.3.47",
+                                "ed25519-dalek":"2.2.0"}.items():
+              assert {p["version"] for p in after if p["name"] == name} == {version}, name
+          kms = next(i for i, p in packages.items() if p["name"] == "kms-proxy")
+          todo, seen = [kms], set()
+          while todo:
+              node = todo.pop()
+              if node in seen:
+                  continue
+              seen.add(node)
+              todo.extend(d["pkg"] for d in nodes[node]["deps"])
+          assert not any(packages[i]["name"] == "redis" for i in seen)
+          print("Workspace Chrono absent; KMS Redis absent; patched versions and registry checksums preserved")
+          PY
+          git diff --exit-code -- Cargo.lock
+          sha256sum Cargo.lock
+          cp Cargo.lock "$RUNNER_TEMP/native.lock"
+          cargo metadata --locked --all-features --format-version 1 > /dev/null
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Preserve native resolver lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-free-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Compile and execute native authority and transport tests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p kms-proxy
+          cargo build --locked -p kms-proxy
+          cargo test --locked -p kms-proxy --bin kms-proxy request_tests::real_axum_listener_enforces_authorization_and_routes -- --exact --nocapture | tee "$RUNNER_TEMP/kms-listener.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/kms-listener.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/kms-listener.txt"
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Fetch checksum-pinned Vault fixture and test real signing
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp -d "$RUNNER_TEMP/pf-vault-bin.XXXXXX")"
+          trap 'rm -rf "$fixture"' EXIT
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 120 \
+            https://releases.hashicorp.com/vault/1.21.4/vault_1.21.4_linux_amd64.zip -o "$fixture/vault.zip"
+          printf '%s  %s\n' '889b681990fe221b884b7932fa9c9dd0ee9811b9349554f1aa287ab63c9f3dae' "$fixture/vault.zip" | sha256sum --check
+          unzip -q "$fixture/vault.zip" vault -d "$fixture"
+          "$fixture/vault" version
+          openssl version
+          PF_TEST_VAULT_BIN="$fixture/vault" python3 scripts/test_kms_live_vault.py
+          cmp Cargo.lock "$RUNNER_TEMP/native.lock"
+      - name: Apply full advisory and scoped certificate-data license policy
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
+
+  combined-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute combined native tests and compile demonstration binaries
+        run: |
+          set -euo pipefail
+          cargo test --locked -p attestor -p tool-broker -p mpc-fintech -p sidecar-watcher --all-features --lib --bins --no-fail-fast
+          cargo build --locked -p mpc-fintech --all-features --bins
+          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
+          git diff --exit-code -- Cargo.lock
+      - name: Verify telemetry response semantics on actual HTTP listener
+        run: |
+          set -euo pipefail
+          cargo test --locked -p telemetry-service --bin telemetry-service http_transport_tests::test_loopback_dispatch_and_body_limit -- --exact --nocapture | tee "$RUNNER_TEMP/telemetry-http.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/telemetry-http.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/telemetry-http.txt"
+      - name: Verify JWKS response semantics on actual HTTP listener
+        run: |
+          set -euo pipefail
+          cargo test --locked -p jwks-manager --bin jwks-manager http_transport_tests::test_loopback_dispatch_and_body_limit -- --exact --nocapture | tee "$RUNNER_TEMP/jwks-http.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/jwks-http.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/jwks-http.txt"
+      - name: Run the existing workspace Clippy acceptance command
+        run: |
+          set -euo pipefail
+          cargo clippy --locked --workspace --exclude provability-fabric-core-sdk-rust -- -D warnings
+          git diff --exit-code -- Cargo.lock
+      - name: Repeat isolated Kubernetes TLS controls
+        run: python3 scripts/test_kube_ca_isolation.py
+      - name: Retain original release performance gate
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --test-threads=1 --nocapture | tee "$RUNNER_TEMP/fifo-gate.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/fifo-gate.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/fifo-gate.txt"
+      - name: Build production sidecar and verify shipped certificate-data license
+        run: |
+          set -euo pipefail
+          cargo fetch --locked
+          docker build -f runtime/sidecar-watcher/Dockerfile -t pf-sidecar-license-fixture .
+          docker run --rm --entrypoint cat pf-sidecar-license-fixture /usr/share/doc/sidecar-watcher/third-party-licenses/webpki-root-certs-1.0.12.LICENSE > "$RUNNER_TEMP/shipped-root-certs.LICENSE"
+          set -- "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/webpki-root-certs-1.0.12/LICENSE
+          test "$#" -eq 1
+          test -s "$1"
+          cmp "$1" "$RUNNER_TEMP/shipped-root-certs.LICENSE"
+          git diff --exit-code -- Cargo.lock

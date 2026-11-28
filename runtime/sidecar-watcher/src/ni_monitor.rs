@@ -215,6 +215,7 @@ impl NIPrefix {
     /// This implements the exact violation detection logic required by \MonNI_L:
     /// 1. Every observed input flows only to an equal or higher output label.
     /// 2. Every input and output respects the declared prefix bounds.
+    ///
     /// This is a local label-flow check, not a proof of global noninterference.
     pub fn violates_ni(&self) -> bool {
         for event in &self.events {

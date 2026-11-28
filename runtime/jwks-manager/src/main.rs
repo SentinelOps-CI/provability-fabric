@@ -378,7 +378,7 @@ impl Clone for JwksManager {
 async fn handle_request(
     req: Request,
     manager: Arc<JwksManager>,
-) -> Result<Response<Body>, Response<Body>> {
+) -> Response<Body> {
     let path = req.uri().path();
     let method = req.method();
 
@@ -387,11 +387,11 @@ async fn handle_request(
             let jwks = manager.get_jwks().await;
             let response_json = serde_json::to_string(&jwks).unwrap();
             
-            Ok(Response::builder()
+            Response::builder()
                 .header("Content-Type", "application/json")
                 .header("Cache-Control", "public, max-age=300") // 5 minute cache
                 .body(Body::from(response_json))
-                .unwrap())
+                .unwrap()
         }
         ("POST", "/rotate-keys") => {
             match manager.rotate_keys().await {
@@ -401,10 +401,10 @@ async fn handle_request(
                         "message": "Keys rotated successfully"
                     });
                     
-                    Ok(Response::builder()
+                    Response::builder()
                         .header("Content-Type", "application/json")
                         .body(Body::from(response.to_string()))
-                        .unwrap())
+                        .unwrap()
                 }
                 Err(e) => {
                     let response = serde_json::json!({
@@ -412,17 +412,19 @@ async fn handle_request(
                         "error": e.to_string()
                     });
                     
-                    Ok(Response::builder()
+                    Response::builder()
                         .status(500)
                         .header("Content-Type", "application/json")
                         .body(Body::from(response.to_string()))
-                        .unwrap())
+                        .unwrap()
                 }
             }
         }
         ("POST", "/validate-token") => {
-            let body_bytes = Bytes::from_request(req, &()).await
-                .map_err(|rejection| rejection.into_response())?;
+            let body_bytes = match Bytes::from_request(req, &()).await {
+                Ok(bytes) => bytes,
+                Err(rejection) => return rejection.into_response(),
+            };
             let request: serde_json::Value = serde_json::from_slice(&body_bytes)
                 .unwrap_or(serde_json::Value::Null);
 
@@ -434,10 +436,10 @@ async fn handle_request(
                             "message": "Token validated successfully"
                         });
                         
-                        Ok(Response::builder()
+                        Response::builder()
                             .header("Content-Type", "application/json")
                             .body(Body::from(response.to_string()))
-                            .unwrap())
+                            .unwrap()
                     }
                     Err(e) => {
                         let response = serde_json::json!({
@@ -445,11 +447,11 @@ async fn handle_request(
                             "error": e.to_string()
                         });
                         
-                        Ok(Response::builder()
+                        Response::builder()
                             .status(400)
                             .header("Content-Type", "application/json")
                             .body(Body::from(response.to_string()))
-                            .unwrap())
+                            .unwrap()
                     }
                 }
             } else {
@@ -457,11 +459,11 @@ async fn handle_request(
                     "error": "Missing token in request body"
                 });
                 
-                Ok(Response::builder()
+                Response::builder()
                     .status(400)
                     .header("Content-Type", "application/json")
                     .body(Body::from(response.to_string()))
-                    .unwrap())
+                    .unwrap()
             }
         }
         _ => {
@@ -470,11 +472,11 @@ async fn handle_request(
                 "message": "Endpoint not supported"
             });
             
-            Ok(Response::builder()
+            Response::builder()
                 .status(404)
                 .header("Content-Type", "application/json")
                 .body(Body::from(response.to_string()))
-                .unwrap())
+                .unwrap()
         }
     }
 }
@@ -532,9 +534,15 @@ mod http_transport_tests {
         let base = format!("http://{addr}");
         let unknown = client.get(format!("{base}/unknown")).send().await.unwrap();
         assert_eq!(unknown.status().as_u16(), 404);
+        assert_eq!(unknown.headers()["content-type"], "application/json");
         assert_eq!(unknown.json::<serde_json::Value>().await.unwrap()["error"], "Not found");
         let response = client.get(format!("{base}/.well-known/jwks.json")).send().await.unwrap();
         assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(response.headers()["cache-control"], "public, max-age=300");
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let missing = client.post(format!("{base}/validate-token")).body("{}").send().await.unwrap();
+        assert_eq!(missing.status().as_u16(), 400);
+        assert_eq!(missing.json::<serde_json::Value>().await.unwrap()["error"], "Missing token in request body");
         let oversized = client.post(format!("{base}/validate-token"))
             .body(vec![b'x'; MAX_REQUEST_BODY_BYTES + 1]).send().await.unwrap();
         assert_eq!(oversized.status().as_u16(), 413);

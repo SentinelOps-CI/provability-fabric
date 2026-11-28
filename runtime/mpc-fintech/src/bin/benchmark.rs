@@ -334,7 +334,6 @@ async fn run_load_test_benchmark(mpc_service: &Arc<MpcFinancialService>) -> Resu
     let concurrent_limit = 100;
     
     let semaphore = Arc::new(Semaphore::new(concurrent_limit));
-    let mut latencies = Vec::new();
     let successful = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let failed = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let transaction_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
@@ -361,10 +360,8 @@ async fn run_load_test_benchmark(mpc_service: &Arc<MpcFinancialService>) -> Resu
                 5000000 // $50,000
             );
             
-            let tx_start = Instant::now();
             match service.process_transaction(transaction).await {
                 Ok(_) => {
-                    let latency = tx_start.elapsed().as_micros() as u64;
                     successful_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 },
                 Err(e) => {
@@ -639,7 +636,7 @@ fn create_test_transaction(transaction_id: &str, tx_type: TransactionType, amoun
 /// Generate comprehensive benchmark report
 async fn generate_benchmark_report(results: &[BenchmarkResult]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("📊 Generating Comprehensive Benchmark Report");
-    info!("=".repeat(80));
+    info!("{}", "=".repeat(80));
     
     for result in results {
         info!("🔍 {}", result.test_name);
@@ -673,7 +670,7 @@ async fn generate_benchmark_report(results: &[BenchmarkResult]) -> Result<(), Bo
 /// Analyze performance regressions
 async fn run_regression_analysis(results: &[BenchmarkResult]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("📈 Performance Regression Analysis");
-    info!("-".repeat(50));
+    info!("{}", "-".repeat(50));
     
     // Find latency benchmark for baseline
     if let Some(latency_result) = results.iter().find(|r| r.test_name.contains("Latency")) {
@@ -709,7 +706,7 @@ async fn run_regression_analysis(results: &[BenchmarkResult]) -> Result<(), Box<
 /// Validate financial industry requirements
 async fn validate_financial_industry_requirements(results: &[BenchmarkResult]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("🏦 Financial Industry Requirements Validation");
-    info!("-".repeat(50));
+    info!("{}", "-".repeat(50));
     
     // Financial industry benchmarks
     let requirements = [
