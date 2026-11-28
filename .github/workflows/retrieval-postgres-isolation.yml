@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - "runtime/retrieval-gateway/**"
+      - "scripts/test_retrieval_postgres_http.py"
+      - "scripts/retrieval_auth_smoke.py"
       - ".github/workflows/retrieval-postgres-isolation.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -12,6 +14,8 @@ on:
     branches: [main]
     paths:
       - "runtime/retrieval-gateway/**"
+      - "scripts/test_retrieval_postgres_http.py"
+      - "scripts/retrieval_auth_smoke.py"
       - ".github/workflows/retrieval-postgres-isolation.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -66,3 +70,12 @@ jobs:
           set -euo pipefail
           cargo test -p retrieval-gateway --locked \
             postgres_rls_tenant_and_label_isolation -- --ignored --nocapture
+
+      - name: Build serving binary with locked dependencies
+        run: cargo build --locked -p retrieval-gateway
+
+      - name: Exercise live HTTP authorization against independently seeded PostgreSQL
+        run: |
+          set -euo pipefail
+          command -v psql
+          python3 scripts/test_retrieval_postgres_http.py

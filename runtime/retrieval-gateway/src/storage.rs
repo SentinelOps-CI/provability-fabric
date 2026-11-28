@@ -289,6 +289,26 @@ impl PostgresVectorAdapter {
         Ok(Self { pool })
     }
 
+    /// Reject obviously privileged or unprepared serving identities. The
+    /// operator must separately verify the actual RLS policy semantics.
+    pub async fn validate_runtime_role(&self) -> Result<()> {
+        let allowed: bool = sqlx::query_scalar(
+            r#"SELECT NOT r.rolsuper AND NOT r.rolbypassrls
+                AND c.relrowsecurity AND c.relforcerowsecurity
+                AND NOT pg_has_role(current_user, c.relowner, 'MEMBER')
+                AND has_table_privilege(current_user, c.oid, 'SELECT')
+                AND NOT has_table_privilege(current_user, c.oid,
+                    'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid
+                    AND p.polname = 'pf_tenant_guard' AND NOT p.polpermissive)
+                FROM pg_roles r CROSS JOIN pg_class c
+                WHERE r.rolname = current_user
+                    AND c.oid = to_regclass('documents')"#,
+        ).fetch_one(&self.pool).await.context("inspect retrieval runtime database role")?;
+        anyhow::ensure!(allowed, "retrieval requires a non-owner, restricted SELECT role and forced RLS");
+        Ok(())
+    }
+
     /// Run privileged, idempotent migrations; runtime roles have only SELECT.
     pub async fn init_schema(&self) -> Result<()> {
         let mut tx = self.pool.begin().await.context("begin schema transaction")?;

@@ -144,3 +144,25 @@ does not enforce counters or concurrency admission. These controls are
 resistance. Receipt submission is also best-effort: a ledger failure is
 logged and the query still returns success. A signed local receipt is not
 proof of ledger persistence.
+
+
+## Opt-in PostgreSQL serving mode
+
+Set `RETRIEVAL_POSTGRES_URL` to a dedicated restricted SELECT role after
+administrator-run schema migration. The gateway rejects empty or invalid
+configuration, owners, superusers, RLS bypass roles, roles with table write
+privileges, and missing forced RLS or restrictive guard. This startup check
+does not establish policy expression correctness or the absence of indirect
+privileges. Operators must verify the actual database policy and trust the
+administrator. Absence of the variable preserves the historical memory mode.
+
+PostgreSQL serving bypasses the result cache because document labels and
+contents are mutable independently of the gateway. A database read failure
+returns HTTP 500 rather than cached results or an empty memory response.
+`RETRIEVAL_LISTEN_ADDR` optionally selects the listener address.
+
+The disposable pgvector CI fixture exercises the actual serving binary and
+independently generated issuer and receipt keys. It checks exact returned
+identifiers, signed receipt commitments, concurrent tenant requests, label
+changes and revoked database SELECT access. It is not a production issuer
+rollout, ledger-persistence test or general proof of mediation.

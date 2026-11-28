@@ -39,7 +39,7 @@ use auth::TokenVerifier;
 use cache::SemanticCache;
 use receipt::{AccessReceipt, ReceiptSigner};
 use result_commitment::compute_result_commitment;
-use storage::{StorageAdapter, VectorIndex};
+use storage::{PostgresVectorAdapter, StorageAdapter, VectorIndex};
 
 lazy_static! {
     static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
@@ -61,6 +61,7 @@ pub struct AppState {
     receipt_signer: Arc<ReceiptSigner>,
     receipt_cache: Arc<RwLock<HashMap<String, AccessReceipt>>>,
     semantic_cache: Arc<SemanticCache>,
+    cache_enabled: bool,
 }
 
 /// Query request payload
@@ -112,7 +113,18 @@ pub struct HealthResponse {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let storage = Arc::new(VectorIndex::new().await?);
+    // Explicit selection; configured database failure never selects memory.
+    let (storage, cache_enabled): (Arc<dyn StorageAdapter>, bool) =
+        match std::env::var("RETRIEVAL_POSTGRES_URL") {
+            Ok(url) => {
+                anyhow::ensure!(!url.trim().is_empty(), "empty RETRIEVAL_POSTGRES_URL");
+                let adapter = PostgresVectorAdapter::new(&url).await?;
+                adapter.validate_runtime_role().await?;
+                (Arc::new(adapter), false)
+            }
+            Err(std::env::VarError::NotPresent) => (Arc::new(VectorIndex::new().await?), true),
+            Err(err) => return Err(err).context("invalid RETRIEVAL_POSTGRES_URL"),
+        };
     let abac_policy = Arc::new(AbacPolicy::load_from_file("abac.yaml").await?);
     // Missing trusted public keys or issuer prevents service startup.
     let token_verifier = Arc::new(TokenVerifier::from_env()?);
@@ -127,6 +139,7 @@ async fn main() -> Result<()> {
         receipt_signer,
         receipt_cache,
         semantic_cache,
+        cache_enabled,
     };
 
     // Receipt lookup and cache administration have no authenticated
@@ -141,7 +154,11 @@ async fn main() -> Result<()> {
         )
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr: SocketAddr = match std::env::var("RETRIEVAL_LISTEN_ADDR") {
+        Ok(value) => value.parse().context("invalid RETRIEVAL_LISTEN_ADDR")?,
+        Err(std::env::VarError::NotPresent) => SocketAddr::from(([0, 0, 0, 0], 8080)),
+        Err(err) => return Err(err).context("invalid RETRIEVAL_LISTEN_ADDR"),
+    };
     info!("Retrieval Gateway listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
@@ -189,10 +206,14 @@ async fn handle_query(
     let _rate_limits = state.abac_policy.get_rate_limits(&context);
 
     let query_hash = context.query_hash.clone();
-    let cached_results = state
-        .semantic_cache
-        .get(&query_hash, &request.labels_filter, &request.tenant, limit)
-        .await;
+    // Independently updated database classifications require fresh queries.
+    let cached_results = if state.cache_enabled {
+        state.semantic_cache
+            .get(&query_hash, &request.labels_filter, &request.tenant, limit)
+            .await
+    } else {
+        None
+    };
 
     let results = if let Some(cached) = cached_results {
         debug!("Cache hit for tenant {}", request.tenant);
@@ -210,19 +231,14 @@ async fn handle_query(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        if let Err(e) = state
-            .semantic_cache
-            .put(
-                &query_hash,
-                &request.labels_filter,
-                &request.tenant,
-                limit,
-                search_results.clone(),
-                None,
-            )
-            .await
-        {
-            warn!("Failed to cache results: {}", e);
+        if state.cache_enabled {
+            if let Err(e) = state.semantic_cache
+                .put(&query_hash, &request.labels_filter, &request.tenant, limit,
+                    search_results.clone(), None)
+                .await
+            {
+                warn!("Failed to cache results: {}", e);
+            }
         }
 
         search_results
@@ -440,6 +456,7 @@ mod tests {
                 token_verifier: Arc::new(verifier),
                 receipt_signer: Arc::new(ReceiptSigner::for_test()),
                 receipt_cache: Arc::new(RwLock::new(HashMap::new())),
+                cache_enabled: true,
                 semantic_cache: Arc::new(SemanticCache::with_config(cache::CacheConfig {
                     cleanup_interval_seconds: 0,
                     ..cache::CacheConfig::default()
