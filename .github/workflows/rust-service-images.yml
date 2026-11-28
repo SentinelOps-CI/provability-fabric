@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 SentinelOps Platform Contributors
+
+name: Rust Service Locked Production Images
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/jwks-manager/**"
+      - "runtime/telemetry-service/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/rust-service-images.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/jwks-manager/**"
+      - "runtime/telemetry-service/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/rust-service-images.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  locked-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: jwks-manager
+            dockerfile: runtime/jwks-manager/Dockerfile
+            runtime_user: jwks
+          - package: telemetry-service
+            dockerfile: runtime/telemetry-service/Dockerfile
+            runtime_user: telemetry
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up locked Rust toolchain
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.99.1"
+
+      - name: Run native package tests against canonical Cargo.lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          rustc +1.99.1 --version
+          cargo +1.99.1 test --locked -p "${{ matrix.package }}"
+
+      - name: Build actual production Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "rust-service-${{ matrix.package }}:ci" .
+
+      - name: Verify packaged binary and non-root runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --entrypoint /bin/sh \
+            "rust-service-${{ matrix.package }}:ci" \
+            -ec 'test -x "/usr/local/bin/${{ matrix.package }}"; test "$(id -u)" -ne 0; test "$(id -un)" = "${{ matrix.runtime_user }}"'
+          echo "Production image packages its binary and defaults to non-root."
+          echo "Service startup, production credentials and deployed authorization were not tested."

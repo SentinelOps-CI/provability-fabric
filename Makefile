@@ -48,7 +48,7 @@ help:
 	@$(ECHOOK) "  make clean           - Clean build artifacts"
 	@$(ECHOOK) ""
 	@$(ECHOOK) "Demo:"
-	@$(ECHOOK) "  make demo-up         - Full profile + demo setup (heavy)"
+	@$(ECHOOK) "  make demo-up         - Start full-profile services (policy setup separate)"
 	@$(ECHOOK) "  make demo-down       - Stop demo environment"
 	@$(ECHOOK) "  make demo-setup      - Setup demo data and policies"
 	@$(ECHOOK) ""
@@ -306,13 +306,14 @@ clean:
 
 # ---------- Demo ----------
 demo-up:
-	@$(ECHOOK) "Starting full demo stack (compose profile full + demo setup)..."
+	@$(ECHOOK) "Starting full-profile services (proof-backed policy setup is separate)..."
 	@$(ECHOOK) "For lighter loops prefer: make platform-up | ledger-up (docs/dev/local-workflows.md)"
 	$(DC) --profile full up -d --build --wait --timeout $(WAIT)
-	@$(ECHOOK) "Setting up demo data..."
-	$(MAKE) demo-setup
 	@$(ECHOOK) ""
-	@$(ECHOOK) "Demo environment ready!"
+	@$(ECHOOK) "Full-profile services started; no policy proofs or certificates were issued."
+	@$(ECHOOK) "Run make demo-setup separately to attempt proof-backed policy setup."
+	@$(ECHOOK) "The current proof service rejects generated admitted obligations (HTTP 422)."
+	@$(ECHOOK) "Service startup does not establish verified policy execution."
 	@$(ECHOOK) "  Console UI:     http://localhost:3000"
 	@$(ECHOOK) "  API Gateway:    http://localhost:8000"
 	@$(ECHOOK) "  Ledger:         http://localhost:4000"

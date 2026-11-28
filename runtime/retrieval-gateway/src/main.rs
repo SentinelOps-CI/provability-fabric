@@ -31,12 +31,14 @@ mod abac;
 mod auth;
 mod cache;
 mod receipt;
+mod result_commitment;
 mod storage;
 
 use abac::{AbacPolicy, QueryContext};
 use auth::TokenVerifier;
 use cache::SemanticCache;
 use receipt::{AccessReceipt, ReceiptSigner};
+use result_commitment::compute_result_commitment;
 use storage::{StorageAdapter, VectorIndex};
 
 lazy_static! {
@@ -336,7 +338,7 @@ async fn generate_access_receipt(
         query_hash: context.query_hash.clone(),
         index_shard: context.index_shard.clone(),
         timestamp,
-        result_hash: compute_result_hash(results),
+        result_hash: compute_result_commitment(&context.tenant, results)?,
         result_count: results.len(),
         query_time_ms,
         sign_alg: String::new(),
@@ -344,19 +346,6 @@ async fn generate_access_receipt(
     };
 
     signer.sign_receipt(&receipt).await
-}
-
-/// Compute hash of search results
-fn compute_result_hash(results: &[SearchResult]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-
-    for result in results {
-        hasher.update(result.document_id.as_bytes());
-        hasher.update(result.content.as_bytes());
-    }
-
-    format!("{:x}", hasher.finalize())
 }
 
 /// Submit receipt to ledger
@@ -595,8 +584,8 @@ mod tests {
             },
         ];
 
-        let hash = compute_result_hash(&results);
-        assert!(!hash.is_empty());
-        assert_eq!(hash.len(), 64);
+        let hash = compute_result_commitment("tenant1", &results).unwrap();
+        assert!(hash.starts_with("sha256-v2:"));
+        assert_eq!(hash.len(), 74);
     }
 }

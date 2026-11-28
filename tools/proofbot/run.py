@@ -1,228 +1,247 @@
 #!/usr/bin/env python3
-"""
-APOLLO - LLM-Assisted Auto-Proof Pipeline
+"""Read-only APOLLO proposal inventory.
 
-This script resolves 'sorry' and 'by admit' in Lean proofs by invoking the APOLLO
-REST API and applying the generated proof patches.
+The scan is lexical, and remote suggestions are untrusted. No candidate is
+applied, compiled, committed, or represented as a checked Lean proof.
 """
 
-import os
-import sys
-import json
-import subprocess
-import tempfile
+from __future__ import annotations
+
 import argparse
+import hashlib
+import json
+import os
 from pathlib import Path
-from typing import List, Dict, Optional
+import re
+import sys
+import tempfile
+from typing import Any
+from urllib.parse import urlsplit
+
 import requests
-from datetime import datetime
-import git
+
+SKIP_DIRECTORIES = frozenset({".git", ".lake", "node_modules", "target", "build", "dist"})
+ADMIT_PATTERN = re.compile(r"\b(?:sorry|admit)\b")
+MAX_SOURCE_BYTES = 1_000_000
+MAX_CONTEXTS = 128
+MAX_CANDIDATES = 200
+MAX_RESPONSE_BYTES = 131_072
+MAX_PATCH_BYTES = 65_536
 
 
-class ApolloProofBot:
-    def __init__(self, api_url: str = "http://localhost:8080", dry_run: bool = False):
-        self.api_url = api_url
-        self.dry_run = dry_run
-        self.repo = git.Repo(".")
-        self.changes_made = False
+class ProposalError(ValueError):
+    """An observation or untrusted API response is invalid."""
 
-    def find_lean_files_with_admits(self) -> List[Path]:
-        """Find all Lean files containing 'sorry' or 'by admit' statements."""
-        lean_files = []
 
-        for lean_file in Path(".").rglob("*.lean"):
-            if ".lake" in str(lean_file):
+def validate_endpoint(raw: str) -> str:
+    """Require an explicit HTTP endpoint without credentials or redirects."""
+    parsed = urlsplit(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ProposalError("invalid_api_endpoint")
+    if parsed.username is not None or parsed.password is not None:
+        raise ProposalError("credential_in_api_url")
+    if parsed.query or parsed.fragment:
+        raise ProposalError("unexpected_api_url_components")
+    if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ProposalError("nonlocal_plaintext_api_url")
+    return raw.rstrip("/") + "/prove"
+
+
+def discover(root: Path) -> list[dict[str, Any]]:
+    """Inventory bounded, non-symlink Lean files with lexical admit markers."""
+    root = root.resolve(strict=True)
+    if not root.is_dir():
+        raise ProposalError("repository_root_not_directory")
+
+    candidates: list[dict[str, Any]] = []
+
+    def walk_error(exc: OSError) -> None:
+        raise exc
+
+    for directory, child_dirs, names in os.walk(root, followlinks=False, onerror=walk_error):
+        child_dirs[:] = sorted(
+            name for name in child_dirs
+            if name not in SKIP_DIRECTORIES and not (Path(directory) / name).is_symlink()
+        )
+        for name in sorted(names):
+            file = Path(directory) / name
+            if not name.endswith(".lean") or file.is_symlink():
                 continue
-
-            try:
-                content = lean_file.read_text(encoding="utf-8")
-                if "sorry" in content or "by admit" in content:
-                    lean_files.append(lean_file)
-            except Exception as e:
-                print(f"Warning: Could not read {lean_file}: {e}")
-
-        return lean_files
-
-    def extract_admit_context(self, lean_file: Path) -> List[Dict]:
-        """Extract context around 'sorry' and 'by admit' statements."""
-        content = lean_file.read_text(encoding="utf-8")
-        lines = content.split("\n")
-        contexts = []
-
-        for i, line in enumerate(lines):
-            if "sorry" in line or "by admit" in line:
-                # Get surrounding context (5 lines before and after)
-                start = max(0, i - 5)
-                end = min(len(lines), i + 6)
-                context = "\n".join(lines[start:end])
-
-                contexts.append(
-                    {
-                        "line_number": i + 1,
-                        "context": context,
-                        "statement": line.strip(),
-                    }
-                )
-
-        return contexts
-
-    def call_apollo_api(self, lean_file: Path, contexts: List[Dict]) -> Optional[str]:
-        """Call APOLLO REST API to get proof patches."""
-        if self.dry_run:
-            print(f"DRY RUN: Would call APOLLO API for {lean_file}")
-            return None
-
-        try:
-            payload = {
-                "file_path": str(lean_file),
+            raw = file.read_bytes()
+            if len(raw) > MAX_SOURCE_BYTES:
+                raise ProposalError("oversized_lean_source")
+            content = raw.decode("utf-8")
+            lines = content.splitlines()
+            markers = [index for index, line in enumerate(lines) if ADMIT_PATTERN.search(line)]
+            if not markers:
+                continue
+            if len(markers) > MAX_CONTEXTS:
+                raise ProposalError("too_many_markers_in_source")
+            contexts = [
+                {
+                    "line_number": index + 1,
+                    "statement": lines[index].strip(),
+                    "context": "\n".join(lines[max(0, index - 4):index + 5]),
+                }
+                for index in markers
+            ]
+            candidates.append({
+                "path": file.relative_to(root).as_posix(),
+                "source_sha256": hashlib.sha256(raw).hexdigest(),
                 "contexts": contexts,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+            })
+            if len(candidates) > MAX_CANDIDATES:
+                raise ProposalError("too_many_lean_candidates")
+    return candidates
 
-            response = requests.post(
-                f"{self.api_url}/prove", json=payload, timeout=300  # 5 minute timeout
-            )
 
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("proof_patch")
-            else:
-                print(
-                    f"Error: APOLLO API returned {response.status_code}: {response.text}"
-                )
-                return None
+def _unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    obj: dict[str, Any] = {}
+    for name, value in pairs:
+        if name in obj:
+            raise ProposalError("duplicate_api_json_field")
+        obj[name] = value
+    return obj
 
-        except requests.exceptions.RequestException as e:
-            print(f"Error calling APOLLO API: {e}")
-            return None
 
-    def apply_proof_patch(self, lean_file: Path, proof_patch: str) -> bool:
-        """Apply the proof patch to the Lean file."""
-        if self.dry_run:
-            print(f"DRY RUN: Would apply proof patch to {lean_file}")
-            return True
+def _invalid_constant(value: str) -> None:
+    raise ProposalError("nonfinite_api_json_number")
 
-        try:
-            content = lean_file.read_text(encoding="utf-8")
-            lines = content.split("\n")
 
-            # Parse the proof patch (simplified - in practice this would be more sophisticated)
-            patch_lines = proof_patch.split("\n")
+def fetch_proposal(url: str, candidate: dict[str, Any]) -> str:
+    """Return only a digest of a bounded untrusted proposal, never its source."""
+    payload = {
+        "file_path": candidate["path"],
+        "contexts": candidate["contexts"],
+    }
+    try:
+        with requests.post(
+            url, json=payload, timeout=(5, 30), allow_redirects=False, stream=True
+        ) as response:
+            if response.status_code != 200:
+                raise ProposalError("api_http_" + str(response.status_code))
+            if "application/json" not in response.headers.get("Content-Type", "").lower():
+                raise ProposalError("unexpected_api_content_type")
+            chunks: list[bytes] = []
+            size = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                size += len(chunk)
+                if size > MAX_RESPONSE_BYTES:
+                    raise ProposalError("oversized_api_response")
+                chunks.append(chunk)
+    except requests.RequestException as exc:
+        raise ProposalError("api_transport_failure") from exc
+    try:
+        result = json.loads(
+            b"".join(chunks).decode("utf-8"),
+            object_pairs_hook=_unique_fields,
+            parse_constant=_invalid_constant,
+        )
+    except ProposalError:
+        raise
+    except (ValueError, UnicodeError) as exc:
+        raise ProposalError("invalid_api_json") from exc
+    if not isinstance(result, dict):
+        raise ProposalError("api_json_not_object")
+    patch = result.get("proof_patch")
+    if not isinstance(patch, str) or not patch.strip():
+        raise ProposalError("missing_proof_patch")
+    encoded = patch.encode("utf-8")
+    if len(encoded) > MAX_PATCH_BYTES:
+        raise ProposalError("oversized_proof_patch")
+    return hashlib.sha256(encoded).hexdigest()
 
-            # For now, we'll do a simple replacement of 'by admit' with the proof
-            # In a real implementation, this would use proper diff/patch logic
-            new_content = content
-            for context in self.extract_admit_context(lean_file):
-                if "by admit" in context["statement"]:
-                    # Replace 'by admit' with the proof
-                    new_content = new_content.replace(
-                        context["statement"],
-                        context["statement"].replace("by admit", "by simp"),
-                    )
 
-            if new_content != content:
-                lean_file.write_text(new_content, encoding="utf-8")
-                self.changes_made = True
-                return True
+def inspect(
+    root: Path, *, api_url: str | None, dry_run: bool = False
+) -> tuple[dict[str, Any], int]:
+    """Collect an inventory and optional proposal digests without modifying source."""
+    root = root.resolve(strict=True)
+    endpoint = None if dry_run else validate_endpoint(api_url or "")
+    candidates = discover(root)
+    records: list[dict[str, Any]] = []
+    failed = False
 
-        except Exception as e:
-            print(f"Error applying proof patch to {lean_file}: {e}")
-            return False
-
-        return False
-
-    def create_branch_and_commit(self, lean_file: Path) -> bool:
-        """Create a new branch and commit the changes."""
-        if self.dry_run:
-            print(f"DRY RUN: Would create branch and commit for {lean_file}")
-            return True
-
-        try:
-            # Create branch name based on file hash
-            file_hash = self.repo.git.hash_object(lean_file)
-            branch_name = f"proofbot/{file_hash[:8]}"
-
-            # Create new branch
-            new_branch = self.repo.create_head(branch_name)
-            new_branch.checkout()
-
-            # Add and commit changes
-            self.repo.index.add([str(lean_file)])
-            commit_message = f"Auto-proof: Resolve admits in {lean_file.name}\n\nGenerated by APOLLO proof bot"
-            self.repo.index.commit(commit_message)
-
-            # Push branch
-            origin = self.repo.remote("origin")
-            origin.push(new_branch)
-
-            print(f"✅ Created branch {branch_name} with proof fixes")
-            return True
-
-        except Exception as e:
-            print(f"Error creating branch and commit: {e}")
-            return False
-
-    def run(self) -> int:
-        """Main execution method."""
-        print("🔍 APOLLO Proof Bot - Scanning for admits...")
-
-        lean_files = self.find_lean_files_with_admits()
-
-        if not lean_files:
-            print("✅ No Lean files with admits found")
-            return 0
-
-        print(f"📝 Found {len(lean_files)} Lean files with admits:")
-        for lean_file in lean_files:
-            print(f"  - {lean_file}")
-
-        for lean_file in lean_files:
-            print(f"\n🔧 Processing {lean_file}...")
-
-            contexts = self.extract_admit_context(lean_file)
-            print(f"  Found {len(contexts)} admit statements")
-
-            proof_patch = self.call_apollo_api(lean_file, contexts)
-
-            if proof_patch:
-                if self.apply_proof_patch(lean_file, proof_patch):
-                    print(f"  ✅ Applied proof patch")
-
-                    if not self.dry_run:
-                        if self.create_branch_and_commit(lean_file):
-                            print(f"  ✅ Created branch and committed changes")
-                        else:
-                            print(f"  ❌ Failed to create branch and commit")
-                            return 1
-                else:
-                    print(f"  ❌ Failed to apply proof patch")
-                    return 1
-            else:
-                print(f"  ⚠️  No proof patch received from APOLLO API")
-
-        if self.changes_made:
-            print(f"\n✅ APOLLO Proof Bot completed successfully")
-            return 0
+    for item in candidates:
+        path = root / item["path"]
+        record = {
+            "path": item["path"],
+            "source_sha256": item["source_sha256"],
+            "markers": len(item["contexts"]),
+            "proposal_verified": False,
+        }
+        if not dry_run:
+            try:
+                record["proposal_sha256"] = fetch_proposal(endpoint, item)
+                if hashlib.sha256(path.read_bytes()).hexdigest() != item["source_sha256"]:
+                    raise ProposalError("source_changed_during_inspection")
+                record["status"] = "UNVERIFIED_PROPOSAL"
+            except (ProposalError, OSError) as exc:
+                record.pop("proposal_sha256", None)
+                record["status"] = "FAILED"
+                record["error_code"] = str(exc) if isinstance(exc, ProposalError) else "source_read_failure"
+                failed = True
         else:
-            print(f"\n⚠️  No changes were made")
-            return 0
+            record["status"] = "LEXICAL_MARKER_ONLY"
+        records.append(record)
 
-
-def main():
-    parser = argparse.ArgumentParser(description="APOLLO Proof Bot")
-    parser.add_argument(
-        "--api-url", default="http://localhost:8080", help="APOLLO API URL"
+    status = (
+        "INCOMPLETE" if failed
+        else "INVENTORY_ONLY" if dry_run
+        else "NO_CANDIDATES" if not records
+        else "UNVERIFIED_PROPOSALS"
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Dry run mode - don't make actual changes",
+    return {
+        "schema_version": 1,
+        "evidence_classification": "READ_ONLY_UNVERIFIED",
+        "proofs_verified": False,
+        "repository_sha": os.environ.get("GITHUB_SHA"),
+        "status": status,
+        "candidate_count": len(records),
+        "records": records,
+    }, int(failed)
+
+
+def write_report(report: dict[str, Any], path: Path, root: Path) -> None:
+    """Publish a bounded report outside the repository using an atomic replacement."""
+    path = path.resolve()
+    if path.is_relative_to(root.resolve()):
+        raise ProposalError("report_path_inside_repository")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    descriptor, temporary = tempfile.mkstemp(prefix=".apollo-report-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--api-url")
+    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--dry-run", action="store_true", help="offline lexical inventory")
+    args = parser.parse_args(argv)
+
+    try:
+        report, exit_code = inspect(args.root, api_url=args.api_url, dry_run=args.dry_run)
+        write_report(report, args.report, args.root)
+    except (OSError, UnicodeError, ProposalError, ValueError) as exc:
+        print("APOLLO inspection failed: " + str(exc), file=sys.stderr)
+        return 1
+
+    print(
+        "APOLLO read-only inspection: "
+        + report["status"]
+        + f"; candidates={report['candidate_count']}; proofs_verified=false"
     )
-
-    args = parser.parse_args()
-
-    bot = ApolloProofBot(api_url=args.api_url, dry_run=args.dry_run)
-    return bot.run()
+    return exit_code
 
 
 if __name__ == "__main__":

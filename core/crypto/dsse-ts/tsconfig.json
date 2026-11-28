@@ -9,12 +9,20 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [
+      "node",
+      "jest"
+    ],
     "typeRoots": [
       "../../../runtime/ledger/node_modules/@types",
       "node_modules/@types"
     ]
   },
-  "include": ["src/verify.ts", "src/cli.ts"],
-  "exclude": ["src/__tests__/**"]
+  "include": [
+    "src/verify.ts",
+    "src/cli.ts"
+  ],
+  "exclude": [
+    "src/__tests__/**"
+  ]
 }

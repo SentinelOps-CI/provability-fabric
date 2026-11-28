@@ -1,0 +1,199 @@
+name: Evidence Service Build and HTTP Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/evidence-service/**"
+      - ".github/workflows/evidence-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/evidence-service/**"
+      - ".github/workflows/evidence-service.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-service-build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: evidence_ci
+          POSTGRES_PASSWORD: evidence_ci_fixture_only
+          POSTGRES_DB: evidence_ci
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U evidence_ci -d evidence_ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: services/evidence-service
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/evidence-service/go.mod
+          cache-dependency-path: services/evidence-service/go.sum
+
+      - name: Verify revision, fixture, dependencies, tests and static checks
+        env:
+          # Disposable PostgreSQL service started for this CI job only.
+          EVIDENCE_TEST_DATABASE_URL: postgres://evidence_ci:evidence_ci_fixture_only@127.0.0.1:15432/evidence_ci?sslmode=disable
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test -f ../../tests/fixtures/crypto/ed25519_public.pem
+          test -f ../../tests/fixtures/crypto/dsse_sample_envelope.json
+          go mod verify
+          go test -race -count=1 -v ./...
+          go vet ./...
+          go build -trimpath -o "$RUNNER_TEMP/evidence-service-ci" .
+
+      - name: Build and launch the production evidence-service image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag evidence-service-ci:local .
+          docker run --detach --rm --name evidence-service-ci-smoke \
+            --publish 127.0.0.1:18004:8004 \
+            --env DATABASE_URL= \
+            --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
+            evidence-service-ci:local
+
+      - name: Reject configured database outage in the production image
+        run: |
+          set -euo pipefail
+          error_file="$(mktemp)"
+          trap 'rm -f "$error_file"' EXIT
+          if docker run --rm --network none \
+            --env DATABASE_URL=postgres://evidence:invalid@127.0.0.1:5432/evidence?sslmode=disable \
+            evidence-service-ci:local 2>"$error_file"; then
+            echo "configured database outage incorrectly started the service" >&2
+            exit 1
+          fi
+          if ! grep -q "configured certificate database unavailable" "$error_file"; then
+            echo "service failed for an unexpected reason" >&2
+            exit 1
+          fi
+          echo "Configured database outage rejected by production image."
+
+      - name: Exercise live health and rejection behavior
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:18004/api/v1"
+
+          def call(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              request = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(request, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              assert status == expected, (
+                  f"{method} {path}: HTTP {status}, expected {expected}: {body[:200]!r}"
+              )
+              return json.loads(body)
+
+          for _ in range(30):
+              try:
+                  health = call("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("evidence service did not become reachable")
+
+          assert health["service"] == "evidence-service", health
+          assert health["status"] == "healthy", health
+          # The deliberately absent database is not a production-readiness check.
+          assert health["database"] == "disconnected", health
+          call("/evidence/cert", method="POST", payload=[], expected=400)
+          certificate = {
+              "bundle_id": "bundle",
+              "policy_hash": "policy",
+              "proof_hash": "proof",
+              "automata_hash": "automata",
+              "labeler_hash": "labeler",
+              "ni_claim": "test",
+              "ni_monitor": "inapplicable",
+              "sidecar_build": "test",
+              "tenant_id": "tenant-1",
+              "session_id": "session-1",
+              "timestamp": "2026-01-01T00:00:00Z",
+          }
+          for field in ("tenant_id", "session_id"):
+              unsafe = {**certificate, field: "../outside"}
+              rejected = call(
+                  "/evidence/cert", method="POST", payload=unsafe, expected=400
+              )
+              assert rejected["error"]["code"] == "INVALID_CERTIFICATE", rejected
+          unavailable = call("/compliance/packet/nonpersistent-id", expected=501)
+          assert unavailable["error"]["code"] == "PACKET_EXPORT_UNAVAILABLE", unavailable
+          # No synthetic compliance archive is emitted for any packet ID.
+
+          # The actual console contract is POST; a GET with a JSON body
+          # remains supported only for backward compatibility.
+          call("/evidence/validate", method="POST", payload={}, expected=400)
+          invalid = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": {}}, expected=200,
+          )
+          assert invalid["schema_valid"] is False, invalid
+          assert invalid["signature_checked"] is False, invalid
+          legacy = call("/evidence/validate", method="GET", payload={"raw": {}}, expected=200)
+          assert legacy["schema_valid"] is False, legacy
+          assert legacy["signature_checked"] is False, legacy
+
+          # A structurally valid, unsigned test object must never report
+          # a checked signature. A malformed signature must be rejected.
+          shape = {
+              **certificate,
+              "permit_decision": "deny",
+              "path_witness_ok": False,
+              "label_derivation_ok": False,
+              "epoch": 1,
+              "egress_profile": "test",
+          }
+          unsigned = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": shape}, expected=200,
+          )
+          assert unsigned["schema_valid"] is True, unsigned
+          assert unsigned["signature_checked"] is False, unsigned
+          forged = call(
+              "/evidence/validate", method="POST",
+              payload={"raw": {**shape, "sig": "not-base64!"}}, expected=200,
+          )
+          assert forged["schema_valid"] is True, forged
+          assert forged["signature_checked"] is True, forged
+          assert forged["signature_valid"] is False, forged
+          print("Production image health and negative HTTP behaviors observed.")
+          print("No database-backed storage, signing, or proof validity is claimed.")
+          PY
+
+      - name: Remove disposable evidence-service container
+        if: always()
+        run: |
+          if docker container inspect evidence-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f evidence-service-ci-smoke
+          fi

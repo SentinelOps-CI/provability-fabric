@@ -9,8 +9,8 @@ PROFILE="${1:-full}"
 COMPOSE=(docker compose --profile "$PROFILE")
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "SKIP: docker not available" >&2
-  exit 0
+  echo "ERROR: docker is required to execute the Compose smoke" >&2
+  exit 2
 fi
 
 echo "=== docker-compose smoke (profile=${PROFILE}) ==="
@@ -68,15 +68,6 @@ if missing:
     sys.exit(1)
 print("pf-env.schema.json: OK")
 PY
-fi
-
-# Rust service Dockerfiles expect Cargo.lock in their build context (workspace root lockfile).
-if [[ -f Cargo.lock ]]; then
-  for ctx in runtime/sidecar-watcher runtime/egress-firewall runtime/attestor; do
-    if [[ -f "${ctx}/Dockerfile" ]]; then
-      cp Cargo.lock "${ctx}/Cargo.lock"
-    fi
-  done
 fi
 
 "${COMPOSE[@]}" config >/dev/null

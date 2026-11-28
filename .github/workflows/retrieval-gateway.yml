@@ -9,7 +9,11 @@ on:
     paths:
       - "runtime/retrieval-gateway/**"
       - "core/crypto/dsse-rs/**"
+      - "core/crypto/dsse/**"
+      - "core/crypto/dsse-ts/**"
       - "tests/fixtures/crypto/**"
+      - "tests/test_retrieval_result_commitment_v2.py"
+      - "docs/security/retrieval-result-commitment-v2.md"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/retrieval-gateway.yml"
@@ -17,7 +21,11 @@ on:
     paths:
       - "runtime/retrieval-gateway/**"
       - "core/crypto/dsse-rs/**"
+      - "core/crypto/dsse/**"
+      - "core/crypto/dsse-ts/**"
       - "tests/fixtures/crypto/**"
+      - "tests/test_retrieval_result_commitment_v2.py"
+      - "docs/security/retrieval-result-commitment-v2.md"
       - "Cargo.toml"
       - "Cargo.lock"
 
@@ -43,3 +51,27 @@ jobs:
 
       - name: cargo test -p retrieval-gateway
         run: cargo test -p retrieval-gateway
+
+      - name: Independently verify versioned receipt commitment vectors
+        run: python3 -m unittest discover -s tests -p 'test_retrieval_result_commitment_v2.py' -v
+
+      - name: Set up Go receipt verifier
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+
+      - name: Verify signed v2 receipt in Go
+        run: cd core/crypto/dsse && go test ./...
+
+      - name: Set up Node receipt verifier
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify signed v2 receipt in TypeScript
+        run: |
+          cd core/crypto/dsse-ts
+          npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+          npm run build
+          npm test -- --runInBand

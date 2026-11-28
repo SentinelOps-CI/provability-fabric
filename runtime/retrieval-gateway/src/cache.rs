@@ -16,7 +16,7 @@ pub struct CacheKey {
     pub question_hash: String,
     pub label_set: Vec<String>,
     pub tenant: String,
-    /// Ensure different result limits use separate cached result sets.
+    /// Requested result count forms part of the authorization-sensitive cache key.
     pub result_limit: usize,
 }
 
@@ -143,8 +143,7 @@ impl SemanticCache {
                 }
                 Some(entry.results.clone())
             } else {
-                // Authorization-sensitive cache entries must match the query
-                // hash, ordered label set, tenant, and requested limit exactly.
+                // Authorization-sensitive reuse must match the entire cache key.
                 None
             }
         };
@@ -618,4 +617,83 @@ mod tests {
         cache.invalidate_tenant(tenant).await.unwrap();
         assert!(cache.get(question_hash, &labels, tenant, 10).await.is_none());
     }
+    #[tokio::test]
+    async fn cache_never_reuses_results_across_label_or_limit_scopes() {
+        // The old 0.7*hash + 0.3*label Jaccard formula admitted a
+        // three-label cached result for a two-label query: 0.9 >= 0.85.
+        // A returned private document must only be reused for the exact
+        // tenant, query hash, label set, and requested result count.
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let original_labels = vec![
+            "public".to_string(),
+            "confidential".to_string(),
+            "secret".to_string(),
+        ];
+        let smaller_scope = vec!["public".to_string(), "confidential".to_string()];
+        let results = vec![SearchResult {
+            document_id: "restricted-document".into(),
+            content: "synthetic secret fixture".into(),
+            content_hash: "sha256-fixture".into(),
+            score: 0.95,
+            metadata: HashMap::new(),
+            labels: original_labels.clone(),
+        }];
+        cache
+            .put("query-hash", &original_labels, "tenant-a", 10, results, None)
+            .await
+            .unwrap();
+
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 10)
+            .await
+            .is_some());
+        assert!(cache
+            .get("query-hash", &smaller_scope, "tenant-a", 10)
+            .await
+            .is_none(), "removed authorization label returned cached private results");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-a", 1)
+            .await
+            .is_none(), "smaller result limit reused larger cached response");
+        assert!(cache
+            .get("different-query", &original_labels, "tenant-a", 10)
+            .await
+            .is_none(), "different query reused cached response");
+        assert!(cache
+            .get("query-hash", &original_labels, "tenant-b", 10)
+            .await
+            .is_none(), "different tenant reused cached response");
+    }
+
+    #[tokio::test]
+    async fn cache_retains_distinct_pages_for_different_result_limits() {
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let labels = vec!["public".to_string()];
+        let result = |id: &str| SearchResult {
+            document_id: id.into(),
+            content: "synthetic public fixture".into(),
+            content_hash: "hash".into(),
+            score: 1.0,
+            metadata: HashMap::new(),
+            labels: labels.clone(),
+        };
+        cache.put("q", &labels, "tenant-a", 1, vec![result("first")], None)
+            .await.unwrap();
+        cache.put("q", &labels, "tenant-a", 2, vec![result("first"), result("second")], None)
+            .await.unwrap();
+
+        let first = cache.get("q", &labels, "tenant-a", 1).await.unwrap();
+        let both = cache.get("q", &labels, "tenant-a", 2).await.unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(both.len(), 2);
+        assert_eq!(first[0].document_id, "first");
+        assert_eq!(both[1].document_id, "second");
+    }
+
 }

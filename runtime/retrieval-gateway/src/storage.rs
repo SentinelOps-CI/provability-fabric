@@ -25,7 +25,7 @@ pub trait StorageAdapter: Send + Sync {
     ) -> Result<Vec<crate::SearchResult>>;
 
     /// Get document by ID with tenant check
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>>;
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>>;
 
     /// Check if tenant has access to shard
     async fn validate_tenant_shard_access(&self, tenant: &str, shard: &str) -> Result<bool>;
@@ -77,6 +77,15 @@ impl VectorIndex {
     /// Add document to index
     pub async fn add_document(&self, document: Document) -> Result<()> {
         let mut docs = self.documents.write().await;
+        // Document IDs are globally unique, matching the PostgreSQL primary
+        // key. A different tenant must never replace an existing document.
+        if let Some(existing) = docs.get(&document.id) {
+            anyhow::ensure!(
+                existing.tenant == document.tenant,
+                "document ID belongs to another tenant"
+            );
+        }
+
         let mut shards = self.tenant_shards.write().await;
         let mut embeddings = self.embeddings.write().await;
 
@@ -110,21 +119,26 @@ impl VectorIndex {
         }
     }
 
-    /// Generate query embedding (simplified)
+    /// Deterministic 128-dimensional synthetic query vector for integration
+    /// testing. This is a hash-derived placeholder, not a semantic embedding.
     pub fn generate_query_embedding(query: &str) -> Vec<f32> {
-        // Simplified embedding generation based on query hash
-        let hash = {
-            use sha2::{Digest, Sha256};
-            let mut hasher = Sha256::new();
-            hasher.update(query.as_bytes());
-            hasher.finalize()
-        };
+        use sha2::{Digest, Sha256};
 
-        // Convert hash to normalized embedding vector
-        hash.iter()
-            .take(128) // Use first 128 bytes
-            .map(|&byte| (byte as f32 - 128.0) / 128.0) // Normalize to [-1, 1]
-            .collect()
+        let mut values = Vec::with_capacity(128);
+        for counter in 0u8..4 {
+            let mut hasher = Sha256::new();
+            hasher.update(b"pf-retrieval/synthetic-embedding/v1\0");
+            hasher.update((query.len() as u64).to_be_bytes());
+            hasher.update(query.as_bytes());
+            hasher.update([counter]);
+            values.extend(
+                hasher.finalize()
+                    .iter()
+                    .map(|&byte| (f32::from(byte) - 128.0) / 128.0),
+            );
+        }
+        debug_assert_eq!(values.len(), 128);
+        values
     }
 }
 
@@ -152,10 +166,10 @@ impl StorageAdapter for VectorIndex {
                     return false;
                 }
 
-                // Every classification on a document must be authorized.
-                // An "any label matches" check leaks mixed public/secret items.
-                !labels_filter.is_empty()
-                    && !doc.labels.is_empty()
+                // Every returned document must have at least one classification,
+                // and every classification must be explicitly authorized.
+                !doc.labels.is_empty()
+                    && !labels_filter.is_empty()
                     && doc.labels.iter().all(|label| labels_filter.contains(label))
             })
             .collect();
@@ -202,16 +216,15 @@ impl StorageAdapter for VectorIndex {
         Ok(results)
     }
 
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>> {
         let docs = self.documents.read().await;
         
         match docs.get(doc_id) {
-            Some(doc) if doc.tenant == tenant => Ok(Some(doc.clone())),
-            Some(_) => {
-                // Document exists but belongs to different tenant
-                tracing::warn!("Cross-tenant document access attempt: {} -> {}", tenant, doc_id);
-                Ok(None)
-            }
+            Some(doc) if doc.tenant == tenant
+                && !labels_filter.is_empty()
+                && !doc.labels.is_empty()
+                && doc.labels.iter().all(|label| labels_filter.contains(label)) => Ok(Some(doc.clone())),
+            Some(_) => Ok(None),
             None => Ok(None),
         }
     }
@@ -276,11 +289,13 @@ impl PostgresVectorAdapter {
         Ok(Self { pool })
     }
 
-    /// Initialize database schema
+    /// Run privileged, idempotent migrations; runtime roles have only SELECT.
     pub async fn init_schema(&self) -> Result<()> {
+        let mut tx = self.pool.begin().await.context("begin schema transaction")?;
+        sqlx::query("CREATE EXTENSION IF NOT EXISTS vector")
+            .execute(&mut *tx).await.context("enable vector extension")?;
         sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS documents (
+            r#"CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
                 tenant TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -289,25 +304,87 @@ impl PostgresVectorAdapter {
                 embedding vector(128),
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant);
-            CREATE INDEX IF NOT EXISTS idx_documents_labels ON documents USING GIN(labels);
-            CREATE INDEX IF NOT EXISTS idx_documents_embedding ON documents USING ivfflat (embedding vector_cosine_ops);
-            
-            -- Row Level Security for tenant isolation
-            ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-            
-            CREATE POLICY IF NOT EXISTS tenant_isolation_policy ON documents
-                FOR ALL USING (tenant = current_setting('app.current_tenant', true));
-            "#,
-        )
-        .execute(&self.pool)
-        .await
-        .context("Failed to initialize schema")?;
+            )"#,
+        ).execute(&mut *tx).await.context("create documents table")?;
 
+        for ddl in [
+            "CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents (tenant)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_labels ON documents USING GIN (labels)",
+            "CREATE INDEX IF NOT EXISTS idx_documents_embedding ON documents USING ivfflat (embedding vector_cosine_ops)",
+            "ALTER TABLE documents ENABLE ROW LEVEL SECURITY",
+            "ALTER TABLE documents FORCE ROW LEVEL SECURITY",
+        ] {
+            sqlx::query(ddl).execute(&mut *tx).await.context("initialize document indices and RLS")?;
+        }
+
+        // Restrictive RLS blocks cross-tenant access even if another permissive
+        // policy exists. A matching permissive policy admits the current tenant.
+        sqlx::query(
+            r#"DO $policies$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = current_schema() AND tablename = 'documents'
+                      AND policyname = 'pf_tenant_allow'
+                ) THEN
+                    CREATE POLICY pf_tenant_allow ON documents
+                        AS PERMISSIVE FOR ALL
+                        USING (tenant = current_setting('app.current_tenant', true))
+                        WITH CHECK (tenant = current_setting('app.current_tenant', true));
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = current_schema() AND tablename = 'documents'
+                      AND policyname = 'pf_tenant_guard'
+                ) THEN
+                    CREATE POLICY pf_tenant_guard ON documents
+                        AS RESTRICTIVE FOR ALL
+                        USING (tenant = current_setting('app.current_tenant', true))
+                        WITH CHECK (tenant = current_setting('app.current_tenant', true));
+                END IF;
+            END
+            $policies$"#,
+        ).execute(&mut *tx).await.context("install restrictive tenant RLS")?;
+        tx.commit().await.context("commit schema transaction")?;
         Ok(())
     }
+
+    /// Set tenant context within the same acquired transaction as the query.
+    async fn tenant_transaction(&self, tenant: &str) -> Result<sqlx::Transaction<'_, sqlx::Postgres>> {
+        anyhow::ensure!(!tenant.is_empty(), "tenant must be nonempty");
+        let mut tx = self.pool.begin().await.context("begin tenant transaction")?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+            .bind(tenant)
+            .execute(&mut *tx).await.context("set local tenant context")?;
+        Ok(tx)
+    }
+
+}
+
+/// Encode an internally derived, finite vector as pgvector text input.
+/// It is supplied via a bound SQL parameter, never concatenated into SQL.
+fn query_vector_literal(query: &str) -> String {
+    let embedding = VectorIndex::generate_query_embedding(query);
+    debug_assert_eq!(embedding.len(), 128);
+    format!(
+        "[{}]",
+        embedding.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(",")
+    )
+}
+
+/// Decode the vector text returned by PostgreSQL into the documented shape.
+fn decode_vector_text(value: Option<String>) -> Result<Vec<f32>> {
+    let Some(text) = value else { return Ok(Vec::new()) };
+    let inner = text.strip_prefix('[')
+        .and_then(|x| x.strip_suffix(']'))
+        .context("invalid pgvector text encoding")?;
+    let values: Vec<f32> = inner
+        .split(',')
+        .map(|x| x.parse::<f32>().context("invalid pgvector component"))
+        .collect::<Result<_>>()?;
+    anyhow::ensure!(values.len() == 128, "unexpected vector dimensions");
+    anyhow::ensure!(values.iter().all(|x| x.is_finite()), "nonfinite stored vector");
+    Ok(values)
 }
 
 #[async_trait]
@@ -319,134 +396,100 @@ impl StorageAdapter for PostgresVectorAdapter {
         labels_filter: &[String],
         limit: usize,
     ) -> Result<Vec<crate::SearchResult>> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
+        let mut tx = self.tenant_transaction(tenant).await?;
+        let vector = query_vector_literal(query);
+        let limit = i64::try_from(limit).context("result limit too large")?;
 
-        // Generate query embedding (simplified)
-        let query_embedding = VectorIndex::generate_query_embedding(query);
+        // Full label containment rejects mixed classifications and any
+        // unclassified record. Empty grants return no search results.
+        let rows = sqlx::query(
+            r#"SELECT id, content, labels, metadata,
+                      (embedding <=> ($1::text)::vector)::double precision AS distance
+               FROM documents
+               WHERE tenant = $2 AND cardinality(labels) > 0
+                 AND labels <@ $3::text[] AND embedding IS NOT NULL
+               ORDER BY embedding <=> ($1::text)::vector, id
+               LIMIT $4"#,
+        )
+        .bind(vector)
+        .bind(tenant)
+        .bind(labels_filter)
+        .bind(limit)
+        .fetch_all(&mut *tx)
+        .await.context("fetch tenant-scoped search results")?;
+        tx.commit().await.context("finish tenant-scoped vector search")?;
 
-        // Build SQL query with label filtering
-        let labels_condition = if labels_filter.is_empty() {
-            "TRUE".to_string()
-        } else {
-            format!("labels && ARRAY[{}]", 
-                labels_filter.iter()
-                    .map(|l| format!("'{}'", l.replace("'", "''")))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        };
-
-        let sql = format!(
-            r#"
-            SELECT id, content, labels, metadata, 
-                   (embedding <=> $1::vector) as distance
-            FROM documents 
-            WHERE {} 
-            ORDER BY embedding <=> $1::vector 
-            LIMIT $2
-            "#,
-            labels_condition
-        );
-
-        let rows = sqlx::query(&sql)
-            .bind(query_embedding.as_slice())
-            .bind(limit as i64)
-            .fetch_all(&self.pool)
-            .await
-            .context("Failed to execute search query")?;
-
-        let results = rows
-            .into_iter()
-            .map(|row| {
-                let distance: f32 = row.get("distance");
-                let score = 1.0 - distance; // Convert distance to similarity
-
-                crate::SearchResult {
-                    document_id: row.get("id"),
-                    content: row.get("content"),
-                    content_hash: content_hash_for(row.get::<String, _>("content").as_str()),
-                    score: score as f64,
-                    metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
-                    labels: row.get("labels"),
-                }
+        rows.into_iter().map(|row| {
+            let distance: f64 = row.try_get("distance")?;
+            anyhow::ensure!(distance.is_finite(), "nonfinite vector distance");
+            let content: String = row.try_get("content")?;
+            Ok(crate::SearchResult {
+                document_id: row.try_get("id")?,
+                content_hash: content_hash_for(&content),
+                content,
+                score: 1.0 - distance,
+                metadata: serde_json::from_value(row.try_get("metadata")?)
+                    .context("invalid document metadata")?,
+                labels: row.try_get("labels")?,
             })
-            .collect();
-
-        Ok(results)
+        }).collect()
     }
 
-    async fn get_document(&self, doc_id: &str, tenant: &str) -> Result<Option<Document>> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
-
+    async fn get_document(&self, doc_id: &str, tenant: &str, labels_filter: &[String]) -> Result<Option<Document>> {
+        let mut tx = self.tenant_transaction(tenant).await?;
         let row = sqlx::query(
-            "SELECT * FROM documents WHERE id = $1"
+            r#"SELECT id, tenant, content, labels, metadata,
+                      embedding::text AS embedding_text, created_at, updated_at
+               FROM documents WHERE id = $1 AND tenant = $2
+                 AND cardinality(labels) > 0 AND labels <@ $3::text[]"#,
         )
-        .bind(doc_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to fetch document")?;
+        .bind(doc_id).bind(tenant).bind(labels_filter)
+        .fetch_optional(&mut *tx).await.context("fetch tenant-scoped document")?;
+        tx.commit().await.context("finish tenant-scoped document fetch")?;
 
-        match row {
-            Some(row) => {
-                let doc = Document {
-                    id: row.get("id"),
-                    content: row.get("content"),
-                    tenant: row.get("tenant"),
-                    labels: row.get("labels"),
-                    metadata: serde_json::from_value(row.get("metadata")).unwrap_or_default(),
-                    embedding: vec![], // Would decode from vector type
-                    created_at: row.get::<i64, _>("created_at") as u64,
-                    updated_at: row.get::<i64, _>("updated_at") as u64,
-                };
-                Ok(Some(doc))
-            }
-            None => Ok(None),
-        }
+        row.map(|row| {
+            let created_at: i64 = row.try_get("created_at")?;
+            let updated_at: i64 = row.try_get("updated_at")?;
+            Ok(Document {
+                id: row.try_get("id")?,
+                content: row.try_get("content")?,
+                tenant: row.try_get("tenant")?,
+                labels: row.try_get("labels")?,
+                metadata: serde_json::from_value(row.try_get("metadata")?)
+                    .context("invalid document metadata")?,
+                embedding: decode_vector_text(row.try_get("embedding_text")?)?,
+                created_at: u64::try_from(created_at).context("negative creation timestamp")?,
+                updated_at: u64::try_from(updated_at).context("negative update timestamp")?,
+            })
+        }).transpose()
     }
 
     async fn validate_tenant_shard_access(&self, tenant: &str, shard: &str) -> Result<bool> {
-        // For PostgreSQL, shard is determined by tenant
-        let expected_shard = format!("shard_{}", tenant);
-        Ok(shard == expected_shard)
+        // A logical shard name is not an independent tenant credential.
+        Ok(!tenant.is_empty() && shard == format!("shard_{}", tenant))
     }
 
     async fn get_shard_stats(&self, tenant: &str) -> Result<ShardStats> {
-        // Set tenant context for RLS
-        sqlx::query("SET app.current_tenant = $1")
-            .bind(tenant)
-            .execute(&self.pool)
-            .await
-            .context("Failed to set tenant context")?;
-
+        let mut tx = self.tenant_transaction(tenant).await?;
         let row = sqlx::query(
-            r#"
-            SELECT 
-                COUNT(*) as document_count,
-                SUM(LENGTH(content)) as total_size_bytes,
-                MAX(updated_at) as last_updated
-            FROM documents
-            "#
+            r#"SELECT COUNT(*) AS document_count,
+                      COALESCE(SUM(OCTET_LENGTH(content)), 0)::bigint AS total_size_bytes,
+                      COALESCE(MAX(updated_at), 0)::bigint AS last_updated
+               FROM documents WHERE tenant = $1"#,
         )
-        .fetch_one(&self.pool)
-        .await
-        .context("Failed to get shard stats")?;
+        .bind(tenant)
+        .fetch_one(&mut *tx).await.context("fetch tenant-scoped statistics")?;
+        tx.commit().await.context("finish tenant-scoped statistics")?;
 
+        let count: i64 = row.try_get("document_count")?;
+        let bytes: i64 = row.try_get("total_size_bytes")?;
+        let updated: i64 = row.try_get("last_updated")?;
         Ok(ShardStats {
             shard_id: format!("shard_{}", tenant),
             tenant: tenant.to_string(),
-            document_count: row.get::<i64, _>("document_count") as usize,
-            total_size_bytes: row.get::<i64, _>("total_size_bytes") as u64,
-            last_updated: row.get::<i64, _>("last_updated") as u64,
+            document_count: usize::try_from(count).context("negative document count")?,
+            total_size_bytes: u64::try_from(bytes).context("negative content size")?,
+            last_updated: u64::try_from(updated).context("negative update time")?,
         })
     }
 }
@@ -493,6 +536,69 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].document_id, "doc1");
+    }
+
+    #[tokio::test]
+    async fn test_cross_tenant_document_replacement_is_rejected() {
+        let index = VectorIndex::new().await.unwrap();
+        let public = vec!["public".to_string()];
+        let original = Document {
+            id: "shared-id".to_string(),
+            content: "original tenant content".to_string(),
+            tenant: "tenant-a".to_string(),
+            labels: public.clone(),
+            metadata: HashMap::new(),
+            embedding: VectorIndex::generate_query_embedding("q"),
+            created_at: 1,
+            updated_at: 1,
+        };
+        index.add_document(original.clone()).await.unwrap();
+
+        let mut conflicting = original.clone();
+        conflicting.tenant = "tenant-b".to_string();
+        conflicting.content = "replacement content".to_string();
+        conflicting.embedding = vec![0.0; 128];
+        assert!(index.add_document(conflicting).await.is_err());
+
+        let retained = index
+            .get_document("shared-id", "tenant-a", &public)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained.content, original.content);
+        assert_eq!(retained.embedding, original.embedding);
+        assert!(index
+            .get_document("shared-id", "tenant-b", &public)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(!index
+            .validate_tenant_shard_access("tenant-b", "shard_tenant-b")
+            .await
+            .unwrap());
+        assert_eq!(index.get_shard_stats("tenant-a").await.unwrap().document_count, 1);
+        assert_eq!(index.get_shard_stats("tenant-b").await.unwrap().document_count, 0);
+
+        let results = index
+            .search_with_tenant_isolation("q", "tenant-a", &public, 10)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, original.content);
+        assert!((results[0].score - 1.0).abs() < 1e-5);
+
+        // Same-tenant replacement continues to work.
+        let mut updated = original;
+        updated.content = "updated tenant content".to_string();
+        updated.updated_at = 2;
+        index.add_document(updated.clone()).await.unwrap();
+        let retained = index
+            .get_document("shared-id", "tenant-a", &public)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained.content, updated.content);
+        assert_eq!(retained.updated_at, 2);
     }
 
     #[tokio::test]
@@ -578,5 +684,204 @@ mod tests {
 
         assert!((VectorIndex::cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
         assert!((VectorIndex::cosine_similarity(&a, &c) - 0.0).abs() < 1e-6);
+    }
+}
+
+#[cfg(test)]
+mod postgres_rls_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+
+    /// Requires the disposable pgvector PostgreSQL service in CI.
+    #[tokio::test]
+    #[ignore = "requires PF_POSTGRES_TEST_ADMIN_URL and PF_POSTGRES_TEST_APP_URL"]
+    async fn postgres_rls_tenant_and_label_isolation() {
+        let admin_url = std::env::var("PF_POSTGRES_TEST_ADMIN_URL")
+            .expect("disposable PostgreSQL administrator URL is required");
+        let app_url = std::env::var("PF_POSTGRES_TEST_APP_URL")
+            .expect("disposable PostgreSQL nonprivileged role URL is required");
+
+        let admin = PostgresVectorAdapter::new(&admin_url).await.unwrap();
+        admin.init_schema().await.unwrap();
+        admin.init_schema().await.expect("idempotent schema migration");
+
+        // This role and its test-only password exist solely in the disposable
+        // CI database. No production role, credential, or permission is changed.
+        sqlx::query(
+            r#"DO $role$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pf_retrieval_ci') THEN
+                    CREATE ROLE pf_retrieval_ci LOGIN PASSWORD 'testpass';
+                END IF;
+            END
+            $role$"#,
+        )
+        .execute(&admin.pool).await.unwrap();
+        sqlx::query("GRANT USAGE ON SCHEMA public TO pf_retrieval_ci")
+            .execute(&admin.pool).await.unwrap();
+        sqlx::query("GRANT SELECT ON documents TO pf_retrieval_ci")
+            .execute(&admin.pool).await.unwrap();
+        sqlx::query("TRUNCATE TABLE documents")
+            .execute(&admin.pool).await.unwrap();
+
+        let vector = query_vector_literal("integration-query");
+        let fixtures = vec![
+            ("a-public", "tenant-a", vec!["public".to_string()], "first content"),
+            ("a-classified", "tenant-a", vec!["public".to_string(), "secret".to_string()], "classified"),
+            ("a-open", "tenant-a", Vec::new(), "public unlabeled"),
+            ("b-public", "tenant-b", vec!["public".to_string()], "other tenant public"),
+            ("b-secret", "tenant-b", vec!["secret".to_string()], "other tenant private"),
+        ];
+        for (id, tenant, labels, content) in fixtures {
+            sqlx::query(
+                r#"INSERT INTO documents (
+                    id, tenant, labels, content, metadata,
+                    embedding, created_at, updated_at
+                ) VALUES ($1, $2, $3::text[], $4, $5::jsonb,
+                          ($6::text)::vector, 1000, 1001)"#,
+            )
+            .bind(id).bind(tenant).bind(labels).bind(content)
+            .bind(serde_json::json!({"origin": "disposable-test"}))
+            .bind(&vector)
+            .execute(&admin.pool).await.unwrap();
+        }
+
+        let pool = PgPoolOptions::new().max_connections(2)
+            .connect(&app_url).await.expect("connect nonprivileged application role");
+        let storage = PostgresVectorAdapter { pool };
+
+        // The test role must never bypass database RLS.
+        let role: (bool, bool) = sqlx::query_as(
+            "SELECT rolbypassrls, rolsuper FROM pg_roles WHERE rolname = current_user",
+        ).fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(role, (false, false));
+
+        // A deliberately over-broad permissive policy must not defeat the
+        // restrictive tenant guard. This is installed only in disposable CI.
+        sqlx::query(
+            "CREATE POLICY pf_ci_wide_policy ON documents AS PERMISSIVE FOR SELECT USING (true)",
+        )
+        .execute(&admin.pool).await.unwrap();
+
+        // No transaction-local tenant context: all documents are hidden.
+        let direct: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM documents")
+            .fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(direct.0, 0);
+
+        let public = vec!["public".to_string()];
+        let full = vec!["public".to_string(), "secret".to_string()];
+        let results = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &public, 10,
+        ).await.unwrap();
+        let ids: Vec<_> = results.iter().map(|r| r.document_id.as_str()).collect();
+        assert_eq!(ids.len(), 1);
+        assert!(ids.contains(&"a-public"));
+        assert!(!ids.contains(&"a-open"));
+        assert!(!ids.contains(&"a-classified"));
+
+        let full_results = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &full, 10,
+        ).await.unwrap();
+        assert_eq!(full_results.len(), 2);
+        let empty_grant = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &[], 10,
+        ).await.unwrap();
+        assert!(empty_grant.is_empty());
+
+        // User-originated label strings are bound, never interpolated into SQL.
+        let hostile = vec!["public' OR TRUE --".to_string()];
+        let injection = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-a", &hostile, 10,
+        ).await.unwrap();
+        assert!(injection.is_empty());
+
+        let other = storage.search_with_tenant_isolation(
+            "integration-query", "tenant-b", &public, 10,
+        ).await.unwrap();
+        assert_eq!(other.len(), 1);
+        assert_eq!(other[0].document_id, "b-public");
+
+        assert!(storage.get_document("b-public", "tenant-a", &public).await.unwrap().is_none());
+        let doc = storage.get_document("a-public", "tenant-a", &public).await.unwrap().unwrap();
+        assert_eq!(doc.embedding.len(), 128);
+        assert_eq!(doc.metadata["origin"], "disposable-test");
+        assert!(storage.get_document("a-classified", "tenant-a", &public).await.unwrap().is_none());
+        assert!(storage.get_document("a-classified", "tenant-a", &full).await.unwrap().is_some());
+        assert!(storage.get_document("a-open", "tenant-a", &full).await.unwrap().is_none());
+        assert!(storage.get_document("a-public", "tenant-a", &[]).await.unwrap().is_none());
+
+        let stats_a = storage.get_shard_stats("tenant-a").await.unwrap();
+        assert_eq!(stats_a.document_count, 3);
+        assert_eq!(stats_a.last_updated, 1001);
+        let stats_b = storage.get_shard_stats("tenant-b").await.unwrap();
+        assert_eq!(stats_b.document_count, 2);
+        let empty = storage.get_shard_stats("missing").await.unwrap();
+        assert_eq!(empty.document_count, 0);
+        assert_eq!(empty.total_size_bytes, 0);
+        assert_eq!(empty.last_updated, 0);
+        assert!(storage.get_shard_stats("").await.is_err());
+
+        // Exercise pooled connection reuse and concurrent alternating tenants.
+        for _ in 0..12 {
+            let (a, b) = tokio::join!(
+                storage.get_shard_stats("tenant-a"),
+                storage.get_shard_stats("tenant-b")
+            );
+            assert_eq!(a.unwrap().document_count, 3);
+            assert_eq!(b.unwrap().document_count, 2);
+        }
+
+        // Tenant GUC settings from prior transactions must not persist on pool
+        // connections, even with the same two physical sessions being reused.
+        let direct_again: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM documents")
+            .fetch_one(&storage.pool).await.unwrap();
+        assert_eq!(direct_again.0, 0);
+
+        // Explicit RLS guard must exist and must be restrictive.
+        let policy: (bool,) = sqlx::query_as(
+            "SELECT polpermissive FROM pg_policy WHERE polname = 'pf_tenant_guard'",
+        ).fetch_one(&admin.pool).await.unwrap();
+        assert!(!policy.0);
+        sqlx::query("DROP POLICY pf_ci_wide_policy ON documents")
+            .execute(&admin.pool).await.unwrap();
+    }
+
+    #[test]
+    fn deterministic_embedding_has_expected_dimensions() {
+        let embedding = VectorIndex::generate_query_embedding("integration-query");
+        assert_eq!(embedding.len(), 128);
+        assert!(embedding.iter().all(|v| v.is_finite()));
+        assert_ne!(embedding, VectorIndex::generate_query_embedding("different"));
+        assert_eq!(embedding, VectorIndex::generate_query_embedding("integration-query"));
+        assert_eq!(decode_vector_text(Some(query_vector_literal("integration-query"))).unwrap().len(), 128);
+        assert!(decode_vector_text(Some("[1,2]".to_string())).is_err());
+    }
+
+    #[tokio::test]
+    async fn memory_index_enforces_complete_label_containment() {
+        let index = VectorIndex::new().await.unwrap();
+        for (id, labels) in [
+            ("both", vec!["public".to_string(), "secret".to_string()]),
+            ("public-only", vec!["public".to_string()]),
+            ("open", Vec::new()),
+        ] {
+            index.add_document(Document {
+                id: id.to_string(), content: "test".to_string(),
+                tenant: "tenant-a".to_string(), labels, metadata: HashMap::new(),
+                embedding: vec![0.1; 128], created_at: 1, updated_at: 2,
+            }).await.unwrap();
+        }
+        let granted = vec!["public".to_string()];
+        let visible = index.search_with_tenant_isolation("q", "tenant-a", &granted, 10)
+            .await.unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].document_id, "public-only");
+        let all = vec!["public".to_string(), "secret".to_string()];
+        assert_eq!(index.search_with_tenant_isolation("q", "tenant-a", &all, 10).await.unwrap().len(), 2);
+        assert!(index.search_with_tenant_isolation("q", "tenant-a", &[], 10).await.unwrap().is_empty());
+        assert!(index.get_document("both", "tenant-a", &granted).await.unwrap().is_none());
+        assert!(index.get_document("both", "tenant-a", &all).await.unwrap().is_some());
+        assert!(index.get_document("open", "tenant-a", &all).await.unwrap().is_none());
+        assert!(index.get_document("public-only", "tenant-a", &[]).await.unwrap().is_none());
     }
 }

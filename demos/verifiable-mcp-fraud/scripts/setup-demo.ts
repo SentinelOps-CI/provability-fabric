@@ -70,7 +70,7 @@ async function setupDemo() {
     
     // Check service health
     for (const [service, status] of Object.entries(health.services)) {
-      const serviceStatus = (status as any).status || 'unknown';
+      const serviceStatus = typeof status === 'object' && status !== null && 'status' in status && typeof status.status === 'string' ? status.status : 'unknown';
       const emoji = serviceStatus === 'healthy' ? '✅' : '❌';
       console.log(`   ${emoji} ${service}: ${serviceStatus}`);
     }

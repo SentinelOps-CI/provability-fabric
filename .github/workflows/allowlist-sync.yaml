@@ -53,11 +53,13 @@ jobs:
           lean --version
 
       - name: Vendor mathlib
+        id: vendor
         run: |
           chmod +x scripts/vendor-mathlib.sh
           bash scripts/vendor-mathlib.sh
 
       - name: Build Lean proofs
+        id: build_proofs
         run: |
           cd core/lean-libs
           if [ -f "lakefile.lean" ]; then
@@ -67,10 +69,12 @@ jobs:
           fi
 
       - name: Generate allowlist from Lean
+        id: generate
         run: |
           python3 tools/gen_allowlist_from_lean.py . /tmp/generated_allowlist.json
 
       - name: Compare with committed allowlist
+        id: compare
         run: |
           echo "Comparing generated allowlist with committed version..."
 
@@ -115,6 +119,7 @@ jobs:
           PY
 
       - name: Validate allowlist structure
+        id: structure
         run: |
           echo "Validating allowlist structure..."
           python3 -c "
@@ -182,11 +187,18 @@ jobs:
 
       - name: Generate drift report
         if: always()
+        env:
+          VENDOR_OUTCOME: ${{ steps.vendor.outcome }}
+          BUILD_OUTCOME: ${{ steps.build_proofs.outcome }}
+          GENERATE_OUTCOME: ${{ steps.generate.outcome }}
+          COMPARE_OUTCOME: ${{ steps.compare.outcome }}
+          STRUCTURE_OUTCOME: ${{ steps.structure.outcome }}
         run: |
           echo "Generating drift report..."
 
           python3 -c "
           import json
+          import os
           from datetime import datetime
 
           with open('runtime/sidecar-watcher/policy/allowlist.json', 'r') as f:
@@ -199,7 +211,19 @@ jobs:
               'total_tools': len(allowlist['tools']),
               'explicit_proofs': len([t for t in allowlist['tools'].values() if t.get('lean_definition', True)]),
               'default_deny': len([t for t in allowlist['tools'].values() if t.get('capability_type') == 'default_deny']),
-              'sync_status': 'in_sync' if allowlist.get('sync_with_lean') else 'drift_detected'
+              'declared_sync_with_lean': allowlist.get('sync_with_lean'),
+              'vendor_outcome': os.environ['VENDOR_OUTCOME'],
+              'build_outcome': os.environ['BUILD_OUTCOME'],
+              'generate_outcome': os.environ['GENERATE_OUTCOME'],
+              'compare_outcome': os.environ['COMPARE_OUTCOME'],
+              'structure_outcome': os.environ['STRUCTURE_OUTCOME'],
+              'sync_status': (
+                  'in_sync' if all(os.environ[k] == 'success' for k in (
+                      'VENDOR_OUTCOME', 'BUILD_OUTCOME', 'GENERATE_OUTCOME',
+                      'COMPARE_OUTCOME', 'STRUCTURE_OUTCOME'))
+                  else 'comparison_failed' if os.environ['COMPARE_OUTCOME'] == 'failure'
+                  else 'not_established'
+              )
           }
 
           with open('/tmp/drift_report.json', 'w') as f:
@@ -229,11 +253,5 @@ jobs:
               repo: context.repo.repo,
               body: `❌ **Allowlist Sync Validation Failed**
               
-              The runtime allowlist is out of sync with Lean proofs. Please run:
-              
-              \`\`\`bash
-              python3 tools/gen_allowlist_from_lean.py . runtime/sidecar-watcher/policy/allowlist.json
-              \`\`\`
-              
-              Then commit the updated allowlist to ensure runtime configuration matches formal specifications.`
+              The validation workflow failed. Inspect the job's provisioning, build, generation, comparison, and structure outcomes in the drift report. A provisioning failure does not establish allowlist drift. If comparison actually failed, inspect the generated and committed tool capabilities before changing policy.`
             })

@@ -4,13 +4,27 @@ A modular platform that converts natural-language policies into formal specifica
 
 ## Quick Start
 
-### Option 1: One-Command Demo
+### Option 1: Full-profile service startup
 
 ```bash
+# Provision an Ed25519 private signing key outside tracked source first.
+mkdir -p .local/secrets
+chmod 700 .local/secrets
+(umask 077; openssl genpkey -algorithm Ed25519 -out .local/secrets/retrieval-receipt-signing-key.pem)
 make demo-up
 ```
 
-This starts the complete platform with the Verifiable MCP Fraud demo.
+This builds and starts the full Compose profile, including the fraud-demo HTTP
+service. It does **not** issue a verified policy, deploy a proven monitor, or
+establish receipt provenance. The private key above is for disposable local
+development only; production uses separately provisioned signing material and
+a corresponding verifier trust root.
+
+`make demo-setup` separately attempts the proof-backed policy workflow. The
+current proof service correctly rejects its generated Lean obligations containing
+`sorry`/`admit` (HTTP 422), so this setup is not currently an operational
+proof-backed demo. The full-profile CI smoke asserts this refusal explicitly
+and separately checks service startup, HTTP tool behavior and synthetic inputs.
 
 ### Option 2: Compose Profiles
 
@@ -21,7 +35,7 @@ make platform-up
 # Full stack (ledger, console, enforcement, demo)
 make full-up
 
-# Setup demo data
+# Attempt proof-backed setup (currently fails closed for admitted Lean obligations)
 make demo-setup
 
 # Run demo agent
@@ -90,11 +104,15 @@ so packet make <decision-id> --out artifacts/
 
 ```bash
 POST /api/v1/policy/compile     # English → ActionDSL
-POST /api/v1/proofs/run         # Generate Lean proofs
+POST /api/v1/proofs/run         # Attempt proof validation; reject admitted obligations
 POST /api/v1/policy/build       # ActionDSL → DFA
 POST /api/v1/runtime/deploy     # Deploy to runtime
 POST /api/v1/runtime/epoch/rotate # Rotate epochs
 ```
+
+**Current proof-service limitation.** Generated Lean obligations still contain `sorry` placeholders, and the optional Morph execution path has no verified backend. Requests that encounter either condition return HTTP 422 with `status: "failed"`, an error diagnostic, an empty `proof_hash`, and no proof artifacts. This fail-closed result must not be interpreted as a completed proof, regardless of the service health endpoint. A subsequent build or deployment needs independently checked proof evidence; this endpoint does not currently establish that evidence.
+
+**Build issuance limitation.** The build orchestrator currently has no configured trusted proof-evidence verifier. Its `POST /api/v1/policy/build` endpoint returns HTTP 503 rather than accepting a caller-provided proof hash as verification. A request containing `signing_key` returns HTTP 501, since no authenticated build signer is configured and the previous key-independent digest was not a digital signature. Failed requests create no policy builds or proof-backed artifacts. Plain policy compilation remains available through `/api/v1/policy/compile`; verified build issuance needs an authenticated evidence verifier and a separately specified signing trust model.
 
 ### Evidence & Replay
 
@@ -103,8 +121,11 @@ GET /api/v1/evidence/cert/:id   # Get CERT-V1
 POST /api/v1/evidence/search    # Search certificates
 POST /api/v1/replay             # Start replay
 GET /api/v1/replay/:jobId       # Get replay status
-GET /api/v1/compliance/packet/:id # Download compliance packet
+POST /api/v1/compliance/packet # Generate an in-request JSON diagnostic (not a certified archive)
+GET /api/v1/compliance/packet/:id # HTTP 501 until authenticated durable export is implemented
 ```
+
+**Compliance archive status.** The POST endpoint returns a generated JSON diagnostic for the current request. It does not persist packet IDs, authenticate an archive issuer, or produce independently certified compliance evidence. The GET download endpoint deliberately returns `501 PACKET_EXPORT_UNAVAILABLE` for every packet ID. An earlier implementation produced placeholder ZIP files containing synthetic certificate and audit data; that behavior is prohibited. Console and CLI integrations expecting ZIP files must treat the failure as an unavailable feature until authenticated persistence, provenance validation, and a real export contract are implemented.
 
 ### Runtime & Monitoring
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -41,7 +42,6 @@ type DocData struct {
 	AcceptanceCriteria []CriterionItem
 	Traceability       string
 	LedgerQuery        string
-	GeneratedAt        string
 }
 
 type RequirementItem struct {
@@ -111,7 +111,13 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 
 	// Prepare requirements
 	var requirements []RequirementItem
-	for id, req := range spec.Requirements {
+	requirementIDs := make([]string, 0, len(spec.Requirements))
+	for id := range spec.Requirements {
+		requirementIDs = append(requirementIDs, id)
+	}
+	sort.Strings(requirementIDs)
+	for _, id := range requirementIDs {
+		req := spec.Requirements[id]
 		requirements = append(requirements, RequirementItem{
 			ID:        id,
 			Statement: req.Statement,
@@ -124,7 +130,13 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 
 	// Prepare non-functional requirements
 	var nonFunctional []RequirementItem
-	for id, req := range spec.NonFunctional {
+	nonFunctionalIDs := make([]string, 0, len(spec.NonFunctional))
+	for id := range spec.NonFunctional {
+		nonFunctionalIDs = append(nonFunctionalIDs, id)
+	}
+	sort.Strings(nonFunctionalIDs)
+	for _, id := range nonFunctionalIDs {
+		req := spec.NonFunctional[id]
 		nonFunctional = append(nonFunctional, RequirementItem{
 			ID:        id,
 			Statement: req.Statement,
@@ -137,7 +149,13 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 
 	// Prepare acceptance criteria
 	var acceptanceCriteria []CriterionItem
-	for id, criterion := range spec.AcceptanceCriteria {
+	acceptanceIDs := make([]string, 0, len(spec.AcceptanceCriteria))
+	for id := range spec.AcceptanceCriteria {
+		acceptanceIDs = append(acceptanceIDs, id)
+	}
+	sort.Strings(acceptanceIDs)
+	for _, id := range acceptanceIDs {
+		criterion := spec.AcceptanceCriteria[id]
 		acceptanceCriteria = append(acceptanceCriteria, CriterionItem{
 			ID:          id,
 			Description: criterion.Description,
@@ -159,7 +177,6 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 		AcceptanceCriteria: acceptanceCriteria,
 		Traceability:       traceability,
 		LedgerQuery:        ledgerQuery,
-		GeneratedAt:        "2025-01-27",
 	}
 
 	// Create output directory
@@ -184,60 +201,82 @@ func generateDocs(spec SpecDoc, outputFile string) error {
 	return nil
 }
 
+// wrappedField renders human-readable prose without overflowing Markdown tables.
+func wrappedField(title, value string) []string {
+	const width = 80
+	prefix := "- **" + title + ":**"
+	words := strings.Fields(value)
+	if len(words) == 0 {
+		return []string{prefix + " (unspecified)"}
+	}
+	lines := []string{}
+	line := prefix
+	for _, word := range words {
+		if len(line)+1+len(word) > width && line != prefix {
+			lines = append(lines, line)
+			line = "  " + word
+		} else if len(line)+1+len(word) > width {
+			lines = append(lines, line)
+			line = "  " + word
+		} else {
+			line += " " + word
+		}
+	}
+	return append(lines, line)
+}
+
+// generateMarkdown creates reproducibly ordered, lintable specification pages.
 func generateMarkdown(data DocData) string {
-	var lines []string
-
-	lines = append(lines, "# Specification Documentation: "+data.ID)
-	lines = append(lines, "")
-	lines = append(lines, "## Requirements")
-	lines = append(lines, "")
-	lines = append(lines, "| ID | Statement | Rationale | Metric | Owner | Priority |")
-	lines = append(lines, "|----|-----------|-----------|--------|-------|----------|")
-
+	lines := []string{
+		"# Specification Documentation: " + data.ID,
+		"",
+		"## Requirements",
+		"",
+	}
 	for _, req := range data.Requirements {
-		lines = append(lines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |",
-			req.ID, req.Statement, req.Rationale, req.Metric, req.Owner, req.Priority))
+		lines = append(lines, "### "+req.ID, "")
+		for _, field := range []struct{ title, value string }{
+			{"Statement", req.Statement},
+			{"Rationale", req.Rationale},
+			{"Metric", req.Metric},
+			{"Owner", req.Owner},
+			{"Priority", req.Priority},
+		} {
+			lines = append(lines, wrappedField(field.title, field.value)...)
+		}
+		lines = append(lines, "")
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, "## Non-Functional Requirements")
-	lines = append(lines, "")
-	lines = append(lines, "| ID | Statement | Rationale | Metric | Owner | Priority |")
-	lines = append(lines, "|----|-----------|-----------|--------|-------|----------|")
-
+	lines = append(lines, "## Non-Functional Requirements", "")
 	for _, req := range data.NonFunctional {
-		lines = append(lines, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |",
-			req.ID, req.Statement, req.Rationale, req.Metric, req.Owner, req.Priority))
+		lines = append(lines, "### "+req.ID, "")
+		for _, field := range []struct{ title, value string }{
+			{"Statement", req.Statement},
+			{"Rationale", req.Rationale},
+			{"Metric", req.Metric},
+			{"Owner", req.Owner},
+			{"Priority", req.Priority},
+		} {
+			lines = append(lines, wrappedField(field.title, field.value)...)
+		}
+		lines = append(lines, "")
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, "## Acceptance Criteria")
-	lines = append(lines, "")
-	lines = append(lines, "| ID | Description | Test Vector |")
-	lines = append(lines, "|----|-------------|-------------|")
-
-	for _, ac := range data.AcceptanceCriteria {
-		lines = append(lines, fmt.Sprintf("| %s | %s | %s |",
-			ac.ID, ac.Description, ac.TestVector))
+	lines = append(lines, "## Acceptance Criteria", "")
+	for _, item := range data.AcceptanceCriteria {
+		lines = append(lines, "### "+item.ID, "")
+		lines = append(lines, wrappedField("Description", item.Description)...)
+		lines = append(lines, wrappedField("Test Vector", item.TestVector)...)
+		lines = append(lines, "")
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, "## Traceability Matrix")
-	lines = append(lines, "")
-	lines = append(lines, data.Traceability)
-
-	lines = append(lines, "")
-	lines = append(lines, "## Ledger Risk History")
-	lines = append(lines, "")
-	lines = append(lines, "To query the risk history for this specification in the ledger:")
-	lines = append(lines, "")
+	lines = append(lines, "## Traceability Matrix", "")
+	lines = append(lines, strings.Split(data.Traceability, "\n")...)
+	lines = append(lines, "", "## Ledger Risk History", "")
+	lines = append(lines, "To query the risk history for this specification in the ledger:", "")
 	lines = append(lines, "```graphql")
-	lines = append(lines, data.LedgerQuery)
-	lines = append(lines, "```")
-
-	lines = append(lines, "")
-	lines = append(lines, "## Generated on "+data.GeneratedAt)
-
+	lines = append(lines, strings.Split(data.LedgerQuery, "\n")...)
+	lines = append(lines, "```", "")
 	return strings.Join(lines, "\n")
 }
 
@@ -270,8 +309,13 @@ func generateTraceabilityMatrix(trace map[string][]string, requirements, nonFunc
 	}
 
 	// Add traceability links
-	for from, toList := range trace {
-		for _, to := range toList {
+	traceIDs := make([]string, 0, len(trace))
+	for id := range trace {
+		traceIDs = append(traceIDs, id)
+	}
+	sort.Strings(traceIDs)
+	for _, from := range traceIDs {
+		for _, to := range trace[from] {
 			lines = append(lines, fmt.Sprintf("    %s --> %s", from, to))
 		}
 	}

@@ -66,15 +66,34 @@ fi
 
 # Populate .olean files (prefer Mathlib's prebuilt cache over a full compile)
 echo "Fetching mathlib build artifacts..."
-if [ -d .lake/build/lib ] && [ -n "$(ls -A .lake/build/lib 2>/dev/null)" ]; then
-  echo "Mathlib build artifacts already present, skipping fetch"
-elif timeout 900 lake exe cache get; then
-  echo "Downloaded mathlib cache"
-else
-  echo "Mathlib cache download failed or timed out after 15 minutes"
-  echo "   CI should restore vendor/mathlib/.lake from cache; avoid full lake build here."
+# A nonempty build directory may contain partial artifacts. Invoke the
+# cache client even after restoring an Actions cache.
+# Three bounded attempts fit inside the former 15-minute download budget.
+if [ "$(git rev-parse HEAD)" != "$MATHLIB_COMMIT" ]; then
+  echo "Mathlib revision verification failed" >&2
   exit 1
 fi
+
+cache_ready=false
+for attempt in 1 2 3; do
+  echo "Mathlib cache retrieval attempt $attempt/3"
+  if timeout --kill-after=5s 280s lake exe cache get; then
+    cache_ready=true
+    break
+  else
+    rc=$?
+    echo "Mathlib cache retrieval attempt $attempt failed (exit $rc)" >&2
+  fi
+  if [ "$attempt" -lt 3 ]; then
+    sleep "$((attempt * 5))"
+  fi
+done
+
+if [ "$cache_ready" != true ]; then
+  echo "Mathlib cache retrieval failed after three bounded attempts" >&2
+  exit 1
+fi
+echo "Mathlib cache client completed; downstream builds must still succeed"
 
 echo "Mathlib vendored successfully!"
 echo "Location: $VENDOR_DIR"

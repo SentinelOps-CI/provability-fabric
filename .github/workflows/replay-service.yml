@@ -1,0 +1,105 @@
+name: Replay Service Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/replay-service/**"
+      - ".github/workflows/replay-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/replay-service/**"
+      - ".github/workflows/replay-service.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: services/replay-service
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up module-compatible Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/replay-service/go.mod
+          cache-dependency-path: services/replay-service/go.sum
+
+      - name: Verify dependency integrity, static checks, and build
+        run: |
+          set -euo pipefail
+          go mod verify
+          go test -race ./...
+          go vet ./...
+          go build -trimpath ./...
+
+      - name: Build and start real replay service image
+        run: |
+          set -euo pipefail
+          docker build --pull --tag replay-service-ci:local .
+          docker run --detach --rm --name replay-service-ci-smoke \
+            --publish 127.0.0.1:18005:8005 replay-service-ci:local
+
+      - name: Check actual HTTP endpoints without external replay kits
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          root = "http://127.0.0.1:18005/api/v1"
+
+          def request(path, *, method="GET", payload=None, expected=200):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = {"Content-Type": "application/json"} if data is not None else {}
+              req = Request(root + path, data=data, headers=headers, method=method)
+              try:
+                  with urlopen(req, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              if status != expected:
+                  raise AssertionError(
+                      f"{method} {path}: HTTP {status}, expected {expected}: {body[:200]!r}"
+                  )
+              return json.loads(body)
+
+          for attempt in range(30):
+              try:
+                  health = request("/health")
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("replay service did not become reachable")
+
+          assert health["status"] == "healthy"
+          assert health["service"] == "replay-service"
+          assert health["replay_kit"] == "missing", (
+              "this CI job does not provision or test the external replay kit"
+          )
+          assert request("/replays")["count"] == 0
+          request("/replay/nonexistent", expected=404)
+          request("/replay/nonexistent/dfa_state", expected=404)
+          request("/replay", method="POST", payload={}, expected=400)
+          assert request("/replays")["count"] == 0
+          print(
+              "Replay service smoke passed: startup, health, empty job inventory, "
+              "missing job, invalid request. Actual replay execution was not exercised."
+          )
+          PY
+
+      - name: Remove disposable replay service container
+        if: always()
+        run: |
+          if docker container inspect replay-service-ci-smoke >/dev/null 2>&1; then
+            docker rm -f replay-service-ci-smoke
+          fi
