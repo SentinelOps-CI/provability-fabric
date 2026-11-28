@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Sidecar COSE Sign1 profile
+
+on:
+  pull_request:
+    branches: [security/kms-authority-consolidated-20261127]
+    paths:
+      - 'runtime/sidecar-watcher/**'
+      - 'scripts/test_cose_reference.py'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - '.github/workflows/sidecar-cose-sign1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Independently verify reference encoding and Ed25519 signature
+        run: python3 scripts/test_cose_reference.py
+      - name: Resolve removal of unmaintained CBOR package
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/before.lock"
+          cargo metadata --all-features --format-version 1 > "$RUNNER_TEMP/cose-metadata.json"
+          python3 - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          def records(path):
+              return {(p["name"], p["version"]): p for p in tomllib.loads(path.read_text())["package"]}
+          before = records(Path(os.environ["RUNNER_TEMP"]) / "before.lock")
+          after = records(Path("Cargo.lock"))
+          assert set(before) - set(after) == {("serde_cbor", "0.11.2"), ("half", "1.8.3")}
+          assert not set(after) - set(before)
+          assert all(before[k] == after[k] for k in after)
+          assert ("ciborium", "0.2.2") in after
+          PY
+          cp Cargo.lock "$RUNNER_TEMP/cose-native.lock"
+          sha256sum Cargo.lock
+      - name: Preserve native resolution
+        uses: actions/upload-artifact@v4
+        with:
+          name: cose-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Verify full dependency policy with final advisory ignore removed
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
+      - name: Native signature and complete sidecar regression suite
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher --lib crypto::tests::cose_reference_vector_and_negative_controls -- --exact --nocapture | tee "$RUNNER_TEMP/cose-tests.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/cose-tests.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/cose-tests.txt"
+          cargo test --locked -p sidecar-watcher --lib --bins --no-fail-fast
+          cargo build --locked -p sidecar-watcher
+          cargo clippy --locked -p sidecar-watcher -- -D warnings
+          cmp Cargo.lock "$RUNNER_TEMP/cose-native.lock"
