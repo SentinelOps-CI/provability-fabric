@@ -13,6 +13,7 @@ on:
       - 'runtime/tool-broker/**'
       - 'runtime/attestor/**'
       - 'runtime/telemetry-service/**'
+      - 'runtime/jwks-manager/**'
       - 'deny.toml'
       - 'Cargo.lock'
       - '.github/workflows/kms-consolidated-candidate.yml'
@@ -123,6 +124,12 @@ jobs:
           cargo test --locked -p telemetry-service --bin telemetry-service http_transport_tests::test_loopback_dispatch_and_body_limit -- --exact --nocapture | tee "$RUNNER_TEMP/telemetry-http.txt"
           grep -F 'running 1 test' "$RUNNER_TEMP/telemetry-http.txt"
           grep -F '1 passed; 0 failed' "$RUNNER_TEMP/telemetry-http.txt"
+      - name: Verify JWKS response semantics on actual HTTP listener
+        run: |
+          set -euo pipefail
+          cargo test --locked -p jwks-manager --bin jwks-manager http_transport_tests::test_loopback_dispatch_and_body_limit -- --exact --nocapture | tee "$RUNNER_TEMP/jwks-http.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/jwks-http.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/jwks-http.txt"
       - name: Run the existing workspace Clippy acceptance command
         run: |
           set -euo pipefail
