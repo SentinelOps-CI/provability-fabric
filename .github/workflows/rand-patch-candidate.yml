@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+# Independent resolver experiment; never modifies the branch's committed lock.
+name: Rand patch qualification
+
+on:
+  pull_request:
+    branches: [security/rust-final-consolidation-20261127]
+    paths:
+      - '.github/workflows/rand-patch-candidate.yml'
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+      - 'deny.toml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve only patched rand release lines
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/before.lock"
+          cargo update -p rand@0.8.5 --precise 0.8.6
+          cargo update -p rand@0.9.2 --precise 0.9.3
+          cargo metadata --locked --all-features --format-version 1 > "$RUNNER_TEMP/rand-metadata.json"
+          python3 - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          def records(path):
+              return {(p["name"], p["version"]): p for p in tomllib.loads(path.read_text())["package"]}
+          before = records(Path(os.environ["RUNNER_TEMP"]) / "before.lock")
+          after = records(Path("Cargo.lock"))
+          assert set(before) - set(after) == {("rand", "0.8.5"), ("rand", "0.9.2")}
+          assert set(after) - set(before) == {("rand", "0.8.6"), ("rand", "0.9.3")}
+          for key in set(before) & set(after):
+              expected = dict(before[key])
+              if "dependencies" in expected:
+                  expected["dependencies"] = [{"rand 0.8.5": "rand 0.8.6", "rand 0.9.2": "rand 0.9.3"}.get(dep, dep) for dep in expected["dependencies"]]
+              assert expected == after[key], key
+          assert {v for n, v in after if n == "rand"} == {"0.8.6", "0.9.3", "0.10.4"}
+          print("Only the two affected rand package versions and their dependency references changed")
+          PY
+          cp Cargo.lock "$RUNNER_TEMP/rand-native.lock"
+          sha256sum Cargo.lock
+      - name: Preserve native patch resolution
+        uses: actions/upload-artifact@v4
+        with:
+          name: rand-patched-native-Cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Remove rand advisory ignore in isolated experimental checkout
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path("deny.toml")
+          original = path.read_text()
+          updated, count = re.subn(r'\[\[advisories\.ignore\]\]\nid = "RUSTSEC-2026-0097"\nreason = "[^"\n]*"\n\n', '', original)
+          assert count == 1
+          path.write_text(updated)
+          PY
+      - name: Scan actual patched graph with rand ignore removed
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+          arguments: --all-features
+          rust-version: stable
+      - name: Qualify affected production libraries and binaries
+        run: |
+          set -euo pipefail
+          cargo test --locked -p sidecar-watcher -p labeler -p retrieval-gateway --lib --bins --no-fail-fast
+          cargo check --locked --workspace --all-features --all-targets
+          cmp Cargo.lock "$RUNNER_TEMP/rand-native.lock"
