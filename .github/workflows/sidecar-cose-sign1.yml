@@ -29,26 +29,43 @@ jobs:
           set -euo pipefail
           cp Cargo.lock "$RUNNER_TEMP/before.lock"
           cargo metadata --all-features --format-version 1 > "$RUNNER_TEMP/cose-metadata.json"
+          cp Cargo.lock "$RUNNER_TEMP/cose-native.lock"
+          sha256sum Cargo.lock
+      - name: Preserve native resolution before graph assertions
+        uses: actions/upload-artifact@v4
+        with:
+          name: cose-native-Cargo-lock
+          path: |
+            ${{ runner.temp }}/before.lock
+            ${{ runner.temp }}/cose-native.lock
+          if-no-files-found: error
+      - name: Check exact permitted package and edge changes
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           import os, tomllib
           from pathlib import Path
           def records(path):
               return {(p["name"], p["version"]): p for p in tomllib.loads(path.read_text())["package"]}
-          before = records(Path(os.environ["RUNNER_TEMP"]) / "before.lock")
-          after = records(Path("Cargo.lock"))
-          assert set(before) - set(after) == {("serde_cbor", "0.11.2"), ("half", "1.8.3")}
-          assert not set(after) - set(before)
-          assert all(before[k] == after[k] for k in after)
+          root = Path(os.environ["RUNNER_TEMP"])
+          before = records(root / "before.lock")
+          after = records(root / "cose-native.lock")
+          removed, added = set(before) - set(after), set(after) - set(before)
+          print("removed:", sorted(removed), "added:", sorted(added))
+          assert removed == {("serde_cbor", "0.11.2"), ("half", "1.8.3")}
+          assert not added
+          for key in after:
+              expected = dict(before[key])
+              if "dependencies" in expected:
+                  expected["dependencies"] = ["half" if dep == "half 2.7.1" else dep
+                                              for dep in expected["dependencies"]]
+              assert expected == after[key], (key, expected, after[key])
           assert ("ciborium", "0.2.2") in after
+          assert not any(name == "serde_cbor" for name, _ in after)
+          assert "[[advisories.ignore]]" not in Path("deny.toml").read_text()
           PY
-          cp Cargo.lock "$RUNNER_TEMP/cose-native.lock"
-          sha256sum Cargo.lock
-      - name: Preserve native resolution
-        uses: actions/upload-artifact@v4
-        with:
-          name: cose-native-Cargo-lock
-          path: Cargo.lock
-          if-no-files-found: error
+          cargo metadata --locked --all-features --format-version 1 > /dev/null
+          cmp Cargo.lock "$RUNNER_TEMP/cose-native.lock"
       - name: Verify full dependency policy with final advisory ignore removed
         uses: EmbarkStudios/cargo-deny-action@v2
         with:

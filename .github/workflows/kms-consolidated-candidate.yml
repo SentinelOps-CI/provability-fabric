@@ -12,6 +12,7 @@ on:
       - 'runtime/mpc-fintech/**'
       - 'runtime/tool-broker/**'
       - 'runtime/attestor/**'
+      - 'runtime/telemetry-service/**'
       - 'deny.toml'
       - 'Cargo.lock'
       - '.github/workflows/kms-consolidated-candidate.yml'
@@ -116,6 +117,12 @@ jobs:
           cargo build --locked -p mpc-fintech --all-features --bins
           cargo test --locked -p sidecar-watcher --test runtime_observation_tests
           git diff --exit-code -- Cargo.lock
+      - name: Verify telemetry response semantics on actual HTTP listener
+        run: |
+          set -euo pipefail
+          cargo test --locked -p telemetry-service --bin telemetry-service http_transport_tests::test_loopback_dispatch_and_body_limit -- --exact --nocapture | tee "$RUNNER_TEMP/telemetry-http.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/telemetry-http.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/telemetry-http.txt"
       - name: Run the existing workspace Clippy acceptance command
         run: |
           set -euo pipefail

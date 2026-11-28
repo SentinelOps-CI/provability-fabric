@@ -303,14 +303,16 @@ impl Clone for TelemetryService {
 async fn handle_request(
     req: Request,
     service: Arc<TelemetryService>,
-) -> Result<Response<Body>, Response<Body>> {
+) -> Response<Body> {
     let path = req.uri().path();
     let method = req.method();
 
     match (method.as_str(), path) {
         ("POST", "/telemetry/collect") => {
-            let body_bytes = Bytes::from_request(req, &()).await
-                .map_err(|rejection| rejection.into_response())?;
+            let body_bytes = match Bytes::from_request(req, &()).await {
+                Ok(bytes) => bytes,
+                Err(rejection) => return rejection.into_response(),
+            };
             let telemetry_data: TelemetryData = serde_json::from_slice(&body_bytes)
                 .unwrap_or_else(|_| TelemetryData {
                     time_to_first_cert_samples: Vec::new(),
@@ -328,10 +330,10 @@ async fn handle_request(
                 Ok(response) => {
                     let response_json = serde_json::to_string(&response).unwrap();
                     
-                    Ok(Response::builder()
+                    Response::builder()
                         .header("Content-Type", "application/json")
                         .body(Body::from(response_json))
-                        .unwrap())
+                        .unwrap()
                 }
                 Err(e) => {
                     let response = TelemetryResponse {
@@ -341,11 +343,11 @@ async fn handle_request(
                     };
                     let response_json = serde_json::to_string(&response).unwrap();
                     
-                    Ok(Response::builder()
+                    Response::builder()
                         .status(400)
                         .header("Content-Type", "application/json")
                         .body(Body::from(response_json))
-                        .unwrap())
+                        .unwrap()
                 }
             }
         }
@@ -353,20 +355,20 @@ async fn handle_request(
             let metrics = service.get_aggregated_metrics().await;
             let response_json = serde_json::to_string(&metrics).unwrap();
             
-            Ok(Response::builder()
+            Response::builder()
                 .header("Content-Type", "application/json")
                 .header("Cache-Control", "public, max-age=60") // 1 minute cache
                 .body(Body::from(response_json))
-                .unwrap())
+                .unwrap()
         }
         ("GET", "/metrics") => {
             let mut buffer = String::new();
             encode(&mut buffer, &service.registry).unwrap();
 
-            Ok(Response::builder()
+            Response::builder()
                 .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
                 .body(Body::from(buffer))
-                .unwrap())
+                .unwrap()
         }
         _ => {
             let response = serde_json::json!({
@@ -374,11 +376,11 @@ async fn handle_request(
                 "message": "Endpoint not supported"
             });
             
-            Ok(Response::builder()
+            Response::builder()
                 .status(404)
                 .header("Content-Type", "application/json")
                 .body(Body::from(response.to_string()))
-                .unwrap())
+                .unwrap()
         }
     }
 }
@@ -430,9 +432,15 @@ mod http_transport_tests {
         let base = format!("http://{addr}");
         let unknown = client.get(format!("{base}/unknown")).send().await.unwrap();
         assert_eq!(unknown.status().as_u16(), 404);
+        assert_eq!(unknown.headers()["content-type"], "application/json");
         assert_eq!(unknown.json::<serde_json::Value>().await.unwrap()["error"], "Not found");
         let response = client.get(format!("{base}/metrics")).send().await.unwrap();
         assert_eq!(response.status().as_u16(), 200);
+        assert_eq!(response.headers()["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+        let metrics = client.get(format!("{base}/telemetry/metrics")).send().await.unwrap();
+        assert_eq!(metrics.status().as_u16(), 200);
+        assert_eq!(metrics.headers()["cache-control"], "public, max-age=60");
+        assert_eq!(metrics.headers()["content-type"], "application/json");
         let oversized = client.post(format!("{base}/telemetry/collect"))
             .body(vec![b'x'; MAX_REQUEST_BODY_BYTES + 1]).send().await.unwrap();
         assert_eq!(oversized.status().as_u16(), 413);

@@ -24,7 +24,9 @@ jobs:
       - name: Install native optional-feature prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libhyperscan-dev libclang-dev pkg-config
+          sudo apt-get install -y --no-install-recommends libhyperscan-dev libclang-dev pkg-config protobuf-compiler
+          protoc --version
+          pkg-config --modversion libhs
       - name: Confirm exact patched Rand versions and absence of suppression
         run: |
           set -euo pipefail
