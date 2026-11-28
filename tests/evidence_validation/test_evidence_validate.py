@@ -174,7 +174,7 @@ def test_independent_execution_attestation_signature(pf_bin: Path, tmp_path: Pat
         fields = [manifest["schema_version"], manifest["bundle_id"], att["schema_version"],
                   att["attestation_id"], att["attestor"], ref["role"], ref["path"],
                   ref["media_type"], ref["digest"], ""]
-        message = b"provability-fabric/execution-attestation/v1\\x00" + b"".join(
+        message = b"provability-fabric/execution-attestation/v1" + bytes([0]) + b"".join(
             struct.pack(">Q", len(field.encode())) + field.encode() for field in fields)
         msg = tmp_path / "message"
         msg.write_bytes(message)
@@ -217,5 +217,19 @@ def test_independent_execution_attestation_signature(pf_bin: Path, tmp_path: Pat
     trust["expected_bundle_id"] = "independent-run"
     trust["expected_trace_digest"] = "sha256:" + "0" * 64
     verify(False, "externally identified execution trace")
+    trust["expected_trace_digest"] = digest
+    original_key = trust["public_key_base64"]
+    other_der = openssl("pkey", "-in", str(other), "-pubout", "-outform", "DER")
+    trust["public_key_base64"] = base64.b64encode(other_der[12:]).decode()
+    verify(False, "signature verification failed")
+    trust["public_key_base64"] = original_key
+    original_trace = trace.read_bytes()
+    trace.write_bytes(original_trace + b" ")
+    new_digest = "sha256:" + hashlib.sha256(trace.read_bytes()).hexdigest()
+    ref["digest"] = new_digest
+    trust["expected_trace_digest"] = new_digest
+    verify(False, "signature verification failed")
+    trace.write_bytes(original_trace)
+    ref["digest"] = digest
     trust["expected_trace_digest"] = digest
     verify(True)

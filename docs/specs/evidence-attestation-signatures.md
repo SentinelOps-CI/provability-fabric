@@ -38,13 +38,13 @@ Existing illustrative fixtures with stale references must be repaired and
 repacked before using this opt-in profile; plain strict validation remains
 compatible with them.
 
-The validator does **not**:
+Plain strict validation and the reference-only profile do **not**:
 
 - Parse or verify DSSE / COSE / JWT envelope formats
 - Validate CERT-V1 `sig` fields on referenced certs
 - Invoke cosign, OpenSSL, or CERT-V1 verifier tooling
 
-No `signature` verification hook exists in `core/evidence` today; adding one would be a separate feature with explicit algorithm and key-trust policy.
+The execution-attestation profile described below is a separate opt-in signature verification feature with explicit algorithm and key-trust policy.
 
 ## Delegated verification (recommended acceptance wording)
 

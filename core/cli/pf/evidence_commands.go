@@ -113,6 +113,9 @@ func evidenceValidateCmd() *cobra.Command {
 		Short: "Validate an Evidence v0.1 or v0.2 bundle",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("execution-attestation-trust") && executionAttestationTrust == "" {
+				return fmt.Errorf("--execution-attestation-trust must identify a trust policy file")
+			}
 			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
 				BundlePath:                   args[0],
 				Strict:                       strict,

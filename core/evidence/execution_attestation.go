@@ -4,6 +4,7 @@ package evidence
 
 import (
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -118,10 +119,12 @@ func verifyExecutionAttestations(baseDir string, bundle EvidenceBundle, trustPat
 		trace.MediaType != roleMediaTypes["execution-trace"] {
 		return fmt.Errorf("expected exactly one externally identified execution trace")
 	}
+	count := 0
 	for _, ref := range bundle.Artifacts {
 		if ref.Role != "attestation" {
 			continue
 		}
+		count++
 		if ref.MediaType != roleMediaTypes["attestation"] {
 			return fmt.Errorf("unexpected execution attestation media type")
 		}
@@ -132,6 +135,10 @@ func verifyExecutionAttestations(baseDir string, bundle EvidenceBundle, trustPat
 		raw, err := os.ReadFile(p)
 		if err != nil {
 			return err
+		}
+		sum := sha256.Sum256(raw)
+		if ref.Digest != DigestPrefix+hex.EncodeToString(sum[:]) {
+			return fmt.Errorf("execution attestation changed after digest validation")
 		}
 		if err := rejectAmbiguousReferenceJSON(raw); err != nil {
 			return err
@@ -153,6 +160,9 @@ func verifyExecutionAttestations(baseDir string, bundle EvidenceBundle, trustPat
 		if !ed25519.Verify(ed25519.PublicKey(key), executionAttestationMessage(bundle, att), sig) {
 			return fmt.Errorf("execution attestation %q signature verification failed", att.ID)
 		}
+	}
+	if count == 0 {
+		return fmt.Errorf("execution attestation signature verification requires an attestation")
 	}
 	return nil
 }
