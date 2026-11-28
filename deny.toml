@@ -11,10 +11,6 @@ db-urls = ["https://github.com/RustSec/advisory-db"]
 id = "RUSTSEC-2021-0127"
 reason = "serde_cbor is used by sidecar-watcher; migration tracked separately"
 
-[[advisories.ignore]]
-id = "RUSTSEC-2026-0097"
-reason = "rand transitive unsoundness via wasmtime/kube chain; upgrade tracked separately"
-
 [licenses]
 version = 2
 confidence-threshold = 0.85

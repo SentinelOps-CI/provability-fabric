@@ -64,7 +64,7 @@ fn decode_hex<const N: usize>(value: &str) -> Option<[u8; N]> {
         return None;
     }
     let mut decoded = [0; N];
-    for (i, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+    for (i, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         decoded[i] = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
     }
     Some(decoded)
