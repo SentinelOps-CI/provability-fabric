@@ -250,6 +250,7 @@ jobs:
                   json.dump(data, f)
           PY
           export DATABASE_URL=""
+          export EVIDENCE_STORAGE_PATH=/tmp/evidence
           network=(--publish 127.0.0.1:18005:18005)
           if [[ "$BACKEND" == postgres ]]; then
             # Administrative migration is a one-shot invocation of the actual image.
@@ -267,11 +268,14 @@ jobs:
             export DATABASE_URL="postgres://evidence_image_runtime:$password@127.0.0.1:15432/evidence_ci?sslmode=disable"
             echo "::add-mask::$DATABASE_URL"
             network=(--network host)
+            # A file cannot be traversed as a directory. PostgreSQL mode must
+            # start and serve authenticated writes despite this unusable path.
+            export EVIDENCE_STORAGE_PATH=/dev/null/evidence
           fi
           docker run --detach --rm --name evidence-service-ci-auth \
             "${network[@]}" --env DATABASE_URL \
             --env PORT=18005 \
-            --env EVIDENCE_STORAGE_PATH=/tmp/evidence \
+            --env EVIDENCE_STORAGE_PATH \
             --env EVIDENCE_ACCESS_FILE=/run/evidence-access.json \
             --mount "type=bind,src=$fixture_dir/access.json,dst=/run/evidence-access.json,readonly" \
             evidence-service-ci:local
@@ -306,6 +310,7 @@ jobs:
                   assert health["service"] == "evidence-service"
                   expected_db = "connected" if os.environ["BACKEND"] == "postgres" else "disconnected"
                   assert health["database"] == expected_db, health
+                  assert health["storage_backend"] == os.environ["BACKEND"], health
                   break
               except (URLError, TimeoutError):
                   time.sleep(1)

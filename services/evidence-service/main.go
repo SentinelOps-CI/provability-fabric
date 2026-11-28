@@ -248,11 +248,11 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if storagePath == "" {
 		storagePath = "/tmp/evidence"
 	}
-	if err := os.MkdirAll(storagePath, 0755); err != nil {
-		if db != nil {
-			_ = db.Close()
+	// Only the filesystem backend needs a local certificate directory.
+	if db == nil {
+		if err := os.MkdirAll(storagePath, 0755); err != nil {
+			return nil, fmt.Errorf("prepare evidence storage directory: %w", err)
 		}
-		return nil, fmt.Errorf("prepare evidence storage directory: %w", err)
 	}
 
 	// Load CERT-V1 schema
@@ -367,12 +367,14 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 		return fmt.Errorf("certificate preparation failed: %w", err)
 	}
 
-	// A configured database is an authoritative persistence backend.
-	// Never report a filesystem-only issuance when its database write fails.
+	// Select exactly one authoritative backend. A second write after a
+	// successful database commit would report failure despite a durable row.
+	// Filesystem mode is explicit; it is neither a mirror nor a fallback.
 	if s.db != nil {
 		if err := s.storeCertInDB(ctx, prepared); err != nil {
 			return fmt.Errorf("database certificate storage failed: %w", err)
 		}
+		return nil
 	}
 
 	if err := s.writeCertInFS(prepared); err != nil {
@@ -1094,19 +1096,22 @@ func (_ *EvidenceService) downloadPacketHandler(c *gin.Context) {
 
 func (s *EvidenceService) healthHandler(c *gin.Context) {
 	dbStatus := "disconnected"
+	storageBackend := "filesystem"
 	if s.db != nil {
+		storageBackend = "postgres"
 		if err := s.db.Ping(); err == nil {
 			dbStatus = "connected"
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":    "healthy",
-		"service":   "evidence-service",
-		"version":   "1.0.0",
-		"timestamp": time.Now(),
-		"database":  dbStatus,
-		"storage":   s.storagePath,
+		"status":          "healthy",
+		"service":         "evidence-service",
+		"version":         "1.0.0",
+		"timestamp":       time.Now(),
+		"database":        dbStatus,
+		"storage":         s.storagePath,
+		"storage_backend": storageBackend,
 	})
 }
 

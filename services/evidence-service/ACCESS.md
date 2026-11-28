@@ -33,6 +33,15 @@ deployment provisioning, TLS termination, database permissions, and proof
 provenance must be reconciled before release. Access tests are not evidence
 of independent certificate issuance authority.
 
+Persistence selects exactly one backend. A configured `DATABASE_URL` selects
+PostgreSQL for all certificate writes and searches; the filesystem path is
+unused for persistence and need not exist. With no database URL, the service
+uses the configured local certificate directory. Database failure never
+switches modes. This removes the former non-atomic post-commit filesystem
+mirror; deployments relying on that mirror need a separate export or backup
+process. This does not establish request idempotency or resolve ambiguous
+database commit outcomes after connection loss.
+
 Database operations bind tenant identity with transaction-local `set_config`.
 Reads use a repeatable-read, read-only transaction for count and result queries.
 Database searches with no tenant are refused. The restricted-role integration

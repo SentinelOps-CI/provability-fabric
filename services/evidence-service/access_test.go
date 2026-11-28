@@ -101,7 +101,12 @@ func TestEvidencePostgresHTTPAccessBindsTenantAndPermission(t *testing.T) {
 	}
 	dsn.User = url.UserPassword(role, password)
 	t.Setenv("DATABASE_URL", dsn.String())
-	t.Setenv("EVIDENCE_STORAGE_PATH", t.TempDir())
+	// Deliberately unusable filesystem path: PostgreSQL is the sole backend.
+	blocked := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocked, []byte("sentinel"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVIDENCE_STORAGE_PATH", filepath.Join(blocked, "evidence"))
 	t.Setenv("EVIDENCE_ACCESS_FILE", "")
 	t.Setenv("EVIDENCE_TRUSTED_JWKS_URL", "")
 	t.Setenv("CERT_SIGNER_BACKEND", "")
@@ -143,6 +148,17 @@ func testEvidenceHTTPAccess(t *testing.T, db, admin *sql.DB) {
 	_, unknownToken := evidenceTestCredential(t, tenantA, true, true)
 	service := &EvidenceService{db: db, storagePath: t.TempDir(), access: []evidenceCredential{a, b, reader, writer}}
 	if db != nil {
+		blocked := filepath.Join(t.TempDir(), "not-a-directory")
+		if err := os.WriteFile(blocked, []byte("sentinel"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		service.storagePath = filepath.Join(blocked, "evidence")
+		t.Cleanup(func() {
+			data, err := os.ReadFile(blocked)
+			if err != nil || string(data) != "sentinel" {
+				t.Errorf("database storage modified filesystem sentinel: %v", err)
+			}
+		})
 		t.Cleanup(func() {
 			if _, err := admin.Exec("DELETE FROM certificates WHERE tenant_id IN ($1, $2)", tenantA, tenantB); err != nil {
 				t.Errorf("remove disposable HTTP isolation records: %v", err)
