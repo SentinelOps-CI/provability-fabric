@@ -72,9 +72,8 @@ Labels not listed in the policy are denied.
 Returned documents must carry at least one label, and **every** document
 label must be within the authorized query label set. Documents classified
 both public and secret are denied to public-only requests. A requested
-result limit must be positive and within the configured maximum. Existing
-semantic cache behavior is not an authorization boundary, and its
-limit-specific correctness needs a separate regression review.
+result limit must be positive and within the configured maximum. Cache reuse is restricted to the exact query hash, tenant, label set and
+result limit. The cache is not an independent authorization boundary.
 
 Until authenticated ownership and administrative scopes have been defined,
 `GET /receipts`, `GET /cache/stats`, and
@@ -114,8 +113,10 @@ These seeded checks exercise the real query handler, ABAC evaluator, in-memory
 index, and Ed25519 signer. They are in-process tests rather than external
 HTTP/ledger experiments and do not establish PostgreSQL adapter isolation,
 ledger persistence, operational audit, or a deployed issuer trust model.
-The PostgreSQL adapter's unresolved tenant-transaction problem is tracked
-separately in issue #304.
+The reconciled mainline includes transaction-local tenant binding, complete
+label containment, and separate PostgreSQL RLS tests. The serving binary
+still uses the in-memory index; a seeded network-facing PostgreSQL service
+and production issuer integration remain separate obligations (issue #304).
 
 ## Disposable signed HTTP validation
 
