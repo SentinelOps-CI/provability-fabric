@@ -1,0 +1,70 @@
+name: Sidecar correctness partition
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "core/lean-libs/Runtime/IFCGrant.lean"
+      - "Cargo.lock"
+      - ".github/workflows/sidecar-correctness-partition.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/sidecar-watcher/**"
+      - "core/lean-libs/Runtime/IFCGrant.lean"
+      - "Cargo.lock"
+      - ".github/workflows/sidecar-correctness-partition.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Execute focused native regression modules
+        run: |
+          set -euo pipefail
+          for module in ifc_labels witness queue_manager policy_adapter declassify replay; do
+            cargo test --locked -p sidecar-watcher --lib "${module}::tests::" -- --test-threads=1 | tee "$RUNNER_TEMP/$module.txt"
+            grep -Eq 'running [1-9][0-9]* tests?' "$RUNNER_TEMP/$module.txt"
+            grep -Eq 'test result: ok\. [1-9][0-9]* passed; 0 failed' "$RUNNER_TEMP/$module.txt"
+          done
+          # deterministic_egress is compiled into the executable, not the library.
+          cargo test --locked -p sidecar-watcher --bin sidecar-watcher deterministic_egress::tests::test_egress_manager_chunks -- --exact --test-threads=1 | tee "$RUNNER_TEMP/deterministic_egress.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/deterministic_egress.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/deterministic_egress.txt"
+          cargo test --locked -p sidecar-watcher --test integration_tests -- --test-threads=1 | tee "$RUNNER_TEMP/integration.txt"
+          grep -Eq 'test result: ok\. [1-9][0-9]* passed; 0 failed' "$RUNNER_TEMP/integration.txt"
+          git diff --exit-code -- Cargo.lock
+
+  abstract-ifc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Lean
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(tr -d '\n\r' < lean-toolchain)"
+      - name: Check abstract grant obligations and axioms
+        run: |
+          set -euo pipefail
+          lean --version
+          lean -DwarningAsError=true core/lean-libs/Runtime/IFCGrant.lean | tee "$RUNNER_TEMP/ifc-axioms.txt"
+          for theorem in grant_exact other_key_unchanged grant_monotone clear_denies; do
+            grep -F "PF.Runtime.IFCGrant.$theorem" "$RUNNER_TEMP/ifc-axioms.txt"
+          done
+          if grep -Fq sorryAx "$RUNNER_TEMP/ifc-axioms.txt"; then
+            exit 1
+          fi

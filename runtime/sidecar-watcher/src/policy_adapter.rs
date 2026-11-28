@@ -268,9 +268,10 @@ impl WitnessValidator {
         Self {}
     }
 
-    pub fn validate_merkle_path(&self, _path: &[String], witness: &str) -> bool {
-        // Deny by default until Merkle path witness is wired
-        !witness.is_empty()
+    pub fn validate_merkle_path(&self, _path: &[String], _witness: &str) -> bool {
+        // No trusted Merkle root or proof verifier is configured here.
+        // A nonempty string (including a session identifier) is not a proof.
+        false
     }
 
     pub fn validate_label_derivation(
@@ -314,10 +315,10 @@ impl PolicyAdapter {
         }
 
         // Validate epoch
-        if self.config.epoch_validation && ctx.epoch < self.epoch_manager.get_current_epoch() {
+        if self.config.epoch_validation && ctx.epoch != self.epoch_manager.get_current_epoch() {
             return PermissionResult {
                 allowed: false,
-                reason: "Context epoch is outdated".to_string(),
+                reason: "Context epoch does not match current epoch".to_string(),
                 epoch: self.epoch_manager.get_current_epoch(),
                 path_witness_ok: false,
                 label_derivation_ok: false,
@@ -333,7 +334,7 @@ impl PolicyAdapter {
         };
 
         // Validate witness and label derivation for high assurance mode
-        let (path_witness_ok, label_derivation_ok) = if self.config.witness_validation {
+        let (path_witness_ok, label_derivation_ok) = if self.config.witness_validation || self.config.high_assurance_mode {
             match action {
                 Action::Read { doc: _, path } => {
                     let witness_ok = self
@@ -600,10 +601,9 @@ mod tests {
         config.epoch_validation = true;
         let mut adapter = PolicyAdapter::new(config);
 
-        let world = WorldState::new(5);
-        let context = Ctx {
+        let mut context = Ctx {
             session: "session-1".to_string(),
-            epoch: 15, // Too far from world epoch
+            epoch: 15, // Future epoch must be rejected
             attributes: vec![],
             tenant: "test-tenant".to_string(),
             timestamp: 1234567890,
@@ -622,6 +622,19 @@ mod tests {
         let result = adapter.evaluate_action(&principal, &action, &context);
         assert!(!result.allowed);
         assert_eq!(result.permit_decision, "reject");
+
+        context.epoch = 0;
+        assert!(!adapter.evaluate_action(&principal, &action, &context).allowed);
+        context.epoch = adapter.get_current_epoch();
+        assert!(adapter.evaluate_action(&principal, &action, &context).allowed);
+
+        adapter.revoke_principal("other-user".to_string(), "test".to_string()).unwrap();
+        assert!(!adapter.evaluate_action(&principal, &action, &context).allowed);
+        context.epoch = adapter.get_current_epoch();
+        assert!(adapter.evaluate_action(&principal, &action, &context).allowed);
+        adapter.revoke_principal(principal.id.clone(), "test".to_string()).unwrap();
+        context.epoch = adapter.get_current_epoch();
+        assert!(!adapter.evaluate_action(&principal, &action, &context).allowed);
     }
 
     #[test]
@@ -631,13 +644,12 @@ mod tests {
         config.witness_validation = true;
         let mut adapter = PolicyAdapter::new(config);
 
-        let world = WorldState::new(1);
         let doc = DocId {
             uri: "test://doc1".to_string(),
             version: 1,
         };
 
-        // Don't add document to world state, so witness validation will fail
+        // A session identifier is not an authenticated document witness.
         let context = Ctx {
             session: "session-1".to_string(),
             epoch: 1,
@@ -661,6 +673,23 @@ mod tests {
         assert!(!result.allowed);
         assert_eq!(result.permit_decision, "reject");
         assert!(!result.path_witness_ok);
+        assert!(!result.label_derivation_ok);
+
+        // High mode must still report missing evidence when the separate
+        // witness flag is disabled. Test both read and write paths.
+        let mut config = PolicyConfig::default();
+        config.high_assurance_mode = true;
+        let mut adapter = PolicyAdapter::new(config);
+        let mut principal = principal;
+        principal.roles.push("writer".to_string());
+        let result = adapter.evaluate_action(&principal, &action, &context);
+        assert!(!result.allowed);
+        assert!(!result.path_witness_ok);
+        let write = Action::Write { doc, path: vec!["field1".to_string()] };
+        let result = adapter.evaluate_action(&principal, &write, &context);
+        assert!(!result.allowed);
+        assert!(!result.path_witness_ok);
+        assert!(!result.label_derivation_ok);
     }
 }
 
