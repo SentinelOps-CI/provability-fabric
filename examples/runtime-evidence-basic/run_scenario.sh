@@ -35,6 +35,6 @@ if [[ ! -f "$SCHEMA" ]]; then
   exit 1
 fi
 
-cargo test -p sidecar-watcher write_cert_with_binding_emits_binding_jsonl -- --nocapture
-cargo test -p sidecar-watcher emit_evidence_binding_through_permit_enforcement -- --nocapture
+export CERT_V1_SCHEMA="$ROOT/$SCHEMA"
+python -m pytest tests/runtime_evidence/test_runtime_evidence_sidecar.py -q
 echo "Live scenario complete."
