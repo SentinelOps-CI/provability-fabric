@@ -1,14 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-# Candidate-only native lockfile resolution. Replace resolution with locked
-# validation after importing the byte-verified Cargo artifact.
+# Native lockfile imported from run 46085025738; validate in locked mode.
 name: Consolidated KMS authority candidate
 
 on:
   pull_request:
-    branches: [security/rust-final-consolidation-20261127]
+    branches: [security/rust-final-consolidation-20261127, main]
     paths:
       - 'runtime/kms-proxy/**'
       - 'scripts/test_kms_live_vault.py'
+      - 'runtime/sidecar-watcher/**'
+      - 'runtime/mpc-fintech/**'
+      - 'runtime/tool-broker/**'
+      - 'runtime/attestor/**'
+      - 'deny.toml'
       - 'Cargo.lock'
       - '.github/workflows/kms-consolidated-candidate.yml'
 
@@ -23,11 +27,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Resolve last Chrono removal using native Cargo
+      - name: Verify imported Chrono-free native Cargo resolution
         run: |
           set -euo pipefail
           cp Cargo.lock "$RUNNER_TEMP/parent.lock"
-          cargo metadata --all-features --format-version 1 > "$RUNNER_TEMP/kms-consolidated-metadata.json"
+          cargo metadata --locked --all-features --format-version 1 > "$RUNNER_TEMP/kms-consolidated-metadata.json"
           python3 - <<'PY'
           import json, os, tomllib
           from pathlib import Path
@@ -58,6 +62,7 @@ jobs:
           assert not any(packages[i]["name"] == "redis" for i in seen)
           print("Workspace Chrono absent; KMS Redis absent; patched versions and registry checksums preserved")
           PY
+          git diff --exit-code -- Cargo.lock
           sha256sum Cargo.lock
           cp Cargo.lock "$RUNNER_TEMP/native.lock"
           cargo metadata --locked --all-features --format-version 1 > /dev/null
