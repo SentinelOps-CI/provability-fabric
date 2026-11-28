@@ -5,7 +5,7 @@ name: Rust Service Locked Production Images
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/kms-authority-consolidated-20261127]
     paths:
       - "runtime/jwks-manager/**"
       - "runtime/telemetry-service/**"

@@ -3,7 +3,7 @@ name: Adapter seccomp locked validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/kms-authority-consolidated-20261127]
     paths:
       - 'adapters/**'
       - 'tests/test_adapter_seccomp_cli.py'

@@ -3,7 +3,7 @@ name: Sidecar timestamp wire compatibility
 
 on:
   pull_request:
-    branches: [security/kube-patched-client-20261127, main]
+    branches: [security/kube-patched-client-20261127, main, security/kms-authority-consolidated-20261127]
     paths:
       - 'runtime/sidecar-watcher/**'
       - 'Cargo.toml'

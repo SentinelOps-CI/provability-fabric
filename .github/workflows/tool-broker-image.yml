@@ -2,7 +2,7 @@ name: Tool Broker Locked Production Image
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/kms-authority-consolidated-20261127]
     paths:
       - "runtime/tool-broker/**"
       - "core/crypto/dsse-rs/**"

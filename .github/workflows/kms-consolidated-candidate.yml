@@ -4,7 +4,7 @@ name: Consolidated KMS authority candidate
 
 on:
   pull_request:
-    branches: [security/rust-final-consolidation-20261127, main]
+    branches: [security/rust-final-consolidation-20261127, main, security/kms-authority-consolidated-20261127]
     paths:
       - 'runtime/kms-proxy/**'
       - 'scripts/test_kms_live_vault.py'
