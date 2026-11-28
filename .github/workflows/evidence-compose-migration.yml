@@ -1,0 +1,76 @@
+name: Evidence local Compose migration
+on:
+  pull_request:
+    branches: [main, security/evidence-integration-20261129]
+    paths:
+      - 'docker-compose.yml'
+      - 'scripts/db/provision-evidence-role.sh'
+      - 'scripts/test_evidence_compose_migration.py'
+      - 'services/evidence-service/**'
+      - '.github/workflows/evidence-compose-migration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - 'scripts/db/provision-evidence-role.sh'
+      - 'scripts/test_evidence_compose_migration.py'
+      - 'services/evidence-service/**'
+      - '.github/workflows/evidence-compose-migration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compose-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Run disposable migration and persistence qualification
+        run: |
+          set -euo pipefail
+          umask 077
+          fixture="$(mktemp -d "$RUNNER_TEMP/evidence-compose.XXXXXX")"
+          export PF_EVIDENCE_ACCESS_FILE="$fixture/access.json"
+          export PF_EVIDENCE_RUNTIME_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$PF_EVIDENCE_RUNTIME_PASSWORD"
+          project="pf-evidence-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          compose=(docker compose --project-name "$project")
+          cleanup() {
+            status=$?
+            trap - EXIT
+            "${compose[@]}" down --volumes --remove-orphans || status=1
+            rm -rf "$fixture"
+            exit "$status"
+          }
+          trap cleanup EXIT
+          python3 - "$fixture" <<'PY'
+          import base64, hashlib, json, secrets, sys
+          from pathlib import Path
+          root = Path(sys.argv[1])
+          entries, tokens = [], {}
+          for name in ("a", "b"):
+              raw = secrets.token_bytes(32)
+              token = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+              print("::add-mask::" + token)
+              tokens[name] = token
+              entries.append(dict(tenant="tenant-"+name, token_sha256=hashlib.sha256(raw).hexdigest(),
+                                  read=True, write=True))
+          (root/"access.json").write_text(json.dumps(entries))
+          (root/"tokens.json").write_text(json.dumps(tokens))
+          PY
+          "${compose[@]}" config --quiet
+          "${compose[@]}" up -d --build --wait --wait-timeout 180 evidence-service
+          python3 scripts/test_evidence_compose_migration.py --tokens "$fixture/tokens.json" --phase seed
+          test "$("${compose[@]}" exec -T postgres psql -X -At -U sentinelops -d sentinelops -c 'SELECT count(*) FROM certificates')" = 2
+          "${compose[@]}" stop evidence-service
+          "${compose[@]}" rm -f evidence-service evidence-db-role evidence-migrate
+          "${compose[@]}" up -d --wait --wait-timeout 180 evidence-service
+          python3 scripts/test_evidence_compose_migration.py --tokens "$fixture/tokens.json" --phase verify
+          test "$("${compose[@]}" exec -T postgres psql -X -At -U sentinelops -d sentinelops -c 'SELECT count(*) FROM certificates')" = 2
+          serving="$("${compose[@]}" ps -q evidence-service)"
+          docker inspect --format '{{json .Config.Env}}' "$serving" | python3 -c 'import json,sys; e=json.load(sys.stdin); assert not any(x.startswith("EVIDENCE_MIGRATION_DATABASE_URL=") or x.startswith("PGPASSWORD=") for x in e); assert any(x.startswith("DATABASE_URL=postgres://pf_evidence_runtime:") for x in e)'
+          echo "PASS: root Compose migration, role isolation, tenant HTTP controls and persistence across migration replay"

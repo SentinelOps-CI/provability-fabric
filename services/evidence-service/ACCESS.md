@@ -62,3 +62,30 @@ excessive nesting and oversized input are rejected. Representable decimal
 values retain the existing Go canonical encoding; this is not RFC 8785
 conformance. Historical payloads outside this restricted domain need explicit
 migration. Signature verification does not establish proof validity.
+
+
+## Local root Compose migration
+
+The root Compose configuration is intended for isolated development, not
+production. It runs the evidence image in migration-only mode, provisions
+a restricted `pf_evidence_runtime` login, then starts the service with that
+login. Generate a persistent local runtime password using
+`openssl rand -hex 32`, export it as `PF_EVIDENCE_RUNTIME_PASSWORD`, and
+set `PF_EVIDENCE_ACCESS_FILE` to the absolute path of the independently
+created access configuration described above. The default host access-file
+path is `.local/secrets/evidence-access.json`. Missing files and malformed
+runtime passwords prevent the evidence service from starting.
+
+```sh
+docker compose up -d --build --wait evidence-service
+```
+
+The database migration and role provisioning are local administrative
+operations; they do not grant ownership or bypass RLS. Repeating them on
+the dedicated local database retains records and sets the dedicated role
+password to the operator-supplied value. Stop the serving process before
+changing that password. Existing deployments using the legacy filesystem
+mirror must arrange their own export or backup. Production deployment
+requires separate credentials, authenticated TLS, and operator-controlled
+database migration. This test does not migrate the console's clients or
+authenticate actual execution.
