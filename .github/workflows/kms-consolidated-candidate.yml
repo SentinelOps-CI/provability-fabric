@@ -116,6 +116,11 @@ jobs:
           cargo build --locked -p mpc-fintech --all-features --bins
           cargo test --locked -p sidecar-watcher --test runtime_observation_tests
           git diff --exit-code -- Cargo.lock
+      - name: Run the existing workspace Clippy acceptance command
+        run: |
+          set -euo pipefail
+          cargo clippy --locked --workspace --exclude provability-fabric-core-sdk-rust -- -D warnings
+          git diff --exit-code -- Cargo.lock
       - name: Repeat isolated Kubernetes TLS controls
         run: python3 scripts/test_kube_ca_isolation.py
       - name: Retain original release performance gate
