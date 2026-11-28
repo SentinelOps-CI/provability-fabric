@@ -95,9 +95,42 @@ jobs:
           openssl version
           PF_TEST_VAULT_BIN="$fixture/vault" python3 scripts/test_kms_live_vault.py
           cmp Cargo.lock "$RUNNER_TEMP/native.lock"
-      - name: Apply unchanged advisory and license policy
+      - name: Apply full advisory and scoped certificate-data license policy
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories bans licenses sources
           arguments: --all-features
           rust-version: stable
+
+  combined-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Execute combined native tests and compile demonstration binaries
+        run: |
+          set -euo pipefail
+          cargo test --locked -p attestor -p tool-broker -p mpc-fintech -p sidecar-watcher --all-features --lib --bins --no-fail-fast
+          cargo build --locked -p mpc-fintech --all-features --bins
+          cargo test --locked -p sidecar-watcher --test runtime_observation_tests
+          git diff --exit-code -- Cargo.lock
+      - name: Repeat isolated Kubernetes TLS controls
+        run: python3 scripts/test_kube_ca_isolation.py
+      - name: Retain original release performance gate
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --test-threads=1 --nocapture | tee "$RUNNER_TEMP/fifo-gate.txt"
+          grep -F 'running 1 test' "$RUNNER_TEMP/fifo-gate.txt"
+          grep -F '1 passed; 0 failed' "$RUNNER_TEMP/fifo-gate.txt"
+      - name: Build production sidecar and verify shipped certificate-data license
+        run: |
+          set -euo pipefail
+          docker build -f runtime/sidecar-watcher/Dockerfile -t pf-sidecar-license-fixture .
+          docker run --rm --entrypoint cat pf-sidecar-license-fixture /usr/share/doc/sidecar-watcher/third-party-licenses/webpki-root-certs-1.0.12.LICENSE > "$RUNNER_TEMP/shipped-root-certs.LICENSE"
+          set -- "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/webpki-root-certs-1.0.12/LICENSE
+          test "$#" -eq 1
+          test -s "$1"
+          cmp "$1" "$RUNNER_TEMP/shipped-root-certs.LICENSE"
+          git diff --exit-code -- Cargo.lock

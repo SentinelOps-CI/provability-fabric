@@ -82,6 +82,14 @@ name = "webpki-roots"
 version = "=1.0.12"
 allow = ["CDLA-Permissive-2.0"]
 
+# Full self-signed Mozilla/CCADB certificate data used by the patched
+# Kubernetes transport (rustls-platform-verifier). The sidecar image
+# includes the resolved upstream LICENSE; no general license is added.
+[[licenses.exceptions]]
+name = "webpki-root-certs"
+version = "=1.0.12"
+allow = ["CDLA-Permissive-2.0"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "warn"
