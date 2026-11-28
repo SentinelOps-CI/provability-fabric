@@ -134,6 +134,34 @@ services:
       timeout: 10s
       retries: 3
 
+  # Local-only administrative migration and separate role provisioning.
+  evidence-migrate:
+    build:
+      context: ./services/evidence-service
+      dockerfile: Dockerfile
+    entrypoint: ["/root/main"]
+    command: ["--migrate"]
+    environment:
+      - EVIDENCE_MIGRATION_DATABASE_URL=postgres://sentinelops:sentinelops_password@postgres:5432/sentinelops?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  evidence-db-role:
+    image: postgres:15
+    entrypoint: ["/bin/bash", "/provision-evidence-role.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: sentinelops
+      PGDATABASE: sentinelops
+      PGPASSWORD: sentinelops_password
+      PF_EVIDENCE_RUNTIME_PASSWORD: ${PF_EVIDENCE_RUNTIME_PASSWORD:-}
+    volumes:
+      - ./scripts/db/provision-evidence-role.sh:/provision-evidence-role.sh:ro
+    depends_on:
+      evidence-migrate:
+        condition: service_completed_successfully
+
   evidence-service:
     build:
       context: ./services/evidence-service
@@ -142,14 +170,19 @@ services:
       - "8004:8004"
     environment:
       - PORT=8004
-      - DATABASE_URL=postgres://sentinelops:sentinelops_password@postgres:5432/sentinelops
-      - EVIDENCE_STORAGE_PATH=/tmp/evidence
+      - DATABASE_URL=postgres://pf_evidence_runtime:${PF_EVIDENCE_RUNTIME_PASSWORD:-}@postgres:5432/sentinelops?sslmode=disable
+      - EVIDENCE_ACCESS_FILE=/run/evidence-access.json
     volumes:
-      - evidence_data:/tmp/evidence
+      - type: bind
+        source: ${PF_EVIDENCE_ACCESS_FILE:-./.local/secrets/evidence-access.json}
+        target: /run/evidence-access.json
+        read_only: true
+        bind:
+          create_host_path: false
       - ./external/CERT-V1:/root/external/CERT-V1:ro
     depends_on:
-      postgres:
-        condition: service_healthy
+      evidence-db-role:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/api/v1/health"]
       interval: 30s
