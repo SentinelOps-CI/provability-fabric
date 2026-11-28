@@ -16,7 +16,8 @@
 
 use arc_swap::ArcSwap;
 use parking_lot::{Mutex, RwLock};
-use std::collections::VecDeque;
+use std::collections::{hash_map::RandomState, VecDeque};
+use std::hash::{BuildHasher, Hash};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -186,68 +187,88 @@ impl<T: Default + Clone + Send + 'static> EventIngress<T> {
     }
 }
 
-/// Epoch-based policy management with ArcSwap
+/// One coherent policy/epoch observation. Retaining the policy Arc keeps
+/// the selected policy alive after later publications.
+pub struct PolicySnapshot<T> {
+    pub epoch: usize,
+    pub policy: Arc<T>,
+}
+
+/// Epoch-based policy management with a single atomic snapshot publication.
 pub struct EpochPolicyManager<T> {
-    current_policy: ArcSwap<T>,
-    epoch: AtomicUsize,
-    update_notify: Arc<RwLock<Vec<mpsc::Sender<()>>>>,
+    snapshot: ArcSwap<PolicySnapshot<T>>,
+    // Serialize publishers, including notifications, so publication order
+    // matches the assigned epoch order.
+    publish_lock: Mutex<()>,
+    update_notify: RwLock<Vec<mpsc::Sender<()>>>,
 }
 
 impl<T: Clone> EpochPolicyManager<T> {
-    /// Create new epoch policy manager
     pub fn new(initial_policy: T) -> Self {
         Self {
-            current_policy: ArcSwap::new(Arc::new(initial_policy)),
-            epoch: AtomicUsize::new(0),
-            update_notify: Arc::new(RwLock::new(Vec::new())),
+            snapshot: ArcSwap::from_pointee(PolicySnapshot {
+                epoch: 0,
+                policy: Arc::new(initial_policy),
+            }),
+            publish_lock: Mutex::new(()),
+            update_notify: RwLock::new(Vec::new()),
         }
     }
 
-    /// Get current policy (lock-free read)
-    #[inline(always)]
+    /// Obtain policy and epoch from the same immutable publication.
+    #[inline]
+    pub fn get_snapshot(&self) -> Arc<PolicySnapshot<T>> {
+        self.snapshot.load_full()
+    }
+
+    /// Compatibility accessor. Use get_snapshot when the epoch also matters:
+    /// independent accessor calls may observe different publications.
+    #[inline]
     pub fn get_policy(&self) -> Arc<T> {
-        self.current_policy.load().clone()
+        Arc::clone(&self.snapshot.load().policy)
     }
 
-    /// Update policy with new epoch (atomic)
+    /// Publish a new policy and epoch together. Epoch exhaustion rejects
+    /// publication by panicking before mutation, rather than reusing an epoch.
     pub fn update_policy(&self, new_policy: T) -> usize {
-        let new_epoch = self.epoch.fetch_add(1, Ordering::SeqCst) + 1;
-        self.current_policy.store(Arc::new(new_policy));
-
-        // Notify all subscribers
-        let notify_list = self.update_notify.read();
-        for sender in notify_list.iter() {
-            let _ = sender.send(());
-        }
-
+        let _publisher = self.publish_lock.lock();
+        let new_epoch = self.snapshot.load().epoch.checked_add(1)
+            .expect("policy epoch exhausted");
+        self.snapshot.store(Arc::new(PolicySnapshot {
+            epoch: new_epoch,
+            policy: Arc::new(new_policy),
+        }));
+        // Notifications are wakeups, not a historical snapshot stream.
+        self.update_notify.write().retain(|sender| sender.send(()).is_ok());
         new_epoch
     }
 
-    /// Subscribe to policy updates
+    /// Subscribe to future publication wakeups. Read get_snapshot after
+    /// subscribing to acquire the current state.
     pub fn subscribe(&self) -> mpsc::Receiver<()> {
         let (tx, rx) = mpsc::channel();
-        let mut notify_list = self.update_notify.write();
-        notify_list.push(tx);
+        self.update_notify.write().push(tx);
         rx
     }
 
-    /// Get current epoch
     pub fn current_epoch(&self) -> usize {
-        self.epoch.load(Ordering::SeqCst)
+        self.snapshot.load().epoch
     }
 }
 
 type BucketEntries<K, V> = Vec<(K, V)>;
 
-/// High-performance concurrent hash map with lock-free reads
+/// Sharded concurrent hash map protected by per-bucket read/write locks.
+/// The legacy type name does not imply lock-free progress.
 pub struct LockFreeHashMap<K, V> {
     buckets: Vec<Arc<RwLock<BucketEntries<K, V>>>>,
     bucket_count: usize,
     mask: usize,
+    hash_builder: RandomState,
 }
 
-impl<K: Clone + PartialEq, V: Clone> LockFreeHashMap<K, V> {
-    /// Create new lock-free hash map
+impl<K: Clone + Eq + Hash, V: Clone> LockFreeHashMap<K, V> {
+    /// Create a map using one stable, randomly seeded hash builder.
     pub fn new(capacity: usize) -> Self {
         let bucket_count = capacity.next_power_of_two();
         let buckets = (0..bucket_count)
@@ -258,6 +279,7 @@ impl<K: Clone + PartialEq, V: Clone> LockFreeHashMap<K, V> {
             buckets,
             bucket_count,
             mask: bucket_count - 1,
+            hash_builder: RandomState::new(),
         }
     }
 
@@ -266,7 +288,7 @@ impl<K: Clone + PartialEq, V: Clone> LockFreeHashMap<K, V> {
         self.bucket_count
     }
 
-    /// Get value by key (lock-free read)
+    /// Get a cloned value under the selected bucket's read lock.
     #[inline(always)]
     pub fn get(&self, key: &K) -> Option<V> {
         let bucket_index = self.hash_key(key) & self.mask;
@@ -320,8 +342,8 @@ impl<K: Clone + PartialEq, V: Clone> LockFreeHashMap<K, V> {
     /// Hash key to bucket index
     #[inline(always)]
     fn hash_key(&self, key: &K) -> usize {
-        // Simple hash function - in production would use a proper hash
-        std::ptr::addr_of!(key) as usize
+        // Equal keys must select the same bucket across calls and threads.
+        self.hash_builder.hash_one(key) as usize
     }
 }
 
@@ -563,6 +585,97 @@ mod tests {
             Some("updated_value1".to_string())
         );
         assert_eq!(map.get(&"key1".to_string()), None);
+    }
+
+    #[test]
+    fn policy_snapshots_match_assigned_epochs_under_concurrent_publication() {
+        use std::sync::atomic::AtomicBool;
+        let manager = Arc::new(EpochPolicyManager::new(0usize));
+        let done = Arc::new(AtomicBool::new(false));
+        let start = Arc::new(std::sync::Barrier::new(5));
+        let wakeups = manager.subscribe();
+        let reader = {
+            let manager = Arc::clone(&manager);
+            let done = Arc::clone(&done);
+            let start = Arc::clone(&start);
+            thread::spawn(move || {
+                let mut observed = Vec::new();
+                start.wait();
+                // Bound memory and the number of observations even if the
+                // writers are temporarily descheduled.
+                for _ in 0..20_000 {
+                    let snapshot = manager.get_snapshot();
+                    observed.push((snapshot.epoch, *snapshot.policy));
+                    if done.load(Ordering::Acquire) {
+                        break;
+                    }
+                    thread::yield_now();
+                }
+                observed
+            })
+        };
+        let mut writers = Vec::new();
+        for worker in 0..4 {
+            let manager = Arc::clone(&manager);
+            let start = Arc::clone(&start);
+            writers.push(thread::spawn(move || {
+                start.wait();
+                (1..=100).map(|i| {
+                    let value = worker * 100 + i;
+                    (manager.update_policy(value), value)
+                }).collect::<Vec<_>>()
+            }));
+        }
+        let mut assignments = std::collections::BTreeMap::from([(0, 0)]);
+        for writer in writers {
+            for (epoch, value) in writer.join().unwrap() {
+                assert!(assignments.insert(epoch, value).is_none());
+            }
+        }
+        done.store(true, Ordering::Release);
+        let observed = reader.join().unwrap();
+        assert!(!observed.is_empty());
+        assert_eq!(assignments.keys().copied().collect::<Vec<_>>(), (0..=400).collect::<Vec<_>>());
+        for (epoch, value) in &observed {
+            assert_eq!(assignments.get(epoch), Some(value));
+        }
+        assert!(observed.windows(2).all(|pair| pair[0].0 <= pair[1].0));
+        let final_snapshot = manager.get_snapshot();
+        assert_eq!(final_snapshot.epoch, 400);
+        assert_eq!(assignments.get(&400), Some(final_snapshot.policy.as_ref()));
+        assert_eq!(wakeups.try_iter().count(), 400);
+    }
+
+    #[test]
+    fn equal_hash_keys_resolve_across_allocations_threads_and_collisions() {
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        struct CollisionKey(String);
+        impl std::hash::Hash for CollisionKey {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                // Force equal hash values for distinct keys.
+                0u8.hash(state);
+            }
+        }
+        let map = Arc::new(LockFreeHashMap::new(64));
+        let key = CollisionKey("first".to_string());
+        let other = CollisionKey("second".to_string());
+        map.insert(key.clone(), 1);
+        map.insert(other.clone(), 2);
+        let worker = {
+            let map = Arc::clone(&map);
+            thread::spawn(move || {
+                let key = CollisionKey("first".to_string());
+                assert_eq!(map.get(&key), Some(1));
+                map.insert(key, 3);
+            })
+        };
+        worker.join().unwrap();
+        assert_eq!(map.get(&key), Some(3));
+        assert_eq!(map.get(&other), Some(2));
+        assert_eq!(map.remove(&key), Some(3));
+        assert_eq!(map.get(&key), None);
+        assert_eq!(map.remove(&other), Some(2));
+        assert_eq!(map.get(&other), None);
     }
 
     #[test]
