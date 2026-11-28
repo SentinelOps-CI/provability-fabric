@@ -8,6 +8,7 @@ on:
     paths:
       - 'runtime/kms-proxy/**'
       - 'scripts/test_kms_live_vault.py'
+      - 'tests/integration/test_kms_attestation.py'
       - 'runtime/sidecar-watcher/**'
       - 'runtime/mpc-fintech/**'
       - 'runtime/tool-broker/**'
@@ -95,7 +96,7 @@ jobs:
           unzip -q "$fixture/vault.zip" vault -d "$fixture"
           "$fixture/vault" version
           openssl version
-          PF_TEST_VAULT_BIN="$fixture/vault" python3 scripts/test_kms_live_vault.py
+          PF_TEST_VAULT_BIN="$fixture/vault" python3 tests/integration/test_kms_attestation.py
           cmp Cargo.lock "$RUNNER_TEMP/native.lock"
       - name: Apply full advisory and scoped certificate-data license policy
         uses: EmbarkStudios/cargo-deny-action@v2

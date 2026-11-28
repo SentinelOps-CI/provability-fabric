@@ -196,6 +196,17 @@ def main():
                     raise RuntimeError("signature verified against altered message")
                 if verify(root, keys["other-key"], b"test message", signature):
                     raise RuntimeError("signature verified against unrelated public key")
+                # Retired operations must fail on the actual HTTP listener,
+                # even when a valid signing credential is supplied.
+                for operation in ("encrypt", "decrypt", "verify", "rotate-keys"):
+                    retired = require(proxy_url, f"/kms/{operation}",
+                                      dict(request, operation=operation), expected=(501,))
+                    if retired.get("success") is not False or retired.get("result") is not None:
+                        raise RuntimeError(f"retired operation {operation} returned success")
+                mismatch = require(proxy_url, "/kms/sign",
+                                   dict(request, operation="encrypt"), expected=(400,))
+                if mismatch.get("success") is not False or mismatch.get("result") is not None:
+                    raise RuntimeError("operation/endpoint mismatch returned success")
                 altered = dict(request, data="changed message")
                 require(proxy_url, "/kms/sign", altered, expected=(403,))
                 require(proxy_url, "/kms/sign", dict(request, attestation_token=None), expected=(403,))
@@ -208,7 +219,7 @@ def main():
                 if denied["success"] or denied["result"] is not None:
                     raise RuntimeError("revoked provider credential returned success")
                 print("PASS: native Vault Ed25519 signature independently verified; wrong message, wrong key, "
-                      "tampered request, missing authority, provider ACL denial and revoked provider token rejected")
+                      "tampered request, missing authority, provider ACL denial, revoked provider token, retired operations and endpoint mismatch rejected")
             finally:
                 stop(proxy)
                 stop(vault)
