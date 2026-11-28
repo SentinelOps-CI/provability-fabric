@@ -102,7 +102,8 @@ func evidenceBundleCmd() *cobra.Command {
 }
 
 func evidenceValidateCmd() *cobra.Command {
-	var strict bool
+	var strict, requireAttestationReferences bool
+	var executionAttestationTrust string
 	var reportOut string
 	var jsonOut bool
 	var baseDir string
@@ -112,10 +113,15 @@ func evidenceValidateCmd() *cobra.Command {
 		Short: "Validate an Evidence v0.1 or v0.2 bundle",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("execution-attestation-trust") && executionAttestationTrust == "" {
+				return fmt.Errorf("--execution-attestation-trust must identify a trust policy file")
+			}
 			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
-				BundlePath: args[0],
-				Strict:     strict,
-				BaseDir:    baseDir,
+				BundlePath:                   args[0],
+				Strict:                       strict,
+				BaseDir:                      baseDir,
+				RequireAttestationReferences: requireAttestationReferences,
+				ExecutionAttestationTrustPath: executionAttestationTrust,
 			})
 			if report == nil {
 				return err
@@ -136,6 +142,9 @@ func evidenceValidateCmd() *cobra.Command {
 				}
 			} else {
 				fmt.Printf("Validation passed: %s\n", args[0])
+				for _, warning := range report.Warnings {
+					fmt.Printf("warning: %s\n", warning)
+				}
 			}
 			if err != nil {
 				return err
@@ -143,7 +152,9 @@ func evidenceValidateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&strict, "strict", false, "Fail closed on schema, digest, and cross-ref errors")
+	cmd.Flags().BoolVar(&strict, "strict", false, "Fail closed on schema and artifact digest errors")
+	cmd.Flags().BoolVar(&requireAttestationReferences, "require-attestation-references", false, "Require exact, nonempty attestation references (with --strict; signatures are not verified)")
+	cmd.Flags().StringVar(&executionAttestationTrust, "execution-attestation-trust", "", "Verifier-owned execution trace trust policy JSON (requires --strict)")
 	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Directory containing artifact paths (default: bundle directory)")
 	cmd.Flags().StringVar(&reportOut, "report-out", "", "Write validation report JSON")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit validation report JSON to stdout")
