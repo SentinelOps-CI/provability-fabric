@@ -195,10 +195,15 @@ type EvidenceService struct {
 	signer          Signer
 	trustedJWKSURL  string
 	trustedJWKSKeys []ed25519.PublicKey
+	access          []evidenceCredential
 }
 
 // NewEvidenceService creates a new evidence service instance
 func NewEvidenceService() (*EvidenceService, error) {
+	access, err := loadEvidenceAccess(os.Getenv("EVIDENCE_ACCESS_FILE"))
+	if err != nil {
+		return nil, fmt.Errorf("load evidence access configuration: %w", err)
+	}
 	// An explicitly configured database is a required persistence backend.
 	// Filesystem-only development is reserved for installations without a
 	// DATABASE_URL setting.
@@ -243,11 +248,11 @@ func NewEvidenceService() (*EvidenceService, error) {
 	if storagePath == "" {
 		storagePath = "/tmp/evidence"
 	}
-	if err := os.MkdirAll(storagePath, 0755); err != nil {
-		if db != nil {
-			_ = db.Close()
+	// Only the filesystem backend needs a local certificate directory.
+	if db == nil {
+		if err := os.MkdirAll(storagePath, 0755); err != nil {
+			return nil, fmt.Errorf("prepare evidence storage directory: %w", err)
 		}
-		return nil, fmt.Errorf("prepare evidence storage directory: %w", err)
 	}
 
 	// Load CERT-V1 schema
@@ -264,6 +269,7 @@ func NewEvidenceService() (*EvidenceService, error) {
 		schemaData:      schemaData,
 		trustedJWKSURL:  trustedJWKSURL,
 		trustedJWKSKeys: trustedJWKSKeys,
+		access:          access,
 	}
 
 	// A configured, unusable signer must never silently produce unsigned records.
@@ -278,13 +284,13 @@ func NewEvidenceService() (*EvidenceService, error) {
 		service.signer = signer
 	}
 
-	// A reachable database with an invalid RLS schema is unsafe to use.
-	// Do not claim a successful startup and fall back after a DDL failure.
-	if err := service.initializeSchema(); err != nil {
+	// Runtime startup only inspects an already migrated schema. It must
+	// never perform DDL or connect as a table owner / RLS-bypass role.
+	if err := service.validateRuntimeDatabase(); err != nil {
 		if db != nil {
 			_ = db.Close()
 		}
-		return nil, fmt.Errorf("initialize certificate database schema: %w", err)
+		return nil, fmt.Errorf("validate certificate runtime database: %w", err)
 	}
 
 	return service, nil
@@ -361,12 +367,14 @@ func (s *EvidenceService) StoreCertificate(ctx context.Context, cert CertV1) err
 		return fmt.Errorf("certificate preparation failed: %w", err)
 	}
 
-	// A configured database is an authoritative persistence backend.
-	// Never report a filesystem-only issuance when its database write fails.
+	// Select exactly one authoritative backend. A second write after a
+	// successful database commit would report failure despite a durable row.
+	// Filesystem mode is explicit; it is neither a mirror nor a fallback.
 	if s.db != nil {
-		if err := s.storeCertInDB(prepared); err != nil {
+		if err := s.storeCertInDB(ctx, prepared); err != nil {
 			return fmt.Errorf("database certificate storage failed: %w", err)
 		}
+		return nil
 	}
 
 	if err := s.writeCertInFS(prepared); err != nil {
@@ -402,7 +410,7 @@ func (s *EvidenceService) SearchCertificates(ctx context.Context, req CertSearch
 
 	if s.db != nil {
 		// Database search
-		certs, count, err := s.searchCertsInDB(req)
+		certs, count, err := s.searchCertsInDB(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("database certificate search failed: %w", err)
 		}
@@ -505,7 +513,12 @@ func (s *EvidenceService) validateCertificate(cert CertV1) error {
 }
 
 // storeCertInDB stores certificate in PostgreSQL
-func (s *EvidenceService) storeCertInDB(cert CertV1) error {
+func (s *EvidenceService) storeCertInDB(ctx context.Context, cert CertV1) error {
+	tx, err := s.beginTenantTx(ctx, cert.TenantID, false)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	query := `
 		INSERT INTO certificates (
 			bundle_id, policy_hash, proof_hash, automata_hash, labeler_hash,
@@ -519,13 +532,16 @@ func (s *EvidenceService) storeCertInDB(cert CertV1) error {
 		return err
 	}
 
-	_, err = s.db.Exec(query,
+	_, err = tx.ExecContext(ctx, query,
 		cert.BundleID, cert.PolicyHash, cert.ProofHash, cert.AutomataHash,
 		cert.LabelerHash, cert.NIClaim, cert.NIMonitor, cert.SidecarBuild,
 		cert.TenantID, cert.SessionID, cert.Timestamp, string(certData),
 	)
 
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // prepareCertificate normalizes the stored fields and signs those exact bytes.
@@ -640,7 +656,12 @@ func (s *EvidenceService) writeCertInFS(cert CertV1) error {
 }
 
 // searchCertsInDB searches certificates in database
-func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int, error) {
+func (s *EvidenceService) searchCertsInDB(ctx context.Context, req CertSearchRequest) ([]CertV1, int, error) {
+	tx, err := s.beginTenantTx(ctx, req.TenantID, true)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
 	// Build dynamic query
 	var conditions []string
 	var args []interface{}
@@ -690,7 +711,7 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM certificates %s", whereClause)
 	var total int
-	err := s.db.QueryRow(countQuery, args...).Scan(&total)
+	err = tx.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -704,7 +725,7 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 
 	args = append(args, req.Limit, req.Offset)
 
-	rows, err := s.db.Query(dataQuery, args...)
+	rows, err := tx.QueryContext(ctx, dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -722,12 +743,21 @@ func (s *EvidenceService) searchCertsInDB(req CertSearchRequest) ([]CertV1, int,
 			return nil, 0, fmt.Errorf("decode stored certificate row: %w", err)
 		}
 
+		if req.TenantID != "" && cert.TenantID != req.TenantID {
+			return nil, 0, fmt.Errorf("stored certificate tenant does not match query scope")
+		}
 		certificates = append(certificates, cert)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("iterate certificate rows: %w", err)
 	}
 
+	if err := rows.Close(); err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
 	return certificates, total, nil
 }
 
@@ -849,7 +879,10 @@ func (s *EvidenceService) generateAuditProof(certs []CertV1) (string, error) {
 	// Generate hash chain of certificates
 	var hashes []string
 	for _, cert := range certs {
-		certData, _ := json.Marshal(cert)
+		certData, err := json.Marshal(cert)
+		if err != nil {
+			return "", fmt.Errorf("encode certificate for diagnostic digest: %w", err)
+		}
 		hash := fmt.Sprintf("%x", sha256.Sum256(certData))
 		hashes = append(hashes, hash)
 	}
@@ -874,7 +907,8 @@ func (s *EvidenceService) generateAuditProof(certs []CertV1) (string, error) {
 func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 	var report strings.Builder
 
-	report.WriteString("# Compliance Conformance Report\n\n")
+	report.WriteString("# Certificate Claims Summary\n\n")
+	report.WriteString("This diagnostic summarizes stored assertions; it does not establish independent proof validity or compliance.\n\n")
 	report.WriteString(fmt.Sprintf("Generated: %s\n", time.Now().Format(time.RFC3339)))
 	report.WriteString(fmt.Sprintf("Total Certificates: %d\n\n", len(certs)))
 
@@ -894,21 +928,23 @@ func (s *EvidenceService) generateConformanceReport(certs []CertV1) string {
 
 	report.WriteString("\n## Policy Distribution\n\n")
 	for hash, count := range policyHashes {
-		report.WriteString(fmt.Sprintf("- Policy %s: %d certificates\n", hash[:16], count))
+		// Identifiers are currently only validated as nonempty strings.
+		report.WriteString(fmt.Sprintf("- Policy %q: %d certificates\n", hash, count))
 	}
 
 	// Compliance summary
-	report.WriteString("\n## Compliance Summary\n\n")
+	report.WriteString("\n## Recorded Monitor Outcomes\n\n")
 	acceptCount := niMonitorCounts["accept"]
 	totalCount := len(certs)
 
 	if totalCount > 0 {
 		complianceRate := float64(acceptCount) / float64(totalCount) * 100
-		report.WriteString(fmt.Sprintf("- Compliance Rate: %.2f%%\n", complianceRate))
+		report.WriteString(fmt.Sprintf("- Recorded accept rate: %.2f%%\n", complianceRate))
 		report.WriteString(fmt.Sprintf("- Total Decisions: %d\n", totalCount))
 		report.WriteString(fmt.Sprintf("- Accepted: %d\n", acceptCount))
 		report.WriteString(fmt.Sprintf("- Rejected: %d\n", niMonitorCounts["reject"]))
 		report.WriteString(fmt.Sprintf("- Errors: %d\n", niMonitorCounts["error"]))
+		report.WriteString(fmt.Sprintf("- Inapplicable: %d\n", niMonitorCounts["inapplicable"]))
 	}
 
 	return report.String()
@@ -952,6 +988,16 @@ func (s *EvidenceService) storeCertHandler(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "INVALID_CERTIFICATE", err.Error(), "Correct certificate fields and retry", "https://docs.sentinelops.dev/error-catalog#INVALID_CERTIFICATE")
 		return
 	}
+	if _, ok := s.authorizeEvidence(c, cert.TenantID, true); !ok {
+		return
+	}
+	// Authenticated storage access is not independent proof verification.
+	if s.signer != nil {
+		writeError(c, http.StatusServiceUnavailable, "EVIDENCE_ISSUANCE_UNAVAILABLE",
+			"Authenticated evidence provenance verification is not implemented",
+			"Use a separately qualified issuance path", "")
+		return
+	}
 	if err := s.StoreCertificate(c.Request.Context(), cert); err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_STORE_FAILED", err.Error(), "Check storage and retry", "https://docs.sentinelops.dev/error-catalog#CERT_STORE_FAILED")
 		return
@@ -971,6 +1017,11 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), "Use nonnegative limit and offset values", "https://docs.sentinelops.dev/error-catalog#INVALID_REQUEST")
 		return
 	}
+	tenant, ok := s.authorizeEvidence(c, req.TenantID, false)
+	if !ok {
+		return
+	}
+	req.TenantID = tenant
 	resp, err := s.SearchCertificates(c.Request.Context(), req)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "CERT_SEARCH_FAILED", err.Error(), "Retry later or narrow filters", "https://docs.sentinelops.dev/error-catalog#CERT_SEARCH_FAILED")
@@ -983,8 +1034,13 @@ func (s *EvidenceService) searchCertsHandler(c *gin.Context) {
 func (s *EvidenceService) getCertHandler(c *gin.Context) {
 	certID := c.Param("id")
 
-	// Search by ID (simplified)
+	tenant, ok := s.authorizeEvidence(c, "", false)
+	if !ok {
+		return
+	}
+	// Search by ID within the authenticated tenant.
 	req := CertSearchRequest{
+		TenantID:  tenant,
 		SessionID: certID,
 		Limit:     1,
 	}
@@ -1010,6 +1066,11 @@ func (s *EvidenceService) buildPacketHandler(c *gin.Context) {
 		return
 	}
 
+	tenant, ok := s.authorizeEvidence(c, req.TenantID, false)
+	if !ok {
+		return
+	}
+	req.TenantID = tenant
 	packet, err := s.BuildCompliancePacket(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -1035,19 +1096,22 @@ func (_ *EvidenceService) downloadPacketHandler(c *gin.Context) {
 
 func (s *EvidenceService) healthHandler(c *gin.Context) {
 	dbStatus := "disconnected"
+	storageBackend := "filesystem"
 	if s.db != nil {
+		storageBackend = "postgres"
 		if err := s.db.Ping(); err == nil {
 			dbStatus = "connected"
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":    "healthy",
-		"service":   "evidence-service",
-		"version":   "1.0.0",
-		"timestamp": time.Now(),
-		"database":  dbStatus,
-		"storage":   s.storagePath,
+		"status":          "healthy",
+		"service":         "evidence-service",
+		"version":         "1.0.0",
+		"timestamp":       time.Now(),
+		"database":        dbStatus,
+		"storage":         s.storagePath,
+		"storage_backend": storageBackend,
 	})
 }
 
@@ -1375,6 +1439,16 @@ func fetchEd25519KeysFromJWKSWithClient(client *http.Client, endpoint string) ([
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--migrate" {
+		if err := migrateEvidenceDatabase(); err != nil {
+			log.Fatalf("Evidence database migration failed: %v", err)
+		}
+		log.Print("Evidence database migration completed")
+		return
+	}
+	if len(os.Args) != 1 {
+		log.Fatal("usage: evidence-service [--migrate]")
+	}
 	// Initialize service
 	service, err := NewEvidenceService()
 	if err != nil {
