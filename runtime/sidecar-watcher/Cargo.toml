@@ -42,6 +42,8 @@ name = "emit_observation"
 path = "src/bin/emit_observation.rs"
 
 [dev-dependencies]
+# Diagnostic candidate only; already present in the workspace lockfile.
+crossbeam-queue = "=0.3.12"
 tokio-test = "0.4"
 tempfile = "3"
 proptest = "1.4"

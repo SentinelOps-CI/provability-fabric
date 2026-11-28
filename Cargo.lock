@@ -3947,6 +3947,7 @@ dependencies = [
  "axum",
  "blake3",
  "ciborium",
+ "crossbeam-queue",
  "ed25519-dalek",
  "jsonschema",
  "k8s-openapi",

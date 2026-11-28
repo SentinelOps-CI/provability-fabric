@@ -165,7 +165,7 @@ jobs:
           import csv, os
           from pathlib import Path
           rows = list(csv.DictReader((Path(os.environ["RUNNER_TEMP"]) / "fifo-diagnostic.csv").open()))
-          names = ("production", "std_mutex", "parking_lot_reference", "sequential_control")
+          names = ("production", "std_mutex", "parking_lot_reference", "sequential_control", "crossbeam_arrayqueue")
           expected = {(n, state, r) for n in names for state in ("fresh", "warm") for r in range(31)}
           observed = [(r["implementation"], r["allocation_state"], int(r["round"])) for r in rows]
           assert len(observed) == len(expected) and set(observed) == expected
