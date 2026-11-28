@@ -10,7 +10,9 @@ WORKDIR /app
 COPY . .
 # Override any floating Rust toolchain selector in the copied source.
 RUN cargo +1.99.1 build --locked --release -p sidecar-watcher
-# Distribute the original license alongside the bundled full root certificates.
+# Collect the locked all-target certificate data license, even when the
+# Linux build does not download the platform-specific crate.
+RUN cargo +1.99.1 fetch --locked
 RUN set -eu; \
     mkdir -p /app/third-party-licenses; \
     set -- "${CARGO_HOME:-/usr/local/cargo}"/registry/src/*/webpki-root-certs-1.0.12/LICENSE; \
