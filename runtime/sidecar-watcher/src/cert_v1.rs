@@ -120,10 +120,6 @@ mod tests {
     use std::io::{BufRead, BufReader};
     use std::path::{Path, PathBuf};
 
-    fn cert_schema_available() -> bool {
-        Path::new("external/CERT-V1/schema/cert-v1.schema.json").exists()
-    }
-
     fn sample_cert() -> CertV1 {
         CertV1 {
             bundle_id: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
@@ -144,11 +140,12 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires pinned external CERT-V1 schema; run alone via evidence smoke"]
     fn write_cert_with_binding_emits_binding_jsonl() {
-        if !cert_schema_available() {
-            eprintln!("skip: CERT-V1 schema missing");
-            return;
-        }
+        let schema = std::env::var("CERT_V1_SCHEMA").expect("absolute CERT_V1_SCHEMA required");
+        assert!(Path::new(&schema).is_absolute() && Path::new(&schema).is_file(),
+            "CERT_V1_SCHEMA must name the pinned schema before changing directory");
+        cert_schema().expect("load pinned schema");
 
         let tmp = tempfile::TempDir::new().expect("tempdir");
         std::env::set_current_dir(tmp.path()).expect("chdir");
@@ -174,6 +171,7 @@ mod tests {
             serde_json::from_str(binding_line).expect("binding JSONL");
         assert_eq!(parsed.event_type, "evidence_v01_binding");
         assert_eq!(parsed.evidence_bundle_ref.as_deref(), Some(bundle_ref));
-        assert!(parsed.artifact_digests.contains_key("cert-v1"));
+        assert_eq!(parsed.artifact_digests.get("cert-v1"), Some(&digest_cert_file(&path).expect("digest emitted cert")));
+        println!("PASS: emitted certificate digest matches binding");
     }
 }

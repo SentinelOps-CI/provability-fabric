@@ -9,16 +9,12 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-fn cert_schema_available() -> bool {
-    Path::new("external/CERT-V1/schema/cert-v1.schema.json").exists()
-}
-
 #[test]
+#[ignore = "requires pinned external CERT-V1 schema; run alone via evidence smoke"]
 fn emit_evidence_binding_through_permit_enforcement() {
-    if !cert_schema_available() {
-        eprintln!("skip: CERT-V1 schema missing (make submodules)");
-        return;
-    }
+    let schema = std::env::var("CERT_V1_SCHEMA").expect("absolute CERT_V1_SCHEMA required");
+    assert!(Path::new(&schema).is_absolute() && Path::new(&schema).is_file(),
+        "CERT_V1_SCHEMA must name the pinned schema before changing directory");
 
     let tmp = tempfile::TempDir::new().expect("tempdir");
     std::env::set_current_dir(tmp.path()).expect("chdir");
@@ -93,5 +89,8 @@ fn emit_evidence_binding_through_permit_enforcement() {
     let binding_line = lines.last().expect("binding");
     assert!(binding_line.contains("evidence_v01_binding"));
     assert!(binding_line.contains("examples/runtime-evidence-basic/basic-evidence-bundle.json"));
-    assert!(binding_line.contains(&expected_digest));
+    let binding: serde_json::Value = serde_json::from_str(binding_line).expect("binding JSON");
+    assert_eq!(binding["event_type"], "evidence_v01_binding");
+    assert_eq!(binding["artifact_digests"]["cert-v1"], expected_digest);
+    println!("PASS: permit emission digest matches binding");
 }
