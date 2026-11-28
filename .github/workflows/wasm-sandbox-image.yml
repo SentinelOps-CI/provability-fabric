@@ -5,7 +5,7 @@ name: WASM Sandbox Locked Production Image
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, security/kms-authority-consolidated-20261127]
     paths:
       - "runtime/wasm-sandbox/**"
       - "tests/test_wasm_sandbox_cli.py"
