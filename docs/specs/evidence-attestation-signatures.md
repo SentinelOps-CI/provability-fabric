@@ -69,3 +69,37 @@ No `signature` verification hook exists in `core/evidence` today; adding one wou
 - [Runtime evidence boundaries](../guides/runtime-evidence-boundaries.md)
 - [Evidence compatibility matrix](evidence-compatibility.md)
 - [Replay guarantees](../guides/replay-guarantees.md)
+
+
+## Independently selected execution attestation profile
+
+The opt-in `--execution-attestation-trust PATH --strict` profile additionally
+verifies every attestation signature over the single expected execution trace.
+The verifier supplies a trusted JSON file independently of the bundle:
+```json
+{
+  "profile": "ed25519-execution-v1",
+  "expected_bundle_id": "deployment-selected-run",
+  "expected_trace_digest": "sha256:<64 lowercase hexadecimal characters>",
+  "attestor": "deployment-selected-attestor",
+  "public_key_base64": "<canonical standard base64 of 32 raw Ed25519 public key bytes>"
+}
+```
+The trace digest refers to raw artifact bytes, not the internal trace_digest
+field. All attestations must reference exactly that trace and selected attestor.
+The signature field uses `ed25519-execution-v1:` followed by canonical standard
+base64 of the 64-byte signature. The signed preimage is the ASCII domain
+`provability-fabric/execution-attestation/v1` followed by NUL, then ten UTF-8
+strings, each preceded by its unsigned 64-bit big-endian byte length:
+bundle schema version, bundle ID, attestation schema version, attestation ID,
+attestor, target role, target path, target media type, target digest and
+attestation's optional media_type (empty if absent). Signature bytes and
+outer bundle digest are excluded to avoid circular commitments.
+
+The profile establishes that the selected key signed a reference to the
+externally selected trace in the specified bundle identity. It does not
+authenticate the real-world execution, establish completeness of mediation,
+check internal trace semantics, attest other artifacts, certify replay,
+or implement freshness, key distribution or revocation. The verifier must
+control the trust policy, key selection, expected run identity and stable
+bundle snapshot. The CLI never derives trust roots from bundle contents.

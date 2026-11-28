@@ -33,6 +33,8 @@ type ValidateOptions struct {
 	// RequireAttestationReferences adds a non-vacuous, exact-reference
 	// check to strict structural validation. It does not verify signatures.
 	RequireAttestationReferences bool
+	// ExecutionAttestationTrustPath identifies a verifier-owned policy file.
+	ExecutionAttestationTrustPath string
 }
 
 // ValidateBundle validates a v0.1 evidence bundle and returns a report.
@@ -50,6 +52,9 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		ValidatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
+	if opts.ExecutionAttestationTrustPath != "" {
+		opts.RequireAttestationReferences = true
+	}
 	if opts.RequireAttestationReferences && !opts.Strict {
 		err := fmt.Errorf("attestation reference verification requires strict validation")
 		report.Status = "fail"
@@ -179,7 +184,16 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 			report.Errors = append(report.Errors, err.Error())
 			return report, err
 		}
-		report.Warnings = append(report.Warnings, "Attestation references verified; signatures and claim validity not verified")
+		if opts.ExecutionAttestationTrustPath != "" {
+			if err := verifyExecutionAttestations(opts.BaseDir, bundle, opts.ExecutionAttestationTrustPath); err != nil {
+				report.Status = "fail"
+				report.Errors = append(report.Errors, err.Error())
+				return report, err
+			}
+			report.Warnings = append(report.Warnings, "Execution trace signatures verified against supplied trust policy; execution authenticity, replay and claim validity not verified")
+		} else {
+			report.Warnings = append(report.Warnings, "Attestation references verified; signatures and claim validity not verified")
+		}
 	}
 
 	if report.Status == "fail" && opts.Strict {

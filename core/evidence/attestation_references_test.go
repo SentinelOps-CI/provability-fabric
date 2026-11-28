@@ -125,3 +125,31 @@ func TestRequireAttestationReferences(t *testing.T) {
 		})
 	}
 }
+
+
+// Independently generated OpenSSL CLI fixtures exercise the full path. This
+// local unit check guards the signed field set against accidental omission.
+func TestExecutionAttestationMessageBindsEveryField(t *testing.T) {
+	b := EvidenceBundle{SchemaVersion:"0.1", BundleID:"bundle"}
+	a := executionAttestation{SchemaVersion:"0.1", ID:"id", Attestor:"issuer",
+		Ref:ArtifactRef{Role:"execution-trace", Path:"trace.json", MediaType:"media", Digest:"digest"}}
+	original := string(executionAttestationMessage(b,a))
+	for _, mutate := range []func(*EvidenceBundle,*executionAttestation){
+		func(b *EvidenceBundle,a *executionAttestation){b.SchemaVersion += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){b.BundleID += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.SchemaVersion += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.ID += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.Attestor += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.Ref.Role += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.Ref.Path += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.Ref.MediaType += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.Ref.Digest += "x"},
+		func(b *EvidenceBundle,a *executionAttestation){a.MediaType += "x"},
+	}{
+		b2,a2 := b,a
+		mutate(&b2,&a2)
+		if string(executionAttestationMessage(b2,a2)) == original {
+			t.Fatal("mutation preserved signed preimage")
+		}
+	}
+}
