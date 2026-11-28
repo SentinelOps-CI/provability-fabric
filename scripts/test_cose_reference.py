@@ -7,35 +7,7 @@ import subprocess
 import tempfile
 
 
-def head(major, length):
-    if length < 24:
-        return bytes([major * 32 + length])
-    for width, tag in ((1, 24), (2, 25), (4, 26), (8, 27)):
-        if length < 1 << (8 * width):
-            return bytes([major * 32 + tag]) + length.to_bytes(width, "big")
-    raise ValueError("CBOR integer out of range")
-
-
-def cbor(value):
-    if isinstance(value, int):
-        return head(0, value) if value >= 0 else head(1, -1 - value)
-    if isinstance(value, bytes):
-        return head(2, len(value)) + value
-    if isinstance(value, str):
-        raw = value.encode("utf-8")
-        return head(3, len(raw)) + raw
-    if isinstance(value, list):
-        return head(4, len(value)) + b"".join(map(cbor, value))
-    if isinstance(value, dict):
-        return head(5, len(value)) + b"".join(
-            cbor(key) + cbor(item) for key, item in value.items())
-    raise TypeError(type(value))
-
-
-def openssl(*args):
-    return subprocess.run(["openssl", *map(str, args)], check=True,
-                          timeout=15, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE).stdout
+from verify_cose_sign1 import head, cbor, openssl
 
 
 def main():
@@ -79,6 +51,40 @@ def main():
     if observed != expected:
         raise RuntimeError("independent COSE fixture mismatch")
     print("PASS: six byte-exact COSE/Ed25519 reference fields; altered message rejected")
+    # Independent external consumer invocation. The fixture public key and
+    # expected payload are passed separately from the envelope under test.
+    with tempfile.TemporaryDirectory(prefix="pf-cose-consumer-") as tmp:
+        root = Path(tmp)
+        verifier = Path(__file__).with_name("verify_cose_sign1.py")
+        key, wrong, expected_json, wire = (root / n for n in
+            ("public.pem", "wrong.pem", "expected.json", "envelope.cbor"))
+        import base64
+        import sys
+        der = bytes.fromhex("302a300506032b6570032100") + bytes.fromhex(expected["public"])
+        key.write_bytes(b"-----BEGIN PUBLIC KEY-----\n" + base64.b64encode(der) + b"\n-----END PUBLIC KEY-----\n")
+        wrong_private = root / "wrong-private.pem"
+        openssl("genpkey", "-algorithm", "Ed25519", "-out", wrong_private)
+        openssl("pkey", "-in", wrong_private, "-pubout", "-out", wrong)
+        fields = {"content_hash": "01" * 32, "timestamp": 1000, "issuer": "test_issuer",
+                  "subject": "test_subject", "request_id": "test_request"}
+        def check(name, candidate, payload_fields, trusted, ok):
+            wire.write_bytes(candidate)
+            expected_json.write_text(json.dumps(payload_fields), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(verifier), "--envelope", str(wire),
+                "--expected-payload", str(expected_json), "--trusted-public-key", str(trusted)],
+                capture_output=True, text=True, timeout=20)
+            if (result.returncode == 0) != ok:
+                raise RuntimeError(f"{name}: unexpected verification outcome: {result.stderr}")
+            print(f"PASS external consumer {name}")
+        check("valid tagged profile", envelope, fields, key, True)
+        check("wrong key", envelope, fields, wrong, False)
+        check("altered signature", envelope[:-1] + bytes([envelope[-1] ^ 1]), fields, key, False)
+        check("untagged legacy envelope", envelope[1:], fields, key, False)
+        check("trailing data", envelope + bytes([0]), fields, key, False)
+        check("changed expected request", envelope, {**fields, "request_id": "different"}, key, False)
+        check("changed expected hash", envelope, {**fields, "content_hash": "02" * 32}, key, False)
+        check("old algorithm header", envelope[:4] + bytes([0x27]) + envelope[5:], fields, key, False)
+        check("private key as trust input", envelope, fields, wrong_private, False)
 
 
 if __name__ == "__main__":

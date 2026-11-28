@@ -3,10 +3,11 @@ name: Sidecar COSE Sign1 profile
 
 on:
   pull_request:
-    branches: [security/kms-authority-consolidated-20261127]
+    branches: [security/kms-authority-consolidated-20261127, main]
     paths:
       - 'runtime/sidecar-watcher/**'
       - 'scripts/test_cose_reference.py'
+      - 'scripts/verify_cose_sign1.py'
       - 'Cargo.lock'
       - 'deny.toml'
       - '.github/workflows/sidecar-cose-sign1.yml'

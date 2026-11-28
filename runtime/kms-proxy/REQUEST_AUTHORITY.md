@@ -1,8 +1,9 @@
 # KMS request authority (candidate v1)
 
 This contract replaces the legacy signature-prefix check and authorization caches.
-It is a deployment-breaking candidate. Existing sidecar callers need an external
-issuer that authenticates the caller and authorizes the exact request. The proxy
+It is a deployment-breaking candidate. The historical sidecar caller is removed in the cumulative candidate.
+Any future caller needs an external issuer that authenticates the caller
+and authorizes the exact request. The proxy
 does not establish hardware attestation, issue credentials, or manage issuer keys.
 
 ## Operator configuration
@@ -115,3 +116,35 @@ They do not bound total process RSS, open TCP connections, or upstream
 HTTP buffering. Provider requests retain their independent ten-second
 timeout and 64 KiB response limit. Native tests of the new controls are
 required before integration.
+
+
+## Current migration boundary
+
+The cumulative sidecar's log-ingestion path builds an incomplete certificate
+candidate and rejects it before issuance if verified permission, witness,
+label, epoch or bridge evidence is absent. It no longer invokes /kms/sign
+or uses the old ATTESTATION_SIG fallback. The JWKS manager retains an
+unused KMS URL field; that field is not evidence of a functioning KMS
+caller. The Go MockKMSClient is test-oriented infrastructure, not a
+compatible production issuer or cryptographic provider.
+
+The independently executed cumulative qualification at c20e0ac1, workflow
+46136377786, passed real disposable Vault signing, ACL denial and revocation
+controls. That result supersedes earlier notes about pending native
+qualification at older revisions. The test issuer is not a production
+authority. Before production cutover:
+
+1. Provision an independent issuer that establishes authenticated caller
+   identity and permission over the exact key, operation and message.
+2. Connect the sidecar only after verified execution-specific evidence is
+   available; reject issuance in its absence.
+3. Provision the proxy public key and allowlists separately from caller
+   inputs; configure HTTPS Vault and least-privilege transit access.
+4. Qualify migrated positive requests, all retired routes and issuer/key
+   revocation against the intended deployment, including TLS.
+5. Keep legacy artifacts distinguishable from newly issued signatures;
+   never restore synthetic signing or downgrade to the prefix check.
+
+Production provisioning and caller migration cannot be established by the
+disposable test. Keep the incompatible candidate undeployed until these
+obligations have actual evidence.

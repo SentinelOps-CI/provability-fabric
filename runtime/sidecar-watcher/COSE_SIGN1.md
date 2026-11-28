@@ -33,3 +33,27 @@ minimal Python CBOR encoder and OpenSSL Ed25519, and native tests compare
 six exact byte fields and reject mutations. Native Cargo must qualify
 removal of serde_cbor and its unreachable half dependency before importing
 the final generated lockfile.
+
+
+## Independent consumer and migration
+
+The reference consumer is `scripts/verify_cose_sign1.py`. It expects the
+exact application payload in JSON (content_hash as lowercase hex, timestamp
+as an unsigned integer, issuer, subject, request_id as strings), a binary
+tagged Sign1 envelope, and a separately selected Ed25519 public PEM key:
+
+```bash
+python3 scripts/verify_cose_sign1.py --envelope certificate.cbor \
+  --expected-payload expected.json --trusted-public-key trusted.pem
+```
+
+It reconstructs the fixed profile bytes independently, rejects trailing or
+legacy encodings, and verifies the exact Sig_structure with OpenSSL. The
+test campaign checks the frozen vector and negative controls for wrong key,
+changed payload expectation, altered signature, untagged encoding and
+trailing bytes. The existing pipeline has no known production caller in
+the inspected source; external consumer migration is still unverified.
+Legacy artifacts need their historical verifier and an explicit legacy
+label. They must never be reinterpreted as the new profile. Retain the old
+reader separately where required; new issuance uses only the qualified
+new profile. This does not authenticate runtime effects.
