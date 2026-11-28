@@ -19,9 +19,19 @@ jobs:
   evidence-service-build-and-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - postgres: "15"
+            backend: postgres
+          - postgres: "16"
+            backend: postgres
+          - postgres: "16"
+            backend: filesystem
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_USER: evidence_ci
           POSTGRES_PASSWORD: evidence_ci_fixture_only
@@ -141,6 +151,11 @@ jobs:
               "session_id": "session-1",
               "timestamp": "2026-01-01T00:00:00Z",
           }
+          # This image deliberately has no access credentials configured.
+          call("/evidence/cert", method="POST", payload=certificate, expected=503)
+          call("/evidence/search", method="POST", payload={}, expected=503)
+          call("/evidence/cert/shared-session", expected=503)
+          call("/compliance/packet", method="POST", payload={}, expected=503)
           for field in ("tenant_id", "session_id"):
               unsafe = {**certificate, field: "../outside"}
               rejected = call(
@@ -190,6 +205,156 @@ jobs:
           print("Production image health and negative HTTP behaviors observed.")
           print("No database-backed storage, signing, or proof validity is claimed.")
           PY
+
+      - name: Verify configured production image access and tenant isolation
+        env:
+          BACKEND: ${{ matrix.backend }}
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          fixture_dir="$(mktemp -d "$RUNNER_TEMP/evidence-access.XXXXXX")"
+          cleanup() {
+            local status=0
+            if docker container inspect evidence-service-ci-auth >/dev/null 2>&1; then
+              docker rm -f evidence-service-ci-auth >/dev/null || status=$?
+            fi
+            rm -rf "$fixture_dir" || status=$?
+            return "$status"
+          }
+          trap cleanup EXIT
+          export FIXTURE_DIR="$fixture_dir"
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import secrets
+
+          root = Path(os.environ["FIXTURE_DIR"])
+          tokens = {}
+          entries = []
+          for name, tenant, read, write in [
+              ("a", "tenant-a", True, True),
+              ("b", "tenant-b", True, True),
+              ("reader", "tenant-a", True, False),
+              ("writer", "tenant-a", False, True),
+          ]:
+              raw = secrets.token_bytes(32)
+              tokens[name] = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+              entries.append(dict(tenant=tenant, token_sha256=hashlib.sha256(raw).hexdigest(),
+                                  read=read, write=write))
+          for filename, data in [("access.json", entries), ("tokens.json", tokens)]:
+              fd = os.open(root / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+              with os.fdopen(fd, "w") as f:
+                  json.dump(data, f)
+          PY
+          export DATABASE_URL=""
+          export EVIDENCE_STORAGE_PATH=/tmp/evidence
+          network=(--publish 127.0.0.1:18005:18005)
+          if [[ "$BACKEND" == postgres ]]; then
+            # Administrative migration is a one-shot invocation of the actual image.
+            docker run --rm --network host --entrypoint /root/main \
+              --env EVIDENCE_MIGRATION_DATABASE_URL=postgres://evidence_ci:evidence_ci_fixture_only@127.0.0.1:15432/evidence_ci?sslmode=disable \
+              evidence-service-ci:local --migrate
+            password="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+            echo "::add-mask::$password"
+            docker exec -i "$POSTGRES_CONTAINER" psql -X -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -v "runtime_password=$password" <<'SQL'
+          CREATE ROLE evidence_image_runtime LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'runtime_password';
+          GRANT USAGE ON SCHEMA public TO evidence_image_runtime;
+          GRANT SELECT, INSERT ON certificates TO evidence_image_runtime;
+          SQL
+            export DATABASE_URL="postgres://evidence_image_runtime:$password@127.0.0.1:15432/evidence_ci?sslmode=disable"
+            echo "::add-mask::$DATABASE_URL"
+            network=(--network host)
+            # A file cannot be traversed as a directory. PostgreSQL mode must
+            # start and serve authenticated writes despite this unusable path.
+            export EVIDENCE_STORAGE_PATH=/dev/null/evidence
+          fi
+          docker run --detach --rm --name evidence-service-ci-auth \
+            "${network[@]}" --env DATABASE_URL \
+            --env PORT=18005 \
+            --env EVIDENCE_STORAGE_PATH \
+            --env EVIDENCE_ACCESS_FILE=/run/evidence-access.json \
+            --mount "type=bind,src=$fixture_dir/access.json,dst=/run/evidence-access.json,readonly" \
+            evidence-service-ci:local
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          tokens = json.loads((Path(os.environ["FIXTURE_DIR"]) / "tokens.json").read_text())
+          base = "http://127.0.0.1:18005/api/v1"
+
+          def call(path, method="GET", payload=None, token=None, expected=200):
+              headers = {"Content-Type": "application/json"}
+              if token is not None:
+                  headers["Authorization"] = "Bearer " + tokens[token]
+              data = None if payload is None else json.dumps(payload).encode()
+              req = Request(base + path, method=method, data=data, headers=headers)
+              try:
+                  with urlopen(req, timeout=5) as response:
+                      status, body = response.status, response.read()
+              except HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              assert status == expected, f"{method} {path}: HTTP {status}, expected {expected}"
+              return json.loads(body)
+
+          for _ in range(30):
+              try:
+                  health = call("/health")
+                  assert health["service"] == "evidence-service"
+                  expected_db = "connected" if os.environ["BACKEND"] == "postgres" else "disconnected"
+                  assert health["database"] == expected_db, health
+                  assert health["storage_backend"] == os.environ["BACKEND"], health
+                  break
+              except (URLError, TimeoutError):
+                  time.sleep(1)
+          else:
+              raise AssertionError("configured evidence image did not become reachable")
+
+          certificate = {
+              "bundle_id": "bundle", "policy_hash": "policy", "proof_hash": "proof",
+              "automata_hash": "automata", "labeler_hash": "labeler", "ni_claim": "fixture",
+              "ni_monitor": "inapplicable", "sidecar_build": "fixture",
+              "tenant_id": "tenant-a", "session_id": "shared-session",
+              "timestamp": "2026-01-01T00:00:00Z",
+          }
+          call("/evidence/cert", "POST", certificate, expected=401)
+          call("/evidence/cert", "POST", certificate, "reader", 403)
+          call("/evidence/cert", "POST", certificate, "b", 403)
+          call("/evidence/cert", "POST", certificate, "a", 201)
+          call("/evidence/cert", "POST", {**certificate, "tenant_id": "tenant-b"}, "b", 201)
+          call("/evidence/search", "POST", {}, expected=401)
+          call("/evidence/search", "POST", {}, "writer", 403)
+          call("/evidence/search", "POST", {"tenant_id": "tenant-b"}, "a", 403)
+          for token, tenant in [("a", "tenant-a"), ("b", "tenant-b")]:
+              result = call("/evidence/search", "POST", {}, token)
+              assert result["total"] == 1 and len(result["certificates"]) == 1, result
+              assert result["certificates"][0]["tenant_id"] == tenant, result
+              record = call("/evidence/cert/shared-session", token=token)
+              assert record["tenant_id"] == tenant and not record.get("sig"), record
+          call("/compliance/packet", "POST", {"tenant_id": "tenant-b"}, "a", 403)
+          packet = call("/compliance/packet", "POST", {}, "reader")
+          assert packet["tenant_id"] == "tenant-a" and len(packet["certificates"]) == 1, packet
+          assert "Recorded accept rate:" in packet["conformance"], packet
+          print("Configured image: authenticated storage, tenant isolation and permission controls observed.")
+          print("Observed storage backend:", os.environ["BACKEND"])
+          PY
+          if [[ "$BACKEND" == postgres ]]; then
+            # Check persisted rows independently of HTTP results using the admin
+            # fixture. The runtime identity must see none outside a tenant tx.
+            actual="$(docker exec "$POSTGRES_CONTAINER" psql -XAt -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -c "SELECT count(*) FROM certificates WHERE session_id = 'shared-session' AND tenant_id IN ('tenant-a','tenant-b')")"
+            test "$actual" = 2
+            actual="$(docker exec "$POSTGRES_CONTAINER" psql -XAt -v ON_ERROR_STOP=1 \
+              -U evidence_ci -d evidence_ci -c 'SET ROLE evidence_image_runtime; SELECT count(*) FROM certificates;' | tail -n 1)"
+            test "$actual" = 0
+          fi
 
       - name: Remove disposable evidence-service container
         if: always()
