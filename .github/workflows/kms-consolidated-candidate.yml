@@ -138,12 +138,58 @@ jobs:
           git diff --exit-code -- Cargo.lock
       - name: Repeat isolated Kubernetes TLS controls
         run: python3 scripts/test_kube_ca_isolation.py
-      - name: Retain original release performance gate
+  fifo-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record benchmark environment
         run: |
           set -euo pipefail
-          cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --test-threads=1 --nocapture | tee "$RUNNER_TEMP/fifo-gate.txt"
+          { git rev-parse HEAD; rustc --version --verbose; uname -a; lscpu; } > "$RUNNER_TEMP/fifo-environment.txt"
+      - name: Retain original release performance gate
+        id: fifo_gate
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p sidecar-watcher --lib concurrency::tests::test_performance_benchmark -- --exact --test-threads=1 --nocapture 2>&1 | tee "$RUNNER_TEMP/fifo-gate.txt"
           grep -F 'running 1 test' "$RUNNER_TEMP/fifo-gate.txt"
           grep -F '1 passed; 0 failed' "$RUNNER_TEMP/fifo-gate.txt"
+      - name: Collect paired FIFO diagnostics after the original gate
+        if: ${{ !cancelled() && steps.fifo_gate.outcome != 'skipped' }}
+        run: |
+          set -euo pipefail
+          cargo run --locked --release -p sidecar-watcher --example queue_performance_diagnostic | tee "$RUNNER_TEMP/fifo-diagnostic.csv"
+          python3 - <<'PY'
+          import csv, os
+          from pathlib import Path
+          rows = list(csv.DictReader((Path(os.environ["RUNNER_TEMP"]) / "fifo-diagnostic.csv").open()))
+          names = ("production", "std_mutex", "parking_lot_reference", "sequential_control")
+          expected = {(n, state, r) for n in names for state in ("fresh", "warm") for r in range(31)}
+          observed = [(r["implementation"], r["allocation_state"], int(r["round"])) for r in rows]
+          assert len(observed) == len(expected) and set(observed) == expected
+          assert all(int(r["push_ns"]) > 0 and int(r["pop_ns"]) > 0 for r in rows)
+          PY
+          git diff --exit-code -- Cargo.lock
+      - name: Preserve performance evidence even on rejection
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fifo-release-evidence
+          path: |
+            ${{ runner.temp }}/fifo-environment.txt
+            ${{ runner.temp }}/fifo-gate.txt
+            ${{ runner.temp }}/fifo-diagnostic.csv
+          if-no-files-found: error
+
+  sidecar-license:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Build production sidecar and verify shipped certificate-data license
         run: |
           set -euo pipefail

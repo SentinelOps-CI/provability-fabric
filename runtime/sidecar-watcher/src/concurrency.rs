@@ -601,13 +601,13 @@ mod tests {
         let pop_duration = start.elapsed();
         assert!(buffer.is_empty());
 
+        println!("100k push operations: {:?}", push_duration);
+        println!("100k pop operations: {:?}", pop_duration);
+
         // Keep the original threshold in the dedicated optimized CI gate.
         if !cfg!(debug_assertions) {
             assert!(push_duration.as_millis() < 1, "Push too slow: {:?}", push_duration);
             assert!(pop_duration.as_millis() < 1, "Pop too slow: {:?}", pop_duration);
         }
-
-        println!("100k push operations: {:?}", push_duration);
-        println!("100k pop operations: {:?}", pop_duration);
     }
 }
