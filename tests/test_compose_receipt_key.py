@@ -32,6 +32,9 @@ class ReceiptSigningComposeTests(unittest.TestCase):
         self.assertIn("source: retrieval_receipt_signing_key", service)
         self.assertIn("mode: 0400", service)
         self.assertIn("PF_RECEIPT_SIGNING_KEY_FILE", compose)
+        self.assertIn("RETRIEVAL_JWT_VERIFY_KEYS_JSON", compose)
+        self.assertIn("RETRIEVAL_JWT_ISSUER", compose)
+        self.assertNotIn("RETRIEVAL_JWT_VERIFY_KEYS_JSON={", compose)
         self.assertNotIn("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", compose)
 
     def test_local_key_files_are_excluded_from_git_and_docker(self) -> None:
@@ -71,6 +74,7 @@ class ReceiptSigningComposeTests(unittest.TestCase):
         completed, calls, key_path = self._execute_smoke()
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertIn("docker-compose smoke passed", completed.stdout)
+        self.assertIn("fixture signed HTTP probe invoked", completed.stdout)
         self.assertTrue(any(" up " in f" {c} " for c in calls))
         self.assertTrue(any(" down " in f" {c} " for c in calls))
         self.assertFalse(key_path.exists())
@@ -111,6 +115,21 @@ class ReceiptSigningComposeTests(unittest.TestCase):
             (scripts / "check_wiring.py").write_text(
                 "print('fixture wiring valid')\n", encoding="utf-8"
             )
+            # This suite verifies the shell lifecycle without a live server.
+            # The actual signed HTTP contract has separate tests and a full CI smoke.
+            (scripts / "retrieval_auth_smoke.py").write_text(
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "assert Path(sys.argv[2]).is_file()\n"
+                "assert os.environ['PF_RETRIEVAL_JWT_ISSUER'] == 'pf-compose-smoke'\n"
+                "if sys.argv[1] == 'export-public':\n"
+                "    print(json.dumps({'ephemeral-smoke-key': 'test-public-key'}))\n"
+                "elif sys.argv[1] == 'probe':\n"
+                "    print('fixture signed HTTP probe invoked')\n"
+                "else:\n"
+                "    sys.exit(4)\n",
+                encoding="utf-8",
+            )
             fake_bin = root / "fake-bin"
             fake_bin.mkdir()
             docker = fake_bin / "docker"
@@ -121,6 +140,10 @@ class ReceiptSigningComposeTests(unittest.TestCase):
                 'test -s "$PF_RECEIPT_SIGNING_KEY_FILE"\n'
                 'grep -q "BEGIN PRIVATE KEY" "$PF_RECEIPT_SIGNING_KEY_FILE"\n'
                 'test "$(stat -c %a "$PF_RECEIPT_SIGNING_KEY_FILE")" = 600\n'
+                'test -s "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE"\n'
+                'test "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE" != "$PF_RECEIPT_SIGNING_KEY_FILE"\n'
+                'test "$(stat -c %a "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE")" = 600\n'
+                'test -n "$PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON"\n'
                 'printf "%s|%s\\n" "$*" "$PF_RECEIPT_SIGNING_KEY_FILE" >> "$MOCK_DOCKER_LOG"\n'
                 'if [[ " $* " == *" up "* && "$MOCK_FAIL_UP" == 1 ]]; then exit 42; fi\n',
                 encoding="utf-8",

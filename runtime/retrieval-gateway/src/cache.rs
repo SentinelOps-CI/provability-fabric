@@ -560,6 +560,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cache_entries_never_cross_labels_or_requested_limit() {
+        let cache = SemanticCache::with_config(CacheConfig {
+            cleanup_interval_seconds: 0,
+            ..CacheConfig::default()
+        });
+        let result = SearchResult {
+            document_id: "public-one".into(),
+            content: "synthetic public data".into(),
+            content_hash: "hash".into(),
+            score: 1.0,
+            metadata: HashMap::new(),
+            labels: vec!["public".into()],
+        };
+        let labels = vec!["public".to_string()];
+        cache.put("query-hash", &labels, "tenant-a", 1, vec![result], None)
+            .await.unwrap();
+        assert!(cache.get("query-hash", &labels, "tenant-a", 1).await.is_some());
+        assert!(cache.get("query-hash", &labels, "tenant-a", 10).await.is_none());
+        assert!(cache.get("query-hash", &labels, "tenant-b", 1).await.is_none());
+        assert!(cache.get("other-hash", &labels, "tenant-a", 1).await.is_none());
+        assert!(cache.get(
+            "query-hash", &["public".into(), "private".into()], "tenant-a", 1,
+        ).await.is_none());
+        assert!(cache.get(
+            "query-hash", &["private".into(), "public".into()], "tenant-a", 1,
+        ).await.is_none());
+    }
+
+    #[tokio::test]
     async fn test_cache_invalidation() {
         let cache = SemanticCache::with_config(CacheConfig {
             cleanup_interval_seconds: 0,

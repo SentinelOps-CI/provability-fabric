@@ -15,6 +15,8 @@ on:
       - "scripts/db/**"
       - "scripts/docker-compose-smoke.sh"
       - "tests/test_compose_receipt_key.py"
+      - "scripts/retrieval_auth_smoke.py"
+      - "tests/test_retrieval_auth_smoke.py"
       - "charts/**"
   pull_request:
     paths:
@@ -26,6 +28,8 @@ on:
       - "scripts/db/**"
       - "scripts/docker-compose-smoke.sh"
       - "tests/test_compose_receipt_key.py"
+      - "scripts/retrieval_auth_smoke.py"
+      - "tests/test_retrieval_auth_smoke.py"
       - "charts/**"
 
 jobs:
@@ -117,6 +121,9 @@ jobs:
 
       - name: Test ephemeral Compose signing-key contract
         run: python -m unittest discover -s tests -p 'test_compose_receipt_key.py' -v
+
+      - name: Test disposable Ed25519 JWT smoke contract
+        run: python -m unittest discover -s tests -p 'test_retrieval_auth_smoke.py' -v
 
       - name: Docker Compose smoke (F21)
         run: |

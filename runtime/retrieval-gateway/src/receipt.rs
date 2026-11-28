@@ -160,6 +160,17 @@ impl ReceiptSigner {
     }
 }
 
+// Test fixtures use a separate signing seed and never configure production keys.
+#[cfg(test)]
+impl ReceiptSigner {
+    pub(crate) fn for_test() -> Self {
+        Self {
+            signing_key: SigningKey::from_bytes(&[21_u8; 32]),
+            key_id: "ephemeral-handler-test-key".into(),
+        }
+    }
+}
+
 /// Receipt validator for external verification.
 pub struct ReceiptValidator;
 

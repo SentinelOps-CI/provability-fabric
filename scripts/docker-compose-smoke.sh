@@ -42,6 +42,15 @@ export PF_RECEIPT_SIGNING_KEY_FILE="$SMOKE_KEY_DIR/retrieval-receipt.pem"
 openssl genpkey -algorithm Ed25519 -out "$PF_RECEIPT_SIGNING_KEY_FILE" >/dev/null 2>&1
 chmod 600 "$PF_RECEIPT_SIGNING_KEY_FILE"
 
+# Independent ephemeral JWT issuer key: never reuse the receipt-signing key.
+export PF_RETRIEVAL_JWT_SIGNING_KEY_FILE="$SMOKE_KEY_DIR/retrieval-jwt-issuer.pem"
+openssl genpkey -algorithm Ed25519 -out "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE" >/dev/null 2>&1
+chmod 600 "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE"
+export PF_RETRIEVAL_JWT_ISSUER="pf-compose-smoke"
+export PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON
+PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON="$(python3 scripts/retrieval_auth_smoke.py export-public "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE")"
+test -n "$PF_RETRIEVAL_JWT_VERIFY_KEYS_JSON" || { echo "Missing ephemeral JWT verifier" >&2; exit 2; }
+
 python scripts/check_wiring.py
 
 # Optional: validate documented env keys exist in schema (structural presence).
@@ -78,6 +87,10 @@ curl -fsS http://localhost:4000/health >/dev/null
 echo "ledger /health: OK"
 curl -fsS http://localhost:8080/health >/dev/null
 echo "retrieval-gateway /health: OK"
+
+# Exercise the actual HTTP authorization boundary with disposable signed tokens.
+# An unseeded index cannot establish data isolation; this only tests admission.
+python3 scripts/retrieval_auth_smoke.py probe "$PF_RETRIEVAL_JWT_SIGNING_KEY_FILE"
 
 "${COMPOSE[@]}" down -v
 SMOKE_COMPOSE_STARTED=0

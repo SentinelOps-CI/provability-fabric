@@ -28,16 +28,18 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod abac;
+mod auth;
 mod cache;
 mod receipt;
 mod result_commitment;
 mod storage;
 
 use abac::{AbacPolicy, QueryContext};
+use auth::TokenVerifier;
 use cache::SemanticCache;
 use receipt::{AccessReceipt, ReceiptSigner};
 use result_commitment::compute_result_commitment;
-use storage::{StorageAdapter, VectorIndex};
+use storage::{PostgresVectorAdapter, StorageAdapter, VectorIndex};
 
 lazy_static! {
     static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::builder()
@@ -55,9 +57,11 @@ lazy_static! {
 pub struct AppState {
     storage: Arc<dyn StorageAdapter>,
     abac_policy: Arc<AbacPolicy>,
+    token_verifier: Arc<TokenVerifier>,
     receipt_signer: Arc<ReceiptSigner>,
     receipt_cache: Arc<RwLock<HashMap<String, AccessReceipt>>>,
     semantic_cache: Arc<SemanticCache>,
+    cache_enabled: bool,
 }
 
 /// Query request payload
@@ -109,8 +113,21 @@ pub struct HealthResponse {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let storage = Arc::new(VectorIndex::new().await?);
+    // Explicit selection; configured database failure never selects memory.
+    let (storage, cache_enabled): (Arc<dyn StorageAdapter>, bool) =
+        match std::env::var("RETRIEVAL_POSTGRES_URL") {
+            Ok(url) => {
+                anyhow::ensure!(!url.trim().is_empty(), "empty RETRIEVAL_POSTGRES_URL");
+                let adapter = PostgresVectorAdapter::new(&url).await?;
+                adapter.validate_runtime_role().await?;
+                (Arc::new(adapter), false)
+            }
+            Err(std::env::VarError::NotPresent) => (Arc::new(VectorIndex::new().await?), true),
+            Err(err) => return Err(err).context("invalid RETRIEVAL_POSTGRES_URL"),
+        };
     let abac_policy = Arc::new(AbacPolicy::load_from_file("abac.yaml").await?);
+    // Missing trusted public keys or issuer prevents service startup.
+    let token_verifier = Arc::new(TokenVerifier::from_env()?);
     let receipt_signer = Arc::new(ReceiptSigner::new().await?);
     let receipt_cache = Arc::new(RwLock::new(HashMap::new()));
     let semantic_cache = Arc::new(SemanticCache::new());
@@ -118,16 +135,17 @@ async fn main() -> Result<()> {
     let state = AppState {
         storage,
         abac_policy,
+        token_verifier,
         receipt_signer,
         receipt_cache,
         semantic_cache,
+        cache_enabled,
     };
 
+    // Receipt lookup and cache administration have no authenticated
+    // ownership protocol yet. Do not expose those privileged endpoints.
     let app = Router::new()
         .route("/query", post(handle_query))
-        .route("/receipts", get(get_receipt))
-        .route("/cache/stats", get(get_cache_stats))
-        .route("/cache/invalidate/:tenant", post(invalidate_cache))
         .route("/health", get(health_check))
         .layer(
             ServiceBuilder::new()
@@ -136,7 +154,11 @@ async fn main() -> Result<()> {
         )
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr: SocketAddr = match std::env::var("RETRIEVAL_LISTEN_ADDR") {
+        Ok(value) => value.parse().context("invalid RETRIEVAL_LISTEN_ADDR")?,
+        Err(std::env::VarError::NotPresent) => SocketAddr::from(([0, 0, 0, 0], 8080)),
+        Err(err) => return Err(err).context("invalid RETRIEVAL_LISTEN_ADDR"),
+    };
     info!("Retrieval Gateway listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
@@ -154,10 +176,13 @@ async fn handle_query(
 ) -> Result<Json<QueryResponse>, StatusCode> {
     let start_time = std::time::Instant::now();
 
-    if !validate_capability_token(&request.capability_token, &request.tenant, &request.subject_id)
-        .await
-    {
-        return Err(StatusCode::FORBIDDEN);
+    let claims = state
+        .token_verifier
+        .verify(&request.capability_token, &request.tenant, &request.subject_id)
+        .map_err(|_| StatusCode::FORBIDDEN)?;
+    let limit = request.limit.unwrap_or(10);
+    if limit == 0 || limit > state.abac_policy.query_context.complexity_limits.max_results_per_query {
+        return Err(StatusCode::BAD_REQUEST);
     }
 
     let context = QueryContext {
@@ -167,6 +192,8 @@ async fn handle_query(
         labels_filter: request.labels_filter.clone(),
         query_hash: compute_query_hash(&request.query).await,
         index_shard: format!("shard_{}", request.tenant),
+        allowed_labels: claims.allowed_labels,
+        capabilities: claims.capabilities,
     };
 
     if !state.abac_policy.evaluate(&context).await {
@@ -179,45 +206,51 @@ async fn handle_query(
     let _rate_limits = state.abac_policy.get_rate_limits(&context);
 
     let query_hash = context.query_hash.clone();
-    let result_limit = request.limit.unwrap_or(10);
-    let cached_results = state
-        .semantic_cache
-        .get(&query_hash, &request.labels_filter, &request.tenant, result_limit)
-        .await;
+    // Independently updated database classifications require fresh queries.
+    let cached_results = if state.cache_enabled {
+        state.semantic_cache
+            .get(&query_hash, &request.labels_filter, &request.tenant, limit)
+            .await
+    } else {
+        None
+    };
 
     let results = if let Some(cached) = cached_results {
-        debug!("Cache hit for query: {}", request.query);
+        debug!("Cache hit for tenant {}", request.tenant);
         cached
     } else {
-        debug!("Cache miss for query: {}", request.query);
+        debug!("Cache miss for tenant {}", request.tenant);
         let search_results = state
             .storage
             .search_with_tenant_isolation(
                 &request.query,
                 &request.tenant,
                 &request.labels_filter,
-                result_limit,
+                limit,
             )
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        if let Err(e) = state
-            .semantic_cache
-            .put(
-                &query_hash,
-                &request.labels_filter,
-                &request.tenant,
-                result_limit,
-                search_results.clone(),
-                None,
-            )
-            .await
-        {
-            warn!("Failed to cache results: {}", e);
+        if state.cache_enabled {
+            if let Err(e) = state.semantic_cache
+                .put(&query_hash, &request.labels_filter, &request.tenant, limit,
+                    search_results.clone(), None)
+                .await
+            {
+                warn!("Failed to cache results: {}", e);
+            }
         }
 
         search_results
     };
+
+    // Defense in depth against a mislabeled storage or cache result.
+    // Documents with an unknown or extra label must never be returned on
+    // the strength of a different, authorized label.
+    let results: Vec<_> = results.into_iter().filter(|result| {
+        !result.labels.is_empty()
+            && result.labels.iter().all(|label| context.labels_filter.contains(label))
+    }).take(limit).collect();
 
     let query_time_ms = start_time.elapsed().as_millis() as u64;
 
@@ -293,11 +326,6 @@ async fn health_check() -> Json<HealthResponse> {
     })
 }
 
-/// Validate capability token (simplified)
-async fn validate_capability_token(token: &str, tenant: &str, subject_id: &str) -> bool {
-    !token.is_empty() && !tenant.is_empty() && !subject_id.is_empty()
-}
-
 /// Compute hash of query for receipt
 async fn compute_query_hash(query: &str) -> String {
     use sha2::{Digest, Sha256};
@@ -361,6 +389,186 @@ async fn submit_receipt_to_ledger(receipt: &AccessReceipt) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use ed25519_dalek::{Signer, SigningKey};
+    use crate::storage::Document;
+
+    fn signed_fixture_token(
+        signer: &SigningKey,
+        tenant: &str,
+        subject: &str,
+        labels: &[&str],
+        capabilities: &[&str],
+    ) -> String {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let header = serde_json::json!({
+            "alg": "EdDSA", "typ": "JWT", "kid": "fixture-issuer-key",
+        });
+        let claims = serde_json::json!({
+            "iss": "fixture-issuer", "aud": "pf-retrieval-gateway",
+            "sub": subject, "tenant": tenant, "iat": now - 2,
+            "nbf": now - 2, "exp": now + 120,
+            "jti": Uuid::new_v4().to_string(),
+            "allowed_labels": labels, "capabilities": capabilities,
+        });
+        let header = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).unwrap());
+        let claims = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let signing_input = format!("{header}.{claims}");
+        let sig = signer.sign(signing_input.as_bytes());
+        format!("{signing_input}.{}", URL_SAFE_NO_PAD.encode(sig.to_bytes()))
+    }
+
+    async fn seeded_gateway_state() -> (AppState, SigningKey) {
+        // These are independently authored test fixtures, not service
+        // responses retrospectively interpreted as an authorization oracle.
+        let index = VectorIndex::new().await.unwrap();
+        let query_embedding = VectorIndex::generate_query_embedding("fixture query");
+        for (id, tenant, labels) in [
+            ("a-public-one", "tenant-a", vec!["public"]),
+            ("a-public-two", "tenant-a", vec!["public"]),
+            ("a-private", "tenant-a", vec!["private"]),
+            ("a-mixed", "tenant-a", vec!["public", "secret"]),
+            ("b-public", "tenant-b", vec!["public"]),
+        ] {
+            index.add_document(Document {
+                id: id.into(),
+                content: format!("fixture content {id}"),
+                tenant: tenant.into(),
+                labels: labels.into_iter().map(str::to_string).collect(),
+                metadata: HashMap::new(),
+                embedding: query_embedding.clone(),
+                created_at: 1,
+                updated_at: 1,
+            }).await.unwrap();
+        }
+        let policy: AbacPolicy = serde_yaml::from_str(include_str!("../abac.yaml")).unwrap();
+        policy.validate_configuration().unwrap();
+        let signer = SigningKey::from_bytes(&[18_u8; 32]);
+        let verifier = TokenVerifier::from_keys(
+            HashMap::from([("fixture-issuer-key".into(), signer.verifying_key())]),
+            "fixture-issuer".into(),
+        ).unwrap();
+        (
+            AppState {
+                storage: Arc::new(index),
+                abac_policy: Arc::new(policy),
+                token_verifier: Arc::new(verifier),
+                receipt_signer: Arc::new(ReceiptSigner::for_test()),
+                receipt_cache: Arc::new(RwLock::new(HashMap::new())),
+                cache_enabled: true,
+                semantic_cache: Arc::new(SemanticCache::with_config(cache::CacheConfig {
+                    cleanup_interval_seconds: 0,
+                    ..cache::CacheConfig::default()
+                })),
+            },
+            signer,
+        )
+    }
+
+    fn seeded_request(
+        signer: &SigningKey,
+        tenant: &str,
+        labels: Vec<&str>,
+        capabilities: &[&str],
+    ) -> QueryRequest {
+        let token = signed_fixture_token(
+            signer, tenant, "user_fixture", &labels, capabilities,
+        );
+        QueryRequest {
+            query: "fixture query".into(),
+            tenant: tenant.into(),
+            subject_id: "user_fixture".into(),
+            capability_token: token,
+            labels_filter: labels.into_iter().map(str::to_string).collect(),
+            limit: Some(10),
+        }
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_enforces_tenant_and_mixed_label_isolation() {
+        let (state, key) = seeded_gateway_state().await;
+        let a = handle_query(
+            State(state.clone()),
+            Json(seeded_request(&key, "tenant-a", vec!["public"], &[])),
+        ).await.unwrap().0;
+        let mut a_ids: Vec<_> = a.results.iter().map(|r| r.document_id.as_str()).collect();
+        a_ids.sort_unstable();
+        assert_eq!(a_ids, vec!["a-public-one", "a-public-two"]);
+        assert!(a.results.iter().all(|r| {
+            r.labels.len() == 1 && r.labels[0] == "public"
+        }));
+        assert_eq!(a.receipt.tenant, "tenant-a");
+        assert_eq!(a.receipt.result_count, 2);
+
+        let b = handle_query(
+            State(state),
+            Json(seeded_request(&key, "tenant-b", vec!["public"], &[])),
+        ).await.unwrap().0;
+        assert_eq!(b.results.len(), 1);
+        assert_eq!(b.results[0].document_id, "b-public");
+        assert_eq!(b.receipt.tenant, "tenant-b");
+        assert_eq!(b.receipt.result_count, 1);
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_never_reuses_limit_one_cache_for_limit_ten() {
+        let (state, key) = seeded_gateway_state().await;
+        let mut request = seeded_request(&key, "tenant-a", vec!["public"], &[]);
+        request.limit = Some(1);
+        let one = handle_query(State(state.clone()), Json(request)).await.unwrap().0;
+        assert_eq!(one.results.len(), 1);
+        let ten = handle_query(
+            State(state),
+            Json(seeded_request(&key, "tenant-a", vec!["public"], &[])),
+        ).await.unwrap().0;
+        assert_eq!(ten.results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn seeded_handler_rejects_unsigned_forged_and_forbidden_scopes() {
+        let (state, signer) = seeded_gateway_state().await;
+        let mut legacy = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        legacy.capability_token = "legacy-any-string".into();
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(legacy)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        let mut foreign = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        foreign.tenant = "tenant-b".into();
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(foreign)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        let mut forged = seeded_request(&signer, "tenant-a", vec!["public"], &[]);
+        forged.capability_token = signed_fixture_token(
+            &SigningKey::from_bytes(&[19_u8; 32]),
+            "tenant-a", "user_fixture", &["public"], &[],
+        );
+        assert!(matches!(
+            handle_query(State(state.clone()), Json(forged)).await,
+            Err(StatusCode::FORBIDDEN),
+        ));
+
+        for labels in [vec!["private"], vec!["secret"]] {
+            let invalid = seeded_request(&signer, "tenant-a", labels, &[]);
+            assert!(matches!(
+                handle_query(State(state.clone()), Json(invalid)).await,
+                Err(StatusCode::FORBIDDEN),
+            ));
+        }
+
+        let authorized_private = seeded_request(
+            &signer, "tenant-a", vec!["private"], &["private_access"],
+        );
+        let private = handle_query(
+            State(state), Json(authorized_private),
+        ).await.unwrap().0;
+        assert_eq!(private.results.len(), 1);
+        assert_eq!(private.results[0].document_id, "a-private");
+    }
 
     #[tokio::test]
     async fn test_query_hash() {

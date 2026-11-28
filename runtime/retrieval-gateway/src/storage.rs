@@ -289,6 +289,26 @@ impl PostgresVectorAdapter {
         Ok(Self { pool })
     }
 
+    /// Reject obviously privileged or unprepared serving identities. The
+    /// operator must separately verify the actual RLS policy semantics.
+    pub async fn validate_runtime_role(&self) -> Result<()> {
+        let allowed: bool = sqlx::query_scalar(
+            r#"SELECT NOT r.rolsuper AND NOT r.rolbypassrls
+                AND c.relrowsecurity AND c.relforcerowsecurity
+                AND NOT pg_has_role(current_user, c.relowner, 'MEMBER')
+                AND has_table_privilege(current_user, c.oid, 'SELECT')
+                AND NOT has_table_privilege(current_user, c.oid,
+                    'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid
+                    AND p.polname = 'pf_tenant_guard' AND NOT p.polpermissive)
+                FROM pg_roles r CROSS JOIN pg_class c
+                WHERE r.rolname = current_user
+                    AND c.oid = to_regclass('documents')"#,
+        ).fetch_one(&self.pool).await.context("inspect retrieval runtime database role")?;
+        anyhow::ensure!(allowed, "retrieval requires a non-owner, restricted SELECT role and forced RLS");
+        Ok(())
+    }
+
     /// Run privileged, idempotent migrations; runtime roles have only SELECT.
     pub async fn init_schema(&self) -> Result<()> {
         let mut tx = self.pool.begin().await.context("begin schema transaction")?;
@@ -638,6 +658,42 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].document_id, "doc1");
+    }
+
+    #[tokio::test]
+    async fn mixed_labels_are_not_disclosed_through_public_filter() {
+        let index = VectorIndex::new().await.unwrap();
+        for (id, labels) in [
+            ("public-only", vec!["public".into()]),
+            ("mixed", vec!["public".into(), "secret".into()]),
+            ("unlabeled", Vec::new()),
+        ] {
+            index.add_document(Document {
+                id: id.into(),
+                content: format!("fixture-{id}"),
+                tenant: "tenant1".into(),
+                labels,
+                metadata: HashMap::new(),
+                embedding: vec![0.1; 128],
+                created_at: 1,
+                updated_at: 1,
+            }).await.unwrap();
+        }
+
+        let public = index
+            .search_with_tenant_isolation("query", "tenant1", &["public".into()], 10)
+            .await.unwrap();
+        assert_eq!(public.len(), 1);
+        assert_eq!(public[0].document_id, "public-only");
+
+        let empty = index.search_with_tenant_isolation("query", "tenant1", &[], 10)
+            .await.unwrap();
+        assert!(empty.is_empty());
+
+        let expanded = index.search_with_tenant_isolation(
+            "query", "tenant1", &["public".into(), "secret".into()], 10,
+        ).await.unwrap();
+        assert_eq!(expanded.len(), 2);
     }
 
     #[test]
