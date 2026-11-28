@@ -2184,12 +2184,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "humantime"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
-
-[[package]]
 name = "hybrid-array"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4597,7 +4591,6 @@ dependencies = [
  "blake3",
  "chrono",
  "ed25519-dalek",
- "humantime",
  "hyper 0.14.32",
  "jsonschema",
  "k8s-openapi",
@@ -4616,6 +4609,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 1.0.69",
+ "time",
  "tokio",
  "tokio-test",
  "tracing",
