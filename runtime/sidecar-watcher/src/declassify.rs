@@ -424,7 +424,8 @@ mod tests {
         }];
 
         let block = DeclassBlock::new(rules);
-        assert!(!block.is_well_formed().unwrap());
+        let err = block.is_well_formed().unwrap_err();
+        assert_eq!(err, "Declassification rule widens labels: public -> secret");
     }
 
     #[test]
@@ -458,8 +459,13 @@ mod tests {
         }];
 
         let block = DeclassBlock::new(rules);
-        let enforcer = DeclassEnforcer::new(block).unwrap();
+        let err = DeclassEnforcer::new(block)
+            .err()
+            .expect("widening rules must be rejected at construction");
+        assert_eq!(err, "Declassification rule widens labels: public -> secret");
 
+        let enforcer = DeclassEnforcer::new(DeclassBlock::new(vec![])).unwrap();
         assert!(enforcer.check_label_widening(&SecurityLabel::Public, &SecurityLabel::Secret));
+        assert!(!enforcer.check_label_widening(&SecurityLabel::Secret, &SecurityLabel::Public));
     }
 }
