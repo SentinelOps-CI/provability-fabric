@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "runtime/wasm-sandbox/**"
+      - "tests/test_wasm_sandbox_cli.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - "runtime/wasm-sandbox/**"
+      - "tests/test_wasm_sandbox_cli.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -74,4 +76,7 @@ jobs:
           fi
           grep -F -- '--module' /tmp/wasm-sandbox-invalid.txt
           echo "CLI startup, required argument and runtime UID verified."
-          echo "No adversarial WASM, isolation strength, or RustSec remediation was tested."
+          echo "CLI startup and UID checks do not establish sandbox security."
+
+      - name: Exercise real binary guests inside the production image
+        run: python3 tests/test_wasm_sandbox_cli.py --docker-image wasm-sandbox-locked-ci:local
