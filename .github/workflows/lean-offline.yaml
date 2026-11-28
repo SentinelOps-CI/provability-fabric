@@ -99,6 +99,32 @@ jobs:
           fi
           grep -Fq 'PF.Runtime.ResponseBound.collect_sound' /tmp/pf-response-bound-axioms.txt
 
+      - name: Verify evidence authorization model
+        run: |
+          set -euo pipefail
+          lean -DwarningAsError=true --run core/lean-libs/Runtime/EvidenceAccess.lean | tee /tmp/pf-evidence-access.txt
+          if grep -Fq sorryAx /tmp/pf-evidence-access.txt; then
+            echo "Unproved authorization obligation"
+            exit 1
+          fi
+          for theorem in unauthenticated_denied scope_sound scope_complete cross_tenant_denied missing_permission_denied; do
+            grep -Fq "PF.Runtime.EvidenceAccess.$theorem" /tmp/pf-evidence-access.txt
+          done
+          grep '^CASE ' /tmp/pf-evidence-access.txt > /tmp/pf-evidence-access-matrix.txt
+          test "$(wc -l < /tmp/pf-evidence-access-matrix.txt)" -eq 48
+
+      - name: Set up Go for authorization correspondence
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/evidence-service/go.mod
+          cache-dependency-path: services/evidence-service/go.sum
+
+      - name: Compare Go authorization decisions with Lean
+        working-directory: services/evidence-service
+        env:
+          EVIDENCE_LEAN_MATRIX: /tmp/pf-evidence-access-matrix.txt
+        run: go test -count=1 -run '^TestEvidenceScopeLeanMatrix$' -v .
+
       - name: Scoped sorry scan (enforced + Runtime)
         run: |
           set -euo pipefail

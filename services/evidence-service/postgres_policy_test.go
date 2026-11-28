@@ -169,7 +169,7 @@ func TestEvidenceStartupRejectsReachableDatabaseWithUnusableSchema(t *testing.T)
 	if err == nil || service != nil {
 		t.Fatal("service accepted a reachable database with an unmodifiable schema")
 	}
-	if !strings.Contains(err.Error(), "initialize certificate database schema") {
+	if !strings.Contains(err.Error(), "validate certificate runtime database") {
 		t.Fatalf("unrecognized startup failure: %v", err)
 	}
 }
