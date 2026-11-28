@@ -98,3 +98,38 @@ def test_validate_emits_report(pf_bin: Path, tmp_path: Path) -> None:
     assert proc.returncode == 0
     report = json.loads(out.read_text(encoding="utf-8"))
     assert report["status"] == "pass"
+
+
+def test_attestation_reference_profile(pf_bin: Path, tmp_path: Path) -> None:
+    """Repack adversarial bytes: a valid outer hash must not excuse a false nested reference."""
+    import hashlib
+
+    shutil.copytree(VALID.parent / "artifacts", tmp_path / "artifacts")
+    shutil.copy(VALID.parent / "manifest.json", tmp_path / "manifest.json")
+    manifest = tmp_path / "manifest.json"
+    bundle = tmp_path / "bundle.json"
+    att_path = tmp_path / "artifacts" / "attestation.json"
+    att = json.loads(att_path.read_text(encoding="utf-8"))
+    proof = tmp_path / att["signed_claim_ref"]["path"]
+    att["signed_claim_ref"]["digest"] = "sha256:" + hashlib.sha256(proof.read_bytes()).hexdigest()
+    att_path.write_text(json.dumps(att), encoding="utf-8")
+
+    def pack() -> None:
+        proc = run_pf(pf_bin, "evidence", "bundle", "pack", "--manifest", str(manifest), "--out", str(bundle))
+        assert proc.returncode == 0, proc.stderr + proc.stdout
+
+    pack()
+    proc = run_pf(pf_bin, "evidence", "validate", str(bundle), "--strict", "--require-attestation-references", "--json")
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    report = json.loads(proc.stdout)
+    assert report["status"] == "pass"
+    assert any("signatures and claim validity not verified" in item for item in report["warnings"])
+
+    att["signed_claim_ref"]["digest"] = "sha256:" + "0" * 64
+    att_path.write_text(json.dumps(att), encoding="utf-8")
+    pack()
+    structural = run_pf(pf_bin, "evidence", "validate", str(bundle), "--strict")
+    assert structural.returncode == 0, structural.stderr + structural.stdout
+    rejected = run_pf(pf_bin, "evidence", "validate", str(bundle), "--strict", "--require-attestation-references")
+    assert rejected.returncode != 0
+    assert "signed_claim_ref" in rejected.stderr + rejected.stdout

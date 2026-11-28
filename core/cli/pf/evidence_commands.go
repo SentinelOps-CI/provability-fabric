@@ -102,7 +102,7 @@ func evidenceBundleCmd() *cobra.Command {
 }
 
 func evidenceValidateCmd() *cobra.Command {
-	var strict bool
+	var strict, requireAttestationReferences bool
 	var reportOut string
 	var jsonOut bool
 	var baseDir string
@@ -113,9 +113,10 @@ func evidenceValidateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			report, err := evidence.ValidateBundle(evidence.ValidateOptions{
-				BundlePath: args[0],
-				Strict:     strict,
-				BaseDir:    baseDir,
+				BundlePath:                   args[0],
+				Strict:                       strict,
+				BaseDir:                      baseDir,
+				RequireAttestationReferences: requireAttestationReferences,
 			})
 			if report == nil {
 				return err
@@ -136,6 +137,9 @@ func evidenceValidateCmd() *cobra.Command {
 				}
 			} else {
 				fmt.Printf("Validation passed: %s\n", args[0])
+				for _, warning := range report.Warnings {
+					fmt.Printf("warning: %s\n", warning)
+				}
 			}
 			if err != nil {
 				return err
@@ -143,7 +147,8 @@ func evidenceValidateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&strict, "strict", false, "Fail closed on schema, digest, and cross-ref errors")
+	cmd.Flags().BoolVar(&strict, "strict", false, "Fail closed on schema and artifact digest errors")
+	cmd.Flags().BoolVar(&requireAttestationReferences, "require-attestation-references", false, "Require exact, nonempty attestation references (with --strict; signatures are not verified)")
 	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Directory containing artifact paths (default: bundle directory)")
 	cmd.Flags().StringVar(&reportOut, "report-out", "", "Write validation report JSON")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Emit validation report JSON to stdout")

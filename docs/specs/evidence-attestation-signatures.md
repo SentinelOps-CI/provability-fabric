@@ -18,7 +18,25 @@ In `--strict` mode, the Evidence validator:
 
 1. Validates the attestation JSON against `attestation.schema.json`
 2. Verifies the attestation artifact digest matches the bundle manifest
-3. Confirms `signed_claim_ref` paths and digests match on-disk artifacts when those artifacts are present in the bundle
+3. Checks the individual manifest artifact references and digests.
+
+Plain strict validation does not check the nested `signed_claim_ref` identity.
+Use the opt-in reference profile:
+
+```bash
+pf evidence validate bundle.json --strict --require-attestation-references
+```
+
+This profile requires at least one attestation. It rejects duplicate manifest
+paths or attestation IDs, ambiguous JSON keys, noncanonical paths, and a
+nested reference that fails to match all four fields (role, path, media
+type and digest) of a non-attestation manifest entry. Every manifest entry
+must independently pass ordinary strict validation. Validation assumes a
+stable bundle snapshot controlled by the verifier. The profile neither
+requires coverage of every artifact nor verifies the opaque signature.
+Existing illustrative fixtures with stale references must be repaired and
+repacked before using this opt-in profile; plain strict validation remains
+compatible with them.
 
 The validator does **not**:
 
@@ -42,7 +60,7 @@ No `signature` verification hook exists in `core/evidence` today; adding one wou
 
 ## Operational guidance
 
-1. Treat `pf evidence validate --strict` as **structural and digest integrity** for attestations.
+1. Treat `pf evidence validate --strict` as **structural and digest integrity** for attestations. Use `--require-attestation-references` for explicit nested reference binding. Neither result establishes cryptographic provenance.
 2. Run CERT-V1 verification on any packaged cert artifacts before trusting enforcement claims.
 3. Replace fixture placeholders with real signatures only in deployment-specific bundles; do not commit production keys to the public repository.
 

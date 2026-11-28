@@ -30,6 +30,9 @@ type ValidateOptions struct {
 	Strict     bool
 	RepoRoot   string
 	BaseDir    string
+	// RequireAttestationReferences adds a non-vacuous, exact-reference
+	// check to strict structural validation. It does not verify signatures.
+	RequireAttestationReferences bool
 }
 
 // ValidateBundle validates a v0.1 evidence bundle and returns a report.
@@ -45,6 +48,13 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		Errors:      []string{},
 		Warnings:    []string{},
 		ValidatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if opts.RequireAttestationReferences && !opts.Strict {
+		err := fmt.Errorf("attestation reference verification requires strict validation")
+		report.Status = "fail"
+		report.Errors = append(report.Errors, err.Error())
+		return report, err
 	}
 
 	if opts.RepoRoot == "" {
@@ -65,6 +75,14 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 		report.Status = "fail"
 		report.Errors = append(report.Errors, err.Error())
 		return report, err
+	}
+
+	if opts.RequireAttestationReferences {
+		if err := rejectAmbiguousReferenceJSON(data); err != nil {
+			report.Status = "fail"
+			report.Errors = append(report.Errors, fmt.Sprintf("ambiguous bundle JSON: %v", err))
+			return report, err
+		}
 	}
 
 	var bundle EvidenceBundle
@@ -153,6 +171,15 @@ func ValidateBundle(opts ValidateOptions) (*ValidationReport, error) {
 				return report, err
 			}
 		}
+	}
+
+	if opts.RequireAttestationReferences {
+		if err := validateAttestationReferences(opts.BaseDir, bundle.Artifacts); err != nil {
+			report.Status = "fail"
+			report.Errors = append(report.Errors, err.Error())
+			return report, err
+		}
+		report.Warnings = append(report.Warnings, "Attestation references verified; signatures and claim validity not verified")
 	}
 
 	if report.Status == "fail" && opts.Strict {
