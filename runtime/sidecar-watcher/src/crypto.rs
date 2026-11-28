@@ -1,7 +1,6 @@
-use blake3::Hasher as Blake3Hasher;
+use ciborium::value::Value;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -26,6 +25,71 @@ pub struct COSESignature {
     pub unprotected_header: Vec<u8>,
     pub payload: Vec<u8>,
     pub signature: Vec<u8>,
+}
+
+// RFC 9864, fully specified Ed25519 (-19) in protected COSE header 1.
+// This exact supported profile rejects legacy custom signatures and other headers.
+const COSE_ED25519_HEADER: &[u8] = &[0xa1, 0x01, 0x32];
+const COSE_EMPTY_MAP: &[u8] = &[0xa0];
+
+fn encode_cbor(value: &Value) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    ciborium::ser::into_writer(value, &mut bytes)
+        .map_err(|e| format!("CBOR serialization failed: {e}"))?;
+    Ok(bytes)
+}
+
+fn cert_payload(cert: &CertCore) -> Result<Vec<u8>, String> {
+    // Explicit application payload schema: fixed map order, hash as bstr,
+    // unsigned timestamp, and three text strings.
+    encode_cbor(&Value::Map(vec![
+        (Value::Text("content_hash".into()), Value::Bytes(cert.content_hash.to_vec())),
+        (Value::Text("timestamp".into()), Value::Integer(cert.timestamp.into())),
+        (Value::Text("issuer".into()), Value::Text(cert.issuer.clone())),
+        (Value::Text("subject".into()), Value::Text(cert.subject.clone())),
+        (Value::Text("request_id".into()), Value::Text(cert.request_id.clone())),
+    ]))
+}
+
+impl COSESignature {
+    fn validate_profile(&self) -> Result<(), String> {
+        if self.protected_header.as_slice() != COSE_ED25519_HEADER
+            || self.unprotected_header.as_slice() != COSE_EMPTY_MAP
+            || self.signature.len() != 64
+        {
+            return Err("unsupported COSE signing profile".into());
+        }
+        Ok(())
+    }
+
+    /// Verify the original signed payload bytes under an independently trusted key.
+    /// This authenticates bytes; it does not authorize a certificate or validate
+    /// the application-level claims in its payload.
+    pub fn verify(&self, key: &VerifyingKey) -> Result<(), String> {
+        self.validate_profile()?;
+        if key.is_weak() {
+            return Err("weak verification key".into());
+        }
+        let signature = Signature::from_slice(&self.signature)
+            .map_err(|e| format!("invalid signature: {e}"))?;
+        let input = AsyncSigningPipeline::create_signature_input(
+            &self.protected_header, &self.payload,
+        )?;
+        key.verify_strict(&input, &signature)
+            .map_err(|e| format!("signature verification failed: {e}"))
+    }
+
+    /// Serialize a tagged COSE_Sign1 structure (tag 18), not a JSON/CBOR
+    /// serialization of the Rust convenience struct.
+    pub fn to_cose_sign1(&self) -> Result<Vec<u8>, String> {
+        self.validate_profile()?;
+        encode_cbor(&Value::Tag(18, Box::new(Value::Array(vec![
+            Value::Bytes(self.protected_header.clone()),
+            Value::Map(Vec::new()),
+            Value::Bytes(self.payload.clone()),
+            Value::Bytes(self.signature.clone()),
+        ]))))
+    }
 }
 
 /// Async signing request
@@ -263,23 +327,16 @@ impl AsyncSigningPipeline {
         }
     }
 
-    /// Sign a certificate core using COSE_Sign1
+    /// Sign the RFC 9052 Sig_structure directly using RFC 9864 Ed25519.
     fn sign_cert_core(
         cert_core: &CertCore,
         signing_key: &SigningKey,
     ) -> Result<COSESignature, String> {
-        // Create COSE_Sign1 structure
-        let protected_header = Self::create_protected_header()?;
-        let unprotected_header = Vec::new();
-        let payload = serde_cbor::to_vec(cert_core)
-            .map_err(|e| format!("CBOR serialization failed: {}", e))?;
-
-        // Create signature input
+        let protected_header = COSE_ED25519_HEADER.to_vec();
+        let unprotected_header = COSE_EMPTY_MAP.to_vec();
+        let payload = cert_payload(cert_core)?;
         let signature_input = Self::create_signature_input(&protected_header, &payload)?;
-
-        // Sign the signature input
         let signature = signing_key.sign(&signature_input);
-
         Ok(COSESignature {
             protected_header,
             unprotected_header,
@@ -288,26 +345,15 @@ impl AsyncSigningPipeline {
         })
     }
 
-    /// Create COSE protected header
-    fn create_protected_header() -> Result<Vec<u8>, String> {
-        let mut header = HashMap::new();
-        header.insert("alg".to_string(), "EdDSA".to_string());
-        header.insert("typ".to_string(), "cose-sign1".to_string());
-
-        serde_cbor::to_vec(&header).map_err(|e| format!("CBOR serialization failed: {}", e))
-    }
-
-    /// Create signature input for COSE_Sign1
+    /// RFC 9052 Section 4.4: ["Signature1", body_protected, external_aad, payload].
+    /// This profile uses empty external AAD and an attached payload.
     fn create_signature_input(protected_header: &[u8], payload: &[u8]) -> Result<Vec<u8>, String> {
-        let mut hasher = Blake3Hasher::new();
-
-        // COSE_Sign1 signature input format
-        hasher.update(b"Signature1");
-        hasher.update(protected_header);
-        hasher.update(&[]); // external_aad
-        hasher.update(payload);
-
-        Ok(hasher.finalize().as_bytes().to_vec())
+        encode_cbor(&Value::Array(vec![
+            Value::Text("Signature1".into()),
+            Value::Bytes(protected_header.to_vec()),
+            Value::Bytes(Vec::new()),
+            Value::Bytes(payload.to_vec()),
+        ]))
     }
 }
 
@@ -883,7 +929,7 @@ mod tests {
 
         // Verify COSE_Sign1 structure
         assert!(!signature.protected_header.is_empty());
-        assert!(signature.unprotected_header.is_empty());
+        assert_eq!(signature.unprotected_header, COSE_EMPTY_MAP);
         assert!(!signature.payload.is_empty());
         assert_eq!(signature.signature.len(), 64); // Ed25519 signature length
 
@@ -900,4 +946,54 @@ mod tests {
         let verification_result = verifying_key.verify(&signature_input, &ed25519_signature);
         assert!(verification_result.is_ok());
     }
+
+    #[test]
+    fn cose_reference_vector_and_negative_controls() {
+        // Independent RFC 8949 byte construction and Ed25519 reference
+        // signature; reproduced by scripts/test_cose_reference.py.
+        let key = SigningKey::from_bytes(&[41; 32]);
+        let cert = CertCore {
+            content_hash: [1; 32],
+            timestamp: 1000,
+            issuer: "test_issuer".into(),
+            subject: "test_subject".into(),
+            request_id: "test_request".into(),
+        };
+        let encoded = AsyncSigningPipeline::sign_cert_core(&cert, &key).unwrap();
+        let hex = |bytes: &[u8]| bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        let vector: serde_json::Value = serde_json::from_str(include_str!("../tests/fixtures/cose-sign1-ed25519.json")).unwrap();
+        assert_eq!(hex(&encoded.protected_header), vector["protected"].as_str().unwrap());
+        assert_eq!(hex(&encoded.payload), vector["payload"].as_str().unwrap());
+        let input = AsyncSigningPipeline::create_signature_input(&encoded.protected_header, &encoded.payload).unwrap();
+        assert_eq!(hex(&input), vector["sig_structure"].as_str().unwrap());
+        assert_eq!(hex(&key.verifying_key().to_bytes()), vector["public"].as_str().unwrap());
+        assert_eq!(hex(&encoded.signature), vector["signature"].as_str().unwrap());
+        assert_eq!(hex(&encoded.to_cose_sign1().unwrap()), vector["envelope"].as_str().unwrap());
+        assert!(encoded.verify(&key.verifying_key()).is_ok());
+        assert!(encoded.verify(&SigningKey::from_bytes(&[42; 32]).verifying_key()).is_err());
+        let mut changed = encoded.clone();
+        changed.payload[0] ^= 1;
+        assert!(changed.verify(&key.verifying_key()).is_err());
+        let mut changed = encoded.clone();
+        changed.protected_header = vec![0xa1, 0x01, 0x27]; // legacy polymorphic EdDSA
+        assert!(changed.verify(&key.verifying_key()).is_err());
+        let mut changed = encoded.clone();
+        changed.unprotected_header = Vec::new(); // legacy convenience format
+        assert!(changed.verify(&key.verifying_key()).is_err());
+        let mut changed = encoded.clone();
+        changed.signature[0] ^= 1;
+        assert!(changed.verify(&key.verifying_key()).is_err());
+        changed.signature.pop();
+        assert!(changed.verify(&key.verifying_key()).is_err());
+        assert!(changed.to_cose_sign1().is_err());
+        // An old hash-and-concatenate signature is never accepted as COSE.
+        let mut legacy = encoded.clone();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"Signature1");
+        hasher.update(&legacy.protected_header);
+        hasher.update(&legacy.payload);
+        legacy.signature = key.sign(hasher.finalize().as_bytes()).to_bytes().to_vec();
+        assert!(legacy.verify(&key.verifying_key()).is_err());
+    }
+
 }
