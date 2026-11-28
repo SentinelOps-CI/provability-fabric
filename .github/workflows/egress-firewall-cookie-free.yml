@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Egress Firewall Cookie-free Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/egress-firewall/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/egress-firewall-cookie-free.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/egress-firewall/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/egress-firewall-cookie-free.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cookie-free:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Check locked workspace graph and firewall feature selection
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 > /tmp/pf-cookie-metadata.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("/tmp/pf-cookie-metadata.json").read_text())
+          packages = data["packages"]
+          assert not any(p["name"] == "cookie" and p["version"] == "0.16.2" for p in packages)
+          ids = {p["id"] for p in packages if p["name"] == "actix-web"}
+          assert len(ids) == 1
+          nodes = [n for n in data["resolve"]["nodes"] if n["id"] in ids]
+          assert len(nodes) == 1
+          features = set(nodes[0]["features"])
+          assert not features.intersection({"cookies", "secure-cookies", "default"})
+          assert {"macros", "compress-brotli", "compress-gzip", "compress-zstd", "http2"} <= features
+          PY
+      - name: Test fallback and default configurations
+        run: |
+          set -euo pipefail
+          cargo test --locked -p egress-firewall --no-default-features
+          cargo test --locked -p egress-firewall
+          cargo build --locked -p egress-firewall
+          git diff --exit-code -- Cargo.lock
