@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Adapter seccomp locked validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'adapters/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/adapter-seccomp-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: "1.98.1"
+      - name: Install native seccomp library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libseccomp-dev pkg-config
+      - name: Verify locked enabled seccomp graph
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --features httpget-adapter/seccomp,fileread-adapter/seccomp --format-version 1 > /tmp/seccomp-metadata.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          packages = json.loads(Path("/tmp/seccomp-metadata.json").read_text())["packages"]
+          assert not any(p["name"] == "nix" and p["version"] == "0.17.0" for p in packages)
+          assert {p["version"] for p in packages if p["name"] == "libseccomp"} == {"0.4.0"}
+          PY
+      - name: Default and opt-in builds
+        run: |
+          set -euo pipefail
+          cargo test --locked -p fileread-adapter -p httpget-adapter
+          cargo test --locked -p fileread-adapter --features seccomp --bin fileread-adapter
+          cargo test --locked -p httpget-adapter --features seccomp --bin httpget-adapter
+          cargo build --locked -p fileread-adapter --features seccomp
+          cargo build --locked -p httpget-adapter --features seccomp
+      - name: Exercise actual filtered CLI binaries
+        run: |
+          python3 tests/test_adapter_seccomp_cli.py
+          git diff --exit-code -- Cargo.lock

@@ -20,11 +20,19 @@ use std::process;
 
 use fileread_adapter::{FileReadAdapter, FileReadEffect};
 
+#[cfg(all(feature = "seccomp", not(all(target_os = "linux", target_arch = "x86_64"))))]
+compile_error!("The adapter seccomp profile is supported only on Linux x86_64");
+
+#[cfg(all(feature = "seccomp", target_os = "linux", target_arch = "x86_64"))]
+#[path = "../../common/seccomp.rs"]
+mod seccomp;
+
+
 fn main() -> Result<(), Box<dyn Error>> {
     // Configure seccomp if enabled
     #[cfg(feature = "seccomp")]
     {
-        if let Err(e) = fileread_adapter::seccomp::configure_seccomp() {
+        if let Err(e) = seccomp::configure(seccomp::Profile::FileRead) {
             eprintln!("Failed to configure seccomp: {}", e);
             process::exit(1);
         }

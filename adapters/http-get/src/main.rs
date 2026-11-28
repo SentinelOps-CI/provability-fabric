@@ -20,17 +20,33 @@ use std::process;
 
 use httpget_adapter::{HttpGetAdapter, HttpGetEffect};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+#[cfg(all(feature = "seccomp", not(all(target_os = "linux", target_arch = "x86_64"))))]
+compile_error!("The adapter seccomp profile is supported only on Linux x86_64");
+
+#[cfg(all(feature = "seccomp", target_os = "linux", target_arch = "x86_64"))]
+#[path = "../../common/seccomp.rs"]
+mod seccomp;
+
+
+fn main() -> Result<(), Box<dyn Error>> {
     // Configure seccomp if enabled
     #[cfg(feature = "seccomp")]
     {
-        if let Err(e) = httpget_adapter::seccomp::configure_seccomp() {
+        if let Err(e) = seccomp::configure(seccomp::Profile::HttpGet) {
             eprintln!("Failed to configure seccomp: {}", e);
             process::exit(1);
         }
     }
     
+    // Install the filter before creating runtime threads; children inherit it.
+    #[cfg(feature = "seccomp")]
+    let mut builder = tokio::runtime::Builder::new_current_thread();
+    #[cfg(not(feature = "seccomp"))]
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+    builder.enable_all().build()?.block_on(run())
+}
+
+async fn run() -> Result<(), Box<dyn Error>> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
